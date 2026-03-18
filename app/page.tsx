@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowRight,
@@ -12,6 +13,8 @@ import {
   Headphones,
   Home,
   Instagram,
+  Lock,
+  LogOut,
   MessageSquare,
   Puzzle,
   Send,
@@ -19,11 +22,138 @@ import {
   ShoppingBag,
   Smartphone,
   Stethoscope,
+  UserRound,
+  X,
   Zap,
 } from "lucide-react";
+import { mockUsers, type MockUser } from "@/lib/mock-users";
 import { cn } from "@/lib/utils";
 
-const Navbar = () => {
+const SESSION_KEY = "infrastudio-auth-user";
+
+type LoginModalProps = {
+  open: boolean;
+  onClose: () => void;
+  onLogin: (user: MockUser) => void;
+};
+
+function LoginModal({ open, onClose, onLogin }: LoginModalProps) {
+  const [email, setEmail] = useState("admin@infrastudio.com");
+  const [password, setPassword] = useState("admin123");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setError("");
+    }
+  }, [open]);
+
+  if (!open) {
+    return null;
+  }
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const user = mockUsers.find((item) => item.email === email && item.password === password);
+
+    if (!user) {
+      setError("Email ou senha invalidos.");
+      return;
+    }
+
+    onLogin(user);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/75 px-4 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, y: 18, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        className="glass-effect relative w-full max-w-md overflow-hidden rounded-[28px] border border-white/15 shadow-2xl"
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+          aria-label="Fechar login"
+        >
+          <X size={16} />
+        </button>
+
+        <div className="border-b border-white/10 bg-white/5 px-6 py-5">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.25em] text-blue-300">
+            <Lock size={14} />
+            Acesso rapido
+          </div>
+          <h2 className="text-2xl font-extrabold text-white">Entrar na area reservada</h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-400">
+            Por enquanto este login e visual. Depois vamos conectar ao Supabase Auth e a tabela `usuarios`.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5 px-6 py-6">
+          <div className="space-y-2">
+            <label htmlFor="email" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-500 focus:border-blue-500/60"
+              placeholder="admin@infrastudio.com"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="password" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Senha
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-500 focus:border-blue-500/60"
+              placeholder="Digite sua senha"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/8 p-4 text-sm text-emerald-100">
+            <p className="font-semibold">Acesso demo</p>
+            <p className="mt-1 text-emerald-200/80">Email: admin@infrastudio.com</p>
+            <p className="text-emerald-200/80">Senha: admin123</p>
+          </div>
+
+          {error ? (
+            <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+              {error}
+            </div>
+          ) : null}
+
+          <button
+            type="submit"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-3 font-bold text-white shadow-xl shadow-blue-900/40 transition-all hover:-translate-y-0.5 hover:from-blue-500 hover:to-cyan-400"
+          >
+            Entrar agora
+            <ArrowRight size={16} />
+          </button>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+type NavbarProps = {
+  currentUser: MockUser | null;
+  onOpenLogin: () => void;
+  onLogout: () => void;
+};
+
+function Navbar({ currentUser, onOpenLogin, onLogout }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -40,17 +170,15 @@ const Navbar = () => {
         scrolled ? "glass-effect border-white/10 py-4" : "border-transparent bg-transparent py-6",
       )}
     >
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-2">
-          <div className="relative h-10 w-10">
-            <img
-              src="logo.png"
-              alt="InfraStudio Logo"
-              className="h-full w-full object-contain"
-              referrerPolicy="no-referrer"
-            />
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-3">
+          <div className="relative h-10 w-10 overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-1">
+            <img src="/logo.png" alt="InfraStudio Logo" className="h-full w-full object-contain" />
           </div>
-          <span className="text-2xl font-extrabold tracking-tight text-white">InfraStudio</span>
+          <div>
+            <span className="block text-2xl font-extrabold tracking-tight text-white">InfraStudio</span>
+            <span className="hidden text-xs uppercase tracking-[0.25em] text-slate-500 sm:block">Digital systems lab</span>
+          </div>
         </div>
 
         <div className="hidden items-center space-x-8 md:flex">
@@ -70,10 +198,49 @@ const Navbar = () => {
             Solicitar orcamento
           </a>
         </div>
+
+        <div className="flex items-center gap-3">
+          {currentUser ? (
+            <>
+              <Link
+                href="/admin/usuarios"
+                className="hidden rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition-all hover:border-blue-500/40 hover:bg-blue-500/10 md:inline-flex"
+              >
+                Admin
+              </Link>
+              <div className="hidden items-center gap-3 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-white md:flex">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
+                  <UserRound size={16} />
+                </div>
+                <div className="leading-tight">
+                  <p className="text-sm font-semibold">{currentUser.name}</p>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/75">{currentUser.role}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-white/10"
+              >
+                <LogOut size={16} />
+                Sair
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenLogin}
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-900/30 transition-all hover:-translate-y-0.5 hover:from-blue-500 hover:to-cyan-400"
+            >
+              <Lock size={16} />
+              Login
+            </button>
+          )}
+        </div>
       </div>
     </nav>
   );
-};
+}
 
 const ServiceCard = ({
   icon: Icon,
@@ -101,25 +268,24 @@ const ServiceCard = ({
   </motion.div>
 );
 
-const ChatDemo = () => {
+function ChatDemo() {
   const [messages, setMessages] = useState<{ text: string; isAi: boolean }[]>([]);
   const [isTyping, setIsTyping] = useState(false);
 
-  const script = [
-    { text: "Ola! Como posso ajudar sua empresa hoje?", isAi: true, delay: 1000 },
-    { text: "Quero automatizar meu atendimento no WhatsApp.", isAi: false, delay: 2000 },
-    {
-      text: "Excelente escolha! Nossas IAs reduzem o trabalho manual e qualificam leads em tempo real. Posso agendar uma demo?",
-      isAi: true,
-      delay: 2500,
-    },
-  ];
+  const script = useMemo(
+    () => [
+      { text: "Ola! Como posso ajudar sua empresa hoje?", isAi: true },
+      { text: "Quero automatizar meu atendimento no WhatsApp.", isAi: false },
+      { text: "Excelente escolha! Posso agendar uma demo para voce agora mesmo?", isAi: true },
+    ],
+    [],
+  );
 
   useEffect(() => {
     let isMounted = true;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    const runScript = async (index: number) => {
+    const runScript = (index: number) => {
       if (!isMounted) {
         return;
       }
@@ -131,7 +297,7 @@ const ChatDemo = () => {
           }
 
           setMessages([]);
-          void runScript(0);
+          runScript(0);
         }, 5000);
         return;
       }
@@ -147,12 +313,12 @@ const ChatDemo = () => {
         }
 
         setIsTyping(false);
-        setMessages((prev) => [...prev, { text: message.text, isAi: message.isAi }]);
-        void runScript(index + 1);
+        setMessages((prev) => [...prev, message]);
+        runScript(index + 1);
       }, message.isAi ? 1500 : 1000);
     };
 
-    void runScript(0);
+    runScript(0);
 
     return () => {
       isMounted = false;
@@ -160,7 +326,7 @@ const ChatDemo = () => {
         clearTimeout(timeoutId);
       }
     };
-  }, []);
+  }, [script]);
 
   return (
     <div className="glass-effect mx-auto w-full max-w-md overflow-hidden rounded-2xl border border-white/20 shadow-2xl lg:mx-0">
@@ -214,17 +380,43 @@ const ChatDemo = () => {
       </div>
     </div>
   );
-};
+}
 
 export default function HomePage() {
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<MockUser | null>(null);
+
+  useEffect(() => {
+    const storedUser = window.localStorage.getItem(SESSION_KEY);
+    if (!storedUser) {
+      return;
+    }
+
+    try {
+      setCurrentUser(JSON.parse(storedUser) as MockUser);
+    } catch {
+      window.localStorage.removeItem(SESSION_KEY);
+    }
+  }, []);
+
+  const handleLogin = (user: MockUser) => {
+    setCurrentUser(user);
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    window.localStorage.removeItem(SESSION_KEY);
+  };
+
   return (
     <div className="min-h-screen bg-grid">
-      <Navbar />
+      <Navbar currentUser={currentUser} onOpenLogin={() => setLoginModalOpen(true)} onLogout={handleLogout} />
 
       <section className="relative overflow-hidden pb-20 pt-32 md:pb-32 md:pt-48">
         <div className="pointer-events-none absolute left-1/2 top-0 h-full w-full max-w-7xl -translate-x-1/2">
           <div className="absolute left-[-10%] top-[-10%] h-[40%] w-[40%] rounded-full bg-blue-600/10 blur-[120px]" />
-          <div className="absolute bottom-[10%] right-[-10%] h-[40%] w-[40%] rounded-full bg-blue-600/10 blur-[120px]" />
+          <div className="absolute bottom-[10%] right-[-10%] h-[40%] w-[40%] rounded-full bg-cyan-500/10 blur-[120px]" />
         </div>
 
         <div className="relative z-10 mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
@@ -356,14 +548,8 @@ export default function HomePage() {
               </p>
 
               <div className="space-y-6">
-                {[
-                  { title: "IA nativa", desc: "Integracao real com modelos GPT para atendimento." },
-                  { title: "Alta performance", desc: "Carregamento instantaneo e UI intuitiva." },
-                ].map((item) => (
-                  <div
-                    key={item.title}
-                    className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 transition-colors hover:border-blue-500/30"
-                  >
+                {[{ title: "IA nativa", desc: "Integracao real com modelos GPT para atendimento." }, { title: "Alta performance", desc: "Carregamento instantaneo e UI intuitiva." }].map((item) => (
+                  <div key={item.title} className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 transition-colors hover:border-blue-500/30">
                     <div className="rounded-lg bg-blue-500/20 p-2 text-blue-400">
                       <CheckCircle2 size={20} />
                     </div>
@@ -477,12 +663,9 @@ export default function HomePage() {
             <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-600/10 blur-[100px]" />
             <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-blue-600/10 blur-[100px]" />
 
-            <h2 className="mb-8 text-3xl font-extrabold tracking-tight text-white md:text-6xl">
-              Pronto para o proximo nivel?
-            </h2>
+            <h2 className="mb-8 text-3xl font-extrabold tracking-tight text-white md:text-6xl">Pronto para o proximo nivel?</h2>
             <p className="mx-auto mb-12 max-w-2xl text-lg leading-relaxed text-slate-400 md:text-xl">
-              Fale sobre sua ideia e receba uma proposta personalizada sem compromisso. Nosso time tecnico entrara em
-              contato.
+              Fale sobre sua ideia e receba uma proposta personalizada sem compromisso. Nosso time tecnico entrara em contato.
             </p>
 
             <a
@@ -504,12 +687,7 @@ export default function HomePage() {
           <div className="flex flex-col items-start justify-between gap-12 md:flex-row">
             <div className="max-w-sm">
               <div className="mb-6 flex items-center gap-2">
-                <img
-                  src="logo.png"
-                  alt="Logo"
-                  className="h-8 w-8 object-contain"
-                  referrerPolicy="no-referrer"
-                />
+                <img src="/logo.png" alt="Logo" className="h-8 w-8 object-contain" />
                 <span className="text-xl font-bold tracking-tight text-white">InfraStudio</span>
               </div>
               <p className="text-sm leading-relaxed text-slate-500">
@@ -550,6 +728,10 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+
+      <AnimatePresence>
+        <LoginModal open={loginModalOpen} onClose={() => setLoginModalOpen(false)} onLogin={handleLogin} />
+      </AnimatePresence>
     </div>
   );
 }
