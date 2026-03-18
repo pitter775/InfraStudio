@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -32,9 +32,9 @@ export default function AdminUsuariosPage() {
           <Users size={14} />
           Usuarios mockados
         </div>
-        <h1 className="text-4xl font-extrabold text-white">Gestao de usuarios</h1>
+        <h1 className="text-4xl font-extrabold text-white">Gest?o de usu?rios</h1>
         <p className="mt-4 max-w-2xl text-slate-400">
-          Esta pagina simula a listagem administrativa que depois sera abastecida pela tabela `usuarios` conectada ao Supabase.
+          Esta p?gina simula a listagem administrativa que depois ser? abastecida pela tabela `usuarios` conectada ao Supabase.
         </p>
       </section>
 
@@ -45,9 +45,9 @@ export default function AdminUsuariosPage() {
               <Lock size={14} />
               Acesso bloqueado
             </div>
-            <h2 className="text-2xl font-bold text-white">Voce ainda nao fez login</h2>
+            <h2 className="text-2xl font-bold text-white">Voc? ainda n?o fez login</h2>
             <p className="mt-3 max-w-xl text-slate-300">
-              Volte para a home, abra o modal de login e entre com o usuario demo para visualizar a experiencia completa.
+              Volte para a home, abra o modal de login e entre com o usu?rio demo para visualizar a experi?ncia completa.
             </p>
           </div>
         ) : !isAllowed ? (
@@ -58,7 +58,7 @@ export default function AdminUsuariosPage() {
             </div>
             <h2 className="text-2xl font-bold text-white">Seu perfil nao tem acesso administrativo</h2>
             <p className="mt-3 max-w-xl text-slate-300">
-              Quando conectarmos ao Supabase, esta liberacao vai depender do papel salvo na tabela `usuarios`.
+              Quando conectarmos ao Supabase, esta libera??o vai depender do papel salvo na tabela `usuarios`.
             </p>
           </div>
         ) : (
@@ -85,7 +85,7 @@ export default function AdminUsuariosPage() {
                 </div>
                 <p className="leading-relaxed text-emerald-50">
                   Depois vamos trocar este mock por consulta real ao Supabase: autentica no Auth, busca o registro na tabela
-                  `usuarios` e monta as permissoes a partir do papel.
+                  `usuarios` e monta as permiss?es a partir do papel.
                 </p>
               </div>
 
@@ -99,7 +99,7 @@ export default function AdminUsuariosPage() {
 
             <div className="overflow-hidden rounded-[32px] border border-white/10 bg-white/5">
               <div className="border-b border-white/10 px-6 py-5">
-                <h3 className="text-xl font-bold text-white">Tabela visual de usuarios</h3>
+                <h3 className="text-xl font-bold text-white">Tabela visual de usu?rios</h3>
                 <p className="mt-1 text-sm text-slate-400">Mock para a futura ligacao com o banco.</p>
               </div>
               <div className="overflow-x-auto">
@@ -131,3 +131,4 @@ export default function AdminUsuariosPage() {
     </main>
   );
 }
+

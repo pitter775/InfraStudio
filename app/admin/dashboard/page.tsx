@@ -1,18 +1,18 @@
-"use client";
+﻿"use client";
 
 import { Activity, ArrowUpRight, Bot, Clock3, Layers3, Users } from "lucide-react";
 import { mockUsers } from "@/lib/mock-users";
 
 const stats = [
-  { label: "Usuarios ativos", value: "24", detail: "+12% este mes", icon: Users },
+  { label: "Usu?rios ativos", value: "24", detail: "+12% este m?s", icon: Users },
   { label: "Leads no funil", value: "138", detail: "+18 hoje", icon: Layers3 },
-  { label: "automações rodando", value: "9", detail: "3 criticas", icon: Bot },
-  { label: "Tempo medio", value: "1m 42s", detail: "-22% resposta", icon: Clock3 },
+  { label: "Automações rodando", value: "9", detail: "3 críticas", icon: Bot },
+  { label: "Tempo m?dio", value: "1m 42s", detail: "-22% resposta", icon: Clock3 },
 ];
 
 const recentEvents = [
-  "Novo lead captado via WhatsApp imobiliario.",
-  "Usuario admin revisou permissoes de equipe.",
+  "Novo lead captado via WhatsApp imobili?rio.",
+  "Usu?rio admin revisou permiss?es de equipe.",
   "Fluxo de agendamento disparou 14 mensagens.",
   "Dashboard consolidou indicadores do dia.",
 ];
@@ -26,10 +26,10 @@ export default function AdminDashboardPage() {
             <Activity size={14} />
             Dashboard mockado
           </div>
-          <h1 className="text-4xl font-extrabold text-white">Visao geral da operacao</h1>
+          <h1 className="text-4xl font-extrabold text-white">Vis?o geral da opera??o</h1>
           <p className="mt-4 max-w-2xl text-slate-400">
             Esta tela ja antecipa como o backoffice vai ficar: indicadores, fluxo recente e acesso rapido para a
-            gestao dos usuarios.
+            gest?o dos usu?rios.
           </p>
 
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -86,8 +86,8 @@ export default function AdminDashboardPage() {
 
         <div className="overflow-hidden rounded-[32px] border border-white/10 bg-white/5">
           <div className="border-b border-white/10 px-6 py-5">
-            <h2 className="text-xl font-bold text-white">Usuarios em destaque</h2>
-            <p className="mt-1 text-sm text-slate-400">Resumo rapido da tabela de usuarios mockada.</p>
+            <h2 className="text-xl font-bold text-white">Usu?rios em destaque</h2>
+            <p className="mt-1 text-sm text-slate-400">Resumo r?pido da tabela de usu?rios mockada.</p>
           </div>
 
           <div className="space-y-3 p-6">
@@ -109,3 +109,5 @@ export default function AdminDashboardPage() {
     </main>
   );
 }
+
+

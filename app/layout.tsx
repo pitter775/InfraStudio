@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -7,11 +7,11 @@ export const metadata: Metadata = {
     default: "InfraStudio",
     template: "%s | InfraStudio",
   },
-  description: "Sistemas, automacoes e IA para ajudar sua empresa a vender mais com menos operacao manual.",
+  description: "Sistemas, automa??es e IA para ajudar sua empresa a vender mais com menos opera??o manual.",
   applicationName: "InfraStudio",
   keywords: [
-    "automacao",
-    "inteligencia artificial",
+    "automa??o",
+    "intelig?ncia artificial",
     "whatsapp",
     "integracao de APIs",
     "sistemas sob medida",
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     url: "https://infrastudio.vercel.app",
     siteName: "InfraStudio",
     title: "InfraStudio",
-    description: "Sistemas, automacoes e IA para ajudar sua empresa a vender mais com menos operacao manual.",
+    description: "Sistemas, automa??es e IA para ajudar sua empresa a vender mais com menos opera??o manual.",
     images: [
       {
         url: "/compartilhar.png",
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "InfraStudio",
-    description: "Sistemas, automacoes e IA para ajudar sua empresa a vender mais com menos operacao manual.",
+    description: "Sistemas, automa??es e IA para ajudar sua empresa a vender mais com menos opera??o manual.",
     images: ["/compartilhar.png"],
   },
 };
@@ -62,3 +62,4 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     </html>
   );
 }
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -21,7 +21,7 @@ const SESSION_KEY = "infrastudio-auth-user";
 
 const adminLinks = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/usuarios", label: "Usuarios", icon: Users },
+  { href: "/admin/usuarios", label: "Usu?rios", icon: Users },
 ];
 
 type SidebarProps = {
@@ -99,10 +99,10 @@ function Sidebar({
             <div className="rounded-2xl border border-cyan-500/15 bg-cyan-500/10 p-4">
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-slate-950/25 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-200">
                 <ShieldCheck size={13} />
-                Area reservada
+                ?rea reservada
               </div>
               <p className="text-sm leading-relaxed text-cyan-50">
-                Dashboard mockado e usuarios mockados, prontos para receber permissao real depois.
+                Dashboard mockado e usu?rios mockados, prontos para receber permiss?o real depois.
               </p>
             </div>
           ) : null}
@@ -147,7 +147,7 @@ function Sidebar({
               </div>
               {!collapsed ? (
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">{currentUser?.name ?? "Nao autenticado"}</p>
+                  <p className="truncate text-sm font-semibold text-white">{currentUser?.name ?? "N?o autenticado"}</p>
                   <p className="truncate text-xs text-slate-400">{currentUser?.email ?? "Login pela home"}</p>
                 </div>
               ) : null}
@@ -239,3 +239,4 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
     </div>
   );
 }
+

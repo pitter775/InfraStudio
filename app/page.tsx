@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Clock,
   Code2,
+  MessageCircle,
   Hammer,
   Headphones,
   Home,
@@ -31,6 +32,7 @@ import { mockUsers, type MockUser } from "@/lib/mock-users";
 import { cn } from "@/lib/utils";
 
 const SESSION_KEY = "infrastudio-auth-user";
+const WHATSAPP_NUMBER = "5511949506267";
 
 type LoginModalProps = {
   open: boolean;
@@ -152,9 +154,10 @@ type NavbarProps = {
   currentUser: MockUser | null;
   onOpenLogin: () => void;
   onLogout: () => void;
+  onOpenChat: () => void;
 };
 
-function Navbar({ currentUser, onOpenLogin, onLogout }: NavbarProps) {
+function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -232,11 +235,15 @@ function Navbar({ currentUser, onOpenLogin, onLogout }: NavbarProps) {
                   Como funciona
                 </a>
                 <a
-                  href="#contato"
-                  onClick={closeMobileMenu}
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    closeMobileMenu();
+                    onOpenChat();
+                  }}
                   className="block rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.06]"
                 >
-                  Solicitar orcamento
+                  Solicitar or?amento
                 </a>
               </div>
 
@@ -315,10 +322,14 @@ function Navbar({ currentUser, onOpenLogin, onLogout }: NavbarProps) {
               Como funciona
             </a>
             <a
-              href="#contato"
+              href="#"
+              onClick={(event) => {
+                event.preventDefault();
+                onOpenChat();
+              }}
               className="rounded-full bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:from-blue-500 hover:to-blue-400"
             >
-              Solicitar orcamento
+              Solicitar or?amento
             </a>
           </div>
 
@@ -372,6 +383,94 @@ function Navbar({ currentUser, onOpenLogin, onLogout }: NavbarProps) {
         </div>
       </nav>
     </>
+  );
+}
+
+type ChatWidgetProps = {
+  open: boolean;
+  onClose: () => void;
+};
+
+function ChatWidget({ open, onClose }: ChatWidgetProps) {
+  const [messages] = useState([
+    { text: "Ola! Sou o atendimento inicial da InfraStudio.", isAi: true },
+    { text: "Me conte rapidamente o que voce quer automatizar.", isAi: true },
+    { text: "Se preferir, eu ja te levo direto para o WhatsApp.", isAi: true },
+  ]);
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed bottom-24 right-4 z-[75] w-[calc(100vw-2rem)] max-w-[380px] sm:right-6">
+      <motion.div
+        initial={{ opacity: 0, y: 24, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        className="overflow-hidden rounded-[28px] border border-white/10 bg-[rgba(9,16,34,0.84)] shadow-2xl backdrop-blur-xl"
+      >
+        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.04] px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500/15">
+              <img src="/logo.png" alt="InfraStudio" className="h-8 w-8 object-contain" />
+            </div>
+            <div>
+              <p className="font-bold text-white">InfraStudio Chat</p>
+              <p className="text-xs text-emerald-300">Online agora</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Fechar chat"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="space-y-3 bg-slate-950/20 p-5">
+          {messages.map((message) => (
+            <div key={message.text} className="max-w-[90%] rounded-2xl rounded-bl-none bg-slate-800 p-3 text-sm leading-relaxed text-slate-200">
+              {message.text}
+            </div>
+          ))}
+        </div>
+
+        <div className="border-t border-white/10 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex-1 rounded-full border border-white/8 bg-white/[0.05] px-4 py-2.5 text-xs italic text-slate-400 backdrop-blur-md">
+              IA esta digitando...
+            </div>
+            <button
+              type="button"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#2563eb] text-white shadow-lg shadow-blue-950/40 transition-all hover:scale-105 hover:bg-[#1d4ed8]"
+              aria-label="Enviar mensagem"
+            >
+              <Send size={15} />
+            </button>
+          </div>
+          <div className="flex gap-3">
+            <a
+              href={`https://wa.me/${WHATSAPP_NUMBER}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white transition-all hover:bg-[#20ba59]"
+            >
+              <Smartphone size={16} />
+              Chamar no WhatsApp
+            </a>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
   );
 }
 
@@ -517,6 +616,7 @@ function ChatDemo() {
 
 export default function HomePage() {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<MockUser | null>(null);
 
   useEffect(() => {
@@ -544,7 +644,12 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-grid">
-      <Navbar currentUser={currentUser} onOpenLogin={() => setLoginModalOpen(true)} onLogout={handleLogout} />
+      <Navbar
+        currentUser={currentUser}
+        onOpenLogin={() => setLoginModalOpen(true)}
+        onLogout={handleLogout}
+        onOpenChat={() => setChatOpen(true)}
+      />
 
       <section className="relative overflow-hidden pb-20 pt-32 md:pb-32 md:pt-48">
         <div className="pointer-events-none absolute left-1/2 top-0 h-full w-full max-w-7xl -translate-x-1/2">
@@ -571,7 +676,7 @@ export default function HomePage() {
             transition={{ delay: 0.1 }}
             className="mb-8 text-4xl font-extrabold leading-[1.1] tracking-tight text-white md:text-7xl"
           >
-            Sistemas, automações e IA <br className="hidden md:block" /> sua empresa{" "}
+            Sistemas, automações e IA <br className="hidden md:block" /> para sua empresa{" "}
             <span className="text-gradient">vai vender mais</span>
           </motion.h1>
 
@@ -581,8 +686,8 @@ export default function HomePage() {
             transition={{ delay: 0.2 }}
             className="mx-auto mb-12 max-w-3xl text-lg leading-relaxed text-slate-400 md:text-xl"
           >
-            Desenvolvemos software sob medida, integracoes de APIs e automações inteligentes para WhatsApp e
-            Instagram. Menos esforco manual, mais resultados escalaveis.
+            Desenvolvemos software sob medida, integrações de APIs e automações inteligentes para WhatsApp e
+            Instagram. Menos esfor?o manual, mais resultados escal?veis.
           </motion.p>
 
           <motion.div
@@ -592,16 +697,20 @@ export default function HomePage() {
             className="flex flex-col items-center justify-center gap-4 sm:flex-row"
           >
             <a
-              href="#contato"
+              href="#"
+              onClick={(event) => {
+                event.preventDefault();
+                setChatOpen(true);
+              }}
               className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-8 py-4 font-bold text-white shadow-xl shadow-blue-600/20 transition-all hover:-translate-y-1 hover:from-blue-500 hover:to-blue-400 sm:w-auto"
             >
-              Solicitar orcamento gratis
+              Solicitar or?amento gratis
             </a>
             <a
               href="#demonstracao"
               className="w-full rounded-xl border border-white/10 bg-white/5 px-8 py-4 font-bold text-white transition-all hover:bg-white/10 sm:w-auto"
             >
-              Ver demonstracao
+              Ver demonstra??o
             </a>
           </motion.div>
 
@@ -802,7 +911,7 @@ export default function HomePage() {
             </p>
 
             <a
-              href="https://wa.me/5511999999999"
+              href={`https://wa.me/${WHATSAPP_NUMBER}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-3 rounded-2xl bg-[#25D366] px-10 py-5 text-xl font-extrabold text-white shadow-2xl shadow-[#25D366]/20 transition-all hover:scale-105 hover:bg-[#20ba59]"
@@ -832,7 +941,7 @@ export default function HomePage() {
               <div className="flex flex-col gap-4">
                 <span className="text-sm font-bold uppercase tracking-widest text-white">Solucoes</span>
                 <nav className="flex flex-col gap-3">
-                  {["automações", "Sistemas", "IA", "API integrations"].map((link) => (
+                  {["Automações", "Sistemas", "IA", "API integrations"].map((link) => (
                     <a key={link} href="#" className="text-sm text-slate-500 transition-colors hover:text-blue-400">
                       {link}
                     </a>
@@ -865,6 +974,20 @@ export default function HomePage() {
       <AnimatePresence>
         <LoginModal open={loginModalOpen} onClose={() => setLoginModalOpen(false)} onLogin={handleLogin} />
       </AnimatePresence>
+
+      <AnimatePresence>
+        <ChatWidget open={chatOpen} onClose={() => setChatOpen(false)} />
+      </AnimatePresence>
+
+      <button
+        type="button"
+        onClick={() => setChatOpen(true)}
+        className="fixed bottom-5 right-4 z-[70] inline-flex h-15 w-15 items-center justify-center rounded-full bg-[#25D366] text-white shadow-2xl shadow-[#25D366]/30 transition-all hover:scale-105 hover:bg-[#20ba59] sm:bottom-6 sm:right-6"
+        aria-label="Abrir chat"
+      >
+        <MessageCircle size={28} />
+      </button>
     </div>
   );
 }
+
