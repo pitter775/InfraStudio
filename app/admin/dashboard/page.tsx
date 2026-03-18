@@ -6,7 +6,7 @@ import { mockUsers } from "@/lib/mock-users";
 const stats = [
   { label: "Usuarios ativos", value: "24", detail: "+12% este mes", icon: Users },
   { label: "Leads no funil", value: "138", detail: "+18 hoje", icon: Layers3 },
-  { label: "Automacoes rodando", value: "9", detail: "3 criticas", icon: Bot },
+  { label: "automações rodando", value: "9", detail: "3 criticas", icon: Bot },
   { label: "Tempo medio", value: "1m 42s", detail: "-22% resposta", icon: Clock3 },
 ];
 

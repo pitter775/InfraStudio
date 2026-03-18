@@ -15,6 +15,7 @@ import {
   Instagram,
   Lock,
   LogOut,
+  Menu,
   MessageSquare,
   Puzzle,
   Send,
@@ -155,6 +156,7 @@ type NavbarProps = {
 
 function Navbar({ currentUser, onOpenLogin, onLogout }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -163,82 +165,213 @@ function Navbar({ currentUser, onOpenLogin, onLogout }: NavbarProps) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  useEffect(() => {
+    if (!mobileMenuOpen) {
+      return;
+    }
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [mobileMenuOpen]);
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
   return (
-    <nav
-      className={cn(
-        "fixed top-0 z-50 w-full border-b transition-all duration-300",
-        scrolled ? "glass-effect border-white/10 py-4" : "border-transparent bg-transparent py-6",
-      )}
-    >
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-3">
-          <div className="relative h-10 w-10 overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-1">
-            <img src="/logo.png" alt="InfraStudio Logo" className="h-full w-full object-contain" />
-          </div>
-          <div>
-            <span className="block text-2xl font-extrabold tracking-tight text-white">InfraStudio</span>
-            <span className="hidden text-xs uppercase tracking-[0.25em] text-slate-500 sm:block">Digital systems lab</span>
-          </div>
-        </div>
+    <>
+      <AnimatePresence>
+        {mobileMenuOpen ? (
+          <>
+            <motion.button
+              type="button"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeMobileMenu}
+              className="fixed inset-0 z-[55] bg-slate-950/78 backdrop-blur-sm md:hidden"
+              aria-label="Fechar menu"
+            />
 
-        <div className="hidden items-center space-x-8 md:flex">
-          <a href="#servicos" className="text-sm font-medium text-slate-300 transition-colors hover:text-blue-400">
-            Servicos
-          </a>
-          <a
-            href="#como-funciona"
-            className="text-sm font-medium text-slate-300 transition-colors hover:text-blue-400"
-          >
-            Como funciona
-          </a>
-          <a
-            href="#contato"
-            className="rounded-full bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:from-blue-500 hover:to-blue-400"
-          >
-            Solicitar orcamento
-          </a>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {currentUser ? (
-            <>
-              <Link
-                href="/admin/usuarios"
-                className="hidden rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition-all hover:border-blue-500/40 hover:bg-blue-500/10 md:inline-flex"
-              >
-                Admin
-              </Link>
-              <div className="hidden items-center gap-3 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-white md:flex">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
-                  <UserRound size={16} />
+            <motion.div
+              initial={{ opacity: 0, y: -16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="fixed left-4 right-4 top-20 z-[60] rounded-[28px] border border-white/10 bg-slate-950/95 p-5 shadow-2xl backdrop-blur-xl md:hidden"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <p className="text-lg font-bold text-white">Menu</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">InfraStudio</p>
                 </div>
-                <div className="leading-tight">
-                  <p className="text-sm font-semibold">{currentUser.name}</p>
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/75">{currentUser.role}</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={closeMobileMenu}
+                  className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+                  aria-label="Fechar menu"
+                >
+                  <X size={16} />
+                </button>
               </div>
+
+              <div className="space-y-2">
+                <a
+                  href="#servicos"
+                  onClick={closeMobileMenu}
+                  className="block rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.06]"
+                >
+                  Servicos
+                </a>
+                <a
+                  href="#como-funciona"
+                  onClick={closeMobileMenu}
+                  className="block rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.06]"
+                >
+                  Como funciona
+                </a>
+                <a
+                  href="#contato"
+                  onClick={closeMobileMenu}
+                  className="block rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.06]"
+                >
+                  Solicitar orcamento
+                </a>
+              </div>
+
+              <div className="mt-5 border-t border-white/8 pt-5">
+                {currentUser ? (
+                  <div className="space-y-3">
+                    <Link
+                      href="/admin/usuarios"
+                      onClick={closeMobileMenu}
+                      className="block rounded-2xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-100"
+                    >
+                      Ir para admin
+                    </Link>
+                    <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/10 px-4 py-3">
+                      <p className="text-sm font-semibold text-white">{currentUser.name}</p>
+                      <p className="text-xs uppercase tracking-[0.18em] text-emerald-200/80">{currentUser.role}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeMobileMenu();
+                        onLogout();
+                      }}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                    >
+                      <LogOut size={16} />
+                      Sair
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeMobileMenu();
+                      onOpenLogin();
+                    }}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                  >
+                    <Lock size={16} />
+                    Login
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </>
+        ) : null}
+      </AnimatePresence>
+
+      <nav
+        className={cn(
+          "fixed top-0 z-50 w-full border-b transition-all duration-300",
+          scrolled
+            ? "border-white/8 bg-slate-950/82 py-4 shadow-[0_12px_50px_rgba(2,6,23,0.42)] backdrop-blur-xl"
+            : "border-transparent bg-transparent py-6",
+        )}
+      >
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <div className="relative h-14 w-14 overflow-hidden p-1">
+              <img src="/logo.png" alt="InfraStudio Logo" className="h-full w-full object-contain" />
+            </div>
+            <div>
+              <span className="block text-2xl font-extrabold tracking-tight text-white">InfraStudio</span>
+              <span className="hidden text-xs uppercase tracking-[0.11em] text-slate-500 sm:block">Smart Systems Lab</span>
+            </div>
+          </div>
+
+          <div className="hidden items-center space-x-8 md:flex">
+            <a href="#servicos" className="text-sm font-medium text-slate-300 transition-colors hover:text-blue-400">
+              Servicos
+            </a>
+            <a
+              href="#como-funciona"
+              className="text-sm font-medium text-slate-300 transition-colors hover:text-blue-400"
+            >
+              Como funciona
+            </a>
+            <a
+              href="#contato"
+              className="rounded-full bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:from-blue-500 hover:to-blue-400"
+            >
+              Solicitar orcamento
+            </a>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {currentUser ? (
+              <>
+                <Link
+                  href="/admin/usuarios"
+                  className="hidden rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition-all hover:border-blue-500/40 hover:bg-blue-500/10 md:inline-flex"
+                >
+                  Admin
+                </Link>
+                <div className="hidden items-center gap-3 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-white md:flex">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
+                    <UserRound size={16} />
+                  </div>
+                  <div className="leading-tight">
+                    <p className="text-sm font-semibold">{currentUser.name}</p>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/75">{currentUser.role}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-white/10 md:inline-flex"
+                >
+                  <LogOut size={16} />
+                  Sair
+                </button>
+              </>
+            ) : (
               <button
                 type="button"
-                onClick={onLogout}
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-white/10"
+                onClick={onOpenLogin}
+                className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-slate-200 transition-all hover:bg-white/[0.08] hover:text-white md:inline-flex"
               >
-                <LogOut size={16} />
-                Sair
+                <Lock size={15} />
+                Login
               </button>
-            </>
-          ) : (
+            )}
+
             <button
               type="button"
-              onClick={onOpenLogin}
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-900/30 transition-all hover:-translate-y-0.5 hover:from-blue-500 hover:to-cyan-400"
+              onClick={() => setMobileMenuOpen(true)}
+              className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/[0.05] p-2.5 text-slate-200 transition-all hover:bg-white/[0.08] hover:text-white md:hidden"
+              aria-label="Abrir menu"
             >
-              <Lock size={16} />
-              Login
+              <Menu size={18} />
             </button>
-          )}
+          </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+    </>
   );
 }
 
@@ -438,8 +571,8 @@ export default function HomePage() {
             transition={{ delay: 0.1 }}
             className="mb-8 text-4xl font-extrabold leading-[1.1] tracking-tight text-white md:text-7xl"
           >
-            Sistemas, automacoes e IA para fazer <br className="hidden md:block" /> sua empresa{" "}
-            <span className="text-gradient">vender mais</span>
+            Sistemas, automações e IA <br className="hidden md:block" /> sua empresa{" "}
+            <span className="text-gradient">vai vender mais</span>
           </motion.h1>
 
           <motion.p
@@ -448,7 +581,7 @@ export default function HomePage() {
             transition={{ delay: 0.2 }}
             className="mx-auto mb-12 max-w-3xl text-lg leading-relaxed text-slate-400 md:text-xl"
           >
-            Desenvolvemos software sob medida, integracoes de APIs e automacoes inteligentes para WhatsApp e
+            Desenvolvemos software sob medida, integracoes de APIs e automações inteligentes para WhatsApp e
             Instagram. Menos esforco manual, mais resultados escalaveis.
           </motion.p>
 
@@ -699,7 +832,7 @@ export default function HomePage() {
               <div className="flex flex-col gap-4">
                 <span className="text-sm font-bold uppercase tracking-widest text-white">Solucoes</span>
                 <nav className="flex flex-col gap-3">
-                  {["Automacoes", "Sistemas", "IA", "API integrations"].map((link) => (
+                  {["automações", "Sistemas", "IA", "API integrations"].map((link) => (
                     <a key={link} href="#" className="text-sm text-slate-500 transition-colors hover:text-blue-400">
                       {link}
                     </a>
