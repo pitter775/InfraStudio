@@ -2,7 +2,13 @@ node_modules/
 build/
 dist/
 coverage/
+.next/
+.vercel/
+out/
+.turbo/
+.cache/
 .DS_Store
 *.log
+tsconfig.tsbuildinfo
 .env*
 !.env.example
