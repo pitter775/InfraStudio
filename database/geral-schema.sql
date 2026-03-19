@@ -1,6 +1,15 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.agente_api (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  agente_id uuid NOT NULL,
+  api_id uuid NOT NULL,
+  created_at timestamp without time zone NOT NULL DEFAULT now(),
+  CONSTRAINT agente_api_pkey PRIMARY KEY (id),
+  CONSTRAINT agente_api_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id),
+  CONSTRAINT agente_api_api_id_fkey FOREIGN KEY (api_id) REFERENCES public.apis(id)
+);
 CREATE TABLE public.agentes (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   projeto_id uuid,
@@ -17,12 +26,22 @@ CREATE TABLE public.agentes (
   CONSTRAINT agentes_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id),
   CONSTRAINT agentes_modelo_id_fkey FOREIGN KEY (modelo_id) REFERENCES public.modelos(id)
 );
+CREATE TABLE public.api_campos (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  api_id uuid NOT NULL,
+  nome character varying NOT NULL,
+  tipo character varying NOT NULL CHECK (tipo::text = ANY (ARRAY['string'::character varying, 'number'::character varying, 'boolean'::character varying]::text[])),
+  descricao text,
+  created_at timestamp without time zone NOT NULL DEFAULT now(),
+  CONSTRAINT api_campos_pkey PRIMARY KEY (id),
+  CONSTRAINT api_campos_api_id_fkey FOREIGN KEY (api_id) REFERENCES public.apis(id)
+);
 CREATE TABLE public.apis (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   projeto_id uuid NOT NULL,
   nome character varying NOT NULL,
   url text NOT NULL,
-  metodo character varying NOT NULL DEFAULT 'GET'::character varying,
+  metodo character varying NOT NULL DEFAULT 'GET'::character varying CHECK (upper(metodo::text) = 'GET'::text),
   descricao text,
   ativo boolean NOT NULL DEFAULT true,
   created_at timestamp without time zone NOT NULL DEFAULT now(),
@@ -30,24 +49,22 @@ CREATE TABLE public.apis (
   CONSTRAINT apis_pkey PRIMARY KEY (id),
   CONSTRAINT apis_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id)
 );
-CREATE TABLE public.api_campos (
+CREATE TABLE public.chat_widgets (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  api_id uuid NOT NULL,
   nome character varying NOT NULL,
-  tipo character varying NOT NULL,
-  descricao text,
+  slug character varying NOT NULL,
+  projeto_id uuid,
+  agente_id uuid,
+  dominio text,
+  ativo boolean NOT NULL DEFAULT true,
   created_at timestamp without time zone NOT NULL DEFAULT now(),
-  CONSTRAINT api_campos_pkey PRIMARY KEY (id),
-  CONSTRAINT api_campos_api_id_fkey FOREIGN KEY (api_id) REFERENCES public.apis(id)
-);
-CREATE TABLE public.agente_api (
-  id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  agente_id uuid NOT NULL,
-  api_id uuid NOT NULL,
-  created_at timestamp without time zone NOT NULL DEFAULT now(),
-  CONSTRAINT agente_api_pkey PRIMARY KEY (id),
-  CONSTRAINT agente_api_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id),
-  CONSTRAINT agente_api_api_id_fkey FOREIGN KEY (api_id) REFERENCES public.apis(id)
+  updated_at timestamp without time zone NOT NULL DEFAULT now(),
+  tema character varying NOT NULL DEFAULT 'dark'::character varying CHECK (tema::text = ANY (ARRAY['dark'::character varying, 'light'::character varying]::text[])),
+  cor_primaria character varying NOT NULL DEFAULT '#2563eb'::character varying,
+  fundo_transparente boolean NOT NULL DEFAULT true,
+  CONSTRAINT chat_widgets_pkey PRIMARY KEY (id),
+  CONSTRAINT chat_widgets_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id),
+  CONSTRAINT chat_widgets_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id)
 );
 CREATE TABLE public.chats (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),

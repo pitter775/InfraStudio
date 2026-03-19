@@ -30,6 +30,22 @@ export type ApiRecord = {
   campos: ApiCampoRecord[];
 };
 
+export type ApiRuntimeField = {
+  nome: string;
+  tipo: "string" | "number" | "boolean";
+  valor: string | number | boolean;
+};
+
+export type ApiRuntimeContext = {
+  apiId: string;
+  nome: string;
+  url: string;
+  descricao: string;
+  campos: ApiRuntimeField[];
+  resumo: string;
+  erro: string | null;
+};
+
 type ApiCampoRow = {
   id: string;
   api_id: string | null;
@@ -105,6 +121,89 @@ function sanitizeCampos(campos: ApiCampoInput[]) {
     });
 }
 
+function normalizeWhitespace(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function compactPrimitiveValue(value: unknown): string | number | boolean | null {
+  if (typeof value === "string") {
+    const compact = normalizeWhitespace(value);
+    return compact.length > 280 ? `${compact.slice(0, 277)}...` : compact;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  return null;
+}
+
+function resolveFieldValue(payload: unknown, path: string): unknown {
+  return path.split(".").reduce<unknown>((current, segment) => {
+    if (current === null || current === undefined) {
+      return undefined;
+    }
+
+    if (Array.isArray(current)) {
+      const index = Number(segment);
+      return Number.isInteger(index) ? current[index] : undefined;
+    }
+
+    if (typeof current !== "object") {
+      return undefined;
+    }
+
+    return (current as Record<string, unknown>)[segment];
+  }, payload);
+}
+
+function formatRuntimeSummary(api: ApiRecord, campos: ApiRuntimeField[]) {
+  const header = [`API: ${api.nome}`, api.descricao ? `Descricao: ${normalizeWhitespace(api.descricao)}` : ""]
+    .filter(Boolean)
+    .join("\n");
+  const body = campos.map((campo) => `- ${campo.nome}: ${String(campo.valor)}`).join("\n");
+  const text = [header, body].filter(Boolean).join("\n");
+  return text.length > 3500 ? `${text.slice(0, 3497)}...` : text;
+}
+
+async function fetchApiPayload(api: ApiRecord) {
+  const response = await fetch(api.url, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`A requisicao retornou status ${response.status}.`);
+  }
+
+  return (await response.json()) as unknown;
+}
+
+function pickRuntimeFields(api: ApiRecord, payload: unknown) {
+  return api.campos
+    .map((campo) => {
+      const rawValue = resolveFieldValue(payload, campo.nome);
+      const valor = compactPrimitiveValue(rawValue);
+
+      if (valor === null) {
+        return null;
+      }
+
+      return {
+        nome: campo.nome,
+        tipo: campo.tipo,
+        valor,
+      } satisfies ApiRuntimeField;
+    })
+    .filter((campo): campo is ApiRuntimeField => Boolean(campo));
+}
+
 function inferFieldType(value: unknown): ApiCampoInput["tipo"] | null {
   if (typeof value === "string") {
     return "string";
@@ -125,22 +224,62 @@ function inferFieldType(value: unknown): ApiCampoInput["tipo"] | null {
   return null;
 }
 
-function extractApiCampos(payload: unknown): ApiCampoInput[] {
-  const source =
-    Array.isArray(payload) ? (payload.find((item) => item && typeof item === "object" && !Array.isArray(item)) ?? null) : payload;
+function buildFieldPath(parentPath: string, segment: string) {
+  return parentPath ? `${parentPath}.${segment}` : segment;
+}
 
-  if (!source || typeof source !== "object" || Array.isArray(source)) {
+function extractNestedApiCampos(
+  value: unknown,
+  parentPath = "",
+  seen = new WeakSet<object>(),
+  depth = 0,
+): ApiCampoInput[] {
+  if (depth > 6) {
     return [];
   }
 
-  return Object.entries(source).flatMap(([nome, value]) => {
-    const tipo = inferFieldType(value);
-    if (!tipo) {
+  const primitiveType = inferFieldType(value);
+  if (primitiveType && parentPath) {
+    return [{ nome: parentPath, tipo: primitiveType, descricao: null }];
+  }
+
+  if (Array.isArray(value)) {
+    const sample = value.find((item) => item !== null && item !== undefined);
+    if (sample === undefined) {
       return [];
     }
 
-    return [{ nome, tipo, descricao: null }];
-  });
+    const sampleType = inferFieldType(sample);
+    if (sampleType && parentPath) {
+      return [{ nome: parentPath, tipo: sampleType, descricao: null }];
+    }
+
+    return extractNestedApiCampos(sample, parentPath, seen, depth + 1);
+  }
+
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+
+  if (seen.has(value)) {
+    return [];
+  }
+
+  seen.add(value);
+
+  return Object.entries(value).flatMap(([segment, nestedValue]) =>
+    extractNestedApiCampos(nestedValue, buildFieldPath(parentPath, segment), seen, depth + 1),
+  );
+}
+
+function extractApiCampos(payload: unknown): ApiCampoInput[] {
+  const campos = extractNestedApiCampos(payload);
+
+  if (!campos.length) {
+    return [];
+  }
+
+  return sanitizeCampos(campos);
 }
 
 async function replaceApiCampos(apiId: string, campos: ApiCampoInput[]) {
@@ -185,6 +324,27 @@ export async function listApis(projetoId: string) {
 
   if (error || !data) {
     console.error("[apis] failed to list apis", error);
+    return [];
+  }
+
+  return data.map((row) => mapApi(row as ApiRow));
+}
+
+export async function listApisByIds(ids: string[]) {
+  const sanitizedIds = [...new Set(ids.filter(Boolean))];
+  if (!sanitizedIds.length) {
+    return [];
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("apis")
+    .select("id, projeto_id, nome, url, metodo, descricao, ativo, created_at, updated_at, api_campos(id, api_id, nome, tipo, descricao, created_at)")
+    .in("id", sanitizedIds)
+    .order("created_at", { ascending: true });
+
+  if (error || !data) {
+    console.error("[apis] failed to list apis by ids", error);
     return [];
   }
 
@@ -333,7 +493,7 @@ export async function testApi(id: string) {
   const campos = extractApiCampos(payload);
 
   if (!campos.length) {
-    return { api, campos: [], error: "Nenhum campo primitivo de primeiro nivel foi encontrado na resposta." };
+    return { api, campos: [], error: "Nenhum campo primitivo foi encontrado na resposta da API." };
   }
 
   const saved = await replaceApiCampos(id, campos);
@@ -416,4 +576,47 @@ export async function syncAgenteApis(agenteId: string, projetoId: string, apiIds
   }
 
   return true;
+}
+
+export async function buildAgenteApiRuntimeContext(agenteId: string) {
+  const apiIdsByAgente = await listApiIdsByAgentes([agenteId]);
+  const apiIds = apiIdsByAgente.get(agenteId) ?? [];
+
+  if (!apiIds.length) {
+    return [];
+  }
+
+  const apis = (await listApisByIds(apiIds)).filter((api) => api.ativo);
+
+  return await Promise.all(
+    apis.map(async (api) => {
+      try {
+        const payload = await fetchApiPayload(api);
+        const campos = pickRuntimeFields(api, payload);
+
+        return {
+          apiId: api.id,
+          nome: api.nome,
+          url: api.url,
+          descricao: api.descricao,
+          campos,
+          resumo: formatRuntimeSummary(api, campos),
+          erro: null,
+        } satisfies ApiRuntimeContext;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Nao foi possivel consultar a API.";
+        console.error("[apis] failed to build runtime context", { apiId: api.id, error });
+
+        return {
+          apiId: api.id,
+          nome: api.nome,
+          url: api.url,
+          descricao: api.descricao,
+          campos: [],
+          resumo: "",
+          erro: message,
+        } satisfies ApiRuntimeContext;
+      }
+    }),
+  );
 }

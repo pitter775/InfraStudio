@@ -1,6 +1,7 @@
 import "server-only";
 
-import { getAgenteAtivo } from "@/lib/agentes";
+import { getAgenteAtivo, getAgenteById } from "@/lib/agentes";
+import { buildAgenteApiRuntimeContext, type ApiRuntimeContext } from "@/lib/apis";
 import { getProjetoOpenAIConfig } from "@/lib/segredos";
 import type { ChatMessageRole } from "@/lib/chats";
 
@@ -56,6 +57,476 @@ function heuristicReply(message: string) {
   }
 
   return "Entendi. Me conta qual processo voce quer automatizar hoje e se isso envolve site, WhatsApp, vendas, agenda ou integracoes. Com isso eu consigo te orientar e te levar para o WhatsApp no momento certo.";
+}
+
+function normalizeText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function singularizeToken(token: string) {
+  if (token.endsWith("oes")) {
+    return `${token.slice(0, -3)}ao`;
+  }
+
+  if (token.endsWith("ais")) {
+    return `${token.slice(0, -3)}al`;
+  }
+
+  if (token.endsWith("eis")) {
+    return `${token.slice(0, -3)}el`;
+  }
+
+  if (token.endsWith("s") && token.length > 4) {
+    return token.slice(0, -1);
+  }
+
+  return token;
+}
+
+function buildSearchTokens(message: string) {
+  const stopwords = new Set([
+    "qual",
+    "quais",
+    "qualis",
+    "como",
+    "sobre",
+    "do",
+    "da",
+    "dos",
+    "das",
+    "de",
+    "o",
+    "a",
+    "os",
+    "as",
+    "um",
+    "uma",
+    "me",
+    "no",
+    "na",
+    "projeto",
+    "imovel",
+    "esse",
+    "essa",
+    "este",
+    "esta",
+  ]);
+
+  const tokens = normalizeText(message)
+    .split(/\W+/)
+    .filter((token) => token.length >= 3 && !stopwords.has(token));
+
+  return [...new Set(tokens.flatMap((token) => [token, singularizeToken(token)]).filter(Boolean))];
+}
+
+function formatApiFieldLabel(path: string) {
+  const segments = path.split(".");
+  const leaf = segments[segments.length - 1] ?? path;
+  return leaf.replace(/_/g, " ");
+}
+
+function formatDirectFieldReply(fieldName: string, value: string | number | boolean) {
+  const normalizedField = normalizeText(fieldName);
+  const textValue = String(value);
+
+  if (normalizedField.endsWith("matricula")) {
+    return `A matricula do imovel e ${textValue}.`;
+  }
+
+  if (normalizedField.endsWith("cartorio")) {
+    return `O cartorio informado e ${textValue}.`;
+  }
+
+  if (normalizedField.endsWith("riscos") || normalizedField.endsWith("risco")) {
+    return `Os principais riscos deste imovel sao ${textValue.charAt(0).toLowerCase()}${textValue.slice(1)}`;
+  }
+
+  if (normalizedField.endsWith("ocupacao")) {
+    return `A ocupacao informada e ${textValue}.`;
+  }
+
+  if (normalizedField.endsWith("valor_minimo")) {
+    return `O valor minimo do imovel e ${textValue}.`;
+  }
+
+  if (normalizedField.endsWith("valor_avaliacao")) {
+    return `O valor de avaliacao do imovel e ${textValue}.`;
+  }
+
+  if (normalizedField.endsWith("data_leilao")) {
+    return `A data do leilao informada e ${textValue}.`;
+  }
+
+  if (normalizedField.endsWith("status")) {
+    return `O status atual do imovel e ${textValue}.`;
+  }
+
+  if (normalizedField.endsWith("rua")) {
+    return `A rua informada e ${textValue}.`;
+  }
+
+  if (normalizedField.endsWith("numero")) {
+    return `O numero informado e ${textValue}.`;
+  }
+
+  if (normalizedField.endsWith("cep")) {
+    return `O CEP informado e ${textValue}.`;
+  }
+
+  if (normalizedField.endsWith("cidade")) {
+    return `A cidade do imovel e ${textValue}.`;
+  }
+
+  if (normalizedField.endsWith("estado")) {
+    return `O estado do imovel e ${textValue}.`;
+  }
+
+  if (normalizedField.endsWith("quartos")) {
+    return `O imovel tem ${textValue} quartos.`;
+  }
+
+  if (normalizedField.endsWith("banheiros")) {
+    return `O imovel tem ${textValue} banheiros.`;
+  }
+
+  if (normalizedField.endsWith("area_total")) {
+    return `A area total informada e ${textValue}.`;
+  }
+
+  if (normalizedField.endsWith("area_construida")) {
+    return `A area construida informada e ${textValue}.`;
+  }
+
+  if (normalizedField.endsWith("descricao") || normalizedField.endsWith("resumo_executivo") || normalizedField.endsWith("analise")) {
+    return textValue;
+  }
+
+  return `${formatApiFieldLabel(fieldName)}: ${textValue}`;
+}
+
+function shouldUseDirectFieldReply(message: string) {
+  const normalized = normalizeText(message);
+  const blockedSignals = [
+    "resumo",
+    "resuma",
+    "explica",
+    "explique",
+    "analise",
+    "analisa",
+    "analisar",
+    "vale a pena",
+    "compensa",
+    "o que acha",
+    "o que voce acha",
+    "me fala sobre",
+    "me passa um resumo",
+    "me diga sobre",
+    "quero entender",
+    "pontos de atencao",
+    "problema",
+    "problemas",
+    "impedimento",
+    "impedimentos",
+    "pendencia",
+    "pendencias",
+    "restricao",
+    "restricoes",
+    "juridico",
+    "juridica",
+    "juridicos",
+    "juridicas",
+    "risco",
+    "riscos",
+    "detalhe",
+    "detalhes",
+    "sobre",
+    "gostei",
+    "bom",
+    "ruim",
+  ];
+  const factualSignals = [
+    "matricula",
+    "cartorio",
+    "cep",
+    "rua",
+    "numero",
+    "cidade",
+    "estado",
+    "ocupacao",
+    "status",
+    "data leilao",
+    "data do leilao",
+    "valor minimo",
+    "valor de avaliacao",
+    "quartos",
+    "banheiros",
+    "area total",
+    "area construida",
+  ];
+  const tokenCount = buildSearchTokens(message).length;
+
+  if (blockedSignals.some((signal) => normalized.includes(signal))) {
+    return false;
+  }
+
+  if (tokenCount > 6) {
+    return false;
+  }
+
+  return factualSignals.some((signal) => normalized.includes(signal));
+}
+
+type ScoredApiField = ApiRuntimeContext["campos"][number] & {
+  apiNome: string;
+  score: number;
+};
+
+const API_FIELD_INTENTS = [
+  {
+    triggers: [
+      "problema",
+      "problemas",
+      "risco",
+      "riscos",
+      "alerta",
+      "alertas",
+      "atencao",
+      "atencoes",
+      "impedimento",
+      "impedimentos",
+      "pendencia",
+      "pendencias",
+      "restricao",
+      "restricoes",
+    ],
+    targets: ["riscos", "risco", "observacoes_juridicas", "ocupacao", "cartorio", "matricula"],
+  },
+  {
+    triggers: ["documento", "documentos", "papelada", "registro", "registros"],
+    targets: ["matricula", "cartorio", "observacoes_juridicas"],
+  },
+  {
+    triggers: ["preco", "precos", "valor", "valores", "quanto", "custa", "lance", "mercado"],
+    targets: ["valor_minimo", "valor_avaliacao", "valor_mercado", "lance_recomendado", "roi_estimado", "lucro_estimado"],
+  },
+  {
+    triggers: ["localizacao", "endereco", "onde", "rua", "numero", "cep"],
+    targets: ["endereco", "rua", "numero", "complemento", "cep", "cidade", "estado"],
+  },
+  {
+    triggers: ["descricao", "resumo", "sobre", "apresentacao"],
+    targets: ["titulo", "descricao", "resumo_executivo", "analise"],
+  },
+  {
+    triggers: ["caracteristica", "caracteristicas", "quartos", "banheiros", "area", "tipo"],
+    targets: ["tipo_propriedade", "quartos", "banheiros", "area_total", "area_construida", "ano_construcao"],
+  },
+];
+
+function getApiKeywordGroups(message: string) {
+  const normalizedMessage = normalizeText(message);
+  const directTokens = buildSearchTokens(message);
+  const intentTokens = API_FIELD_INTENTS.flatMap((intent) =>
+    intent.triggers.some((trigger) => directTokens.includes(trigger) || normalizedMessage.includes(trigger)) ? intent.targets : [],
+  );
+  const keywordGroups = [
+    ["endereco", "rua", "numero", "complemento", "cep", "cidade", "estado", "localizacao"],
+    ["valor", "preco", "avaliacao", "minimo", "mercado", "lance", "roi", "lucro"],
+    ["leilao", "data", "status"],
+    ["ocupacao", "ocupado", "desocupado"],
+    ["matricula", "cartorio", "juridico", "documento", "observacoes", "risco", "riscos", "estrategia"],
+    ["quarto", "quartos", "banheiro", "banheiros", "area", "construida", "total", "tipo", "propriedade"],
+    ["resumo", "descricao", "detalhe", "detalhes", "analise"],
+  ];
+
+  const matchedGroup = keywordGroups.find((group) => group.some((keyword) => normalizedMessage.includes(keyword))) ?? [];
+  return {
+    directTokens,
+    intentTokens: [...new Set(intentTokens.flatMap((token) => [token, singularizeToken(token)]))],
+    relatedTokens: matchedGroup.filter((keyword) => !directTokens.includes(keyword)),
+  };
+}
+
+function findMatchingApiFields(apiContexts: ApiRuntimeContext[], message: string) {
+  const { directTokens, intentTokens, relatedTokens } = getApiKeywordGroups(message);
+
+  return apiContexts.flatMap((api) =>
+    api.campos.flatMap((campo) => {
+      const normalizedPath = normalizeText(campo.nome);
+      const normalizedLabel = normalizeText(formatApiFieldLabel(campo.nome));
+      const leafLabel = normalizedLabel.split(".").at(-1) ?? normalizedLabel;
+      const directScore = directTokens.reduce((total, keyword) => {
+        if (!keyword) {
+          return total;
+        }
+
+        if (leafLabel === keyword) {
+          return total + 60;
+        }
+
+        if (normalizedPath === keyword || normalizedLabel === keyword) {
+          return total + 40;
+        }
+
+        if (normalizedPath.endsWith(`.${keyword}`) || normalizedPath.endsWith(keyword)) {
+          return total + 28;
+        }
+
+        if (normalizedPath.includes(keyword) || normalizedLabel.includes(keyword)) {
+          return total + 16;
+        }
+
+        return total;
+      }, 0);
+
+      const intentScore = intentTokens.reduce((total, keyword) => {
+        if (!keyword) {
+          return total;
+        }
+
+        if (leafLabel === keyword) {
+          return total + 22;
+        }
+
+        if (normalizedPath.endsWith(`.${keyword}`) || normalizedPath.endsWith(keyword)) {
+          return total + 12;
+        }
+
+        if (normalizedPath.includes(keyword) || normalizedLabel.includes(keyword)) {
+          return total + 6;
+        }
+
+        return total;
+      }, 0);
+
+      const relatedScore = relatedTokens.reduce((total, keyword) => {
+        if (!keyword) {
+          return total;
+        }
+
+        if (normalizedPath === keyword || normalizedLabel === keyword) {
+          return total + 6;
+        }
+
+        if (normalizedPath.endsWith(`.${keyword}`) || normalizedPath.endsWith(keyword)) {
+          return total + 4;
+        }
+
+        if (normalizedPath.includes(keyword) || normalizedLabel.includes(keyword)) {
+          return total + 2;
+        }
+
+        return total;
+      }, 0);
+
+      const score = directScore + intentScore + relatedScore;
+
+      if (score <= 0) {
+        return [];
+      }
+
+      return [
+        {
+          ...campo,
+          apiNome: api.nome,
+          score,
+        } satisfies ScoredApiField,
+      ];
+    }),
+  );
+}
+
+function buildFocusedApiContext(message: string, apiContexts: ApiRuntimeContext[]) {
+  const availableApis = apiContexts.filter((api) => api.campos.length > 0);
+  const failedApis = apiContexts.filter((api) => api.erro);
+  if (!availableApis.length && !failedApis.length) {
+    return { instructions: "", fields: [] as ScoredApiField[] };
+  }
+
+  const matches = findMatchingApiFields(availableApis, message)
+    .sort((left, right) => right.score - left.score || left.nome.localeCompare(right.nome))
+    .slice(0, 6);
+
+  const preferredFields = ["titulo", "descricao", "cidade", "estado", "valor_minimo", "data_leilao", "status"];
+  const baselineFields = preferredFields.flatMap((field) =>
+    availableApis.flatMap((api) =>
+      api.campos.flatMap((campo) =>
+        normalizeText(campo.nome).endsWith(field)
+          ? [
+              {
+                ...campo,
+                apiNome: api.nome,
+                score: 1,
+              } satisfies ScoredApiField,
+            ]
+          : [],
+      ),
+    ),
+  );
+
+  const selectedFields = matches.length ? matches : baselineFields.slice(0, 5);
+  const fieldLines = selectedFields.map(
+    (campo) => `- ${formatApiFieldLabel(campo.nome)} (${campo.nome}): ${String(campo.valor)}`,
+  );
+  const failedLines = failedApis.map((api) => `- API indisponivel: ${api.nome}. Motivo: ${api.erro}`);
+
+  return {
+    fields: selectedFields,
+    instructions: [
+      "Use somente os dados compactados abaixo como fonte da verdade.",
+      "Responda apenas com base nesses campos e no historico recente da conversa.",
+      "Se a informacao pedida nao estiver presente, diga isso com clareza.",
+      fieldLines.length ? "Campos relevantes para esta pergunta:\n" + fieldLines.join("\n") : "",
+      failedLines.length ? "APIs indisponiveis:\n" + failedLines.join("\n") : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  };
+}
+
+function buildDirectApiReply(message: string, apiContexts: ApiRuntimeContext[]) {
+  const availableApis = apiContexts.filter((api) => api.campos.length > 0);
+  if (!availableApis.length) {
+    return null;
+  }
+
+  const matches = findMatchingApiFields(availableApis, message)
+    .sort((left, right) => right.score - left.score || left.nome.localeCompare(right.nome))
+    .slice(0, 3);
+
+  if (!matches.length) {
+    return null;
+  }
+
+  const topScore = matches[0]?.score ?? 0;
+  const strongMatches = matches.filter((campo) => campo.score >= topScore - 3);
+  if (strongMatches.length > 2 || topScore < 20) {
+    return null;
+  }
+
+  if (strongMatches.length === 1) {
+    const campo = strongMatches[0];
+    return formatDirectFieldReply(campo.nome, campo.valor);
+  }
+
+  return strongMatches.map((campo) => formatDirectFieldReply(campo.nome, campo.valor)).join("\n");
+}
+
+function buildApiFallbackReply(message: string, apiContexts: ApiRuntimeContext[]) {
+  const directReply = buildDirectApiReply(message, apiContexts);
+  if (directReply) {
+    return directReply;
+  }
+
+  const focused = buildFocusedApiContext(message, apiContexts);
+  if (focused.fields.length) {
+    return focused.fields.map((campo) => formatDirectFieldReply(campo.nome, campo.valor)).join("\n");
+  }
+
+  return null;
 }
 
 function buildSystemPrompt(agent: Awaited<ReturnType<typeof getAgenteAtivo>>) {
@@ -137,13 +608,6 @@ type CatalogItem = {
   nome: string;
   preco: number;
 };
-
-function normalizeText(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-}
 
 function detectCatalogItems(history: ConversationMessage[]) {
   const userText = history
@@ -241,12 +705,17 @@ function maybeAskForLeadIdentification(context: ConversationContext, history: Co
 export async function generateSalesReply(history: ConversationMessage[], context?: ConversationContext) {
   const latestUserMessage = [...history].reverse().find((item) => item.role === "user")?.content ?? "";
   const projectId = context?.projeto?.id ?? null;
-  const agent = projectId ? await getAgenteAtivo(projectId) : null;
+  const agentId = context?.agente?.id ?? null;
+  const agent = agentId ? await getAgenteById(agentId) : projectId ? await getAgenteAtivo(projectId) : null;
+  const apiContexts = agent?.id ? await buildAgenteApiRuntimeContext(agent.id) : [];
   const openai = await getProjetoOpenAIConfig(projectId);
   const systemPrompt = buildSystemPrompt(agent);
+  const focusedApiContext = buildFocusedApiContext(latestUserMessage, apiContexts);
   const catalogPricingReply = buildCatalogPricingReply(history);
+  const canUseDirectReply = shouldUseDirectFieldReply(latestUserMessage);
+  const directApiReply = canUseDirectReply ? buildDirectApiReply(latestUserMessage, apiContexts) : null;
 
-  if (catalogPricingReply) {
+  if (catalogPricingReply && apiContexts.length === 0) {
     return {
       reply: catalogPricingReply,
       usage: { inputTokens: 0, outputTokens: 0 },
@@ -261,7 +730,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
 
   const identificationPrompt = maybeAskForLeadIdentification(context ?? {}, history, latestUserMessage);
 
-  if (identificationPrompt) {
+  if (identificationPrompt && apiContexts.length === 0) {
     return {
       reply: identificationPrompt,
       usage: { inputTokens: 0, outputTokens: 0 },
@@ -274,16 +743,31 @@ export async function generateSalesReply(history: ConversationMessage[], context
     };
   }
 
-  if (!openai.apiKey) {
+  if (directApiReply) {
     return {
-      reply: heuristicReply(latestUserMessage),
+      reply: directApiReply,
+      usage: { inputTokens: 0, outputTokens: 0 },
+      metadata: {
+        provider: "heuristic",
+        model: "direct_api_field",
+        agenteId: agent?.id ?? null,
+        agenteNome: agent?.nome ?? null,
+      },
+    };
+  }
+
+  if (!openai.apiKey) {
+    const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
+    return {
+      reply: apiFallbackReply ?? heuristicReply(latestUserMessage),
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: { provider: "heuristic", model: "fallback", agenteId: agent?.id ?? null, agenteNome: agent?.nome ?? null },
     };
   }
 
   try {
-    const recentMessages = history.slice(-6);
+    const hasSummary = Boolean(context?.memoria?.resumo);
+    const recentMessages = history.slice(hasSummary ? -3 : -5);
     const summary = context?.memoria?.resumo ? `Resumo atual do chat: ${context.memoria.resumo}` : "";
     const lead = context?.lead?.identificado
       ? `Lead identificado: nome=${context.lead?.nome ?? ""}; telefone=${context.lead?.telefone ?? ""}.`
@@ -306,7 +790,9 @@ export async function generateSalesReply(history: ConversationMessage[], context
         model: openai.model,
         temperature: 0.5,
         max_output_tokens: 220,
-        instructions: [systemPrompt, summary, lead, qualification].filter(Boolean).join("\n"),
+        instructions: [systemPrompt, focusedApiContext.instructions, summary, lead, qualification]
+          .filter(Boolean)
+          .join("\n\n"),
         input: buildInput(recentMessages),
       }),
     });
@@ -316,8 +802,9 @@ export async function generateSalesReply(history: ConversationMessage[], context
 
     if (!response.ok || !outputText) {
       console.error("[chat] openai response failed", payload.error?.message ?? payload);
+      const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
       return {
-        reply: heuristicReply(latestUserMessage),
+        reply: apiFallbackReply ?? heuristicReply(latestUserMessage),
         usage: { inputTokens: 0, outputTokens: 0 },
         metadata: {
           provider: "heuristic",
@@ -343,8 +830,9 @@ export async function generateSalesReply(history: ConversationMessage[], context
     };
   } catch (error) {
     console.error("[chat] failed to call openai", error);
+    const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
     return {
-      reply: heuristicReply(latestUserMessage),
+      reply: apiFallbackReply ?? heuristicReply(latestUserMessage),
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
         provider: "heuristic",
@@ -458,7 +946,7 @@ export function enrichLeadContext(
 }
 
 export function shouldRefreshSummary(messageCount: number) {
-  return messageCount > 0 && messageCount % 5 === 0;
+  return messageCount > 0 && messageCount % 4 === 0;
 }
 
 export async function summarizeConversation(
@@ -466,7 +954,7 @@ export async function summarizeConversation(
   currentSummary: string | null | undefined,
   projectId?: string | null,
 ) {
-  const recent = history.slice(-8);
+  const recent = history.slice(-6);
   const openai = await getProjetoOpenAIConfig(projectId);
 
   if (!openai.apiKey) {
@@ -488,9 +976,9 @@ export async function summarizeConversation(
       body: JSON.stringify({
         model: openai.model,
         temperature: 0.2,
-        max_output_tokens: 140,
+        max_output_tokens: 110,
         instructions:
-          "Resuma a conversa comercial em portugues de forma objetiva, destacando necessidade, segmento, dor, objecoes e proximo passo. Nao floreie.",
+          "Resuma a conversa em portugues de forma extremamente compacta. Guarde somente fatos uteis para continuar o atendimento: pedido do usuario, dados identificados, restricoes e proximo passo. Use no maximo 5 linhas curtas.",
         input: buildInput([
           ...(currentSummary ? [{ role: "system" as const, content: `Resumo anterior: ${currentSummary}` }] : []),
           ...recent,

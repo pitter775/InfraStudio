@@ -1,28 +1,55 @@
 import { NextResponse } from "next/server";
 import { appendMessage, createChat, getChatById, getChatContext, listChatMessages, updateChatContext, updateChatStats } from "@/lib/chats";
 import { enrichLeadContext, generateSalesReply, shouldRefreshSummary, summarizeConversation } from "@/lib/chat-orchestrator";
-import { getAgenteAtivo } from "@/lib/agentes";
-import { getProjetoBySlug } from "@/lib/projetos";
+import { getAgenteAtivo, getAgenteById } from "@/lib/agentes";
+import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetBySlug } from "@/lib/chat-widgets";
+import { getProjetoById, getProjetoBySlug } from "@/lib/projetos";
 
 type ChatRequestBody = {
   chatId?: string;
   message?: string;
+  widgetSlug?: string;
 };
 
+function buildCorsHeaders(origin: string | null) {
+  return {
+    "Access-Control-Allow-Origin": origin ?? "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    Vary: "Origin",
+  };
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: buildCorsHeaders(request.headers.get("origin")),
+  });
+}
+
 export async function POST(request: Request) {
+  const corsHeaders = buildCorsHeaders(request.headers.get("origin"));
+
   try {
     const body = (await request.json()) as ChatRequestBody;
     const message = body.message?.trim();
 
     if (!message) {
-      return NextResponse.json({ error: "Mensagem obrigatória." }, { status: 400 });
+      return NextResponse.json({ error: "Mensagem obrigatoria." }, { status: 400, headers: corsHeaders });
     }
 
     let chat = body.chatId ? await getChatById(body.chatId) : null;
 
     if (!chat) {
-      const projeto = await getProjetoBySlug("infrastudio");
-      const agente = projeto ? await getAgenteAtivo(projeto.id) : null;
+      const widgetSlug = body.widgetSlug?.trim() || DEFAULT_HOME_WIDGET_SLUG;
+      const widget = await getChatWidgetBySlug(widgetSlug);
+      const projeto = widget?.projetoId ? await getProjetoById(widget.projetoId) : await getProjetoBySlug("infrastudio");
+      const agente =
+        widget?.agenteId && projeto
+          ? await getAgenteById(widget.agenteId)
+          : projeto
+            ? await getAgenteAtivo(projeto.id)
+            : null;
 
       chat = await createChat({
         titulo: message.length > 60 ? `${message.slice(0, 57)}...` : message,
@@ -32,6 +59,10 @@ export async function POST(request: Request) {
           source: "site_widget",
           canal: "site",
           objetivo: "captacao_comercial",
+          widget: {
+            slug: widget?.slug ?? widgetSlug,
+            nome: widget?.nome ?? "Chat",
+          },
           projeto: {
             id: projeto?.id ?? null,
             slug: projeto?.slug ?? "infrastudio",
@@ -47,8 +78,8 @@ export async function POST(request: Request) {
 
     if (!chat) {
       return NextResponse.json(
-        { error: "Não foi possível iniciar a conversa no banco. Verifique permissões da API nas tabelas `chats` e `mensagens`." },
-        { status: 500 },
+        { error: "Nao foi possivel iniciar a conversa no banco. Verifique permissoes nas tabelas `chats` e `mensagens`." },
+        { status: 500, headers: corsHeaders },
       );
     }
 
@@ -63,8 +94,8 @@ export async function POST(request: Request) {
 
     if (!userMessage) {
       return NextResponse.json(
-        { error: "Não foi possível gravar a mensagem do cliente. Verifique permissões na tabela `mensagens`." },
-        { status: 500 },
+        { error: "Nao foi possivel gravar a mensagem do cliente. Verifique permissoes na tabela `mensagens`." },
+        { status: 500, headers: corsHeaders },
       );
     }
 
@@ -108,8 +139,8 @@ export async function POST(request: Request) {
 
     if (!assistantMessage) {
       return NextResponse.json(
-        { error: "O modelo respondeu, mas não foi possível salvar a resposta no banco." },
-        { status: 500 },
+        { error: "O modelo respondeu, mas nao foi possivel salvar a resposta no banco." },
+        { status: 500, headers: corsHeaders },
       );
     }
 
@@ -147,17 +178,17 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         chatId: chat.id,
-        reply: assistantMessage?.conteudo ?? ai.reply,
+        reply: assistantMessage.conteudo ?? ai.reply,
       },
-      { status: 200 },
+      { status: 200, headers: corsHeaders },
     );
   } catch (error) {
     console.error("[chat] failed to answer message", error);
     return NextResponse.json(
       {
-        error: "Não foi possível responder agora.",
+        error: "Nao foi possivel responder agora.",
       },
-      { status: 500 },
+      { status: 500, headers: corsHeaders },
     );
   }
 }

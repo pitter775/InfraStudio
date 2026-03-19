@@ -68,6 +68,15 @@ type ProjetoDetalhe = {
   };
 };
 
+function summarizeApiFields(campos: ApiCampo[], limit = 6) {
+  const labels = campos.slice(0, limit).map((campo) => campo.nome);
+  if (campos.length <= limit) {
+    return labels.join(", ");
+  }
+
+  return `${labels.join(", ")} +${campos.length - limit}`;
+}
+
 type AgenteFormState = {
   id?: string;
   projetoId: string;
@@ -88,6 +97,22 @@ type ApiFormState = {
   descricao: string;
   ativo: boolean;
   campos: ApiCampo[];
+};
+
+type ApiCampoTreeNode = {
+  key: string;
+  label: string;
+  fullPath: string | null;
+  tipo: ApiCampo["tipo"] | null;
+  children: ApiCampoTreeNode[];
+};
+
+type ApiCampoTreeDraftNode = {
+  key: string;
+  label: string;
+  fullPath: string | null;
+  tipo: ApiCampo["tipo"] | null;
+  children: Map<string, ApiCampoTreeDraftNode>;
 };
 
 const defaultConfiguracoes = {
@@ -118,6 +143,96 @@ const emptyApiForm: ApiFormState = {
   ativo: true,
   campos: [],
 };
+
+function buildApiCampoTree(campos: ApiCampo[]): ApiCampoTreeNode[] {
+  const root = new Map<string, ApiCampoTreeDraftNode>();
+
+  for (const campo of campos) {
+    const segments = campo.nome.split(".").filter(Boolean);
+    let currentLevel = root;
+    let currentPath = "";
+
+    segments.forEach((segment, index) => {
+      currentPath = currentPath ? `${currentPath}.${segment}` : segment;
+      let node = currentLevel.get(segment);
+
+      if (!node) {
+        node = {
+          key: currentPath,
+          label: segment,
+          fullPath: null,
+          tipo: null,
+          children: new Map<string, ApiCampoTreeDraftNode>(),
+        };
+        currentLevel.set(segment, node);
+      }
+
+      if (index === segments.length - 1) {
+        node.fullPath = campo.nome;
+        node.tipo = campo.tipo;
+      }
+
+      currentLevel = node.children;
+    });
+  }
+
+  const normalize = (level: Map<string, ApiCampoTreeDraftNode>): ApiCampoTreeNode[] =>
+    Array.from(level.values())
+      .map((node) => ({
+        key: node.key,
+        label: node.label,
+        fullPath: node.fullPath,
+        tipo: node.tipo,
+        children: normalize(node.children),
+      }))
+      .sort((left, right) => left.label.localeCompare(right.label, "pt-BR"));
+
+  return normalize(root);
+}
+
+function ApiCampoTree({
+  nodes,
+  selectedNames,
+  onToggleCampo,
+  depth = 0,
+}: {
+  nodes: ApiCampoTreeNode[];
+  selectedNames: Set<string>;
+  onToggleCampo: (campo: ApiCampo) => void;
+  depth?: number;
+}) {
+  return (
+    <div className={depth === 0 ? "space-y-0.5" : "space-y-0.5"}>
+      {nodes.map((node) => {
+        const isLeaf = Boolean(node.fullPath && node.tipo);
+        const isChecked = node.fullPath ? selectedNames.has(node.fullPath) : false;
+
+        return (
+          <div key={node.key}>
+            <div
+              className="flex items-center gap-2 rounded-md px-1.5 py-0.5 text-[13px] text-slate-300"
+              style={{ paddingLeft: `${depth * 12 + 6}px` }}
+            >
+              {isLeaf ? (
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => onToggleCampo({ nome: node.fullPath!, tipo: node.tipo!, descricao: "" })}
+                  className="h-3.5 w-3.5"
+                />
+              ) : (
+                <span className="inline-block h-3.5 w-3.5 rounded-sm border border-white/10 bg-white/[0.03]" />
+              )}
+              <span className={isLeaf ? "font-medium text-white" : "font-medium text-slate-300"}>{node.label}</span>
+              {isLeaf ? <span className="rounded bg-slate-800/80 px-1.5 py-0 text-[10px] uppercase tracking-[0.14em] text-cyan-200">{node.tipo}</span> : null}
+            </div>
+            {node.children.length ? <ApiCampoTree nodes={node.children} selectedNames={selectedNames} onToggleCampo={onToggleCampo} depth={depth + 1} /> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function AgenteModal({
   open,
@@ -248,6 +363,9 @@ function ApiModal({
     return null;
   }
 
+  const campoTree = buildApiCampoTree(detectedApiCampos);
+  const selectedCampoNames = new Set(form.campos.map((campo) => campo.nome));
+
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
       <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
@@ -255,7 +373,7 @@ function ApiModal({
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">API</p>
             <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar API" : "Nova API"}</h2>
-            <p className="mt-1 text-sm text-slate-400">Cadastre uma API GET, teste a resposta e escolha os campos que ficam ativos.</p>
+            <p className="mt-1 text-sm text-slate-400">Cadastre uma API GET, teste a resposta e escolha os campos ativos, inclusive os aninhados.</p>
           </div>
           <button
             type="button"
@@ -267,8 +385,9 @@ function ApiModal({
           </button>
         </div>
 
-        <div className="max-h-[calc(92vh-88px)] overflow-y-auto p-6">
-          <div className="space-y-4">
+        <div className="flex max-h-[calc(92vh-88px)] flex-col">
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="space-y-4 pb-6">
             <input value={form.nome} onChange={(event) => onChange({ nome: event.target.value })} placeholder="Nome da API" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
             <input value={form.url} onChange={(event) => onChange({ url: event.target.value })} placeholder="https://api.exemplo.com/recurso" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
             <input value={form.metodo} readOnly className="w-full rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-white outline-none" />
@@ -278,7 +397,7 @@ function ApiModal({
               API ativa no projeto
             </label>
 
-            <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+            <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-white">Campos detectados</p>
                 <button type="button" onClick={onTest} disabled={testing || saving} className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100">
@@ -287,21 +406,18 @@ function ApiModal({
                 </button>
               </div>
 
-              <div className="mt-4 space-y-2">
-                {detectedApiCampos.length ? (
-                  detectedApiCampos.map((campo) => (
-                    <label key={campo.nome} className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
-                      <input type="checkbox" checked={form.campos.some((item) => item.nome === campo.nome)} onChange={() => onToggleCampo(campo)} />
-                      <span className="font-semibold text-white">{campo.nome}</span>
-                      <span className="rounded-full bg-slate-800 px-2 py-1 text-[11px] uppercase tracking-[0.18em] text-cyan-200">{campo.tipo}</span>
-                    </label>
-                  ))
+              <div className="mt-3 max-h-[44vh] overflow-y-auto rounded-lg border border-white/8 bg-white/[0.02] p-2">
+                {campoTree.length ? (
+                  <ApiCampoTree nodes={campoTree} selectedNames={selectedCampoNames} onToggleCampo={onToggleCampo} />
                 ) : (
-                  <p className="text-sm text-slate-400">Teste a API para detectar os campos de primeiro nivel automaticamente.</p>
+                  <p className="text-sm text-slate-400">Teste a API para detectar automaticamente campos simples e aninhados.</p>
                 )}
               </div>
             </div>
+            </div>
+          </div>
 
+          <div className="border-t border-white/10 bg-brand-dark/95 px-6 py-4 backdrop-blur">
             <div className="flex gap-3">
               <button type="button" onClick={onSubmit} disabled={saving} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
                 {form.id ? <Pencil size={16} /> : <Plus size={16} />}
@@ -312,7 +428,7 @@ function ApiModal({
               </button>
             </div>
 
-            {feedback ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</div> : null}
+            {feedback ? <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</div> : null}
           </div>
         </div>
       </div>
@@ -579,8 +695,13 @@ export default function AdminProjetoDetalhePage() {
     setApiModalOpen(true);
   };
 
-  const handleDeleteApi = async (apiId: string) => {
-    const response = await fetch(`/api/apis/${apiId}`, { method: "DELETE" });
+  const handleDeleteApi = async (api: Api) => {
+    const confirmed = window.confirm(`Tem certeza que deseja excluir a API "${api.nome}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    const response = await fetch(`/api/apis/${api.id}`, { method: "DELETE" });
     const payload = (await response.json()) as { error?: string };
 
     if (!response.ok) {
@@ -589,10 +710,10 @@ export default function AdminProjetoDetalhePage() {
     }
 
     await loadProjeto();
-    if (apiForm.id === apiId) {
+    if (apiForm.id === api.id) {
       resetApiForm();
     }
-    setFeedbackApi("API excluida com sucesso.");
+    setFeedbackApi(`API "${api.nome}" excluida com sucesso.`);
   };
 
   const toggleApiCampo = (campo: ApiCampo) => {
@@ -665,7 +786,7 @@ export default function AdminProjetoDetalhePage() {
         </section>
       )}
 
-      <div className="space-y-6">
+      <div className="grid gap-6 xl:grid-cols-2">
         <section id="agentes" className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
           <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -677,14 +798,14 @@ export default function AdminProjetoDetalhePage() {
               Novo agente
             </button>
           </div>
-          <div className="space-y-4 p-6">
+          <div className="space-y-3 p-4">
             {data.agentes.length ? (
               data.agentes.map((agente) => (
-                <div key={agente.id} className="rounded-xl border border-white/10 bg-slate-950/30 p-5">
+                <div key={agente.id} className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
                   <div className="flex items-start justify-between gap-4">
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-3">
-                        <h4 className="text-lg font-bold text-white">{agente.nome}</h4>
+                        <h4 className="text-base font-bold text-white">{agente.nome}</h4>
                         <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${agente.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
                           {agente.ativo ? "ativo" : "inativo"}
                         </span>
@@ -695,7 +816,7 @@ export default function AdminProjetoDetalhePage() {
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descricao."}</p>
+                      <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descricao."}</p>
                       <p className="mt-3 text-xs text-cyan-200/80">
                         APIs vinculadas: {agente.apiIds.length ? agente.apiIds.map((apiId) => data.apis.find((api) => api.id === apiId)?.nome ?? "API").join(", ") : "nenhuma"}
                       </p>
@@ -723,28 +844,39 @@ export default function AdminProjetoDetalhePage() {
               Nova API
             </button>
           </div>
-          <div className="space-y-4 p-6">
+          <div className="space-y-3 p-4">
             {data.apis.length ? (
               data.apis.map((api) => (
-                <div key={api.id} className="rounded-xl border border-white/10 bg-slate-950/30 p-5">
+                <div key={api.id} className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
                   <div className="flex items-start justify-between gap-4">
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-3">
-                        <h4 className="text-lg font-bold text-white">{api.nome}</h4>
+                        <h4 className="text-base font-bold text-white">{api.nome}</h4>
                         <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200">{api.metodo}</span>
                         <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${api.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
                           {api.ativo ? "ativa" : "inativa"}
                         </span>
                       </div>
-                      <p className="mt-2 break-all text-sm text-slate-400">{api.url}</p>
-                      <p className="mt-2 text-sm leading-relaxed text-slate-400">{api.descricao || "Sem descricao."}</p>
-                      <p className="mt-3 text-xs text-cyan-200/80">Campos: {api.campos.length ? api.campos.map((campo) => campo.nome).join(", ") : "nenhum campo detectado"}</p>
+                      <p className="mt-2 truncate text-sm text-slate-400">{api.url}</p>
+                      <p className="mt-2 line-clamp-1 text-sm leading-relaxed text-slate-400">{api.descricao || "Sem descricao."}</p>
+                      <div className="mt-3 grid gap-2 text-xs text-slate-400 sm:grid-cols-3">
+                        <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2">
+                          <span className="block text-[10px] uppercase tracking-[0.16em] text-slate-500">Campos</span>
+                          <span className="mt-1 block font-semibold text-white">{api.campos.length}</span>
+                        </div>
+                        <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2 sm:col-span-2">
+                          <span className="block text-[10px] uppercase tracking-[0.16em] text-slate-500">Resumo</span>
+                          <span className="mt-1 block text-cyan-200/80">
+                            {api.campos.length ? summarizeApiFields(api.campos) : "Nenhum campo detectado"}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => handleEditApi(api)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200">
                         Editar
                       </button>
-                      <button type="button" onClick={() => void handleDeleteApi(api.id)} className="inline-flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-100">
+                      <button type="button" onClick={() => void handleDeleteApi(api)} className="inline-flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-100">
                         <Trash2 size={14} />
                         Excluir
                       </button>
@@ -758,7 +890,9 @@ export default function AdminProjetoDetalhePage() {
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+      </div>
+
+      <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
           <div className="border-b border-white/10 px-6 py-5">
             <h3 className="text-xl font-bold text-white">Chats recentes</h3>
             <p className="mt-1 text-sm text-slate-400">Visao rapida das conversas ligadas a este projeto.</p>
@@ -785,7 +919,6 @@ export default function AdminProjetoDetalhePage() {
         <Link href="/admin/projetos" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-3 font-semibold text-white transition-colors hover:bg-white/10">
           Voltar para projetos
         </Link>
-      </div>
 
       <AgenteModal
         open={agenteModalOpen}
