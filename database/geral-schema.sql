@@ -17,6 +17,38 @@ CREATE TABLE public.agentes (
   CONSTRAINT agentes_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id),
   CONSTRAINT agentes_modelo_id_fkey FOREIGN KEY (modelo_id) REFERENCES public.modelos(id)
 );
+CREATE TABLE public.apis (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  projeto_id uuid NOT NULL,
+  nome character varying NOT NULL,
+  url text NOT NULL,
+  metodo character varying NOT NULL DEFAULT 'GET'::character varying,
+  descricao text,
+  ativo boolean NOT NULL DEFAULT true,
+  created_at timestamp without time zone NOT NULL DEFAULT now(),
+  updated_at timestamp without time zone NOT NULL DEFAULT now(),
+  CONSTRAINT apis_pkey PRIMARY KEY (id),
+  CONSTRAINT apis_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id)
+);
+CREATE TABLE public.api_campos (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  api_id uuid NOT NULL,
+  nome character varying NOT NULL,
+  tipo character varying NOT NULL,
+  descricao text,
+  created_at timestamp without time zone NOT NULL DEFAULT now(),
+  CONSTRAINT api_campos_pkey PRIMARY KEY (id),
+  CONSTRAINT api_campos_api_id_fkey FOREIGN KEY (api_id) REFERENCES public.apis(id)
+);
+CREATE TABLE public.agente_api (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  agente_id uuid NOT NULL,
+  api_id uuid NOT NULL,
+  created_at timestamp without time zone NOT NULL DEFAULT now(),
+  CONSTRAINT agente_api_pkey PRIMARY KEY (id),
+  CONSTRAINT agente_api_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id),
+  CONSTRAINT agente_api_api_id_fkey FOREIGN KEY (api_id) REFERENCES public.apis(id)
+);
 CREATE TABLE public.chats (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   projeto_id uuid,

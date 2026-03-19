@@ -52,6 +52,7 @@ export async function POST(request: Request) {
       promptBase?: string;
       configuracoes?: unknown;
       ativo?: boolean;
+      apiIds?: string[];
     };
 
     if (!body.nome?.trim()) {
@@ -71,6 +72,7 @@ export async function POST(request: Request) {
       promptBase: body.promptBase,
       configuracoes: parseConfiguracoes(body.configuracoes),
       ativo: body.ativo,
+      apiIds: Array.isArray(body.apiIds) ? body.apiIds : [],
     });
 
     if (!created) {
@@ -101,6 +103,7 @@ export async function PUT(request: Request) {
       promptBase?: string;
       configuracoes?: unknown;
       ativo?: boolean;
+      apiIds?: string[];
     };
 
     if (!body.id || !body.nome?.trim()) {
@@ -121,6 +124,7 @@ export async function PUT(request: Request) {
       promptBase: body.promptBase,
       configuracoes: parseConfiguracoes(body.configuracoes),
       ativo: body.ativo,
+      apiIds: Array.isArray(body.apiIds) ? body.apiIds : [],
     });
 
     if (!updated) {

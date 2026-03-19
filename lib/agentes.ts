@@ -1,5 +1,6 @@
 import "server-only";
 
+import { listApiIdsByAgentes, syncAgenteApis } from "@/lib/apis";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export type AgenteRecord = {
@@ -14,6 +15,7 @@ export type AgenteRecord = {
   projetoNome?: string | null;
   projetoSlug?: string | null;
   modeloId: string | null;
+  apiIds: string[];
   createdAt: string;
 };
 
@@ -53,8 +55,21 @@ function mapAgente(row: AgenteRow): AgenteRecord {
     projetoNome: Array.isArray(row.projetos) ? row.projetos[0]?.nome ?? null : row.projetos?.nome ?? null,
     projetoSlug: Array.isArray(row.projetos) ? row.projetos[0]?.slug ?? null : row.projetos?.slug ?? null,
     modeloId: row.modelo_id,
+    apiIds: [],
     createdAt: row.created_at ?? new Date().toISOString(),
   };
+}
+
+async function attachApiIds(agentes: AgenteRecord[]) {
+  if (!agentes.length) {
+    return agentes;
+  }
+
+  const apiIdsByAgente = await listApiIdsByAgentes(agentes.map((agente) => agente.id));
+  return agentes.map((agente) => ({
+    ...agente,
+    apiIds: apiIdsByAgente.get(agente.id) ?? [],
+  }));
 }
 
 export async function listAgentes(projetoId?: string | null) {
@@ -75,7 +90,7 @@ export async function listAgentes(projetoId?: string | null) {
     return [];
   }
 
-  return data.map((row) => mapAgente(row as AgenteRow));
+  return await attachApiIds(data.map((row) => mapAgente(row as AgenteRow)));
 }
 
 export async function getAgenteAtivo(projetoId: string) {
@@ -96,7 +111,8 @@ export async function getAgenteAtivo(projetoId: string) {
     return null;
   }
 
-  return mapAgente(data as AgenteRow);
+  const [agente] = await attachApiIds([mapAgente(data as AgenteRow)]);
+  return agente ?? null;
 }
 
 async function disableOtherAgents(exceptId: string, projetoId: string | null) {
@@ -124,6 +140,7 @@ export async function createAgente(input: {
   promptBase?: string;
   configuracoes?: Record<string, unknown> | null;
   ativo?: boolean;
+  apiIds?: string[];
 }) {
   const supabase = getSupabaseAdminClient();
   const now = new Date().toISOString();
@@ -138,6 +155,7 @@ export async function createAgente(input: {
       configuracoes: input.configuracoes ?? null,
       ativo: input.ativo ?? true,
       created_at: now,
+      updated_at: now,
     } as never)
     .select("id, slug, nome, descricao, prompt_base, configuracoes, ativo, projeto_id, projetos(nome, slug), modelo_id, created_at")
     .single();
@@ -152,7 +170,9 @@ export async function createAgente(input: {
     await disableOtherAgents(agente.id, agente.projetoId);
   }
 
-  return agente;
+  await syncAgenteApis(agente.id, input.projetoId, input.apiIds ?? []);
+  const [withApis] = await attachApiIds([agente]);
+  return withApis ?? null;
 }
 
 export async function updateAgente(input: {
@@ -164,6 +184,7 @@ export async function updateAgente(input: {
   promptBase?: string;
   configuracoes?: Record<string, unknown> | null;
   ativo?: boolean;
+  apiIds?: string[];
 }) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
@@ -176,6 +197,7 @@ export async function updateAgente(input: {
       prompt_base: input.promptBase?.trim() || null,
       configuracoes: input.configuracoes ?? null,
       ativo: input.ativo ?? false,
+      updated_at: new Date().toISOString(),
     } as never)
     .eq("id", input.id)
     .select("id, slug, nome, descricao, prompt_base, configuracoes, ativo, projeto_id, projetos(nome, slug), modelo_id, created_at")
@@ -191,5 +213,10 @@ export async function updateAgente(input: {
     await disableOtherAgents(agente.id, agente.projetoId);
   }
 
-  return agente;
+  if (agente.projetoId) {
+    await syncAgenteApis(agente.id, agente.projetoId, input.apiIds ?? []);
+  }
+
+  const [withApis] = await attachApiIds([agente]);
+  return withApis ?? null;
 }

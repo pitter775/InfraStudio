@@ -1,10 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Bot, BrainCircuit, Lock, Pencil, Plus, Search, Shield, Sparkles, X } from "lucide-react";
+import { Bot, BrainCircuit, DatabaseZap, Lock, Pencil, Plus, Search, Shield, Sparkles, X } from "lucide-react";
 import { canAccessAdmin } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
+
+type Api = {
+  id: string;
+  nome: string;
+  metodo: "GET";
+  ativo: boolean;
+};
 
 type Agente = {
   id: string;
@@ -18,6 +25,7 @@ type Agente = {
   projetoId: string | null;
   projetoNome?: string | null;
   projetoSlug?: string | null;
+  apiIds: string[];
 };
 
 type Projeto = {
@@ -35,6 +43,7 @@ type AgenteFormState = {
   promptBase: string;
   configuracoes: string;
   ativo: boolean;
+  apiIds: string[];
 };
 
 const defaultConfiguracoes = {
@@ -59,12 +68,14 @@ const emptyForm: AgenteFormState = {
   promptBase: "",
   configuracoes: JSON.stringify(defaultConfiguracoes, null, 2),
   ativo: true,
+  apiIds: [],
 };
 
 function AgentModal({
   open,
   form,
   projetos,
+  apis,
   currentUser,
   saving,
   feedback,
@@ -75,6 +86,7 @@ function AgentModal({
   open: boolean;
   form: AgenteFormState;
   projetos: Projeto[];
+  apis: Api[];
   currentUser: AppUser | null;
   saving: boolean;
   feedback: string | null;
@@ -88,12 +100,12 @@ function AgentModal({
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
-      <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
+      <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Agente</p>
             <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar agente" : "Novo agente"}</h2>
-            <p className="mt-1 text-sm text-slate-400">Ajuste projeto, prompt base e configuracoes sem sair da listagem.</p>
+            <p className="mt-1 text-sm text-slate-400">Ajuste projeto, prompt base, configuracoes e as APIs disponiveis para este agente.</p>
           </div>
           <button
             type="button"
@@ -105,14 +117,14 @@ function AgentModal({
           </button>
         </div>
 
-        <div className="grid max-h-[calc(92vh-88px)] gap-0 overflow-y-auto lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="grid max-h-[calc(92vh-88px)] gap-0 overflow-y-auto lg:grid-cols-[1.05fr_0.95fr]">
           <div className="space-y-4 p-6">
             {currentUser?.isMaster ? (
               <label className="block space-y-2">
                 <span className="text-sm font-semibold text-slate-300">Projeto</span>
                 <select
                   value={form.projetoId}
-                  onChange={(event) => onChange({ projetoId: event.target.value })}
+                  onChange={(event) => onChange({ projetoId: event.target.value, apiIds: [] })}
                   className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
                 >
                   <option value="">Selecione o projeto</option>
@@ -175,7 +187,7 @@ function AgentModal({
               <textarea
                 value={form.configuracoes}
                 onChange={(event) => onChange({ configuracoes: event.target.value })}
-                rows={14}
+                rows={12}
                 className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 font-mono text-xs leading-relaxed text-cyan-100 outline-none"
               />
             </label>
@@ -197,11 +209,40 @@ function AgentModal({
               Agente ativo para o chat do site
             </label>
 
+            <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/30 p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <DatabaseZap size={16} className="text-cyan-200" />
+                <p className="text-sm font-semibold text-white">APIs vinculadas ao agente</p>
+              </div>
+              <div className="space-y-2">
+                {apis.length ? (
+                  apis.map((api) => (
+                    <label key={api.id} className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={form.apiIds.includes(api.id)}
+                        onChange={(event) =>
+                          onChange({
+                            apiIds: event.target.checked ? [...form.apiIds, api.id] : form.apiIds.filter((item) => item !== api.id),
+                          })
+                        }
+                      />
+                      <span className="font-semibold text-white">{api.nome}</span>
+                      <span className="text-slate-500">{api.metodo}</span>
+                    </label>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400">Nenhuma API encontrada para o projeto selecionado.</p>
+                )}
+              </div>
+            </div>
+
             <div className="mt-5 space-y-3 rounded-2xl border border-white/10 bg-slate-950/30 p-5">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Resumo rapido</p>
               <p className="text-sm text-slate-300">Projeto: {projetos.find((item) => item.id === form.projetoId)?.nome ?? "Nao definido"}</p>
               <p className="text-sm text-slate-300">Slug: {form.slug || "Nao definido"}</p>
               <p className="text-sm text-slate-300">Status: {form.ativo ? "Ativo" : "Inativo"}</p>
+              <p className="text-sm text-slate-300">APIs: {form.apiIds.length}</p>
             </div>
 
             <div className="mt-6 flex gap-3">
@@ -239,12 +280,29 @@ export default function AdminAgentesPage() {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [agentes, setAgentes] = useState<Agente[]>([]);
+  const [projectApis, setProjectApis] = useState<Api[]>([]);
   const [form, setForm] = useState<AgenteFormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [filterProjectId, setFilterProjectId] = useState("");
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+
+  const loadProjectApis = async (projectId: string) => {
+    if (!projectId) {
+      setProjectApis([]);
+      return;
+    }
+
+    const response = await fetch(`/api/projetos/${projectId}/apis`, { cache: "no-store" });
+    if (!response.ok) {
+      setProjectApis([]);
+      return;
+    }
+
+    const payload = (await response.json()) as { apis?: Api[] };
+    setProjectApis(payload.apis ?? []);
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -271,11 +329,18 @@ export default function AdminAgentesPage() {
           ...prev,
           projetoId: prev.projetoId || initialProjectId,
         }));
+        if (initialProjectId) {
+          await loadProjectApis(initialProjectId);
+        }
       }
     };
 
     void loadData();
   }, []);
+
+  useEffect(() => {
+    void loadProjectApis(form.projetoId);
+  }, [form.projetoId]);
 
   const isAllowed = canAccessAdmin(currentUser);
   const effectiveProjectId = currentUser?.isMaster ? filterProjectId : currentUser?.currentProjectId ?? filterProjectId;
@@ -311,18 +376,23 @@ export default function AdminAgentesPage() {
     setModalOpen(true);
   };
 
-  const handleEdit = (agente: Agente) => {
+  const handleEdit = async (agente: Agente) => {
+    const projetoId = agente.projetoId ?? currentUser?.currentProjectId ?? "";
     setForm({
       id: agente.id,
-      projetoId: agente.projetoId ?? currentUser?.currentProjectId ?? "",
+      projetoId,
       slug: agente.slug ?? "",
       nome: agente.nome,
       descricao: agente.descricao,
       promptBase: agente.promptBase,
       configuracoes: JSON.stringify(agente.configuracoes ?? defaultConfiguracoes, null, 2),
       ativo: agente.ativo,
+      apiIds: agente.apiIds ?? [],
     });
     setFeedback(null);
+    if (projetoId) {
+      await loadProjectApis(projetoId);
+    }
     setModalOpen(true);
   };
 
@@ -368,7 +438,7 @@ export default function AdminAgentesPage() {
         </div>
         <h1 className="text-4xl font-extrabold text-white">Gestao de agentes</h1>
         <p className="mt-4 max-w-3xl text-slate-400">
-          Centralize os agentes por cliente, filtre por projeto e edite tudo em modal sem sair da listagem.
+          Centralize os agentes por cliente, filtre por projeto e controle tambem quais APIs cada agente pode consumir.
         </p>
       </section>
 
@@ -408,7 +478,7 @@ export default function AdminAgentesPage() {
                 <Sparkles size={18} />
               </div>
               <p className="text-sm leading-relaxed text-cyan-50">
-                Clique em editar para abrir o modal e ajustar prompt, JSON, status e projeto do agente.
+                Agora cada agente tambem pode ser vinculado a APIs do projeto diretamente no modal de edicao.
               </p>
             </div>
           </section>
@@ -466,6 +536,7 @@ export default function AdminAgentesPage() {
                   <tr className="text-left text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                     <th className="px-6 py-4">Agente</th>
                     <th className="px-6 py-4">Projeto</th>
+                    <th className="px-6 py-4">APIs</th>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4">Criado em</th>
                     <th className="px-6 py-4">Acao</th>
@@ -484,6 +555,7 @@ export default function AdminAgentesPage() {
                           <p className="font-semibold text-white">{agente.projetoNome ?? "Sem projeto"}</p>
                           <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{agente.projetoSlug ?? "sem-slug"}</p>
                         </td>
+                        <td className="px-6 py-5 text-slate-400">{agente.apiIds.length}</td>
                         <td className="px-6 py-5">
                           <span
                             className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${
@@ -497,7 +569,7 @@ export default function AdminAgentesPage() {
                         <td className="px-6 py-5">
                           <button
                             type="button"
-                            onClick={() => handleEdit(agente)}
+                            onClick={() => void handleEdit(agente)}
                             className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 font-semibold text-white transition-colors hover:bg-white/10"
                           >
                             <Pencil size={14} />
@@ -508,7 +580,7 @@ export default function AdminAgentesPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="px-6 py-10 text-center text-slate-400">
+                      <td colSpan={6} className="px-6 py-10 text-center text-slate-400">
                         Nenhum agente encontrado para o filtro atual.
                       </td>
                     </tr>
@@ -522,6 +594,7 @@ export default function AdminAgentesPage() {
             open={modalOpen}
             form={form}
             projetos={projetos}
+            apis={projectApis}
             currentUser={currentUser}
             saving={saving}
             feedback={feedback}
