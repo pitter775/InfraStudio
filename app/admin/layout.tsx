@@ -1,9 +1,12 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  Bot,
+  BriefcaseBusiness,
+  MessageSquare,
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
@@ -14,24 +17,27 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { type MockUser } from "@/lib/mock-users";
+import { getCurrentProjectUser, signOutProjectAuth } from "@/lib/auth";
+import type { AppUser } from "@/lib/app-user";
+import { canAccessAdmin } from "@/lib/access";
 import { cn } from "@/lib/utils";
-
-const SESSION_KEY = "infrastudio-auth-user";
 
 const adminLinks = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/usuarios", label: "Usu?rios", icon: Users },
+  { href: "/admin/projetos", label: "Projetos", icon: BriefcaseBusiness },
+  { href: "/admin/chats", label: "Chats", icon: MessageSquare },
+  { href: "/admin/agentes", label: "Agentes", icon: Bot },
+  { href: "/admin/usuarios", label: "Usuários", icon: Users },
 ];
 
 type SidebarProps = {
-  currentUser: MockUser | null;
+  currentUser: AppUser | null;
   collapsed: boolean;
   mobileOpen: boolean;
   pathname: string;
   onCollapseToggle: () => void;
   onCloseMobile: () => void;
-  onLogout: () => void;
+  onLogout: () => Promise<void> | void;
 };
 
 function Sidebar({
@@ -43,6 +49,10 @@ function Sidebar({
   onCloseMobile,
   onLogout,
 }: SidebarProps) {
+  const visibleLinks = currentUser?.isMaster
+    ? adminLinks
+    : adminLinks.filter((item) => item.href !== "/admin/usuarios" && item.href !== "/admin/projetos");
+
   return (
     <>
       <div
@@ -62,8 +72,8 @@ function Sidebar({
         )}
       >
         <div className="flex items-center justify-between px-2">
-          <Link href="/" className="flex items-center gap-3 overflow-hidden rounded-2xl px-2 py-2">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+          <Link href="/" className="flex items-center gap-3 overflow-hidden rounded-xl px-2 py-2">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5">
               <img src="/logo.png" alt="InfraStudio" className="h-8 w-8 object-contain" />
             </div>
             {!collapsed ? (
@@ -96,20 +106,22 @@ function Sidebar({
 
         <div className="mt-8 px-2">
           {!collapsed ? (
-            <div className="rounded-2xl border border-cyan-500/15 bg-cyan-500/10 p-4">
+            <div className="rounded-xl border border-cyan-500/15 bg-cyan-500/10 p-4">
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-slate-950/25 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-200">
                 <ShieldCheck size={13} />
-                ?rea reservada
+                Área reservada
               </div>
               <p className="text-sm leading-relaxed text-cyan-50">
-                Dashboard mockado e usu?rios mockados, prontos para receber permiss?o real depois.
+                {currentUser?.isMaster
+                  ? "Visão global da InfraStudio para acompanhar todos os projetos e agentes."
+                  : "Você está no ambiente do seu projeto e vê apenas os chats e agentes ligados ao seu cliente."}
               </p>
             </div>
           ) : null}
         </div>
 
         <nav className="mt-6 flex-1 space-y-2 px-2">
-          {adminLinks.map((item) => {
+          {visibleLinks.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href;
 
@@ -119,7 +131,7 @@ function Sidebar({
                 href={item.href}
                 onClick={onCloseMobile}
                 className={cn(
-                  "group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition-all",
+                  "group flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all",
                   active
                     ? "bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg shadow-blue-900/30"
                     : "text-slate-300 hover:bg-white/6 hover:text-white",
@@ -137,7 +149,7 @@ function Sidebar({
         <div className="border-t border-white/10 px-2 pt-4">
           <div
             className={cn(
-              "rounded-2xl border border-white/10 bg-white/5 p-3",
+              "rounded-xl border border-white/10 bg-white/5 p-3",
               collapsed ? "flex flex-col items-center gap-3" : "space-y-3",
             )}
           >
@@ -147,21 +159,28 @@ function Sidebar({
               </div>
               {!collapsed ? (
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">{currentUser?.name ?? "N?o autenticado"}</p>
+                  <p className="truncate text-sm font-semibold text-white">{currentUser?.name ?? "Não autenticado"}</p>
                   <p className="truncate text-xs text-slate-400">{currentUser?.email ?? "Login pela home"}</p>
+                  {!currentUser?.isMaster && currentUser?.memberships?.[0]?.projetoNome ? (
+                    <p className="truncate text-[11px] uppercase tracking-[0.16em] text-cyan-200/80">
+                      {currentUser.memberships[0].projetoNome}
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </div>
 
             {!collapsed ? (
               <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/10 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-200">
-                {currentUser?.role ?? "sem acesso"}
+                {currentUser?.isMaster ? "master" : currentUser?.role ?? "sem acesso"}
               </div>
             ) : null}
 
             <button
               type="button"
-              onClick={onLogout}
+              onClick={() => {
+                void onLogout();
+              }}
               className={cn(
                 "inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white",
                 collapsed ? "w-11 h-11 p-0" : "w-full",
@@ -180,32 +199,47 @@ function Sidebar({
 
 export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<MockUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
+  const [authResolved, setAuthResolved] = useState(false);
 
   useEffect(() => {
-    const storedUser = window.localStorage.getItem(SESSION_KEY);
-    if (!storedUser) {
-      return;
-    }
+    const loadUser = async () => {
+      const user = await getCurrentProjectUser();
+      if (!canAccessAdmin(user)) {
+        router.replace("/");
+        return;
+      }
 
-    try {
-      setCurrentUser(JSON.parse(storedUser) as MockUser);
-    } catch {
-      window.localStorage.removeItem(SESSION_KEY);
-    }
-  }, []);
+      setCurrentUser(user);
+      setAuthResolved(true);
+    };
+
+    void loadUser();
+  }, [router]);
 
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
-  const handleLogout = () => {
-    window.localStorage.removeItem(SESSION_KEY);
+  const handleLogout = async () => {
+    await signOutProjectAuth();
     setCurrentUser(null);
     window.location.href = "/";
   };
+
+  if (!authResolved) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-brand-dark px-6 text-slate-200">
+        <div className="rounded-2xl border border-white/10 bg-white/5 px-6 py-5 text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Validando acesso</p>
+          <p className="mt-3 text-lg text-white">Carregando ambiente master...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-brand-dark text-slate-200">

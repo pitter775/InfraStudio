@@ -28,22 +28,24 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { mockUsers, type MockUser } from "@/lib/mock-users";
+import { getAuthProviderLabel, getCurrentProjectUser, signInWithProjectAuth, signOutProjectAuth } from "@/lib/auth";
+import type { AppUser } from "@/lib/app-user";
 import { cn } from "@/lib/utils";
 
-const SESSION_KEY = "infrastudio-auth-user";
 const WHATSAPP_NUMBER = "5511949506267";
 
 type LoginModalProps = {
   open: boolean;
   onClose: () => void;
-  onLogin: (user: MockUser) => void;
+  authProvider: "mock" | "database";
+  onLogin: (email: string, password: string) => Promise<string | null>;
 };
 
-function LoginModal({ open, onClose, onLogin }: LoginModalProps) {
-  const [email, setEmail] = useState("admin@infrastudio.com");
-  const [password, setPassword] = useState("admin123");
+function LoginModal({ open, onClose, onLogin, authProvider }: LoginModalProps) {
+  const [email, setEmail] = useState("adm@adm");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -55,17 +57,19 @@ function LoginModal({ open, onClose, onLogin }: LoginModalProps) {
     return null;
   }
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setLoading(true);
 
-    const user = mockUsers.find((item) => item.email === email && item.password === password);
+    const loginError = await onLogin(email, password);
 
-    if (!user) {
-      setError("Email ou senha invalidos.");
+    if (loginError) {
+      setError(loginError);
+      setLoading(false);
       return;
     }
 
-    onLogin(user);
+    setLoading(false);
     onClose();
   };
 
@@ -88,11 +92,13 @@ function LoginModal({ open, onClose, onLogin }: LoginModalProps) {
         <div className="border-b border-white/10 bg-white/5 px-6 py-5">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.25em] text-blue-300">
             <Lock size={14} />
-            Acesso rapido
+            Acesso rápido
           </div>
-          <h2 className="text-2xl font-extrabold text-white">Entrar na area reservada</h2>
+          <h2 className="text-2xl font-extrabold text-white">Entrar na área reservada</h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-400">
-            Por enquanto este login e visual. Depois vamos conectar ao Supabase Auth e a tabela `usuarios`.
+            {authProvider === "database"
+              ? "Este login usa a tabela `usuarios` da aplicação e mantém a autenticação desacoplada do provedor do banco."
+              : "Enquanto as envs de banco e sessão não forem preenchidas, este login continua usando o modo demo local."}
           </p>
         </div>
 
@@ -107,7 +113,7 @@ function LoginModal({ open, onClose, onLogin }: LoginModalProps) {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-500 focus:border-blue-500/60"
-              placeholder="admin@infrastudio.com"
+              placeholder="adm@adm"
             />
           </div>
 
@@ -126,9 +132,18 @@ function LoginModal({ open, onClose, onLogin }: LoginModalProps) {
           </div>
 
           <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/8 p-4 text-sm text-emerald-100">
-            <p className="font-semibold">Acesso demo</p>
-            <p className="mt-1 text-emerald-200/80">Email: admin@infrastudio.com</p>
-            <p className="text-emerald-200/80">Senha: admin123</p>
+            <p className="font-semibold">{authProvider === "database" ? "Autenticação própria" : "Acesso demo"}</p>
+            {authProvider === "database" ? (
+              <>
+                <p className="mt-1 text-emerald-200/80">Use um usuário cadastrado na tabela `public.usuarios`.</p>
+                <p className="text-emerald-200/80">Exemplo atual: `adm@adm`</p>
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-emerald-200/80">Email: admin@infrastudio.com</p>
+                <p className="text-emerald-200/80">Senha: admin123</p>
+              </>
+            )}
           </div>
 
           {error ? (
@@ -139,9 +154,10 @@ function LoginModal({ open, onClose, onLogin }: LoginModalProps) {
 
           <button
             type="submit"
+            disabled={loading}
             className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-3 font-bold text-white shadow-xl shadow-blue-900/40 transition-all hover:-translate-y-0.5 hover:from-blue-500 hover:to-cyan-400"
           >
-            Entrar agora
+            {loading ? "Entrando..." : "Entrar agora"}
             <ArrowRight size={16} />
           </button>
         </form>
@@ -151,9 +167,9 @@ function LoginModal({ open, onClose, onLogin }: LoginModalProps) {
 }
 
 type NavbarProps = {
-  currentUser: MockUser | null;
+  currentUser: AppUser | null;
   onOpenLogin: () => void;
-  onLogout: () => void;
+  onLogout: () => Promise<void> | void;
   onOpenChat: () => void;
 };
 
@@ -225,7 +241,7 @@ function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: NavbarProps)
                   onClick={closeMobileMenu}
                   className="block rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.06]"
                 >
-                  Servicos
+                  Serviços
                 </a>
                 <a
                   href="#como-funciona"
@@ -243,7 +259,7 @@ function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: NavbarProps)
                   }}
                   className="block rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.06]"
                 >
-                  Solicitar or?amento
+                  Solicitar orçamento
                 </a>
               </div>
 
@@ -313,7 +329,7 @@ function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: NavbarProps)
 
           <div className="hidden items-center space-x-8 md:flex">
             <a href="#servicos" className="text-sm font-medium text-slate-300 transition-colors hover:text-blue-400">
-              Servicos
+              Serviços
             </a>
             <a
               href="#como-funciona"
@@ -329,7 +345,7 @@ function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: NavbarProps)
               }}
               className="rounded-full bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:from-blue-500 hover:to-blue-400"
             >
-              Solicitar or?amento
+              Solicitar orçamento
             </a>
           </div>
 
@@ -353,7 +369,9 @@ function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: NavbarProps)
                 </div>
                 <button
                   type="button"
-                  onClick={onLogout}
+                  onClick={() => {
+                    void onLogout();
+                  }}
                   className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-white/10 md:inline-flex"
                 >
                   <LogOut size={16} />
@@ -392,11 +410,104 @@ type ChatWidgetProps = {
 };
 
 function ChatWidget({ open, onClose }: ChatWidgetProps) {
-  const [messages] = useState([
-    { text: "Ola! Sou o atendimento inicial da InfraStudio.", isAi: true },
-    { text: "Me conte rapidamente o que voce quer automatizar.", isAi: true },
-    { text: "Se preferir, eu ja te levo direto para o WhatsApp.", isAi: true },
+  const CHAT_STORAGE_KEY = "infrastudio-site-chat";
+  const initialMessages = [
+    { id: "intro-1", text: "Olá! Sou o atendimento inicial da InfraStudio.", isAi: true },
+    { id: "intro-2", text: "Me conte rapidamente o que você quer automatizar.", isAi: true },
+    { id: "intro-3", text: "Se preferir, eu já te levo direto para o WhatsApp.", isAi: true },
+  ];
+  const [messages, setMessages] = useState([
+    ...initialMessages,
   ]);
+  const [draft, setDraft] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [chatId, setChatId] = useState<string | null>(null);
+
+  const quickReplies: string[] = [];
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const stored = window.localStorage.getItem(CHAT_STORAGE_KEY);
+    if (!stored) {
+      return;
+    }
+
+    try {
+      const payload = JSON.parse(stored) as {
+        chatId: string | null;
+        messages: typeof initialMessages;
+      };
+      setChatId(payload.chatId);
+      if (payload.messages?.length) {
+        setMessages(payload.messages);
+      }
+    } catch {
+      window.localStorage.removeItem(CHAT_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(
+      CHAT_STORAGE_KEY,
+      JSON.stringify({
+        chatId,
+        messages,
+      }),
+    );
+  }, [chatId, messages]);
+
+  const sendMessage = async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || loading) {
+      return;
+    }
+
+    setMessages((prev) => [...prev, { id: `user-${Date.now()}`, text: trimmed, isAi: false }]);
+    setDraft("");
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ chatId, message: trimmed }),
+      });
+
+      const payload = (await response.json()) as { reply?: string; error?: string; chatId?: string };
+      if (payload.chatId) {
+        setChatId(payload.chatId);
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `ai-${Date.now()}`,
+          text: payload.reply ?? payload.error ?? "Não consegui responder agora, mas posso te levar para o WhatsApp.",
+          isAi: true,
+        },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `ai-${Date.now()}`,
+          text: "Não consegui responder agora, mas posso te levar para o WhatsApp.",
+          isAi: true,
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!open) {
     return null;
@@ -407,7 +518,7 @@ function ChatWidget({ open, onClose }: ChatWidgetProps) {
       <motion.div
         initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        className="overflow-hidden rounded-[28px] border border-white/10 bg-[rgba(9,16,34,0.84)] shadow-2xl backdrop-blur-xl"
+        className="flex max-h-[min(780px,calc(100vh-7rem))] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[rgba(9,16,34,0.84)] shadow-2xl backdrop-blur-xl"
       >
         <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.04] px-5 py-4">
           <div className="flex items-center gap-3">
@@ -429,43 +540,69 @@ function ChatWidget({ open, onClose }: ChatWidgetProps) {
           </button>
         </div>
 
-        <div className="space-y-3 bg-slate-950/20 p-5">
-          {messages.map((message) => (
-            <div key={message.text} className="max-w-[90%] rounded-2xl rounded-bl-none bg-slate-800 p-3 text-sm leading-relaxed text-slate-200">
-              {message.text}
-            </div>
-          ))}
+        <div className="chat-scroll min-h-0 flex-1 overflow-y-auto bg-slate-950/20 p-5">
+          <div className="space-y-3">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={cn(
+                  "max-w-[90%] rounded-2xl p-3 text-sm leading-relaxed",
+                  message.isAi
+                    ? "rounded-bl-none bg-slate-800 text-slate-200"
+                    : "ml-auto rounded-br-none bg-blue-600 text-white",
+                )}
+              >
+                {message.text}
+              </div>
+            ))}
+
+            {loading ? (
+              <div className="max-w-[90%] rounded-2xl rounded-bl-none bg-slate-800 p-3 text-sm leading-relaxed text-slate-200">
+                IA está digitando...
+              </div>
+            ) : null}
+          </div>
         </div>
+
+        {quickReplies.length ? (
+          <div className="border-t border-white/10 bg-slate-950/15 px-4 py-3">
+            <div className="flex flex-wrap gap-2">
+              {quickReplies.map((reply) => (
+                <button
+                  key={reply}
+                  type="button"
+                  onClick={() => void sendMessage(reply)}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-white/10"
+                >
+                  {reply}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="border-t border-white/10 p-4">
           <div className="mb-3 flex items-center gap-2">
-            <div className="flex-1 rounded-full border border-white/8 bg-white/[0.05] px-4 py-2.5 text-xs italic text-slate-400 backdrop-blur-md">
-              IA esta digitando...
-            </div>
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void sendMessage(draft);
+                }
+              }}
+              className="flex-1 rounded-full border border-white/8 bg-white/[0.05] px-4 py-2.5 text-sm text-white outline-none placeholder:text-slate-500 backdrop-blur-md"
+              placeholder="Descreva o que você quer automatizar..."
+            />
             <button
               type="button"
+              onClick={() => void sendMessage(draft)}
+              disabled={loading}
               className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#2563eb] text-white shadow-lg shadow-blue-950/40 transition-all hover:scale-105 hover:bg-[#1d4ed8]"
               aria-label="Enviar mensagem"
             >
               <Send size={15} />
-            </button>
-          </div>
-          <div className="flex gap-3">
-            <a
-              href={`https://wa.me/${WHATSAPP_NUMBER}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white transition-all hover:bg-[#20ba59]"
-            >
-              <Smartphone size={16} />
-              Chamar no WhatsApp
-            </a>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
-            >
-              Fechar
             </button>
           </div>
         </div>
@@ -506,9 +643,9 @@ function ChatDemo() {
 
   const script = useMemo(
     () => [
-      { text: "Ola! Como posso ajudar sua empresa hoje?", isAi: true },
+      { text: "Olá! Como posso ajudar sua empresa hoje?", isAi: true },
       { text: "Quero automatizar meu atendimento no WhatsApp.", isAi: false },
-      { text: "Excelente escolha! Posso agendar uma demo para voce agora mesmo?", isAi: true },
+      { text: "Excelente escolha! Posso agendar uma demo para você agora mesmo?", isAi: true },
     ],
     [],
   );
@@ -604,7 +741,7 @@ function ChatDemo() {
       </div>
       <div className="flex gap-2 border-t border-white/5 p-4">
         <div className="flex-grow rounded-full bg-white/5 px-4 py-2 text-xs italic text-slate-500">
-          {isTyping ? "IA esta digitando..." : "Online"}
+          {isTyping ? "IA está digitando..." : "Online"}
         </div>
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white">
           <Send size={14} />
@@ -617,29 +754,32 @@ function ChatDemo() {
 export default function HomePage() {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<MockUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
+  const authProvider = getAuthProviderLabel();
 
   useEffect(() => {
-    const storedUser = window.localStorage.getItem(SESSION_KEY);
-    if (!storedUser) {
-      return;
-    }
+    const loadUser = async () => {
+      const user = await getCurrentProjectUser();
+      setCurrentUser(user);
+    };
 
-    try {
-      setCurrentUser(JSON.parse(storedUser) as MockUser);
-    } catch {
-      window.localStorage.removeItem(SESSION_KEY);
-    }
+    void loadUser();
   }, []);
 
-  const handleLogin = (user: MockUser) => {
-    setCurrentUser(user);
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  const handleLogin = async (email: string, password: string) => {
+    const result = await signInWithProjectAuth(email, password);
+
+    if (result.user) {
+      setCurrentUser(result.user);
+      window.location.href = "/admin/dashboard";
+    }
+
+    return result.error;
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOutProjectAuth();
     setCurrentUser(null);
-    window.localStorage.removeItem(SESSION_KEY);
   };
 
   return (
@@ -667,7 +807,7 @@ export default function HomePage() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
             </span>
-            Tecnologia de ponta e automacao inteligente
+            Tecnologia de ponta e automação inteligente
           </motion.div>
 
           <motion.h1
@@ -687,7 +827,7 @@ export default function HomePage() {
             className="mx-auto mb-12 max-w-3xl text-lg leading-relaxed text-slate-400 md:text-xl"
           >
             Desenvolvemos software sob medida, integrações de APIs e automações inteligentes para WhatsApp e
-            Instagram. Menos esfor?o manual, mais resultados escal?veis.
+            Instagram. Menos esforço manual, mais resultados escaláveis.
           </motion.p>
 
           <motion.div
@@ -704,13 +844,13 @@ export default function HomePage() {
               }}
               className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-8 py-4 font-bold text-white shadow-xl shadow-blue-600/20 transition-all hover:-translate-y-1 hover:from-blue-500 hover:to-blue-400 sm:w-auto"
             >
-              Solicitar or?amento gratis
+              Solicitar orçamento grátis
             </a>
             <a
               href="#demonstracao"
               className="w-full rounded-xl border border-white/10 bg-white/5 px-8 py-4 font-bold text-white transition-all hover:bg-white/10 sm:w-auto"
             >
-              Ver demonstra??o
+              Ver demonstração
             </a>
           </motion.div>
 
@@ -732,27 +872,27 @@ export default function HomePage() {
       <section id="servicos" className="bg-slate-900/30 py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-20 text-center">
-            <h2 className="mb-4 text-3xl font-bold text-white md:text-4xl">Solucoes para a era da eficiencia</h2>
-            <p className="text-slate-400">Tudo o que voce precisa para digitalizar e escalar sua operacao.</p>
+            <h2 className="mb-4 text-3xl font-bold text-white md:text-4xl">Soluções para a era da eficiência</h2>
+            <p className="text-slate-400">Tudo o que você precisa para digitalizar e escalar sua operação.</p>
           </div>
 
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
             <ServiceCard
               icon={Code2}
               title="Sistemas sob medida"
-              description="Desenvolvimento de softwares exclusivos focados nas necessidades especificas do seu modelo de negocio."
+              description="Desenvolvimento de softwares exclusivos focados nas necessidades específicas do seu modelo de negócio."
               delay={0.1}
             />
             <ServiceCard
               icon={Zap}
-              title="Automacao de processos"
+              title="Automação de processos"
               description="Elimine tarefas repetitivas integrando ferramentas e automatizando fluxos de trabalho complexos."
               delay={0.2}
             />
             <ServiceCard
               icon={Share2}
-              title="Integracao de APIs"
-              description="Conectamos seu CRM, ERP e sistemas de pagamento para que seus dados fluam sem interrupcoes."
+              title="Integração de APIs"
+              description="Conectamos seu CRM, ERP e sistemas de pagamento para que seus dados fluam sem interrupções."
               delay={0.3}
             />
             <ServiceCard
@@ -763,14 +903,14 @@ export default function HomePage() {
             />
             <ServiceCard
               icon={Smartphone}
-              title="Automacao WhatsApp"
-              description="Sistemas de triagem, agendamento e vendas automaticas diretamente no aplicativo mais usado do pais."
+              title="Automação WhatsApp"
+              description="Sistemas de triagem, agendamento e vendas automáticas diretamente no aplicativo mais usado do país."
               delay={0.5}
             />
             <ServiceCard
               icon={Instagram}
               title="Instagram automation"
-              description="Respostas automaticas no Direct e comentarios que transformam seguidores em leads qualificados."
+              description="Respostas automáticas no Direct e comentários que transformam seguidores em leads qualificados."
               delay={0.6}
             />
           </div>
@@ -782,15 +922,15 @@ export default function HomePage() {
           <div className="flex flex-col items-center gap-20 lg:flex-row">
             <div className="lg:w-1/2">
               <h2 className="mb-8 text-3xl font-extrabold leading-tight text-white md:text-5xl">
-                A experiencia e a nossa maior prova.
+                A experiência é a nossa maior prova.
               </h2>
               <p className="mb-10 text-lg leading-relaxed text-slate-400">
-                Nao apenas falamos sobre tecnologia, nos a vivemos. Esta pagina e nossos sistemas sao construidos com
-                a mesma excelencia que entregamos aos nossos clientes.
+                Não apenas falamos sobre tecnologia, nós a vivemos. Esta página e nossos sistemas são construídos com
+                a mesma excelência que entregamos aos nossos clientes.
               </p>
 
               <div className="space-y-6">
-                {[{ title: "IA nativa", desc: "Integracao real com modelos GPT para atendimento." }, { title: "Alta performance", desc: "Carregamento instantaneo e UI intuitiva." }].map((item) => (
+                {[{ title: "IA nativa", desc: "Integração real com modelos GPT para atendimento." }, { title: "Alta performance", desc: "Carregamento instantâneo e UI intuitiva." }].map((item) => (
                   <div key={item.title} className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 transition-colors hover:border-blue-500/30">
                     <div className="rounded-lg bg-blue-500/20 p-2 text-blue-400">
                       <CheckCircle2 size={20} />
@@ -818,7 +958,7 @@ export default function HomePage() {
               { icon: Zap, title: "Produtividade", desc: "Foque no que importa, deixe a rotina com a gente." },
               { icon: Clock, title: "Menos manual", desc: "Erros humanos reduzidos a quase zero." },
               { icon: Puzzle, title: "Integrado", desc: "Toda sua stack conversando em tempo real." },
-              { icon: Headphones, title: "Suporte veloz", desc: "Time tecnico direto no WhatsApp para voce." },
+              { icon: Headphones, title: "Suporte veloz", desc: "Time técnico direto no WhatsApp para você." },
             ].map((item) => (
               <div key={item.title} className="group text-center">
                 <div className="mb-6 flex justify-center text-blue-500 transition-transform group-hover:scale-110">
@@ -835,7 +975,7 @@ export default function HomePage() {
       <section id="como-funciona" className="bg-slate-900/20 py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-20 text-center">
-            <h2 className="text-3xl font-bold text-white md:text-4xl">Do problema a eficiencia em 5 passos</h2>
+            <h2 className="text-3xl font-bold text-white md:text-4xl">Do problema à eficiência em 5 passos</h2>
           </div>
 
           <div className="relative">
@@ -844,10 +984,10 @@ export default function HomePage() {
             <div className="relative z-10 grid grid-cols-1 gap-8 md:grid-cols-3 lg:grid-cols-5">
               {[
                 { n: "1", title: "Explique a dor", desc: "Conte o que trava o crescimento da sua empresa hoje." },
-                { n: "2", title: "Diagnostico", desc: "Analisamos a melhor stack tecnologica para resolver." },
-                { n: "3", title: "Arquitetura", desc: "Desenvolvemos o projeto logico e visual do seu sistema." },
-                { n: "4", title: "Mao na massa", desc: "Nossa equipe codifica sua solucao." },
-                { n: "5", title: "Eficiencia", desc: "Entrega, treinamento e colheita de resultados.", highlight: true },
+                { n: "2", title: "Diagnóstico", desc: "Analisamos a melhor stack tecnológica para resolver." },
+                { n: "3", title: "Arquitetura", desc: "Desenvolvemos o projeto lógico e visual do seu sistema." },
+                { n: "4", title: "Mão na massa", desc: "Nossa equipe codifica sua solução." },
+                { n: "5", title: "Eficiência", desc: "Entrega, treinamento e colheita de resultados.", highlight: true },
               ].map((step) => (
                 <div
                   key={step.n}
@@ -874,13 +1014,13 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-16 text-center">
             <h2 className="mb-4 text-3xl font-bold text-white">Feito para quem busca escala</h2>
-            <p className="text-slate-400">Solucoes adaptadas para diferentes nichos de mercado.</p>
+            <p className="text-slate-400">Soluções adaptadas para diferentes nichos de mercado.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
             {[
-              { icon: Home, label: "Imobiliarias" },
-              { icon: Stethoscope, label: "Clinicas" },
+              { icon: Home, label: "Imobiliárias" },
+              { icon: Stethoscope, label: "Clínicas" },
               { icon: ShoppingBag, label: "Lojas" },
               { icon: Hammer, label: "Prestadores" },
               { icon: Building2, label: "PMEs" },
@@ -905,9 +1045,9 @@ export default function HomePage() {
             <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-600/10 blur-[100px]" />
             <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-blue-600/10 blur-[100px]" />
 
-            <h2 className="mb-8 text-3xl font-extrabold tracking-tight text-white md:text-6xl">Pronto para o proximo nivel?</h2>
+            <h2 className="mb-8 text-3xl font-extrabold tracking-tight text-white md:text-6xl">Pronto para o próximo nível?</h2>
             <p className="mx-auto mb-12 max-w-2xl text-lg leading-relaxed text-slate-400 md:text-xl">
-              Fale sobre sua ideia e receba uma proposta personalizada sem compromisso. Nosso time tecnico entrara em contato.
+              Fale sobre sua ideia e receba uma proposta personalizada sem compromisso. Nosso time técnico entrará em contato.
             </p>
 
             <a
@@ -919,7 +1059,7 @@ export default function HomePage() {
               <Smartphone size={24} />
               Chamar no WhatsApp
             </a>
-            <p className="mt-8 text-sm font-medium text-slate-500">Respostas em menos de 1 hora em horario comercial.</p>
+            <p className="mt-8 text-sm font-medium text-slate-500">Respostas em menos de 1 hora em horário comercial.</p>
           </div>
         </div>
       </section>
@@ -933,13 +1073,13 @@ export default function HomePage() {
                 <span className="text-xl font-bold tracking-tight text-white">InfraStudio</span>
               </div>
               <p className="text-sm leading-relaxed text-slate-500">
-                Tecnologia sob medida para acelerar negocios brasileiros com inteligencia e automacao.
+                Tecnologia sob medida para acelerar negócios brasileiros com inteligência e automação.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-20">
               <div className="flex flex-col gap-4">
-                <span className="text-sm font-bold uppercase tracking-widest text-white">Solucoes</span>
+                <span className="text-sm font-bold uppercase tracking-widest text-white">Soluções</span>
                 <nav className="flex flex-col gap-3">
                   {["Automações", "Sistemas", "IA", "API integrations"].map((link) => (
                     <a key={link} href="#" className="text-sm text-slate-500 transition-colors hover:text-blue-400">
@@ -951,7 +1091,7 @@ export default function HomePage() {
               <div className="flex flex-col gap-4">
                 <span className="text-sm font-bold uppercase tracking-widest text-white">Empresa</span>
                 <nav className="flex flex-col gap-3">
-                  {["Sobre nos", "Privacidade", "Contato", "Carreiras"].map((link) => (
+                  {["Sobre nós", "Privacidade", "Contato", "Carreiras"].map((link) => (
                     <a key={link} href="#" className="text-sm text-slate-500 transition-colors hover:text-blue-400">
                       {link}
                     </a>
@@ -972,7 +1112,12 @@ export default function HomePage() {
       </footer>
 
       <AnimatePresence>
-        <LoginModal open={loginModalOpen} onClose={() => setLoginModalOpen(false)} onLogin={handleLogin} />
+        <LoginModal
+          open={loginModalOpen}
+          onClose={() => setLoginModalOpen(false)}
+          onLogin={handleLogin}
+          authProvider={authProvider}
+        />
       </AnimatePresence>
 
       <AnimatePresence>
@@ -982,7 +1127,7 @@ export default function HomePage() {
       <button
         type="button"
         onClick={() => setChatOpen(true)}
-        className="fixed bottom-5 right-4 z-[70] inline-flex h-15 w-15 items-center justify-center rounded-full bg-[#25D366] text-white shadow-2xl shadow-[#25D366]/30 transition-all hover:scale-105 hover:bg-[#20ba59] sm:bottom-6 sm:right-6"
+        className="fixed bottom-5 right-4 z-[70] inline-flex h-15 w-15 items-center justify-center rounded-full bg-[#2563eb] text-white shadow-2xl shadow-blue-950/35 transition-all hover:scale-105 hover:bg-[#1d4ed8] sm:bottom-6 sm:right-6"
         aria-label="Abrir chat"
       >
         <MessageCircle size={28} />

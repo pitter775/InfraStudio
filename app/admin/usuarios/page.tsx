@@ -1,106 +1,262 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BadgeCheck, Lock, Shield, Users } from "lucide-react";
-import { mockUsers, type MockUser } from "@/lib/mock-users";
+import { BadgeCheck, Lock, Pencil, Plus, Shield, Trash2, UserRound, Users } from "lucide-react";
+import { canAccessAdmin } from "@/lib/access";
+import { getCurrentProjectUser, listProjectUsers } from "@/lib/auth";
+import type { AppUser } from "@/lib/app-user";
 
-const SESSION_KEY = "infrastudio-auth-user";
+type UsuarioFormState = {
+  id?: string;
+  nome: string;
+  email: string;
+  senha: string;
+  ativo: boolean;
+};
+
+const emptyForm: UsuarioFormState = {
+  nome: "",
+  email: "",
+  senha: "",
+  ativo: true,
+};
 
 export default function AdminUsuariosPage() {
-  const [currentUser, setCurrentUser] = useState<MockUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [form, setForm] = useState<UsuarioFormState>(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
-    const storedUser = window.localStorage.getItem(SESSION_KEY);
-    if (!storedUser) {
+    const loadData = async () => {
+      const [user, projectUsers] = await Promise.all([getCurrentProjectUser(), listProjectUsers()]);
+      setCurrentUser(user);
+      setUsers(projectUsers);
+    };
+
+    void loadData();
+  }, []);
+
+  const isAllowed = canAccessAdmin(currentUser);
+
+  const refreshUsers = async () => {
+    setUsers(await listProjectUsers());
+  };
+
+  const handleSubmit = async () => {
+    setSaving(true);
+    setFeedback(null);
+
+    const method = form.id ? "PUT" : "POST";
+    const response = await fetch("/api/admin/usuarios", {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(form),
+    });
+
+    const payload = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      setFeedback(payload.error ?? "Não foi possível salvar o usuário.");
+      setSaving(false);
       return;
     }
 
-    try {
-      setCurrentUser(JSON.parse(storedUser) as MockUser);
-    } catch {
-      window.localStorage.removeItem(SESSION_KEY);
-    }
-  }, []);
+    await refreshUsers();
+    setForm(emptyForm);
+    setSaving(false);
+    setFeedback(form.id ? "Usuário atualizado com sucesso." : "Usuário criado com sucesso.");
+  };
 
-  const isAllowed = currentUser?.role === "admin";
+  const handleEdit = (user: AppUser) => {
+    setForm({
+      id: user.id,
+      nome: user.name,
+      email: user.email,
+      senha: "",
+      ativo: user.status === "ativo",
+    });
+    setFeedback(null);
+  };
+
+  const handleDelete = async (user: AppUser) => {
+    const confirmed = window.confirm(`Excluir o usuário ${user.name}?`);
+    if (!confirmed) {
+      return;
+    }
+
+    const response = await fetch(`/api/admin/usuarios/${user.id}`, {
+      method: "DELETE",
+    });
+
+    const payload = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      setFeedback(payload.error ?? "Não foi possível excluir o usuário.");
+      return;
+    }
+
+    await refreshUsers();
+    setFeedback("Usuário excluído com sucesso.");
+  };
+
+  const handleToggleStatus = async (user: AppUser) => {
+    const response = await fetch(`/api/admin/usuarios/${user.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ativo: user.status !== "ativo" }),
+    });
+
+    const payload = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      setFeedback(payload.error ?? "Não foi possível alterar o status.");
+      return;
+    }
+
+    await refreshUsers();
+    setFeedback(`Status de ${user.name} atualizado.`);
+  };
 
   return (
     <main className="space-y-6">
-      <section className="rounded-[32px] border border-white/10 bg-white/5 p-8">
+      <section className="px-1 py-2">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-blue-300">
           <Users size={14} />
-          Usuarios mockados
+          Usuários
         </div>
-        <h1 className="text-4xl font-extrabold text-white">Gest?o de usu?rios</h1>
+        <h1 className="text-4xl font-extrabold text-white">Gestão de usuários</h1>
         <p className="mt-4 max-w-2xl text-slate-400">
-          Esta p?gina simula a listagem administrativa que depois ser? abastecida pela tabela `usuarios` conectada ao Supabase.
+          Cadastre, edite, ative ou remova usuários da aplicação diretamente pela tabela `usuarios`.
         </p>
       </section>
 
       <div>
         {!currentUser ? (
-          <div className="rounded-[32px] border border-amber-500/20 bg-amber-500/10 p-8">
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-8">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-slate-950/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-amber-200">
               <Lock size={14} />
               Acesso bloqueado
             </div>
-            <h2 className="text-2xl font-bold text-white">Voc? ainda n?o fez login</h2>
+            <h2 className="text-2xl font-bold text-white">Você ainda não fez login</h2>
             <p className="mt-3 max-w-xl text-slate-300">
-              Volte para a home, abra o modal de login e entre com o usu?rio demo para visualizar a experi?ncia completa.
+              Volte para a home, abra o modal de login e entre com um usuário autorizado para visualizar a experiência
+              completa.
             </p>
           </div>
         ) : !isAllowed ? (
-          <div className="rounded-[32px] border border-rose-500/20 bg-rose-500/10 p-8">
+          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-8">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-rose-400/20 bg-slate-950/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-rose-200">
               <Shield size={14} />
-              Permissao insuficiente
+              Permissão insuficiente
             </div>
-            <h2 className="text-2xl font-bold text-white">Seu perfil nao tem acesso administrativo</h2>
+            <h2 className="text-2xl font-bold text-white">Seu perfil não tem acesso administrativo</h2>
             <p className="mt-3 max-w-xl text-slate-300">
-              Quando conectarmos ao Supabase, esta libera??o vai depender do papel salvo na tabela `usuarios`.
+              Neste momento, o painel libera acesso apenas para o usuário master configurado na aplicação.
             </p>
           </div>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
             <div className="space-y-6">
-              <div className="rounded-[32px] border border-white/10 bg-white/5 p-7">
-                <h2 className="text-2xl font-bold text-white">Resumo do painel</h2>
-                <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-white/8 bg-slate-950/40 p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Usuarios</p>
-                    <p className="mt-2 text-3xl font-extrabold text-white">{mockUsers.length}</p>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-7">
+                <div className="mb-5 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">{form.id ? "Editar usuário" : "Novo usuário"}</h2>
+                    <p className="mt-1 text-sm text-slate-400">Crie acessos próprios da aplicação sem depender do Auth externo.</p>
                   </div>
-                  <div className="rounded-2xl border border-white/8 bg-slate-950/40 p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Perfil ativo</p>
-                    <p className="mt-2 text-3xl font-extrabold text-white">{currentUser.role}</p>
+                  <div className="rounded-xl border border-blue-500/15 bg-blue-500/10 p-3 text-blue-200">
+                    <UserRound size={20} />
                   </div>
+                </div>
+
+                <div className="space-y-4">
+                  <input
+                    value={form.nome}
+                    onChange={(event) => setForm((prev) => ({ ...prev, nome: event.target.value }))}
+                    placeholder="Nome completo"
+                    className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+                  />
+                  <input
+                    value={form.email}
+                    onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
+                    placeholder="email@dominio.com"
+                    className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+                  />
+                  <input
+                    value={form.senha}
+                    onChange={(event) => setForm((prev) => ({ ...prev, senha: event.target.value }))}
+                    placeholder={form.id ? "Nova senha (opcional)" : "Senha inicial"}
+                    className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+                  />
+
+                  <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={form.ativo}
+                      onChange={(event) => setForm((prev) => ({ ...prev, ativo: event.target.checked }))}
+                    />
+                    Usuário ativo
+                  </label>
+
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleSubmit()}
+                      disabled={saving}
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
+                    >
+                      {form.id ? <Pencil size={16} /> : <Plus size={16} />}
+                      {saving ? "Salvando..." : form.id ? "Atualizar usuário" : "Criar usuário"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm(emptyForm);
+                        setFeedback(null);
+                      }}
+                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white"
+                    >
+                      Limpar
+                    </button>
+                  </div>
+
+                  {feedback ? (
+                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+                      {feedback}
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
-              <div className="rounded-[32px] border border-emerald-500/20 bg-emerald-500/10 p-7">
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-7">
                 <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-slate-950/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-emerald-200">
                   <BadgeCheck size={14} />
-                  Pronto para integrar
+                  Operações ativas
                 </div>
                 <p className="leading-relaxed text-emerald-50">
-                  Depois vamos trocar este mock por consulta real ao Supabase: autentica no Auth, busca o registro na tabela
-                  `usuarios` e monta as permiss?es a partir do papel.
+                  O CRUD já cria senha com hash bcrypt, atualiza cadastro, alterna status e remove vínculos em
+                  `usuarios_projetos` antes de excluir o usuário.
                 </p>
               </div>
 
               <Link
                 href="/admin/dashboard"
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-semibold text-white transition-colors hover:bg-white/10"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-3 font-semibold text-white transition-colors hover:bg-white/10"
               >
-                Ir para dashboard mockado
+                Ir para dashboard
               </Link>
             </div>
 
-            <div className="overflow-hidden rounded-[32px] border border-white/10 bg-white/5">
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
               <div className="border-b border-white/10 px-6 py-5">
-                <h3 className="text-xl font-bold text-white">Tabela visual de usu?rios</h3>
-                <p className="mt-1 text-sm text-slate-400">Mock para a futura ligacao com o banco.</p>
+                <h3 className="text-xl font-bold text-white">Usuários cadastrados</h3>
+                <p className="mt-1 text-sm text-slate-400">Clique em editar para carregar os dados no formulário ao lado.</p>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left">
@@ -108,17 +264,50 @@ export default function AdminUsuariosPage() {
                     <tr>
                       <th className="px-6 py-4 font-semibold">Nome</th>
                       <th className="px-6 py-4 font-semibold">Email</th>
-                      <th className="px-6 py-4 font-semibold">Role</th>
+                      <th className="px-6 py-4 font-semibold">Perfil</th>
                       <th className="px-6 py-4 font-semibold">Status</th>
+                      <th className="px-6 py-4 font-semibold">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {mockUsers.map((user) => (
+                    {users.map((user) => (
                       <tr key={user.id} className="border-t border-white/5 text-sm text-slate-300">
                         <td className="px-6 py-4 font-semibold text-white">{user.name}</td>
                         <td className="px-6 py-4">{user.email}</td>
-                        <td className="px-6 py-4">{user.role}</td>
-                        <td className="px-6 py-4">{user.status}</td>
+                        <td className="px-6 py-4">{user.isMaster ? "master" : user.role}</td>
+                        <td className="px-6 py-4">
+                          <button
+                            type="button"
+                            onClick={() => void handleToggleStatus(user)}
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              user.status === "ativo"
+                                ? "bg-emerald-500/15 text-emerald-300"
+                                : "bg-amber-500/15 text-amber-300"
+                            }`}
+                          >
+                            {user.status}
+                          </button>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(user)}
+                              className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-200"
+                              title="Editar"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDelete(user)}
+                              className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-2 text-rose-200"
+                              title="Excluir"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -131,4 +320,3 @@ export default function AdminUsuariosPage() {
     </main>
   );
 }
-

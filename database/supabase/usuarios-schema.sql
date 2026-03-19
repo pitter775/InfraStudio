@@ -1,0 +1,17 @@
+-- Referência rápida apenas.
+-- A documentação fiel do banco atual está em:
+-- database/geral-schema.sql
+--
+-- Estrutura relevante para autenticação/permissões hoje:
+-- public.usuarios
+--   - id
+--   - nome
+--   - email
+--   - provider
+--   - provider_id
+--   - ativo
+--
+-- public.usuarios_projetos
+--   - usuario_id
+--   - projeto_id
+--   - papel
