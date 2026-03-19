@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence } from "motion/react";
 import { getAuthProviderLabel, getCurrentProjectUser, signInWithProjectAuth, signOutProjectAuth } from "@/lib/auth";
@@ -23,7 +23,7 @@ import {
   ServicesSection,
 } from "@/app/_components/home/sections";
 
-export default function HomePage() {
+function HomePageContent() {
   const searchParams = useSearchParams();
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -120,5 +120,13 @@ export default function HomePage() {
         </>
       ) : null}
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-grid" />}>
+      <HomePageContent />
+    </Suspense>
   );
 }
