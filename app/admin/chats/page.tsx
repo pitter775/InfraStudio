@@ -165,10 +165,10 @@ export default function AdminChatsPage() {
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`max-w-[88%] rounded-xl p-4 text-sm leading-relaxed ${
+                className={`max-w-[88%] rounded-xl border p-4 text-sm leading-relaxed shadow-sm ${
                   message.role === "assistant"
-                    ? "self-start rounded-bl-none bg-slate-800 text-slate-200"
-                    : "self-end rounded-br-none bg-blue-600 text-white"
+                    ? "self-start rounded-bl-none border-white/8 bg-slate-800/90 text-slate-200"
+                    : "self-end rounded-br-none border-blue-400/20 bg-blue-500/18 text-blue-50"
                 }`}
               >
                 <p>{message.conteudo}</p>

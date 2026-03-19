@@ -6,13 +6,14 @@ import { useEffect, useState } from "react";
 import {
   Bot,
   BriefcaseBusiness,
+  Coins,
   MessageSquare,
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
   LogOut,
   Menu,
-  ShieldCheck,
+  Globe,
   UserRound,
   Users,
   X,
@@ -26,6 +27,7 @@ const adminLinks = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/projetos", label: "Projetos", icon: BriefcaseBusiness },
   { href: "/admin/chats", label: "Chats", icon: MessageSquare },
+  { href: "/admin/ia-tokens", label: "IA Tokens", icon: Coins },
   { href: "/admin/agentes", label: "Agentes", icon: Bot },
   { href: "/admin/usuarios", label: "Usuários", icon: Users },
 ];
@@ -103,24 +105,7 @@ function Sidebar({
             </button>
           </div>
         </div>
-
-        <div className="mt-8 px-2">
-          {!collapsed ? (
-            <div className="rounded-xl border border-cyan-500/15 bg-cyan-500/10 p-4">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-slate-950/25 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-200">
-                <ShieldCheck size={13} />
-                Área reservada
-              </div>
-              <p className="text-sm leading-relaxed text-cyan-50">
-                {currentUser?.isMaster
-                  ? "Visão global da InfraStudio para acompanhar todos os projetos e agentes."
-                  : "Você está no ambiente do seu projeto e vê apenas os chats e agentes ligados ao seu cliente."}
-              </p>
-            </div>
-          ) : null}
-        </div>
-
-        <nav className="mt-6 flex-1 space-y-2 px-2">
+        <nav className="mt-8 flex-1 space-y-2 px-2">
           {visibleLinks.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href;
@@ -175,6 +160,18 @@ function Sidebar({
                 {currentUser?.isMaster ? "master" : currentUser?.role ?? "sem acesso"}
               </div>
             ) : null}
+
+            <Link
+              href="/"
+              className={cn(
+                "inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white",
+                collapsed ? "h-11 w-11 p-0" : "w-full",
+              )}
+              title={collapsed ? "Voltar ao site" : undefined}
+            >
+              <Globe size={16} />
+              {!collapsed ? <span>Voltar ao site</span> : null}
+            </Link>
 
             <button
               type="button"
@@ -264,7 +261,16 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
               <Menu size={16} />
               Menu
             </button>
-            <p className="text-sm font-semibold text-slate-300">Painel admin</p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm font-semibold text-slate-300">Painel admin</p>
+              <Link
+                href="/"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white"
+              >
+                <Globe size={15} />
+                Site
+              </Link>
+            </div>
           </div>
         </div>
 

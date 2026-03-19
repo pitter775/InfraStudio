@@ -123,6 +123,7 @@ export async function POST(request: Request) {
             content: item.conteudo,
           })),
           typeof nextContext.memoria?.resumo === "string" ? nextContext.memoria.resumo : null,
+          nextContext.projeto?.id ?? null,
         ),
         ultimo_resumo_at: new Date().toISOString(),
       };

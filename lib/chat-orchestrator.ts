@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getAgenteAtivo } from "@/lib/agentes";
+import { getProjetoOpenAIConfig } from "@/lib/segredos";
 import type { ChatMessageRole } from "@/lib/chats";
 
 type ConversationMessage = {
@@ -103,13 +104,130 @@ function buildInput(messages: ConversationMessage[]) {
   }));
 }
 
-function maybeAskForLeadIdentification(context: ConversationContext, latestUserMessage: string) {
+type OpenAIResponsesPayload = {
+  output_text?: string;
+  output?: Array<{
+    content?: Array<{
+      type?: string;
+      text?: string;
+    }>;
+  }>;
+  usage?: { input_tokens?: number; output_tokens?: number };
+  error?: { message?: string };
+  model?: string;
+};
+
+function extractOutputText(payload: OpenAIResponsesPayload) {
+  if (typeof payload.output_text === "string" && payload.output_text.trim()) {
+    return payload.output_text.trim();
+  }
+
+  const parts =
+    payload.output
+      ?.flatMap((item) => item.content ?? [])
+      .filter((content) => content.type === "output_text" || typeof content.text === "string")
+      .map((content) => content.text?.trim() ?? "")
+      .filter(Boolean) ?? [];
+
+  return parts.join("\n").trim();
+}
+
+type CatalogItem = {
+  slug: "site-comum" | "chat-ia" | "automacao-whatsapp" | "integracao-crm" | "sistema-sob-medida-simples";
+  nome: string;
+  preco: number;
+};
+
+function normalizeText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function detectCatalogItems(history: ConversationMessage[]) {
+  const userText = history
+    .filter((item) => item.role === "user")
+    .map((item) => normalizeText(item.content))
+    .join(" ");
+
+  const items: CatalogItem[] = [];
+  const has = (pattern: RegExp) => pattern.test(userText);
+
+  if (has(/\bsite\b|\blanding page\b|\bpagina\b/)) {
+    items.push({ slug: "site-comum", nome: "Site comum", preco: 300 });
+  }
+
+  if (has(/\bchat\b|\bia no site\b|\bagente no site\b|\batendimento com ia\b/)) {
+    items.push({ slug: "chat-ia", nome: "Chat com IA", preco: 700 });
+  }
+
+  if (has(/\bwhatsapp\b|\bautomatiza(?:r|cao) whatsapp\b|\batendimento no whatsapp\b/)) {
+    items.push({ slug: "automacao-whatsapp", nome: "Automacao WhatsApp", preco: 1000 });
+  }
+
+  if (has(/\bcrm\b|\bintegrac(?:ao|a)o com crm\b/)) {
+    items.push({ slug: "integracao-crm", nome: "Integracao CRM", preco: 1000 });
+  }
+
+  if (has(/\bsistema\b|\bpainel\b/)) {
+    items.push({ slug: "sistema-sob-medida-simples", nome: "Sistema sob medida simples", preco: 2000 });
+  }
+
+  return items.filter((item, index, array) => array.findIndex((entry) => entry.slug === item.slug) === index);
+}
+
+function isOutOfScopeForCatalog(history: ConversationMessage[]) {
+  const userText = history
+    .filter((item) => item.role === "user")
+    .map((item) => normalizeText(item.content))
+    .join(" ");
+
+  const complexSignals = [
+    /\berp\b/,
+    /\bintegrac(?:ao|a)o(?:es)?\b/,
+    /\bmuitas regras\b/,
+    /\bfluxos\b/,
+    /\bprocessos\b/,
+    /\bsistema interno\b/,
+    /\bsob medida\b/,
+    /\bvarios\b/,
+    /\bcomplex[oa]\b/,
+    /\bmais de um\b/,
+  ];
+
+  const catalogItems = detectCatalogItems(history);
+  return catalogItems.length === 0 || complexSignals.some((pattern) => pattern.test(userText));
+}
+
+function buildCatalogPricingReply(history: ConversationMessage[]) {
+  const catalogItems = detectCatalogItems(history);
+  if (catalogItems.length === 0 || isOutOfScopeForCatalog(history)) {
+    return null;
+  }
+
+  const total = catalogItems.reduce((sum, item) => sum + item.preco, 0);
+  const labels = catalogItems.map((item) => `${item.nome}: R$ ${item.preco.toLocaleString("pt-BR")}`);
+  const joinedLabels = labels.join(" + ");
+
+  if (catalogItems.length === 1) {
+    return `Pelo que voce descreveu, isso encaixa em ${joinedLabels}. Se quiser, eu sigo com voce por aqui ou te encaminho no WhatsApp para fecharmos o proximo passo.`;
+  }
+
+  return `Pelo que voce descreveu, isso encaixa no nosso catalogo como ${joinedLabels}. Nesse cenario, a estimativa inicial fica em R$ ${total.toLocaleString("pt-BR")} no total. Se quiser, eu posso te direcionar no WhatsApp para alinharmos os detalhes finais.`;
+}
+
+function maybeAskForLeadIdentification(context: ConversationContext, history: ConversationMessage[], latestUserMessage: string) {
   const count = context.memoria?.mensagem_count ?? 0;
   const identified = Boolean(context.lead?.identificado);
   const ready = Boolean(context.qualificacao?.pronto_para_whatsapp);
-  const normalized = latestUserMessage.toLowerCase();
+  const normalized = normalizeText(latestUserMessage);
 
   if (identified) {
+    return null;
+  }
+
+  if (!isOutOfScopeForCatalog(history)) {
     return null;
   }
 
@@ -124,8 +242,24 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const latestUserMessage = [...history].reverse().find((item) => item.role === "user")?.content ?? "";
   const projectId = context?.projeto?.id ?? null;
   const agent = projectId ? await getAgenteAtivo(projectId) : null;
+  const openai = await getProjetoOpenAIConfig(projectId);
   const systemPrompt = buildSystemPrompt(agent);
-  const identificationPrompt = maybeAskForLeadIdentification(context ?? {}, latestUserMessage);
+  const catalogPricingReply = buildCatalogPricingReply(history);
+
+  if (catalogPricingReply) {
+    return {
+      reply: catalogPricingReply,
+      usage: { inputTokens: 0, outputTokens: 0 },
+      metadata: {
+        provider: "heuristic",
+        model: "catalog_pricing",
+        agenteId: agent?.id ?? null,
+        agenteNome: agent?.nome ?? null,
+      },
+    };
+  }
+
+  const identificationPrompt = maybeAskForLeadIdentification(context ?? {}, history, latestUserMessage);
 
   if (identificationPrompt) {
     return {
@@ -140,7 +274,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     };
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!openai.apiKey) {
     return {
       reply: heuristicReply(latestUserMessage),
       usage: { inputTokens: 0, outputTokens: 0 },
@@ -166,10 +300,10 @@ export async function generateSalesReply(history: ConversationMessage[], context
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${openai.apiKey}`,
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini",
+        model: openai.model,
         temperature: 0.5,
         max_output_tokens: 220,
         instructions: [systemPrompt, summary, lead, qualification].filter(Boolean).join("\n"),
@@ -177,14 +311,10 @@ export async function generateSalesReply(history: ConversationMessage[], context
       }),
     });
 
-    const payload = (await response.json()) as {
-      output_text?: string;
-      usage?: { input_tokens?: number; output_tokens?: number };
-      error?: { message?: string };
-      model?: string;
-    };
+    const payload = (await response.json()) as OpenAIResponsesPayload;
+    const outputText = extractOutputText(payload);
 
-    if (!response.ok || !payload.output_text) {
+    if (!response.ok || !outputText) {
       console.error("[chat] openai response failed", payload.error?.message ?? payload);
       return {
         reply: heuristicReply(latestUserMessage),
@@ -199,14 +329,14 @@ export async function generateSalesReply(history: ConversationMessage[], context
     }
 
     return {
-      reply: payload.output_text.trim(),
+      reply: outputText,
       usage: {
         inputTokens: payload.usage?.input_tokens ?? 0,
         outputTokens: payload.usage?.output_tokens ?? 0,
       },
       metadata: {
         provider: "openai",
-        model: payload.model ?? (process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini"),
+        model: payload.model ?? openai.model,
         agenteId: agent?.id ?? null,
         agenteNome: agent?.nome ?? null,
       },
@@ -233,7 +363,30 @@ function extractPhone(message: string) {
 
 function extractName(message: string) {
   const match = message.match(/(?:meu nome(?: e| eh)?|sou o|sou a)\s+([a-zà-ú ]{3,})/i);
-  return match?.[1]?.trim() ?? null;
+  if (match?.[1]?.trim()) {
+    return match[1].trim();
+  }
+
+  if (!extractPhone(message)) {
+    return null;
+  }
+
+  const candidate = message
+    .replace(/(?:\+?\d[\d\s().-]{7,}\d)/g, " ")
+    .replace(/\b(?:meu|nome|e|eh|sou|o|a|telefone|fone|celular|zap|whatsapp|ddd|com)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!candidate || !/^[A-Za-zÃ-Ã¿][A-Za-zÃ-Ã¿' -]*$/.test(candidate)) {
+    return null;
+  }
+
+  const words = candidate.split(/\s+/).filter((word) => word.length >= 2);
+  if (words.length === 0 || words.length > 4) {
+    return null;
+  }
+
+  return words.join(" ");
 }
 
 export function enrichLeadContext(
@@ -308,10 +461,15 @@ export function shouldRefreshSummary(messageCount: number) {
   return messageCount > 0 && messageCount % 5 === 0;
 }
 
-export async function summarizeConversation(history: ConversationMessage[], currentSummary: string | null | undefined) {
+export async function summarizeConversation(
+  history: ConversationMessage[],
+  currentSummary: string | null | undefined,
+  projectId?: string | null,
+) {
   const recent = history.slice(-8);
+  const openai = await getProjetoOpenAIConfig(projectId);
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!openai.apiKey) {
     const compact = recent
       .map((item) => `${item.role === "assistant" ? "Assistente" : "Cliente"}: ${item.content}`)
       .join(" | ")
@@ -325,10 +483,10 @@ export async function summarizeConversation(history: ConversationMessage[], curr
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${openai.apiKey}`,
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini",
+        model: openai.model,
         temperature: 0.2,
         max_output_tokens: 140,
         instructions:
@@ -340,8 +498,8 @@ export async function summarizeConversation(history: ConversationMessage[], curr
       }),
     });
 
-    const payload = (await response.json()) as { output_text?: string };
-    return payload.output_text?.trim() ?? currentSummary ?? null;
+    const payload = (await response.json()) as OpenAIResponsesPayload;
+    return extractOutputText(payload) || currentSummary || null;
   } catch (error) {
     console.error("[chat] failed to summarize conversation", error);
     return currentSummary ?? null;

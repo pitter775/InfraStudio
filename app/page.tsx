@@ -33,6 +33,48 @@ import type { AppUser } from "@/lib/app-user";
 import { cn } from "@/lib/utils";
 
 const WHATSAPP_NUMBER = "5511949506267";
+const TECH_STACK = [
+  "OpenAI",
+  "GPT-4o",
+  "TypeScript",
+  "JavaScript",
+  "Node.js",
+  "Next.js",
+  "React",
+  "Tailwind CSS",
+  "Python",
+  "FastAPI",
+  "Django",
+  "Flask",
+  "PostgreSQL",
+  "Supabase",
+  "MongoDB",
+  "Redis",
+  "Docker",
+  "Kubernetes",
+  "AWS",
+  "Vercel",
+  "Cloudflare",
+  "Stripe",
+  "Make",
+  "n8n",
+  "WhatsApp API",
+  "Instagram Graph",
+  "LangChain",
+  "Webhooks",
+  "REST API",
+  "GraphQL",
+  "Prisma",
+  "NestJS",
+  "PHP",
+  "Laravel",
+  "MySQL",
+  "Linux",
+  "GitHub Actions",
+  "CI/CD",
+  "Automation",
+  "AI Agents",
+];
 
 type LoginModalProps = {
   open: boolean;
@@ -349,37 +391,46 @@ function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: NavbarProps)
             </a>
           </div>
 
-          <div className="flex items-center gap-3">
-            {currentUser ? (
-              <>
-                <Link
-                  href="/admin/usuarios"
-                  className="hidden rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition-all hover:border-blue-500/40 hover:bg-blue-500/10 md:inline-flex"
-                >
-                  Admin
-                </Link>
-                <div className="hidden items-center gap-3 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-white md:flex">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
-                    <UserRound size={16} />
+            <div className="flex items-center gap-3">
+              {currentUser ? (
+                <>
+                  <div className="group relative hidden md:block">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-2 rounded-full border border-emerald-500/15 bg-emerald-500/8 px-3 py-1.5 text-white transition-all hover:border-emerald-400/25 hover:bg-emerald-500/12"
+                    >
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10">
+                        <UserRound size={14} />
+                      </div>
+                      <div className="leading-tight text-left">
+                        <p className="text-xs font-semibold">{currentUser.name}</p>
+                        <p className="text-[10px] uppercase tracking-[0.16em] text-emerald-200/70">{currentUser.role}</p>
+                      </div>
+                    </button>
+
+                    <div className="invisible absolute right-0 top-full z-20 mt-2 w-44 rounded-2xl border border-white/10 bg-slate-950/95 p-2 opacity-0 shadow-2xl backdrop-blur-xl transition-all duration-200 group-hover:visible group-hover:opacity-100">
+                      <Link
+                        href="/admin/dashboard"
+                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/8 hover:text-white"
+                      >
+                        <Lock size={14} />
+                        Admin
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void onLogout();
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/8 hover:text-white"
+                      >
+                        <LogOut size={14} />
+                        Sair
+                      </button>
+                    </div>
                   </div>
-                  <div className="leading-tight">
-                    <p className="text-sm font-semibold">{currentUser.name}</p>
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/75">{currentUser.role}</p>
-                  </div>
-                </div>
+                </>
+              ) : (
                 <button
-                  type="button"
-                  onClick={() => {
-                    void onLogout();
-                  }}
-                  className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-white/10 md:inline-flex"
-                >
-                  <LogOut size={16} />
-                  Sair
-                </button>
-              </>
-            ) : (
-              <button
                 type="button"
                 onClick={onOpenLogin}
                 className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-slate-200 transition-all hover:bg-white/[0.08] hover:text-white md:inline-flex"
@@ -424,6 +475,13 @@ function ChatWidget({ open, onClose }: ChatWidgetProps) {
   const [chatId, setChatId] = useState<string | null>(null);
 
   const quickReplies: string[] = [];
+
+  const resetConversation = () => {
+    setChatId(null);
+    setDraft("");
+    setLoading(false);
+    setMessages([...initialMessages]);
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -521,19 +579,22 @@ function ChatWidget({ open, onClose }: ChatWidgetProps) {
         className="flex max-h-[min(780px,calc(100vh-7rem))] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[rgba(9,16,34,0.84)] shadow-2xl backdrop-blur-xl"
       >
         <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.04] px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500/15">
-              <img src="/logo.png" alt="InfraStudio" className="h-8 w-8 object-contain" />
-            </div>
+          <div className="flex-1">
             <div>
               <p className="font-bold text-white">InfraStudio Chat</p>
-              <p className="text-xs text-emerald-300">Online agora</p>
             </div>
+            <button
+              type="button"
+              onClick={resetConversation}
+              className="mt-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[10px] font-semibold text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+            >
+              Novo atendimento
+            </button>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+            className="ml-4 self-start rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
             aria-label="Fechar chat"
           >
             <X size={16} />
@@ -543,17 +604,17 @@ function ChatWidget({ open, onClose }: ChatWidgetProps) {
         <div className="chat-scroll min-h-0 flex-1 overflow-y-auto bg-slate-950/20 p-5">
           <div className="space-y-3">
             {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "max-w-[90%] rounded-2xl p-3 text-sm leading-relaxed",
-                  message.isAi
-                    ? "rounded-bl-none bg-slate-800 text-slate-200"
-                    : "ml-auto rounded-br-none bg-blue-600 text-white",
-                )}
-              >
-                {message.text}
-              </div>
+                <div
+                  key={message.id}
+                  className={cn(
+                    "max-w-[90%] rounded-2xl border p-3 text-sm leading-relaxed shadow-sm backdrop-blur-sm",
+                    message.isAi
+                      ? "rounded-bl-none border-white/5 bg-slate-800/90 text-slate-200"
+                      : "ml-auto rounded-br-none border-blue-400/20 bg-blue-500/18 text-blue-50",
+                  )}
+                >
+                  {message.text}
+                </div>
             ))}
 
             {loading ? (
@@ -710,19 +771,19 @@ function ChatDemo() {
       <div className="flex h-[380px] flex-col gap-4 overflow-y-auto bg-slate-900/40 p-6">
         <AnimatePresence mode="popLayout">
           {messages.map((message, index) => (
-            <motion.div
-              key={`${index}-${message.text}`}
-              initial={{ opacity: 0, y: 10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              className={cn(
-                "max-w-[85%] rounded-2xl p-3 text-sm leading-relaxed",
-                message.isAi
-                  ? "self-start rounded-bl-none bg-slate-800 text-slate-200"
-                  : "self-end rounded-br-none bg-blue-600 text-white",
-              )}
-            >
-              {message.text}
-            </motion.div>
+              <motion.div
+                key={`${index}-${message.text}`}
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                className={cn(
+                  "max-w-[85%] rounded-2xl border p-3 text-sm leading-relaxed shadow-sm backdrop-blur-sm",
+                  message.isAi
+                    ? "self-start rounded-bl-none border-white/5 bg-slate-800/90 text-slate-200"
+                    : "self-end rounded-br-none border-blue-400/20 bg-blue-500/18 text-blue-50",
+                )}
+              >
+                {message.text}
+              </motion.div>
           ))}
           {isTyping ? (
             <motion.div
@@ -743,7 +804,7 @@ function ChatDemo() {
         <div className="flex-grow rounded-full bg-white/5 px-4 py-2 text-xs italic text-slate-500">
           {isTyping ? "IA está digitando..." : "Online"}
         </div>
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-400/20 bg-blue-500/20 text-blue-50">
           <Send size={14} />
         </div>
       </div>
@@ -854,20 +915,27 @@ export default function HomePage() {
             </a>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.4 }}
-            transition={{ delay: 0.5 }}
-            className="mt-24 flex flex-wrap justify-center gap-x-12 gap-y-8 grayscale transition-all duration-500 hover:grayscale-0"
-          >
-            {["Waboxapp", "OpenAI", "Stripe", "Make.com", "AWS"].map((tech) => (
-              <span key={tech} className="text-sm font-bold tracking-widest text-slate-300">
-                {tech}
-              </span>
-            ))}
-          </motion.div>
-        </div>
-      </section>
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="mt-24"
+            >
+              <div className="mx-auto max-w-6xl overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]">
+                <div className="tech-marquee flex w-max items-center gap-3 py-4">
+                  {[...TECH_STACK, ...TECH_STACK].map((tech, index) => (
+                    <span
+                      key={`${tech}-${index}`}
+                      className="rounded-full border border-white/8 bg-white/[0.03] px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] text-slate-400 transition-all duration-300 hover:border-blue-500/35 hover:bg-blue-500/10 hover:text-blue-300"
+                    >
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </section>
 
       <section id="servicos" className="bg-slate-900/30 py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
