@@ -878,7 +878,7 @@ export default function HomePage() {
             className="mb-8 text-4xl font-extrabold leading-[1.1] tracking-tight text-white md:text-7xl"
           >
             Sistemas, automações e IA <br className="hidden md:block" /> para sua empresa{" "}
-            <span className="text-gradient">vai vender mais</span>
+            <span className="text-gradient">vender mais</span>
           </motion.h1>
 
           <motion.p
