@@ -28,7 +28,17 @@ export async function POST(_request: Request, context: RouteContext) {
   }
 
   try {
-    const result = await testApi(id);
+    let body: { context?: Record<string, unknown> | null } | null = null;
+    try {
+      body = (await _request.json()) as { context?: Record<string, unknown> | null };
+    } catch {
+      body = null;
+    }
+
+    const result = await testApi(
+      id,
+      body?.context && typeof body.context === "object" && !Array.isArray(body.context) ? body.context : null,
+    );
 
     if (result.error) {
       return NextResponse.json({ error: result.error, api: result.api, campos: result.campos }, { status: 400 });

@@ -219,6 +219,12 @@ function normalizeApiForm(form: ApiFormState): ApiFormState {
   };
 }
 
+function syncTestParameterValues(url: string, current: Record<string, string>) {
+  const nextNames = extractUrlParameterNames(url);
+  const nextEntries = nextNames.map((name) => [name, current[name] ?? ""] as const);
+  return Object.fromEntries(nextEntries);
+}
+
 type ApiCampoTreeNode = {
   key: string;
   label: string;
@@ -617,8 +623,10 @@ function ApiModal({
   saving,
   testing,
   feedback,
+  testParameterValues,
   onClose,
   onChange,
+  onChangeTestParameter,
   onToggleCampo,
   onToggleParametro,
   onToggleObrigatorio,
@@ -631,8 +639,10 @@ function ApiModal({
   saving: boolean;
   testing: boolean;
   feedback: string | null;
+  testParameterValues: Record<string, string>;
   onClose: () => void;
   onChange: (next: Partial<ApiFormState>) => void;
+  onChangeTestParameter: (name: string, value: string) => void;
   onToggleCampo: (campo: ApiCampo) => void;
   onToggleParametro: (campo: ApiCampo) => void;
   onToggleObrigatorio: (campo: ApiCampo) => void;
@@ -689,6 +699,29 @@ function ApiModal({
                 </p>
               ) : null}
             </div>
+            {inferredUrlParameters.length ? (
+              <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
+                <p className="text-sm font-semibold text-white">Valores de teste</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Esses valores sao usados apenas no botao <span className="font-semibold text-cyan-100">Testar API</span> para descobrir os campos da resposta correta.
+                </p>
+                <div className="mt-3 space-y-3">
+                  {inferredUrlParameters.map((parametro) => (
+                    <label key={parametro} className="block">
+                      <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                        {parametro}
+                      </span>
+                      <input
+                        value={testParameterValues[parametro] ?? ""}
+                        onChange={(event) => onChangeTestParameter(parametro, event.target.value)}
+                        placeholder={`Valor de teste para ${parametro}`}
+                        className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <input value={form.metodo} readOnly className="w-full rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-white outline-none" />
             <textarea value={form.descricao} onChange={(event) => onChange({ descricao: event.target.value })} placeholder="Descricao da API" rows={5} className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none placeholder:text-slate-500" />
             <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
@@ -981,6 +1014,7 @@ export default function AdminProjetoDetalhePage() {
   const [apiForm, setApiForm] = useState<ApiFormState>(emptyApiForm);
   const [widgetForm, setWidgetForm] = useState<WidgetFormState>(emptyWidgetForm);
   const [detectedApiCampos, setDetectedApiCampos] = useState<ApiCampo[]>([]);
+  const [apiTestParameterValues, setApiTestParameterValues] = useState<Record<string, string>>({});
   const [savingAgente, setSavingAgente] = useState(false);
   const [savingApi, setSavingApi] = useState(false);
   const [savingWidget, setSavingWidget] = useState(false);
@@ -1028,6 +1062,7 @@ export default function AdminProjetoDetalhePage() {
 
   const resetApiForm = () => {
     setApiForm(emptyApiForm);
+    setApiTestParameterValues({});
     setDetectedApiCampos([]);
     setFeedbackApi(null);
   };
@@ -1243,15 +1278,16 @@ export default function AdminProjetoDetalhePage() {
     await loadProjeto();
     const message = apiForm.id ? "API atualizada com sucesso." : "API criada com sucesso.";
     if (payload.api) {
+      const savedApi = payload.api;
       setDetectedApiCampos(
         mergeDetectedApiCampos(
-          payload.api.campos.map((campo) => ({
+          savedApi.campos.map((campo) => ({
             id: campo.id,
             nome: campo.nome,
             tipo: campo.tipo,
             descricao: campo.descricao,
           })),
-          payload.api.parametros.map((parametro) => ({
+          savedApi.parametros.map((parametro) => ({
             nome: parametro.nome,
             tipo: parametro.tipo,
             obrigatorio: parametro.obrigatorio,
@@ -1259,24 +1295,25 @@ export default function AdminProjetoDetalhePage() {
         ),
       );
       setApiForm({
-        id: payload.api.id,
-        nome: payload.api.nome,
-        url: payload.api.url,
+        id: savedApi.id,
+        nome: savedApi.nome,
+        url: savedApi.url,
         metodo: "GET",
-        descricao: payload.api.descricao,
-        ativo: payload.api.ativo,
-        campos: payload.api.campos.map((campo) => ({
+        descricao: savedApi.descricao,
+        ativo: savedApi.ativo,
+        campos: savedApi.campos.map((campo) => ({
           id: campo.id,
           nome: campo.nome,
           tipo: campo.tipo,
           descricao: campo.descricao,
         })),
-        parametros: payload.api.parametros.map((parametro) => ({
+        parametros: savedApi.parametros.map((parametro) => ({
           nome: parametro.nome,
           tipo: parametro.tipo,
           obrigatorio: parametro.obrigatorio,
         })),
       });
+      setApiTestParameterValues((prev) => syncTestParameterValues(savedApi.url, prev));
     } else {
       resetApiForm();
     }
@@ -1341,8 +1378,15 @@ export default function AdminProjetoDetalhePage() {
 
     try {
       const api = await persistApiBeforeTest();
+      const testContext = Object.fromEntries(
+        Object.entries(apiTestParameterValues)
+          .map(([key, value]) => [key, value.trim()])
+          .filter(([, value]) => Boolean(value)),
+      );
       const response = await fetch(`/api/apis/${api.id}/testar`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ context: testContext }),
       });
 
       const payload = (await response.json()) as { error?: string; api?: Api };
@@ -1352,16 +1396,17 @@ export default function AdminProjetoDetalhePage() {
         setTestingApi(false);
         return;
       }
+      const testedApi = payload.api;
 
       setDetectedApiCampos(
         mergeDetectedApiCampos(
-          payload.api.campos.map((campo) => ({
+          testedApi.campos.map((campo) => ({
             id: campo.id,
             nome: campo.nome,
             tipo: campo.tipo,
             descricao: campo.descricao,
           })),
-          payload.api.parametros.map((parametro) => ({
+          testedApi.parametros.map((parametro) => ({
             nome: parametro.nome,
             tipo: parametro.tipo,
             obrigatorio: parametro.obrigatorio,
@@ -1369,24 +1414,25 @@ export default function AdminProjetoDetalhePage() {
         ),
       );
       setApiForm({
-        id: payload.api.id,
-        nome: payload.api.nome,
-        url: payload.api.url,
+        id: testedApi.id,
+        nome: testedApi.nome,
+        url: testedApi.url,
         metodo: "GET",
-        descricao: payload.api.descricao,
-        ativo: payload.api.ativo,
-        campos: payload.api.campos.map((campo) => ({
+        descricao: testedApi.descricao,
+        ativo: testedApi.ativo,
+        campos: testedApi.campos.map((campo) => ({
           id: campo.id,
           nome: campo.nome,
           tipo: campo.tipo,
           descricao: campo.descricao,
         })),
-        parametros: payload.api.parametros.map((parametro) => ({
+        parametros: testedApi.parametros.map((parametro) => ({
           nome: parametro.nome,
           tipo: parametro.tipo,
           obrigatorio: parametro.obrigatorio,
         })),
       });
+      setApiTestParameterValues((prev) => syncTestParameterValues(testedApi.url, prev));
       await loadProjeto();
       setFeedbackApi("API testada e campos detectados com sucesso.");
     } catch (error) {
@@ -1431,6 +1477,7 @@ export default function AdminProjetoDetalhePage() {
         obrigatorio: parametro.obrigatorio,
       })),
     });
+    setApiTestParameterValues((prev) => syncTestParameterValues(api.url, prev));
     setFeedbackApi(null);
     setApiModalOpen(true);
   };
@@ -1509,6 +1556,21 @@ export default function AdminProjetoDetalhePage() {
             ],
       });
     });
+  };
+
+  const handleApiFormChange = (next: Partial<ApiFormState>) => {
+    setApiForm((prev) => {
+      const updated = normalizeApiForm({ ...prev, ...next });
+      setApiTestParameterValues((current) => syncTestParameterValues(updated.url, current));
+      return updated;
+    });
+  };
+
+  const handleApiTestParameterChange = (name: string, value: string) => {
+    setApiTestParameterValues((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const toggleApiParametroObrigatorio = (campo: ApiCampo) => {
@@ -1883,11 +1945,13 @@ export default function AdminProjetoDetalhePage() {
         saving={savingApi}
         testing={testingApi}
         feedback={feedbackApi}
+        testParameterValues={apiTestParameterValues}
         onClose={() => {
           setApiModalOpen(false);
           resetApiForm();
         }}
-        onChange={(next) => setApiForm((prev) => normalizeApiForm({ ...prev, ...next }))}
+        onChange={handleApiFormChange}
+        onChangeTestParameter={handleApiTestParameterChange}
         onToggleCampo={toggleApiCampo}
         onToggleParametro={toggleApiParametro}
         onToggleObrigatorio={toggleApiParametroObrigatorio}

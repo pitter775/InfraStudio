@@ -657,13 +657,18 @@ export async function deleteApi(id: string) {
   return true;
 }
 
-export async function testApi(id: string) {
+export async function testApi(id: string, context?: Record<string, unknown> | null) {
   const api = await getApiById(id);
   if (!api) {
     return { api: null, campos: [], error: "API nao encontrada." };
   }
 
-  const response = await fetch(api.url, {
+  const resolved = buildApiUrlWithParameters(api, context);
+  if (resolved.error) {
+    return { api, campos: [], error: resolved.error };
+  }
+
+  const response = await fetch(resolved.url, {
     method: "GET",
     headers: { Accept: "application/json" },
     cache: "no-store",
