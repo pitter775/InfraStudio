@@ -73,7 +73,7 @@ function HomePageContent() {
   };
 
   return (
-    <div className="min-h-screen bg-grid">
+    <div className="home-shell min-h-screen bg-grid">
       <Navbar
         currentUser={currentUser}
         onOpenLogin={() => setLoginModalOpen(true)}
@@ -117,7 +117,7 @@ function HomePageContent() {
 
 export default function HomePage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-grid" />}>
+    <Suspense fallback={<div className="home-shell min-h-screen bg-grid" />}>
       <HomePageContent />
     </Suspense>
   );
