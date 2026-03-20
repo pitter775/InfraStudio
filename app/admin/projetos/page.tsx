@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { BriefcaseBusiness, Globe2, Lock, Pencil, Plus, Shield, X } from "lucide-react";
+import { BriefcaseBusiness, Lock, Pencil, Plus, Shield, Workflow, X } from "lucide-react";
 import { canAccessAdmin } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -14,42 +14,21 @@ type Projeto = {
   tipo: string | null;
   descricao: string;
   status: string;
-  siteChatAtivo: boolean;
 };
 
 type Agente = {
   id: string;
-  nome: string;
-  slug?: string | null;
   projetoId: string | null;
-  ativo: boolean;
-  apiIds?: string[];
-};
-
-type ApiParametro = {
-  nome: string;
-  tipo: "string" | "number" | "boolean";
-  obrigatorio: boolean;
 };
 
 type Api = {
   id: string;
   projetoId: string | null;
-  nome: string;
-  parametros: ApiParametro[];
 };
 
 type ChatWidget = {
   id?: string;
-  nome: string;
-  slug: string;
   projetoId: string | null;
-  agenteId: string | null;
-  dominio: string;
-  tema: "dark" | "light";
-  corPrimaria: string;
-  fundoTransparente: boolean;
-  ativo: boolean;
 };
 
 type ProjetoFormState = {
@@ -68,58 +47,6 @@ const emptyProjetoForm: ProjetoFormState = {
   descricao: "",
   status: "ativo",
 };
-
-const emptyWidgetForm: ChatWidget = {
-  nome: "",
-  slug: "",
-  projetoId: null,
-  agenteId: null,
-  dominio: "",
-  tema: "dark",
-  corPrimaria: "#2563eb",
-  fundoTransparente: true,
-  ativo: true,
-};
-
-function renderSnippetLine(line: string) {
-  const trimmed = line.trim();
-  if (!trimmed) {
-    return <span className="text-slate-500"> </span>;
-  }
-
-  if (trimmed.startsWith("<!--") || trimmed.startsWith("//")) {
-    return <span className="text-amber-300">{line}</span>;
-  }
-
-  if (trimmed.startsWith("<script") || trimmed.startsWith("></script>") || trimmed.startsWith("</script>")) {
-    return <span className="text-fuchsia-300">{line}</span>;
-  }
-
-  const parts = line.split(/(data-[\w-]+|src|InfraChat\.setContext)/g);
-  return (
-    <>
-      {parts.map((part, index) => {
-        if (part === "src" || part.startsWith("data-") || part === "InfraChat.setContext") {
-          return (
-            <span key={`${part}-${index}`} className="text-cyan-300">
-              {part}
-            </span>
-          );
-        }
-
-        if (part.includes("=") || part.includes('"')) {
-          return (
-            <span key={`${part}-${index}`} className="text-emerald-200">
-              {part}
-            </span>
-          );
-        }
-
-        return <span key={`${part}-${index}`} className="text-slate-200">{part}</span>;
-      })}
-    </>
-  );
-}
 
 function AdminModal({
   open,
@@ -168,14 +95,11 @@ export default function AdminProjetosPage() {
   const [apis, setApis] = useState<Api[]>([]);
   const [widgets, setWidgets] = useState<ChatWidget[]>([]);
   const [projetoForm, setProjetoForm] = useState<ProjetoFormState>(emptyProjetoForm);
-  const [widgetForm, setWidgetForm] = useState<ChatWidget>(emptyWidgetForm);
   const [projetoModalOpen, setProjetoModalOpen] = useState(false);
-  const [widgetModalOpen, setWidgetModalOpen] = useState(false);
   const [savingProjeto, setSavingProjeto] = useState(false);
-  const [savingWidget, setSavingWidget] = useState(false);
   const [feedbackProjeto, setFeedbackProjeto] = useState<string | null>(null);
-  const [feedbackWidget, setFeedbackWidget] = useState<string | null>(null);
-  const [origin, setOrigin] = useState("");
+
+  const isAllowed = canAccessAdmin(currentUser);
 
   const loadProjetos = async () => {
     const response = await fetch("/api/admin/projetos", { cache: "no-store" });
@@ -187,123 +111,55 @@ export default function AdminProjetosPage() {
     setProjetos(payload.projetos ?? []);
   };
 
-  const loadWidgets = async () => {
+  const loadProjectResources = async () => {
     const response = await fetch("/api/admin/chat-widgets", { cache: "no-store" });
     if (!response.ok) {
       return;
     }
 
-    const payload = (await response.json()) as { widgets?: ChatWidget[]; projetos?: Projeto[]; agentes?: Agente[]; apis?: Api[] };
-    setWidgets(payload.widgets ?? []);
+    const payload = (await response.json()) as {
+      projetos?: Projeto[];
+      agentes?: Agente[];
+      apis?: Api[];
+      widgets?: ChatWidget[];
+    };
+
     setAgentes(payload.agentes ?? []);
     setApis(payload.apis ?? []);
+    setWidgets(payload.widgets ?? []);
+
     if ((payload.projetos ?? []).length) {
       setProjetos(payload.projetos ?? []);
     }
   };
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setOrigin(window.location.origin);
-    }
-
     const loadData = async () => {
       const user = await getCurrentProjectUser();
       setCurrentUser(user);
 
-      await Promise.all([loadProjetos(), loadWidgets()]);
+      if (!canAccessAdmin(user)) {
+        return;
+      }
+
+      await Promise.all([loadProjetos(), loadProjectResources()]);
     };
 
     void loadData();
   }, []);
 
-  const isAllowed = canAccessAdmin(currentUser);
-
-  const agentesDoProjetoSelecionado = useMemo(
-    () => agentes.filter((agente) => agente.projetoId === widgetForm.projetoId),
-    [agentes, widgetForm.projetoId],
-  );
-
-  const getResolvedWidgetAgent = (widget: ChatWidget) => {
-    if (widget.agenteId) {
-      return agentes.find((agente) => agente.id === widget.agenteId) ?? null;
-    }
-
-    return agentes.find((agente) => agente.projetoId === widget.projetoId && agente.ativo) ?? null;
-  };
-
-  const getWidgetRequiredParameters = (widget: ChatWidget) => {
-    const agente = getResolvedWidgetAgent(widget);
-    if (!agente?.apiIds?.length) {
-      return [];
-    }
-
-    const allowedApiIds = new Set(agente.apiIds);
-    const required = apis
-      .filter((api) => allowedApiIds.has(api.id))
-      .flatMap((api) => api.parametros.filter((parametro) => parametro.obrigatorio));
-
-    return required.filter(
-      (parametro, index, array) => array.findIndex((item) => item.nome.toLowerCase() === parametro.nome.toLowerCase()) === index,
-    );
-  };
-
-  const buildContextSnippet = (widget: ChatWidget) => {
-    const requiredParameters = getWidgetRequiredParameters(widget);
-    const lines = [
-      `    title: '${widget.nome.replace(/'/g, "\\'")}',`,
-      `    theme: '${widget.tema}',`,
-      `    accent: '${widget.corPrimaria}',`,
-      `    transparent: ${widget.fundoTransparente ? "true" : "false"},`,
-    ];
-
-    if (requiredParameters.length) {
-      lines.push("    // Campos obrigatorios das APIs vinculadas ao agente");
-      for (const parametro of requiredParameters) {
-        const placeholder = parametro.tipo === "number" ? "0" : parametro.tipo === "boolean" ? "false" : "'XXX'";
-        lines.push(`    ${parametro.nome}: ${placeholder},`);
-      }
-    } else {
-      lines.push("    id: 'uuid-123',");
-    }
-
-    return lines;
-  };
-
-  const buildWidgetSnippet = (widget: ChatWidget) => {
-    const base = origin || "https://seu-dominio";
-    const projeto = projetos.find((item) => item.id === widget.projetoId);
-    const agente = getResolvedWidgetAgent(widget);
-    const projetoRef = projeto?.slug || projeto?.id || "seu-projeto";
-    const agenteRef = agente?.slug || agente?.id || "default";
-    const contextLines = buildContextSnippet(widget);
-
-    return [
-      "<!-- 1) Cole este bloco no HTML/layout para carregar o chat na abertura da pagina -->",
-      "<script",
-      `  src="${base}/chat.js"`,
-      `  data-projeto="${projetoRef}"`,
-      `  data-agente="${agenteRef}"`,
-      "></script>",
-      "",
-      "<!-- 2) Depois, no JavaScript da pagina ou do framework, envie contexto e personalize se quiser -->",
-      "<script>",
-      "  // Exemplo: execute quando a pagina carregar ou quando tiver os dados do cliente",
-      "  InfraChat.setContext({",
-      ...contextLines,
-      "  });",
-      "</script>",
-    ].join("\n");
-  };
+  const projectSummaries = useMemo(() => {
+    return projetos.map((projeto) => ({
+      projeto,
+      totalAgentes: agentes.filter((agente) => agente.projetoId === projeto.id).length,
+      totalApis: apis.filter((api) => api.projetoId === projeto.id).length,
+      totalWidgets: widgets.filter((widget) => widget.projetoId === projeto.id).length,
+    }));
+  }, [agentes, apis, projetos, widgets]);
 
   const resetProjetoForm = () => {
     setProjetoForm(emptyProjetoForm);
     setFeedbackProjeto(null);
-  };
-
-  const resetWidgetForm = () => {
-    setWidgetForm(emptyWidgetForm);
-    setFeedbackWidget(null);
   };
 
   const openNewProjetoModal = () => {
@@ -311,9 +167,17 @@ export default function AdminProjetosPage() {
     setProjetoModalOpen(true);
   };
 
-  const openNewWidgetModal = () => {
-    resetWidgetForm();
-    setWidgetModalOpen(true);
+  const handleProjetoEdit = (projeto: Projeto) => {
+    setProjetoForm({
+      id: projeto.id,
+      nome: projeto.nome,
+      slug: projeto.slug ?? "",
+      tipo: projeto.tipo ?? "",
+      descricao: projeto.descricao,
+      status: projeto.status,
+    });
+    setFeedbackProjeto(null);
+    setProjetoModalOpen(true);
   };
 
   const handleProjetoSubmit = async () => {
@@ -336,70 +200,12 @@ export default function AdminProjetosPage() {
       return;
     }
 
-    await loadProjetos();
+    await Promise.all([loadProjetos(), loadProjectResources()]);
     const message = projetoForm.id ? "Projeto atualizado com sucesso." : "Projeto criado com sucesso.";
     resetProjetoForm();
     setSavingProjeto(false);
     setProjetoModalOpen(false);
     setFeedbackProjeto(message);
-  };
-
-  const handleWidgetSubmit = async () => {
-    setSavingWidget(true);
-    setFeedbackWidget(null);
-
-    const response = await fetch("/api/admin/chat-widgets", {
-      method: widgetForm.id ? "PUT" : "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(widgetForm),
-    });
-
-    const payload = (await response.json()) as { error?: string };
-
-    if (!response.ok) {
-      setFeedbackWidget(payload.error ?? "Nao foi possivel salvar o widget.");
-      setSavingWidget(false);
-      return;
-    }
-
-    await loadWidgets();
-    const message = widgetForm.id ? "Widget atualizado com sucesso." : "Widget criado com sucesso.";
-    resetWidgetForm();
-    setSavingWidget(false);
-    setWidgetModalOpen(false);
-    setFeedbackWidget(message);
-  };
-
-  const handleProjetoEdit = (projeto: Projeto) => {
-    setProjetoForm({
-      id: projeto.id,
-      nome: projeto.nome,
-      slug: projeto.slug ?? "",
-      tipo: projeto.tipo ?? "",
-      descricao: projeto.descricao,
-      status: projeto.status,
-    });
-    setFeedbackProjeto(null);
-    setProjetoModalOpen(true);
-  };
-
-  const handleWidgetEdit = (widget: ChatWidget) => {
-    setWidgetForm({
-      id: widget.id,
-      nome: widget.nome,
-      slug: widget.slug,
-      projetoId: widget.projetoId,
-      agenteId: widget.agenteId,
-      dominio: widget.dominio,
-      tema: widget.tema,
-      corPrimaria: widget.corPrimaria,
-      fundoTransparente: widget.fundoTransparente,
-      ativo: widget.ativo,
-    });
-    setFeedbackWidget(null);
-    setWidgetModalOpen(true);
   };
 
   if (!currentUser) {
@@ -411,7 +217,7 @@ export default function AdminProjetosPage() {
             Acesso bloqueado
           </div>
           <h2 className="text-2xl font-bold text-white">Voce ainda nao fez login</h2>
-          <p className="mt-3 max-w-xl text-slate-300">Entre com o usuario master para administrar projetos e widgets de chat.</p>
+          <p className="mt-3 max-w-xl text-slate-300">Entre com o usuario master para administrar projetos.</p>
         </div>
       </main>
     );
@@ -425,8 +231,8 @@ export default function AdminProjetosPage() {
             <Shield size={14} />
             Permissao insuficiente
           </div>
-          <h2 className="text-2xl font-bold text-white">Somente o master pode gerenciar projetos e widgets</h2>
-          <p className="mt-3 max-w-xl text-slate-300">Usuarios comuns operam apenas os agentes e chats do proprio projeto.</p>
+          <h2 className="text-2xl font-bold text-white">Somente o master pode gerenciar projetos</h2>
+          <p className="mt-3 max-w-xl text-slate-300">O fluxo administrativo agora comeca em projetos e se desdobra dentro de cada projeto.</p>
         </div>
       </main>
     );
@@ -437,27 +243,26 @@ export default function AdminProjetosPage() {
       <section className="px-1 py-2">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-amber-200">
           <BriefcaseBusiness size={14} />
-          Projetos e Widgets
+          Projetos
         </div>
-        <h1 className="text-4xl font-extrabold text-white">Gestao de projetos e canais de chat</h1>
+        <h1 className="text-4xl font-extrabold text-white">Escolha um projeto para abrir o workspace</h1>
         <p className="mt-4 max-w-3xl text-slate-400">
-          Cada widget de chat aponta para um projeto e, opcionalmente, para um agente especifico. Assim o mesmo backend atende a InfraStudio ou qualquer site externo sem trocar codigo.
+          O fluxo do painel agora segue uma ordem unica: primeiro projeto, depois chat, agente, API e widget dentro dele. Nao existe mais atalho solto para agentes no menu.
         </p>
       </section>
 
-      {(feedbackProjeto || feedbackWidget) && (
-        <section className="grid gap-3">
-          {feedbackProjeto ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackProjeto}</div> : null}
-          {feedbackWidget ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackWidget}</div> : null}
+      {feedbackProjeto ? (
+        <section>
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackProjeto}</div>
         </section>
-      )}
+      ) : null}
 
-      <section className="grid gap-6 xl:grid-cols-[1.05fr_1.25fr]">
+      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-          <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+          <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h3 className="text-xl font-bold text-white">Projetos cadastrados</h3>
-              <p className="mt-1 text-sm text-slate-400">Crie e edite projetos antes de conectar agentes, APIs e widgets.</p>
+              <p className="mt-1 text-sm text-slate-400">Entre em um projeto para liberar a gestao de agentes, APIs, widgets e chats desse contexto.</p>
             </div>
             <button
               type="button"
@@ -470,12 +275,12 @@ export default function AdminProjetosPage() {
           </div>
 
           <div className="space-y-4 p-6">
-            {projetos.length ? (
-              projetos.map((projeto) => (
-                <div key={projeto.id} className="rounded-xl border border-white/10 bg-slate-950/30 p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-3">
+            {projectSummaries.length ? (
+              projectSummaries.map(({ projeto, totalAgentes, totalApis, totalWidgets }) => (
+                <div key={projeto.id} className="rounded-2xl border border-white/10 bg-slate-950/30 p-5">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-3">
                         <h4 className="text-lg font-bold text-white">{projeto.nome}</h4>
                         <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-200">
                           {projeto.status}
@@ -485,20 +290,30 @@ export default function AdminProjetosPage() {
                         slug: {projeto.slug ?? "sem-slug"} {projeto.tipo ? `• tipo: ${projeto.tipo}` : ""}
                       </p>
                       <p className="mt-3 text-sm leading-relaxed text-slate-400">{projeto.descricao || "Sem descricao."}</p>
+
+                      <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-2">{totalAgentes} agentes</span>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-2">{totalApis} APIs</span>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-2">{totalWidgets} widgets</span>
+                      </div>
                     </div>
+
                     <div className="flex gap-2">
                       <Link
                         href={`/admin/projetos/${projeto.id}`}
-                        className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-sm font-semibold text-blue-100"
+                        className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-100"
                       >
-                        Abrir
+                        Abrir workspace
                       </Link>
                       <button
                         type="button"
                         onClick={() => handleProjetoEdit(projeto)}
-                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200"
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200"
                       >
-                        Editar
+                        <span className="inline-flex items-center gap-2">
+                          <Pencil size={14} />
+                          Editar
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -512,74 +327,37 @@ export default function AdminProjetosPage() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-          <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
-            <div>
-              <h3 className="text-xl font-bold text-white">Widgets de chat</h3>
-              <p className="mt-1 text-sm text-slate-400">A criacao agora acontece dentro de cada projeto. Aqui fica apenas a visao consolidada dos widgets ja configurados.</p>
+        <aside className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+          <div className="border-b border-white/10 px-6 py-5">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">
+              <Workflow size={14} />
+              Fluxo correto
             </div>
-            <span className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-300">Crie widgets dentro do projeto</span>
+            <h3 className="mt-4 text-xl font-bold text-white">Tudo nasce dentro do projeto</h3>
+            <p className="mt-2 text-sm text-slate-400">A navegacao foi simplificada para refletir a ordem real de configuracao e operacao.</p>
           </div>
 
           <div className="space-y-4 p-6">
-            {widgets.length ? (
-              widgets.map((widget) => {
-                const projeto = projetos.find((item) => item.id === widget.projetoId);
-                const agente = agentes.find((item) => item.id === widget.agenteId);
-
-                return (
-                  <div key={widget.id ?? widget.slug} className="rounded-xl border border-white/10 bg-slate-950/30 p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-3">
-                          <h4 className="text-lg font-bold text-white">{widget.nome}</h4>
-                          <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${widget.ativo ? "bg-emerald-500/10 text-emerald-200" : "bg-slate-800 text-slate-400"}`}>
-                            {widget.ativo ? "ativo" : "inativo"}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">slug: {widget.slug}</p>
-                        <p className="mt-3 text-sm text-slate-300">Projeto: {projeto?.nome ?? "nao vinculado"}</p>
-                        <p className="mt-1 text-sm text-slate-400">Agente: {agente?.nome ?? "agente ativo do projeto"}</p>
-                        <p className="mt-1 text-sm text-slate-400">Dominio/contexto: {widget.dominio || "nao informado"}</p>
-                        <p className="mt-1 text-sm text-slate-400">Tema: {widget.tema === "light" ? "claro" : "escuro"} • cor: {widget.corPrimaria}</p>
-                        <p className="mt-1 text-sm text-slate-400">Fundo: {widget.fundoTransparente ? "transparente" : "solido"}</p>
-                        <div className="mt-4 w-full rounded-xl border border-white/10 bg-slate-950/60 p-3">
-                          <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Codigo de injecao</p>
-                          <div className="w-full overflow-x-auto rounded-lg border border-white/10 bg-[#07111f]">
-                            <pre className="min-h-[170px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
-                              {buildWidgetSnippet(widget)
-                                .split("\n")
-                                .map((line, index) => (
-                                  <div key={`${widget.slug}-line-${index}`}>{renderSnippetLine(line)}</div>
-                                ))}
-                            </pre>
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleWidgetEdit(widget)}
-                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200"
-                      >
-                        Editar
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">
-                Nenhum widget cadastrado ainda.
-              </div>
-            )}
+            <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">1. Escolha o projeto</p>
+              <p className="mt-2 text-sm text-slate-300">A lista de projetos virou o ponto de entrada principal do painel.</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">2. Entre no workspace</p>
+              <p className="mt-2 text-sm text-slate-300">Dentro do projeto voce encontra agentes, APIs, widgets e os chats recentes daquele contexto.</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">3. Opere sem redundancia</p>
+              <p className="mt-2 text-sm text-slate-300">Sem menu paralelo para agentes, o painel evita bifurcacao e deixa a jornada mais previsivel.</p>
+            </div>
           </div>
-        </div>
+        </aside>
       </section>
 
       <AdminModal
         open={projetoModalOpen}
         title={projetoForm.id ? "Editar projeto" : "Novo projeto"}
-        subtitle="Crie o projeto e depois conecte agentes, APIs e widgets."
+        subtitle="Crie o projeto e depois conecte agentes, APIs e widgets dentro dele."
         onClose={() => setProjetoModalOpen(false)}
       >
         <div className="space-y-4">
@@ -643,124 +421,6 @@ export default function AdminProjetosPage() {
           {feedbackProjeto ? (
             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
               {feedbackProjeto}
-            </div>
-          ) : null}
-        </div>
-      </AdminModal>
-
-      <AdminModal
-        open={widgetModalOpen}
-        title={widgetForm.id ? "Editar widget" : "Novo widget"}
-        subtitle="Configure qual projeto esse canal de chat deve usar."
-        onClose={() => setWidgetModalOpen(false)}
-      >
-        <div className="space-y-4">
-          <input
-            value={widgetForm.nome}
-            onChange={(event) => setWidgetForm((prev) => ({ ...prev, nome: event.target.value }))}
-            placeholder="Nome do widget"
-            className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-          />
-          <input
-            value={widgetForm.slug}
-            onChange={(event) => setWidgetForm((prev) => ({ ...prev, slug: event.target.value }))}
-            placeholder="Slug publico do widget"
-            className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-          />
-          <input
-            value={widgetForm.dominio}
-            onChange={(event) => setWidgetForm((prev) => ({ ...prev, dominio: event.target.value }))}
-            placeholder="Dominio permitido ou contexto do embed"
-            className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-          />
-          <div className="grid gap-4 sm:grid-cols-[0.7fr_0.3fr]">
-            <select
-              value={widgetForm.tema}
-              onChange={(event) => setWidgetForm((prev) => ({ ...prev, tema: event.target.value === "light" ? "light" : "dark" }))}
-              className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
-            >
-              <option value="dark">Tema escuro</option>
-              <option value="light">Tema claro</option>
-            </select>
-            <input
-              type="color"
-              value={widgetForm.corPrimaria}
-              onChange={(event) => setWidgetForm((prev) => ({ ...prev, corPrimaria: event.target.value }))}
-              className="h-[50px] w-full rounded-xl border border-white/10 bg-slate-950/50 px-2 py-2"
-            />
-          </div>
-          <select
-            value={widgetForm.projetoId ?? ""}
-            onChange={(event) =>
-              setWidgetForm((prev) => ({
-                ...prev,
-                projetoId: event.target.value || null,
-                agenteId: null,
-              }))
-            }
-            className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
-          >
-            <option value="">Selecione o projeto do widget</option>
-            {projetos.map((projeto) => (
-              <option key={projeto.id} value={projeto.id}>
-                {projeto.nome}
-              </option>
-            ))}
-          </select>
-          <select
-            value={widgetForm.agenteId ?? ""}
-            onChange={(event) => setWidgetForm((prev) => ({ ...prev, agenteId: event.target.value || null }))}
-            className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
-          >
-            <option value="">Usar o agente ativo do projeto</option>
-            {agentesDoProjetoSelecionado.map((agente) => (
-              <option key={agente.id} value={agente.id}>
-                {agente.nome}{agente.ativo ? " (ativo)" : ""}
-              </option>
-            ))}
-          </select>
-          <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
-            <input
-              type="checkbox"
-              checked={widgetForm.ativo}
-              onChange={(event) => setWidgetForm((prev) => ({ ...prev, ativo: event.target.checked }))}
-            />
-            Widget ativo
-          </label>
-          <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
-            <input
-              type="checkbox"
-              checked={widgetForm.fundoTransparente}
-              onChange={(event) => setWidgetForm((prev) => ({ ...prev, fundoTransparente: event.target.checked }))}
-            />
-            Fundo transparente
-          </label>
-
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => void handleWidgetSubmit()}
-              disabled={savingWidget}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
-            >
-              {widgetForm.id ? <Pencil size={16} /> : <Plus size={16} />}
-              {savingWidget ? "Salvando..." : widgetForm.id ? "Atualizar widget" : "Criar widget"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                resetWidgetForm();
-                setWidgetModalOpen(false);
-              }}
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white"
-            >
-              Cancelar
-            </button>
-          </div>
-
-          {feedbackWidget ? (
-            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-              {feedbackWidget}
             </div>
           ) : null}
         </div>

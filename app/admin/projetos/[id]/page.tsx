@@ -62,6 +62,13 @@ type Chat = {
   contexto: Record<string, unknown> | null;
 };
 
+type ChatMessage = {
+  id: string;
+  role: "user" | "assistant" | "system";
+  conteudo: string;
+  createdAt: string;
+};
+
 type ChatWidget = {
   id?: string;
   nome: string;
@@ -93,6 +100,11 @@ type ProjetoDetalhe = {
 
 type WidgetFormState = ChatWidget & {
   id?: string;
+};
+
+type ChatDetailState = {
+  chat: Chat;
+  messages: ChatMessage[];
 };
 
 function sanitizePhoneDigits(value: string) {
@@ -197,6 +209,8 @@ type ApiCampoTreeDraftNode = {
   tipo: ApiCampo["tipo"] | null;
   children: Map<string, ApiCampoTreeDraftNode>;
 };
+
+type ProjectTab = "agentes" | "apis" | "chats";
 
 const defaultConfiguracoes = {
   objetivo: "Qualificar leads e operar o atendimento do projeto com contexto de negocio.",
@@ -502,6 +516,14 @@ function AgenteModal({
                       <input type="checkbox" checked={form.apiIds.includes(api.id)} onChange={(event) => onChange({ apiIds: event.target.checked ? [...form.apiIds, api.id] : form.apiIds.filter((item) => item !== api.id) })} />
                       <span className="font-semibold text-white">{api.nome}</span>
                       <span className="text-slate-500">{api.metodo}</span>
+                      <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${api.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-200"}`}>
+                        {api.ativo ? "ativa" : "inativa"}
+                      </span>
+                      {api.parametros.some((parametro) => parametro.obrigatorio) ? (
+                        <span className="text-[11px] text-amber-200/80">
+                          exige: {api.parametros.filter((parametro) => parametro.obrigatorio).map((parametro) => parametro.nome).join(", ")}
+                        </span>
+                      ) : null}
                     </label>
                   ))
                 ) : (
@@ -509,6 +531,36 @@ function AgenteModal({
                 )}
               </div>
             </div>
+
+            {form.apiIds.length ? (
+              <div className="mt-4 space-y-3">
+                {apis.filter((api) => form.apiIds.includes(api.id) && !api.ativo).length ? (
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                    APIs inativas vinculadas:{" "}
+                    {apis
+                      .filter((api) => form.apiIds.includes(api.id) && !api.ativo)
+                      .map((api) => api.nome)
+                      .join(", ")}
+                    . O agente so consulta APIs marcadas como ativas.
+                  </div>
+                ) : null}
+                {apis.some((api) => form.apiIds.includes(api.id) && api.parametros.some((parametro) => parametro.obrigatorio)) ? (
+                  <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+                    Para o agente consultar essas APIs no chat, envie no contexto:{" "}
+                    {apis
+                      .filter((api) => form.apiIds.includes(api.id))
+                      .flatMap((api) => api.parametros.filter((parametro) => parametro.obrigatorio))
+                      .filter(
+                        (parametro, index, array) =>
+                          array.findIndex((item) => item.nome.toLowerCase() === parametro.nome.toLowerCase()) === index,
+                      )
+                      .map((parametro) => parametro.nome)
+                      .join(", ")}
+                    .
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             <label className="mt-5 flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
               <input type="checkbox" checked={form.ativo} onChange={(event) => onChange({ ativo: event.target.checked })} />
@@ -805,6 +857,77 @@ function WidgetModal({
   );
 }
 
+function ChatHistoryModal({
+  open,
+  loading,
+  error,
+  detail,
+  onClose,
+}: {
+  open: boolean;
+  loading: boolean;
+  error: string | null;
+  detail: ChatDetailState | null;
+  onClose: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
+      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Conversa</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{detail?.chat.titulo ?? "Carregando conversa"}</h2>
+            {detail ? <p className="mt-1 text-sm text-slate-400">Atualizada em {new Date(detail.chat.updatedAt).toLocaleString("pt-BR")}</p> : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Fechar modal"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          {loading ? <div className="rounded-xl border border-white/10 bg-slate-950/30 p-6 text-sm text-slate-300">Carregando historico da conversa...</div> : null}
+          {!loading && error ? <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-6 text-sm text-rose-100">{error}</div> : null}
+          {!loading && !error && detail ? (
+            <div className="space-y-4">
+              {detail.messages.length ? (
+                detail.messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`rounded-2xl border px-4 py-3 ${
+                      message.role === "assistant"
+                        ? "border-cyan-500/20 bg-cyan-500/10"
+                        : message.role === "user"
+                          ? "border-white/10 bg-slate-950/40"
+                          : "border-amber-500/20 bg-amber-500/10"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-300">{message.role === "assistant" ? "Assistente" : message.role === "user" ? "Cliente" : "Sistema"}</span>
+                      <span className="text-[11px] text-slate-500">{new Date(message.createdAt).toLocaleString("pt-BR")}</span>
+                    </div>
+                    <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-white">{message.conteudo}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhuma mensagem encontrada nesta conversa.</div>
+              )}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminProjetoDetalhePage() {
   const params = useParams<{ id: string }>();
   const [data, setData] = useState<ProjetoDetalhe | null>(null);
@@ -822,6 +945,10 @@ export default function AdminProjetoDetalhePage() {
   const [agenteModalOpen, setAgenteModalOpen] = useState(false);
   const [apiModalOpen, setApiModalOpen] = useState(false);
   const [widgetModalOpen, setWidgetModalOpen] = useState(false);
+  const [chatHistoryOpen, setChatHistoryOpen] = useState(false);
+  const [chatHistoryLoading, setChatHistoryLoading] = useState(false);
+  const [chatHistoryError, setChatHistoryError] = useState<string | null>(null);
+  const [chatDetail, setChatDetail] = useState<ChatDetailState | null>(null);
   const [origin, setOrigin] = useState("");
 
   const loadProjeto = async () => {
@@ -882,6 +1009,32 @@ export default function AdminProjetoDetalhePage() {
     setWidgetModalOpen(true);
   };
 
+  const handleOpenChatHistory = async (chat: Chat) => {
+    setChatHistoryOpen(true);
+    setChatHistoryLoading(true);
+    setChatHistoryError(null);
+    setChatDetail(null);
+
+    const response = await fetch(`/api/admin/chats/${chat.id}`, { cache: "no-store" });
+    const payload = (await response.json()) as {
+      error?: string;
+      chat?: Chat;
+      messages?: ChatMessage[];
+    };
+
+    if (!response.ok || !payload.chat) {
+      setChatHistoryError(payload.error ?? "Nao foi possivel carregar a conversa.");
+      setChatHistoryLoading(false);
+      return;
+    }
+
+    setChatDetail({
+      chat: payload.chat,
+      messages: payload.messages ?? [],
+    });
+    setChatHistoryLoading(false);
+  };
+
   const getResolvedWidgetAgent = (widget: ChatWidget) => {
     if (widget.agenteId) {
       return data?.agentes.find((agente) => agente.id === widget.agenteId) ?? null;
@@ -889,6 +1042,24 @@ export default function AdminProjetoDetalhePage() {
 
     return data?.agentes.find((agente) => agente.ativo) ?? null;
   };
+
+  const getAgentLinkedApis = (agente: Agente) => {
+    if (!data) {
+      return [];
+    }
+
+    const allowedApiIds = new Set(agente.apiIds);
+    return data.apis.filter((api) => allowedApiIds.has(api.id));
+  };
+
+  const getAgentRequiredParameters = (agente: Agente) => {
+    const required = getAgentLinkedApis(agente).flatMap((api) => api.parametros.filter((parametro) => parametro.obrigatorio));
+    return required.filter(
+      (parametro, index, array) => array.findIndex((item) => item.nome.toLowerCase() === parametro.nome.toLowerCase()) === index,
+    );
+  };
+
+  const getAgentInactiveApis = (agente: Agente) => getAgentLinkedApis(agente).filter((api) => !api.ativo);
 
   const getWidgetRequiredParameters = (widget: ChatWidget) => {
     const agente = getResolvedWidgetAgent(widget);
@@ -1298,6 +1469,8 @@ export default function AdminProjetoDetalhePage() {
     });
   };
 
+  const [activeTab, setActiveTab] = useState<ProjectTab>("agentes");
+
   if (!data) {
     return (
       <main className="space-y-6">
@@ -1320,15 +1493,39 @@ export default function AdminProjetoDetalhePage() {
         <h1 className="text-4xl font-extrabold text-white">{data.projeto.nome}</h1>
         <p className="mt-3 max-w-3xl text-slate-400">{data.projeto.descricao || "Sem descricao cadastrada."}</p>
         <div className="mt-5 flex flex-wrap gap-3">
-          <a href="#agentes" className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white">
+          <button
+            type="button"
+            onClick={() => setActiveTab("agentes")}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+              activeTab === "agentes"
+                ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
+                : "border border-white/10 bg-white/5 text-white"
+            }`}
+          >
             Agentes
-          </a>
-          <a href="#apis" className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100">
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("apis")}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+              activeTab === "apis"
+                ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
+                : "border border-white/10 bg-white/5 text-white"
+            }`}
+          >
             APIs
-          </a>
-          <a href="#widgets" className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white">
-            Widgets
-          </a>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("chats")}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+              activeTab === "chats"
+                ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
+                : "border border-white/10 bg-white/5 text-white"
+            }`}
+          >
+            Chats
+          </button>
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-6">
           <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
@@ -1366,8 +1563,8 @@ export default function AdminProjetoDetalhePage() {
         </section>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <section id="agentes" className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+      <div className="space-y-6">
+        <section className={`${activeTab === "agentes" ? "block" : "hidden"} overflow-hidden rounded-2xl border border-white/10 bg-white/5`}>
           <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h3 className="text-xl font-bold text-white">Agentes do projeto</h3>
@@ -1380,40 +1577,50 @@ export default function AdminProjetoDetalhePage() {
           </div>
           <div className="space-y-3 p-4">
             {data.agentes.length ? (
-              data.agentes.map((agente) => (
-                <div key={agente.id} className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-3">
-                        <h4 className="text-base font-bold text-white">{agente.nome}</h4>
-                        <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${agente.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
-                          {agente.ativo ? "ativo" : "inativo"}
-                        </span>
-                        {agente.ativo ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-blue-200">
-                            <CheckCircle2 size={12} />
-                            em uso
+              data.agentes.map((agente) => {
+                const linkedApis = getAgentLinkedApis(agente);
+                const inactiveApis = getAgentInactiveApis(agente);
+                const requiredParameters = getAgentRequiredParameters(agente);
+
+                return (
+                  <div key={agente.id} className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-3">
+                          <h4 className="text-base font-bold text-white">{agente.nome}</h4>
+                          <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${agente.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
+                            {agente.ativo ? "ativo" : "inativo"}
                           </span>
+                          {agente.ativo ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-blue-200">
+                              <CheckCircle2 size={12} />
+                              em uso
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descricao."}</p>
+                        <p className="mt-3 text-xs text-cyan-200/80">APIs vinculadas: {linkedApis.length ? linkedApis.map((api) => api.nome).join(", ") : "nenhuma"}</p>
+                        {inactiveApis.length ? (
+                          <p className="mt-2 text-xs text-amber-200/80">APIs inativas ignoradas no runtime: {inactiveApis.map((api) => api.nome).join(", ")}</p>
+                        ) : null}
+                        {requiredParameters.length ? (
+                          <p className="mt-1 text-xs text-cyan-100/80">O chat precisa enviar no contexto: {requiredParameters.map((parametro) => parametro.nome).join(", ")}</p>
                         ) : null}
                       </div>
-                      <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descricao."}</p>
-                      <p className="mt-3 text-xs text-cyan-200/80">
-                        APIs vinculadas: {agente.apiIds.length ? agente.apiIds.map((apiId) => data.apis.find((api) => api.id === apiId)?.nome ?? "API").join(", ") : "nenhuma"}
-                      </p>
+                      <button type="button" onClick={() => handleEditAgente(agente)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200">
+                        Editar
+                      </button>
                     </div>
-                    <button type="button" onClick={() => handleEditAgente(agente)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200">
-                      Editar
-                    </button>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhum agente cadastrado para este projeto ainda.</div>
             )}
           </div>
         </section>
 
-        <section id="apis" className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+        <section className={`${activeTab === "apis" ? "block" : "hidden"} overflow-hidden rounded-2xl border border-white/10 bg-white/5`}>
           <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h3 className="text-xl font-bold text-white">APIs do projeto</h3>
@@ -1460,6 +1667,12 @@ export default function AdminProjetoDetalhePage() {
                           Parametros: {api.parametros.map((parametro) => `${parametro.nome}${parametro.obrigatorio ? "*" : ""}`).join(", ")}
                         </p>
                       ) : null}
+                      {api.parametros.some((parametro) => parametro.obrigatorio) ? (
+                        <p className="mt-1 text-xs text-cyan-100/80">
+                          Essa API so funciona no chat quando o contexto enviar:{" "}
+                          {api.parametros.filter((parametro) => parametro.obrigatorio).map((parametro) => parametro.nome).join(", ")}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => handleEditApi(api)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200">
@@ -1481,94 +1694,103 @@ export default function AdminProjetoDetalhePage() {
 
       </div>
 
-      <section id="widgets" className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-        <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h3 className="text-xl font-bold text-white">Widgets do projeto</h3>
-            <p className="mt-1 text-sm text-slate-400">O widget agora nasce dentro deste projeto, com o contexto correto desde a criacao.</p>
-          </div>
-          <button type="button" onClick={openNewWidgetModal} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
-            <Plus size={16} />
-            Novo widget
-          </button>
-        </div>
-        <div className="space-y-4 p-6">
-          {data.widgets.length ? (
-            data.widgets.map((widget) => {
-              const agente = getResolvedWidgetAgent(widget);
+      <section className={`${activeTab === "chats" ? "block" : "hidden"}`}>
+        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+          <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+            <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-white">Widget do chat</h3>
+                <p className="mt-1 text-sm text-slate-400">Do lado esquerdo fica a operacao do chat: widget, embed e configuracao.</p>
+              </div>
+              <button type="button" onClick={openNewWidgetModal} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
+                <Plus size={16} />
+                Novo widget de chat
+              </button>
+            </div>
+            <div className="space-y-4 p-6">
+              {data.widgets.length ? (
+                data.widgets.map((widget) => {
+                  const agente = getResolvedWidgetAgent(widget);
 
-              return (
-                <div key={widget.id ?? widget.slug} className="rounded-xl border border-white/10 bg-slate-950/30 p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-3">
-                        <h4 className="text-lg font-bold text-white">{widget.nome}</h4>
-                        <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${widget.ativo ? "bg-emerald-500/10 text-emerald-200" : "bg-slate-800 text-slate-400"}`}>
-                          {widget.ativo ? "ativo" : "inativo"}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">slug: {widget.slug}</p>
-                      <p className="mt-3 text-sm text-slate-300">Projeto: {data.projeto.nome}</p>
-                      <p className="mt-1 text-sm text-slate-400">Agente: {agente?.nome ?? "agente ativo do projeto"}</p>
-                      <p className="mt-1 text-sm text-slate-400">Dominio/contexto: {widget.dominio || "nao informado"}</p>
-                      <p className="mt-1 text-sm text-slate-400">WhatsApp: {widget.whatsappCelular || "nao informado"}</p>
-                      <p className="mt-1 text-sm text-slate-400">Tema: {widget.tema === "light" ? "claro" : "escuro"} | cor: {widget.corPrimaria}</p>
-                      <p className="mt-1 text-sm text-slate-400">Fundo: {widget.fundoTransparente ? "transparente" : "solido"}</p>
-                      <div className="mt-4 w-full rounded-xl border border-white/10 bg-slate-950/60 p-3">
-                        <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Codigo de injecao</p>
-                        <div className="w-full overflow-x-auto rounded-lg border border-white/10 bg-[#07111f]">
-                          <pre className="min-h-[170px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
-                            {buildWidgetSnippet(widget)
-                              .split("\n")
-                              .map((line, index) => (
-                                <div key={`${widget.slug}-line-${index}`}>{renderSnippetLine(line)}</div>
-                              ))}
-                          </pre>
+                  return (
+                    <div key={widget.id ?? widget.slug} className="rounded-xl border border-white/10 bg-slate-950/30 p-5">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-3">
+                            <h4 className="text-lg font-bold text-white">{widget.nome}</h4>
+                            <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${widget.ativo ? "bg-emerald-500/10 text-emerald-200" : "bg-slate-800 text-slate-400"}`}>
+                              {widget.ativo ? "ativo" : "inativo"}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">slug: {widget.slug}</p>
+                          <p className="mt-3 text-sm text-slate-300">Projeto: {data.projeto.nome}</p>
+                          <p className="mt-1 text-sm text-slate-400">Agente: {agente?.nome ?? "agente ativo do projeto"}</p>
+                          <p className="mt-1 text-sm text-slate-400">Dominio/contexto: {widget.dominio || "nao informado"}</p>
+                          <p className="mt-1 text-sm text-slate-400">WhatsApp: {widget.whatsappCelular || "nao informado"}</p>
+                          <p className="mt-1 text-sm text-slate-400">Tema: {widget.tema === "light" ? "claro" : "escuro"} | cor: {widget.corPrimaria}</p>
+                          <p className="mt-1 text-sm text-slate-400">Fundo: {widget.fundoTransparente ? "transparente" : "solido"}</p>
+                          <div className="mt-4 w-full rounded-xl border border-white/10 bg-slate-950/60 p-3">
+                            <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Codigo de injecao</p>
+                            <div className="w-full overflow-x-auto rounded-lg border border-white/10 bg-[#07111f]">
+                              <pre className="min-h-[170px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
+                                {buildWidgetSnippet(widget)
+                                  .split("\n")
+                                  .map((line, index) => (
+                                    <div key={`${widget.slug}-line-${index}`}>{renderSnippetLine(line)}</div>
+                                  ))}
+                              </pre>
+                            </div>
+                          </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => handleEditWidget(widget)}
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200"
+                        >
+                          Editar
+                        </button>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleEditWidget(widget)}
-                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200"
-                    >
-                      Editar
-                    </button>
-                  </div>
+                  );
+                })
+              ) : (
+                <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">
+                  Nenhum widget de chat cadastrado para este projeto ainda.
                 </div>
-              );
-            })
-          ) : (
-            <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">
-              Nenhum widget cadastrado para este projeto ainda.
+              )}
             </div>
-          )}
+          </section>
+
+          <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+            <div className="border-b border-white/10 px-6 py-5">
+              <h3 className="text-xl font-bold text-white">Conversas</h3>
+              <p className="mt-1 text-sm text-slate-400">Do lado direito ficam as conversas. Clique para abrir o historico completo.</p>
+            </div>
+            <div className="space-y-4 p-6">
+              {data.chats.length ? (
+                data.chats.slice(0, 12).map((chat) => (
+                  <button
+                    key={chat.id}
+                    type="button"
+                    onClick={() => void handleOpenChatHistory(chat)}
+                    className="block w-full rounded-xl border border-white/10 bg-slate-950/30 p-4 text-left transition-colors hover:border-cyan-500/30 hover:bg-slate-950/50"
+                  >
+                    <div className="flex items-center gap-2 text-cyan-200">
+                      <MessageSquare size={14} />
+                      <p className="font-semibold text-white">{chat.titulo}</p>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">{new Date(chat.updatedAt).toLocaleString("pt-BR")}</p>
+                    <p className="mt-2 text-xs text-slate-400">Lead: {String((chat.contexto?.lead as { nome?: string } | undefined)?.nome ?? "Nao identificado")}</p>
+                    <p className="mt-1 text-xs text-cyan-200/80">Tokens: {chat.totalTokens}</p>
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhum chat registrado para este projeto ainda.</div>
+              )}
+            </div>
+          </section>
         </div>
       </section>
-
-      <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-          <div className="border-b border-white/10 px-6 py-5">
-            <h3 className="text-xl font-bold text-white">Chats recentes</h3>
-            <p className="mt-1 text-sm text-slate-400">Visao rapida das conversas ligadas a este projeto.</p>
-          </div>
-          <div className="space-y-4 p-6">
-            {data.chats.length ? (
-              data.chats.slice(0, 8).map((chat) => (
-                <div key={chat.id} className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
-                  <div className="flex items-center gap-2 text-cyan-200">
-                    <MessageSquare size={14} />
-                    <p className="font-semibold text-white">{chat.titulo}</p>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">{new Date(chat.updatedAt).toLocaleString("pt-BR")}</p>
-                  <p className="mt-2 text-xs text-slate-400">Lead: {String((chat.contexto?.lead as { nome?: string } | undefined)?.nome ?? "Nao identificado")}</p>
-                  <p className="mt-1 text-xs text-cyan-200/80">Tokens: {chat.totalTokens}</p>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhum chat registrado para este projeto ainda.</div>
-            )}
-          </div>
-        </section>
 
         <Link href="/admin/projetos" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-3 font-semibold text-white transition-colors hover:bg-white/10">
           Voltar para projetos
@@ -1626,6 +1848,18 @@ export default function AdminProjetoDetalhePage() {
           }))
         }
         onSubmit={() => void handleWidgetSubmit()}
+      />
+      <ChatHistoryModal
+        open={chatHistoryOpen}
+        loading={chatHistoryLoading}
+        error={chatHistoryError}
+        detail={chatDetail}
+        onClose={() => {
+          setChatHistoryOpen(false);
+          setChatHistoryLoading(false);
+          setChatHistoryError(null);
+          setChatDetail(null);
+        }}
       />
     </main>
   );
