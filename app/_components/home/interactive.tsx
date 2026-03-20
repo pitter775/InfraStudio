@@ -422,6 +422,46 @@ type ChatWidgetProps = {
   onClose: () => void;
 };
 
+function escapeChatHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatChatInline(value: string) {
+  return escapeChatHtml(value).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
+function formatChatRichText(value: string) {
+  return value
+    .trim()
+    .split(/\n\s*\n/)
+    .map((block) => {
+      const lines = block.split("\n").filter(Boolean);
+      if (!lines.length) {
+        return "";
+      }
+
+      if (lines.every((line) => /^[-*]\s+/.test(line))) {
+        return `<ul>${lines
+          .map((line) => `<li>${formatChatInline(line.replace(/^[-*]\s+/, ""))}</li>`)
+          .join("")}</ul>`;
+      }
+
+      if (lines.every((line) => /^\d+\.\s+/.test(line))) {
+        return `<ol>${lines
+          .map((line) => `<li>${formatChatInline(line.replace(/^\d+\.\s+/, ""))}</li>`)
+          .join("")}</ol>`;
+      }
+
+      return `<p>${lines.map((line) => formatChatInline(line)).join("<br>")}</p>`;
+    })
+    .join("");
+}
+
 export function ChatWidget({ open, onClose }: ChatWidgetProps) {
   const chatStorageKey = "infrastudio-site-chat";
   const initialMessages = [
@@ -433,6 +473,7 @@ export function ChatWidget({ open, onClose }: ChatWidgetProps) {
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
   const [chatId, setChatId] = useState<string | null>(null);
+  const [docked, setDocked] = useState(false);
 
   const quickReplies: string[] = [];
 
@@ -480,6 +521,45 @@ export function ChatWidget({ open, onClose }: ChatWidgetProps) {
       }),
     );
   }, [chatId, messages]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const previous = {
+      marginLeft: document.body.style.marginLeft,
+      marginRight: document.body.style.marginRight,
+      width: document.body.style.width,
+      minHeight: document.body.style.minHeight,
+      transition: document.body.style.transition,
+      overflowX: document.body.style.overflowX,
+    };
+
+    if (!open || !docked) {
+      return () => undefined;
+    }
+
+    if (window.innerWidth >= 960) {
+      document.body.style.transition = "margin-left .28s ease, margin-right .28s ease, width .28s ease";
+      document.body.style.marginLeft = previous.marginLeft;
+      document.body.style.marginRight = "420px";
+      document.body.style.width = "calc(100% - 420px)";
+      document.body.style.minHeight = "100vh";
+      document.body.style.overflowX = "hidden";
+    } else {
+      document.body.style.overflowX = "hidden";
+    }
+
+    return () => {
+      document.body.style.marginLeft = previous.marginLeft;
+      document.body.style.marginRight = previous.marginRight;
+      document.body.style.width = previous.width;
+      document.body.style.minHeight = previous.minHeight;
+      document.body.style.transition = previous.transition;
+      document.body.style.overflowX = previous.overflowX;
+    };
+  }, [docked, open]);
 
   const sendMessage = async (text: string) => {
     const trimmed = text.trim();
@@ -532,11 +612,23 @@ export function ChatWidget({ open, onClose }: ChatWidgetProps) {
   }
 
   return (
-    <div className="fixed bottom-24 right-4 z-[75] w-[calc(100vw-2rem)] max-w-[380px] sm:right-6">
+    <div
+      className={cn(
+        "fixed z-[75]",
+        docked
+          ? "bottom-0 left-auto right-0 top-0 w-full max-w-none sm:w-auto"
+          : "bottom-24 right-4 w-[calc(100vw-2rem)] max-w-[380px] sm:right-6",
+      )}
+    >
       <motion.div
         initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        className="flex max-h-[min(780px,calc(100vh-7rem))] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[rgba(9,16,34,0.84)] shadow-2xl backdrop-blur-xl"
+        className={cn(
+          "flex flex-col overflow-hidden border border-white/10 bg-[rgba(9,16,34,0.84)] shadow-2xl backdrop-blur-xl",
+          docked
+            ? "h-screen w-full rounded-none md:w-[420px] md:rounded-l-[28px] md:border-r-0"
+            : "max-h-[min(780px,calc(100vh-7rem))] rounded-[28px]",
+        )}
       >
         <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.04] px-5 py-4">
           <div className="flex-1">
@@ -551,14 +643,30 @@ export function ChatWidget({ open, onClose }: ChatWidgetProps) {
               Novo atendimento
             </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="ml-4 self-start rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
-            aria-label="Fechar chat"
-          >
-            <X size={16} />
-          </button>
+          <div className="ml-4 flex self-start">
+            <button
+              type="button"
+              onClick={() => setDocked((prev) => !prev)}
+              className="mr-2 rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label={docked ? "Reduzir chat" : "Maximizar chat"}
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+                <rect x="4" y="5" width="16" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M9 5v14" stroke="currentColor" strokeWidth="1.8" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDocked(false);
+                onClose();
+              }}
+              className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label="Fechar chat"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         <div className="chat-scroll min-h-0 flex-1 overflow-y-auto bg-slate-950/20 p-5">
@@ -569,17 +677,24 @@ export function ChatWidget({ open, onClose }: ChatWidgetProps) {
                 className={cn(
                   "max-w-[90%] rounded-2xl border p-3 text-sm leading-relaxed shadow-sm backdrop-blur-sm",
                   message.isAi
-                    ? "rounded-bl-none border-white/5 bg-slate-800/90 text-slate-200"
+                    ? "rounded-bl-none border-transparent bg-transparent p-0 text-slate-200 shadow-none backdrop-blur-none"
                     : "ml-auto rounded-br-none border-blue-400/20 bg-blue-500/18 text-blue-50",
                 )}
               >
-                {message.text}
+                <div
+                  className="[&_ol]:m-0 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol_+_p]:mt-2.5 [&_p]:m-0 [&_p_+_ol]:mt-2.5 [&_p_+_p]:mt-2.5 [&_p_+_ul]:mt-2.5 [&_strong]:font-bold [&_strong]:text-white [&_ul]:m-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ul_+_p]:mt-2.5 [&_ul_+_ul]:mt-2.5 [&_li_+_li]:mt-1.5"
+                  dangerouslySetInnerHTML={{ __html: formatChatRichText(message.text) }}
+                />
               </div>
             ))}
 
             {loading ? (
-              <div className="max-w-[90%] rounded-2xl rounded-bl-none bg-slate-800 p-3 text-sm leading-relaxed text-slate-200">
-                IA está digitando...
+              <div className="inline-flex w-fit max-w-[90%] items-center gap-2 rounded-2xl rounded-bl-none border border-white/5 bg-slate-800/90 p-3 text-sm text-slate-400">
+                <span className="flex gap-1" aria-hidden="true">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:0ms]" />
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:120ms]" />
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:240ms]" />
+                </span>
               </div>
             ) : null}
           </div>
@@ -746,15 +861,15 @@ export function ChatDemo() {
   );
 }
 
-export function FloatingChatButton({ onOpen }: { onOpen: () => void }) {
+export function FloatingChatButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
     <button
       type="button"
-      onClick={onOpen}
+      onClick={onToggle}
       className="fixed bottom-5 right-4 z-[70] inline-flex h-15 w-15 items-center justify-center rounded-full bg-[#2563eb] text-white shadow-2xl shadow-blue-950/35 transition-all hover:scale-105 hover:bg-[#1d4ed8] sm:bottom-6 sm:right-6"
-      aria-label="Abrir chat"
+      aria-label={open ? "Fechar chat" : "Abrir chat"}
     >
-      <MessageCircle size={28} />
+      {open ? <X size={26} /> : <MessageCircle size={28} />}
     </button>
   );
 }

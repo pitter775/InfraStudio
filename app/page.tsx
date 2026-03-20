@@ -108,7 +108,7 @@ function HomePageContent() {
           <AnimatePresence>
             <ChatWidget open={chatOpen} onClose={() => setChatOpen(false)} />
           </AnimatePresence>
-          <FloatingChatButton onOpen={() => setChatOpen(true)} />
+          <FloatingChatButton open={chatOpen} onToggle={() => setChatOpen((value) => !value)} />
         </>
       ) : null}
     </div>

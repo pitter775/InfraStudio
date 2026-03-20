@@ -67,30 +67,30 @@ function Sidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-white/10 bg-slate-950/95 px-3 py-4 shadow-2xl transition-all duration-300",
+          "infra-premium-panel fixed inset-y-0 left-0 z-50 flex h-screen flex-col px-3 py-4 transition-all duration-300",
           collapsed ? "w-[92px]" : "w-[280px]",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
           "lg:translate-x-0",
         )}
       >
         <div className="flex items-center justify-between px-2">
-          <Link href="/" className="flex items-center gap-3 overflow-hidden rounded-xl px-2 py-2">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5">
-              <img src="/logo.png" alt="InfraStudio" className="h-8 w-8 object-contain" />
-            </div>
-            {!collapsed ? (
-              <div className="min-w-0">
-                <p className="truncate text-lg font-extrabold text-white">InfraStudio</p>
-                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Admin panel</p>
+            <Link href="/" className="flex items-center gap-3 overflow-hidden rounded-2xl px-2 py-2">
+              <div className="infra-premium-panel flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl">
+                <img src="/logo.png" alt="InfraStudio" className="h-8 w-8 object-contain" />
               </div>
-            ) : null}
-          </Link>
+              {!collapsed ? (
+                <div className="min-w-0">
+                  <p className="truncate text-lg font-extrabold text-white">InfraStudio</p>
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-sky-200/55">Premium cockpit</p>
+                </div>
+              ) : null}
+            </Link>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onCollapseToggle}
-              className="hidden rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white lg:inline-flex"
+                className="infra-premium-panel hidden rounded-xl p-2 text-slate-300 transition-colors hover:text-white lg:inline-flex"
               aria-label="Recolher menu"
             >
               {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
@@ -98,7 +98,7 @@ function Sidebar({
             <button
               type="button"
               onClick={onCloseMobile}
-              className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
+                className="infra-premium-panel rounded-xl p-2 text-slate-300 transition-colors hover:text-white lg:hidden"
               aria-label="Fechar menu"
             >
               <X size={16} />
@@ -116,10 +116,10 @@ function Sidebar({
                 href={item.href}
                 onClick={onCloseMobile}
                 className={cn(
-                  "group flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all",
+                  "group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition-all duration-200",
                   active
-                    ? "bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg shadow-blue-900/30"
-                    : "text-slate-300 hover:bg-white/6 hover:text-white",
+                    ? "infra-premium-pill text-white shadow-[0_20px_44px_rgba(37,99,235,0.22)]"
+                    : "text-slate-300 hover:bg-white/[0.04] hover:text-white",
                   collapsed ? "justify-center" : "",
                 )}
                 title={collapsed ? item.label : undefined}
@@ -134,12 +134,12 @@ function Sidebar({
         <div className="border-t border-white/10 px-2 pt-4">
           <div
             className={cn(
-              "rounded-xl border border-white/10 bg-white/5 p-3",
+              "infra-premium-panel rounded-2xl p-3",
               collapsed ? "flex flex-col items-center gap-3" : "space-y-3",
             )}
           >
             <div className={cn("flex items-center gap-3", collapsed ? "justify-center" : "")}>
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-blue-200">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/24 to-cyan-400/12 text-blue-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
                 <UserRound size={18} />
               </div>
               {!collapsed ? (
@@ -156,15 +156,15 @@ function Sidebar({
             </div>
 
             {!collapsed ? (
-              <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/10 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-200">
-                {currentUser?.isMaster ? "master" : currentUser?.role ?? "sem acesso"}
-              </div>
-            ) : null}
+                <div className="rounded-xl border border-emerald-400/18 bg-emerald-400/10 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                  {currentUser?.isMaster ? "master" : currentUser?.role ?? "sem acesso"}
+                </div>
+              ) : null}
 
             <Link
               href="/"
               className={cn(
-                "inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white",
+                "infra-premium-panel inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:text-white",
                 collapsed ? "h-11 w-11 p-0" : "w-full",
               )}
               title={collapsed ? "Voltar ao site" : undefined}
@@ -179,7 +179,7 @@ function Sidebar({
                 void onLogout();
               }}
               className={cn(
-                "inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white",
+                "infra-premium-panel inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:text-white",
                 collapsed ? "w-11 h-11 p-0" : "w-full",
               )}
               title={collapsed ? "Sair" : undefined}
@@ -229,8 +229,8 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
 
   if (!authResolved) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-brand-dark px-6 text-slate-200">
-        <div className="rounded-2xl border border-white/10 bg-white/5 px-6 py-5 text-center">
+      <div className="infra-premium-bg flex min-h-screen items-center justify-center px-6 text-slate-200">
+        <div className="infra-premium-panel rounded-[28px] px-6 py-5 text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Validando acesso</p>
           <p className="mt-3 text-lg text-white">Carregando ambiente master...</p>
         </div>
@@ -239,7 +239,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   }
 
   return (
-    <div className="min-h-screen bg-brand-dark text-slate-200">
+    <div className="infra-premium-bg min-h-screen text-slate-200">
       <Sidebar
         currentUser={currentUser}
         collapsed={collapsed}
@@ -250,13 +250,13 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
         onLogout={handleLogout}
       />
 
-      <div className={cn("transition-all duration-300", collapsed ? "lg:pl-[92px]" : "lg:pl-[280px]")}>
-        <div className="sticky top-0 z-30 border-b border-white/8 bg-brand-dark/85 px-4 py-4 backdrop-blur lg:hidden">
+        <div className={cn("transition-all duration-300", collapsed ? "lg:pl-[92px]" : "lg:pl-[280px]")}>
+         <div className="sticky top-0 z-30 border-b border-white/8 bg-[#050814]/78 px-4 py-4 backdrop-blur-xl lg:hidden">
           <div className="flex items-center justify-between">
             <button
               type="button"
               onClick={() => setMobileOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white"
+              className="infra-premium-panel inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white"
             >
               <Menu size={16} />
               Menu
@@ -265,7 +265,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
               <p className="text-sm font-semibold text-slate-300">Painel admin</p>
               <Link
                 href="/"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white"
+                className="infra-premium-panel inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-white"
               >
                 <Globe size={15} />
                 Site
@@ -274,7 +274,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
           </div>
         </div>
 
-        <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">{children}</div>
+         <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">{children}</div>
       </div>
     </div>
   );
