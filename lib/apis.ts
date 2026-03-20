@@ -96,6 +96,32 @@ function sanitizeParametros(parametros: ApiParametroInput[]) {
     });
 }
 
+function extractUrlParameterNames(url: string) {
+  return [...url.matchAll(/\{([a-zA-Z0-9_.-]+)\}/g)]
+    .map((match) => match[1]?.trim() || "")
+    .filter(Boolean);
+}
+
+function mergeUrlParametros(url: string, parametros: ApiParametroInput[]) {
+  const byName = new Map<string, ApiParametroInput>();
+
+  for (const parametro of sanitizeParametros(parametros)) {
+    byName.set(parametro.nome.toLowerCase(), parametro);
+  }
+
+  for (const nome of extractUrlParameterNames(url)) {
+    const key = nome.toLowerCase();
+    const current = byName.get(key);
+    byName.set(key, {
+      nome,
+      tipo: current?.tipo ?? "string",
+      obrigatorio: true,
+    });
+  }
+
+  return sanitizeParametros(Array.from(byName.values()));
+}
+
 function mapParametros(configuracoes: Record<string, unknown> | null | undefined) {
   const raw = configuracoes?.parametros;
   if (!Array.isArray(raw)) {
@@ -137,18 +163,20 @@ function mapApiCampo(row: ApiCampoRow): ApiCampoRecord {
 }
 
 function mapApi(row: ApiRow): ApiRecord {
+  const url = row.url?.trim() || "";
+
   return {
     id: row.id,
     projetoId: row.projeto_id,
     nome: row.nome?.trim() || "API sem nome",
-    url: row.url?.trim() || "",
+    url,
     metodo: "GET",
     descricao: row.descricao?.trim() || "",
     ativo: Boolean(row.ativo),
     createdAt: row.created_at ?? new Date().toISOString(),
     updatedAt: row.updated_at ?? row.created_at ?? new Date().toISOString(),
     campos: (row.api_campos ?? []).map((campo) => mapApiCampo(campo)),
-    parametros: mapParametros(row.configuracoes),
+    parametros: mergeUrlParametros(url, mapParametros(row.configuracoes)),
   };
 }
 
@@ -286,6 +314,7 @@ function buildApiUrlWithParameters(api: ApiRecord, context: Record<string, unkno
   }
 
   let nextUrl = api.url;
+  const appliedParametros = new Set<string>();
   for (const parametro of api.parametros) {
     const value = resolveParameterValue(context, parametro.nome);
     if (value === null) {
@@ -293,7 +322,36 @@ function buildApiUrlWithParameters(api: ApiRecord, context: Record<string, unkno
     }
 
     const encoded = encodeURIComponent(stringifyParameterValue(value));
-    nextUrl = nextUrl.replace(new RegExp(`\\{${parametro.nome}\\}`, "g"), encoded);
+    const placeholder = new RegExp(`\\{${parametro.nome}\\}`, "g");
+    if (placeholder.test(nextUrl)) {
+      nextUrl = nextUrl.replace(placeholder, encoded);
+      appliedParametros.add(parametro.nome);
+    }
+  }
+
+  const pendingParametros = api.parametros
+    .map((parametro) => {
+      const value = resolveParameterValue(context, parametro.nome);
+      if (value === null || appliedParametros.has(parametro.nome)) {
+        return null;
+      }
+
+      return {
+        nome: parametro.nome,
+        valor: stringifyParameterValue(value),
+      };
+    })
+    .filter((parametro): parametro is { nome: string; valor: string } => Boolean(parametro));
+
+  if (pendingParametros.length === 1 && api.parametros.length === 1 && !/[?#]/.test(nextUrl)) {
+    const [parametro] = pendingParametros;
+    nextUrl = nextUrl.replace(/\/?$/, "/") + encodeURIComponent(parametro.valor);
+  } else if (pendingParametros.length) {
+    const url = new URL(nextUrl);
+    for (const parametro of pendingParametros) {
+      url.searchParams.set(parametro.nome, parametro.valor);
+    }
+    nextUrl = url.toString();
   }
 
   return {
@@ -508,7 +566,7 @@ export async function createApi(input: {
       descricao: input.descricao?.trim() || null,
       ativo: input.ativo ?? true,
       configuracoes: {
-        parametros: sanitizeParametros(input.parametros ?? []),
+        parametros: mergeUrlParametros(input.url.trim(), input.parametros ?? []),
       },
       created_at: now,
       updated_at: now,
@@ -552,7 +610,7 @@ export async function updateApi(input: {
       ativo: input.ativo ?? true,
       configuracoes: {
         ...(current?.configuracoes ?? {}),
-        parametros: sanitizeParametros(input.parametros ?? []),
+        parametros: mergeUrlParametros(input.url.trim(), input.parametros ?? []),
       },
       updated_at: new Date().toISOString(),
     } as never)

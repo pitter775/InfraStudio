@@ -194,6 +194,31 @@ type ApiFormState = {
   parametros: ApiParametro[];
 };
 
+function extractUrlParameterNames(url: string) {
+  return [...url.matchAll(/\{([a-zA-Z0-9_.-]+)\}/g)]
+    .map((match) => match[1]?.trim() || "")
+    .filter(Boolean);
+}
+
+function normalizeApiForm(form: ApiFormState): ApiFormState {
+  const inferredNames = extractUrlParameterNames(form.url);
+  const manualByName = new Map(form.parametros.map((parametro) => [parametro.nome, parametro]));
+
+  for (const nome of inferredNames) {
+    const current = manualByName.get(nome);
+    manualByName.set(nome, {
+      nome,
+      tipo: current?.tipo ?? "string",
+      obrigatorio: true,
+    });
+  }
+
+  return {
+    ...form,
+    parametros: Array.from(manualByName.values()).sort((left, right) => left.nome.localeCompare(right.nome, "pt-BR")),
+  };
+}
+
 type ApiCampoTreeNode = {
   key: string;
   label: string;
@@ -622,6 +647,8 @@ function ApiModal({
   const selectedCampoNames = new Set(form.campos.map((campo) => campo.nome));
   const parameterNames = new Set(form.parametros.map((parametro) => parametro.nome));
   const requiredNames = new Set(form.parametros.filter((parametro) => parametro.obrigatorio).map((parametro) => parametro.nome));
+  const inferredUrlParameters = extractUrlParameterNames(form.url);
+  const inferredUrlParameterNames = new Set(inferredUrlParameters);
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
@@ -647,6 +674,21 @@ function ApiModal({
             <div className="space-y-4 pb-6">
             <input value={form.nome} onChange={(event) => onChange({ nome: event.target.value })} placeholder="Nome da API" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
             <input value={form.url} onChange={(event) => onChange({ url: event.target.value })} placeholder="https://api.exemplo.com/recurso" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
+            <div className="rounded-xl border border-cyan-500/15 bg-cyan-500/8 px-4 py-3 text-sm text-cyan-50">
+              <p className="font-semibold text-white">Como configurar sem erro</p>
+              <p className="mt-1 text-cyan-100/80">
+                Se a API precisar de um identificador, escreva na URL como <code className="rounded bg-slate-950/50 px-1.5 py-0.5 text-xs text-cyan-100">{"{id}"}</code>.
+                O sistema marca esse parametro como obrigatorio automaticamente.
+              </p>
+              <p className="mt-2 text-xs text-cyan-100/70">
+                Exemplo: <code className="rounded bg-slate-950/50 px-1.5 py-0.5">https://api.exemplo.com/imoveis/{"{id}"}</code>
+              </p>
+              {inferredUrlParameters.length ? (
+                <p className="mt-2 text-xs text-amber-200">
+                  Parametros obrigatorios detectados na URL: {inferredUrlParameters.join(", ")}
+                </p>
+              ) : null}
+            </div>
             <input value={form.metodo} readOnly className="w-full rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-white outline-none" />
             <textarea value={form.descricao} onChange={(event) => onChange({ descricao: event.target.value })} placeholder="Descricao da API" rows={5} className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none placeholder:text-slate-500" />
             <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
@@ -689,7 +731,11 @@ function ApiModal({
                         {parametro.nome} ({parametro.tipo})
                       </span>
                       <span className={parametro.obrigatorio ? "text-amber-200" : "text-slate-500"}>
-                        {parametro.obrigatorio ? "obrigatorio" : "opcional"}
+                        {inferredUrlParameterNames.has(parametro.nome)
+                          ? "obrigatorio pela URL"
+                          : parametro.obrigatorio
+                            ? "obrigatorio"
+                            : "opcional"}
                       </span>
                     </div>
                   ))}
@@ -1432,8 +1478,24 @@ export default function AdminProjetoDetalhePage() {
 
   const toggleApiParametro = (campo: ApiCampo) => {
     setApiForm((prev) => {
+      if (extractUrlParameterNames(prev.url).includes(campo.nome)) {
+        return normalizeApiForm({
+          ...prev,
+          parametros: prev.parametros.some((item) => item.nome === campo.nome)
+            ? prev.parametros
+            : [
+                ...prev.parametros,
+                {
+                  nome: campo.nome,
+                  tipo: campo.tipo,
+                  obrigatorio: true,
+                },
+              ],
+        });
+      }
+
       const exists = prev.parametros.some((item) => item.nome === campo.nome);
-      return {
+      return normalizeApiForm({
         ...prev,
         parametros: exists
           ? prev.parametros.filter((item) => item.nome !== campo.nome)
@@ -1445,17 +1507,21 @@ export default function AdminProjetoDetalhePage() {
                 obrigatorio: false,
               },
             ],
-      };
+      });
     });
   };
 
   const toggleApiParametroObrigatorio = (campo: ApiCampo) => {
     setApiForm((prev) => {
+      if (extractUrlParameterNames(prev.url).includes(campo.nome)) {
+        return normalizeApiForm(prev);
+      }
+
       if (!prev.parametros.some((item) => item.nome === campo.nome)) {
         return prev;
       }
 
-      return {
+      return normalizeApiForm({
         ...prev,
         parametros: prev.parametros.map((item) =>
           item.nome === campo.nome
@@ -1465,7 +1531,7 @@ export default function AdminProjetoDetalhePage() {
               }
             : item,
         ),
-      };
+      });
     });
   };
 
@@ -1821,7 +1887,7 @@ export default function AdminProjetoDetalhePage() {
           setApiModalOpen(false);
           resetApiForm();
         }}
-        onChange={(next) => setApiForm((prev) => ({ ...prev, ...next }))}
+        onChange={(next) => setApiForm((prev) => normalizeApiForm({ ...prev, ...next }))}
         onToggleCampo={toggleApiCampo}
         onToggleParametro={toggleApiParametro}
         onToggleObrigatorio={toggleApiParametroObrigatorio}
