@@ -225,6 +225,20 @@ function syncTestParameterValues(url: string, current: Record<string, string>) {
   return Object.fromEntries(nextEntries);
 }
 
+function buildApiTestContext(values: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(values)
+      .map(([key, value]) => [key, value.trim()])
+      .filter(([, value]) => Boolean(value)),
+  );
+}
+
+function hasRequiredTestValues(parametros: ApiParametro[], values: Record<string, string>) {
+  return parametros
+    .filter((parametro) => parametro.obrigatorio)
+    .every((parametro) => Boolean(values[parametro.nome]?.trim()));
+}
+
 type ApiCampoTreeNode = {
   key: string;
   label: string;
@@ -1256,70 +1270,82 @@ export default function AdminProjetoDetalhePage() {
     setSavingApi(true);
     setFeedbackApi(null);
 
-    const endpoint = apiForm.id ? `/api/apis/${apiForm.id}` : `/api/projetos/${params.id}/apis`;
-    const method = apiForm.id ? "PUT" : "POST";
+    try {
+      const endpoint = apiForm.id ? `/api/apis/${apiForm.id}` : `/api/projetos/${params.id}/apis`;
+      const method = apiForm.id ? "PUT" : "POST";
 
-    const response = await fetch(endpoint, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(apiForm),
-    });
+      const response = await fetch(endpoint, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(apiForm),
+      });
 
-    const payload = (await response.json()) as { error?: string; api?: Api };
+      const payload = (await response.json()) as { error?: string; api?: Api };
 
-    if (!response.ok) {
-      setFeedbackApi(payload.error ?? "Nao foi possivel salvar a API.");
-      setSavingApi(false);
-      return;
-    }
+      if (!response.ok) {
+        setFeedbackApi(payload.error ?? "Nao foi possivel salvar a API.");
+        setSavingApi(false);
+        return;
+      }
 
-    await loadProjeto();
-    const message = apiForm.id ? "API atualizada com sucesso." : "API criada com sucesso.";
-    if (payload.api) {
-      const savedApi = payload.api;
-      setDetectedApiCampos(
-        mergeDetectedApiCampos(
-          savedApi.campos.map((campo) => ({
+      const savedApi = payload.api ? await maybeRefreshApiFieldsAfterSave(payload.api) : null;
+
+      await loadProjeto();
+      const message = savedApi && hasRequiredTestValues(savedApi.parametros, apiTestParameterValues)
+        ? "API atualizada com sucesso e campos reais sincronizados automaticamente."
+        : apiForm.id
+          ? "API atualizada com sucesso."
+          : "API criada com sucesso.";
+
+      if (savedApi) {
+        setDetectedApiCampos(
+          mergeDetectedApiCampos(
+            savedApi.campos.map((campo) => ({
+              id: campo.id,
+              nome: campo.nome,
+              tipo: campo.tipo,
+              descricao: campo.descricao,
+            })),
+            savedApi.parametros.map((parametro) => ({
+              nome: parametro.nome,
+              tipo: parametro.tipo,
+              obrigatorio: parametro.obrigatorio,
+            })),
+          ),
+        );
+        setApiForm({
+          id: savedApi.id,
+          nome: savedApi.nome,
+          url: savedApi.url,
+          metodo: "GET",
+          descricao: savedApi.descricao,
+          ativo: savedApi.ativo,
+          campos: savedApi.campos.map((campo) => ({
             id: campo.id,
             nome: campo.nome,
             tipo: campo.tipo,
             descricao: campo.descricao,
           })),
-          savedApi.parametros.map((parametro) => ({
+          parametros: savedApi.parametros.map((parametro) => ({
             nome: parametro.nome,
             tipo: parametro.tipo,
             obrigatorio: parametro.obrigatorio,
           })),
-        ),
-      );
-      setApiForm({
-        id: savedApi.id,
-        nome: savedApi.nome,
-        url: savedApi.url,
-        metodo: "GET",
-        descricao: savedApi.descricao,
-        ativo: savedApi.ativo,
-        campos: savedApi.campos.map((campo) => ({
-          id: campo.id,
-          nome: campo.nome,
-          tipo: campo.tipo,
-          descricao: campo.descricao,
-        })),
-        parametros: savedApi.parametros.map((parametro) => ({
-          nome: parametro.nome,
-          tipo: parametro.tipo,
-          obrigatorio: parametro.obrigatorio,
-        })),
-      });
-      setApiTestParameterValues((prev) => syncTestParameterValues(savedApi.url, prev));
-    } else {
-      resetApiForm();
+        });
+        setApiTestParameterValues((prev) => syncTestParameterValues(savedApi.url, prev));
+      } else {
+        resetApiForm();
+      }
+
+      setSavingApi(false);
+      setApiModalOpen(false);
+      setFeedbackApi(message);
+    } catch (error) {
+      setFeedbackApi(error instanceof Error ? error.message : "Nao foi possivel salvar a API.");
+      setSavingApi(false);
     }
-    setSavingApi(false);
-    setApiModalOpen(false);
-    setFeedbackApi(message);
   };
 
   const handleWidgetSubmit = async () => {
@@ -1367,6 +1393,25 @@ export default function AdminProjetoDetalhePage() {
     const payload = (await response.json()) as { error?: string; api?: Api };
     if (!response.ok || !payload.api) {
       throw new Error(payload.error ?? "Nao foi possivel salvar a API antes do teste.");
+    }
+
+    return payload.api;
+  };
+
+  const maybeRefreshApiFieldsAfterSave = async (api: Api) => {
+    if (!hasRequiredTestValues(api.parametros, apiTestParameterValues)) {
+      return api;
+    }
+
+    const response = await fetch(`/api/apis/${api.id}/testar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context: buildApiTestContext(apiTestParameterValues) }),
+    });
+
+    const payload = (await response.json()) as { error?: string; api?: Api };
+    if (!response.ok || !payload.api) {
+      throw new Error(payload.error ?? "A API foi salva, mas nao foi possivel atualizar os campos automaticamente.");
     }
 
     return payload.api;
