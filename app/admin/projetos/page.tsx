@@ -515,16 +515,9 @@ export default function AdminProjetosPage() {
           <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
             <div>
               <h3 className="text-xl font-bold text-white">Widgets de chat</h3>
-              <p className="mt-1 text-sm text-slate-400">Use um canal por site, landing page ou embed externo com projeto/agente fixos e contexto dinamico.</p>
+              <p className="mt-1 text-sm text-slate-400">A criacao agora acontece dentro de cada projeto. Aqui fica apenas a visao consolidada dos widgets ja configurados.</p>
             </div>
-            <button
-              type="button"
-              onClick={openNewWidgetModal}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
-            >
-              <Plus size={16} />
-              Novo widget
-            </button>
+            <span className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-300">Crie widgets dentro do projeto</span>
           </div>
 
           <div className="space-y-4 p-6">

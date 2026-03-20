@@ -62,17 +62,36 @@ type Chat = {
   contexto: Record<string, unknown> | null;
 };
 
+type ChatWidget = {
+  id?: string;
+  nome: string;
+  slug: string;
+  projetoId: string | null;
+  agenteId: string | null;
+  dominio: string;
+  tema: "dark" | "light";
+  corPrimaria: string;
+  fundoTransparente: boolean;
+  ativo: boolean;
+};
+
 type ProjetoDetalhe = {
   projeto: Projeto;
   agentes: Agente[];
   apis: Api[];
+  widgets: ChatWidget[];
   chats: Chat[];
   stats: {
     totalAgentes: number;
     agenteAtivoId: string | null;
     totalApis: number;
+    totalWidgets: number;
     totalChats: number;
   };
+};
+
+type WidgetFormState = ChatWidget & {
+  id?: string;
 };
 
 function summarizeApiFields(campos: ApiCampo[], limit = 6) {
@@ -172,6 +191,62 @@ const emptyApiForm: ApiFormState = {
   campos: [],
   parametros: [],
 };
+
+const emptyWidgetForm: WidgetFormState = {
+  nome: "",
+  slug: "",
+  projetoId: null,
+  agenteId: null,
+  dominio: "",
+  tema: "dark",
+  corPrimaria: "#2563eb",
+  fundoTransparente: true,
+  ativo: true,
+};
+
+function renderSnippetLine(line: string) {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return <span className="text-slate-500"> </span>;
+  }
+
+  if (trimmed.startsWith("<!--") || trimmed.startsWith("//")) {
+    return <span className="text-amber-300">{line}</span>;
+  }
+
+  if (trimmed.startsWith("<script") || trimmed.startsWith("></script>") || trimmed.startsWith("</script>")) {
+    return <span className="text-fuchsia-300">{line}</span>;
+  }
+
+  const parts = line.split(/(data-[\w-]+|src|InfraChat\.setContext)/g);
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (part === "src" || part.startsWith("data-") || part === "InfraChat.setContext") {
+          return (
+            <span key={`${part}-${index}`} className="text-cyan-300">
+              {part}
+            </span>
+          );
+        }
+
+        if (part.includes("=") || part.includes('"')) {
+          return (
+            <span key={`${part}-${index}`} className="text-emerald-200">
+              {part}
+            </span>
+          );
+        }
+
+        return (
+          <span key={`${part}-${index}`} className="text-slate-200">
+            {part}
+          </span>
+        );
+      })}
+    </>
+  );
+}
 
 function buildApiCampoTree(campos: ApiCampo[]): ApiCampoTreeNode[] {
   const root = new Map<string, ApiCampoTreeDraftNode>();
@@ -554,19 +629,154 @@ function ApiModal({
   );
 }
 
+function WidgetModal({
+  open,
+  form,
+  agentes,
+  saving,
+  feedback,
+  onClose,
+  onChange,
+  onSubmit,
+}: {
+  open: boolean;
+  form: WidgetFormState;
+  agentes: Agente[];
+  saving: boolean;
+  feedback: string | null;
+  onClose: () => void;
+  onChange: (next: Partial<WidgetFormState>) => void;
+  onSubmit: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Widget</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar widget" : "Novo widget"}</h2>
+            <p className="mt-1 text-sm text-slate-400">Este widget ja nasce vinculado ao projeto atual para evitar ambiguidades na abertura do chat.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Fechar modal"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="max-h-[calc(92vh-88px)] overflow-y-auto p-6">
+          <div className="space-y-4">
+            <input
+              value={form.nome}
+              onChange={(event) => onChange({ nome: event.target.value })}
+              placeholder="Nome do widget"
+              className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+            />
+            <input
+              value={form.slug}
+              onChange={(event) => onChange({ slug: event.target.value })}
+              placeholder="Slug publico do widget"
+              className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+            />
+            <input
+              value={form.dominio}
+              onChange={(event) => onChange({ dominio: event.target.value })}
+              placeholder="Dominio permitido ou contexto do embed"
+              className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+            />
+            <div className="grid gap-4 sm:grid-cols-[0.7fr_0.3fr]">
+              <select
+                value={form.tema}
+                onChange={(event) => onChange({ tema: event.target.value === "light" ? "light" : "dark" })}
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
+              >
+                <option value="dark">Tema escuro</option>
+                <option value="light">Tema claro</option>
+              </select>
+              <input
+                type="color"
+                value={form.corPrimaria}
+                onChange={(event) => onChange({ corPrimaria: event.target.value })}
+                className="h-[50px] w-full rounded-xl border border-white/10 bg-slate-950/50 px-2 py-2"
+              />
+            </div>
+            <div className="rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm text-slate-300">
+              Projeto selecionado
+            </div>
+            <select
+              value={form.agenteId ?? ""}
+              onChange={(event) => onChange({ agenteId: event.target.value || null })}
+              className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
+            >
+              <option value="">Usar o agente ativo do projeto</option>
+              {agentes.map((agente) => (
+                <option key={agente.id} value={agente.id}>
+                  {agente.nome}
+                  {agente.ativo ? " (ativo)" : ""}
+                </option>
+              ))}
+            </select>
+            <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
+              <input type="checkbox" checked={form.ativo} onChange={(event) => onChange({ ativo: event.target.checked })} />
+              Widget ativo
+            </label>
+            <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                checked={form.fundoTransparente}
+                onChange={(event) => onChange({ fundoTransparente: event.target.checked })}
+              />
+              Fundo transparente
+            </label>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onSubmit}
+                disabled={saving}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
+              >
+                {form.id ? <Pencil size={16} /> : <Plus size={16} />}
+                {saving ? "Salvando..." : form.id ? "Atualizar widget" : "Criar widget"}
+              </button>
+              <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
+                Cancelar
+              </button>
+            </div>
+
+            {feedback ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</div> : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminProjetoDetalhePage() {
   const params = useParams<{ id: string }>();
   const [data, setData] = useState<ProjetoDetalhe | null>(null);
   const [agenteForm, setAgenteForm] = useState<AgenteFormState>(emptyAgenteForm);
   const [apiForm, setApiForm] = useState<ApiFormState>(emptyApiForm);
+  const [widgetForm, setWidgetForm] = useState<WidgetFormState>(emptyWidgetForm);
   const [detectedApiCampos, setDetectedApiCampos] = useState<ApiCampo[]>([]);
   const [savingAgente, setSavingAgente] = useState(false);
   const [savingApi, setSavingApi] = useState(false);
+  const [savingWidget, setSavingWidget] = useState(false);
   const [testingApi, setTestingApi] = useState(false);
   const [feedbackAgente, setFeedbackAgente] = useState<string | null>(null);
   const [feedbackApi, setFeedbackApi] = useState<string | null>(null);
+  const [feedbackWidget, setFeedbackWidget] = useState<string | null>(null);
   const [agenteModalOpen, setAgenteModalOpen] = useState(false);
   const [apiModalOpen, setApiModalOpen] = useState(false);
+  const [widgetModalOpen, setWidgetModalOpen] = useState(false);
+  const [origin, setOrigin] = useState("");
 
   const loadProjeto = async () => {
     const response = await fetch(`/api/admin/projetos/${params.id}`, { cache: "no-store" });
@@ -583,6 +793,9 @@ export default function AdminProjetoDetalhePage() {
   };
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
     void loadProjeto();
   }, [params.id]);
 
@@ -600,6 +813,14 @@ export default function AdminProjetoDetalhePage() {
     setFeedbackApi(null);
   };
 
+  const resetWidgetForm = () => {
+    setWidgetForm({
+      ...emptyWidgetForm,
+      projetoId: params.id,
+    });
+    setFeedbackWidget(null);
+  };
+
   const openNewAgenteModal = () => {
     resetAgenteForm();
     setAgenteModalOpen(true);
@@ -608,6 +829,75 @@ export default function AdminProjetoDetalhePage() {
   const openNewApiModal = () => {
     resetApiForm();
     setApiModalOpen(true);
+  };
+
+  const openNewWidgetModal = () => {
+    resetWidgetForm();
+    setWidgetModalOpen(true);
+  };
+
+  const getResolvedWidgetAgent = (widget: ChatWidget) => {
+    if (widget.agenteId) {
+      return data?.agentes.find((agente) => agente.id === widget.agenteId) ?? null;
+    }
+
+    return data?.agentes.find((agente) => agente.ativo) ?? null;
+  };
+
+  const getWidgetRequiredParameters = (widget: ChatWidget) => {
+    const agente = getResolvedWidgetAgent(widget);
+    if (!agente?.apiIds.length) {
+      return [];
+    }
+
+    const allowedApiIds = new Set(agente.apiIds);
+    const required = data?.apis
+      .filter((api) => allowedApiIds.has(api.id))
+      .flatMap((api) => api.parametros.filter((parametro) => parametro.obrigatorio)) ?? [];
+
+    return required.filter(
+      (parametro, index, array) => array.findIndex((item) => item.nome.toLowerCase() === parametro.nome.toLowerCase()) === index,
+    );
+  };
+
+  const buildWidgetSnippet = (widget: ChatWidget) => {
+    const base = origin || "https://seu-dominio";
+    const projetoRef = data?.projeto.slug || data?.projeto.id || "seu-projeto";
+    const agente = getResolvedWidgetAgent(widget);
+    const agenteRef = agente?.slug || agente?.id || "default";
+    const requiredParameters = getWidgetRequiredParameters(widget);
+    const contextLines = [
+      `    title: '${widget.nome.replace(/'/g, "\\'")}',`,
+      `    theme: '${widget.tema}',`,
+      `    accent: '${widget.corPrimaria}',`,
+      `    transparent: ${widget.fundoTransparente ? "true" : "false"},`,
+    ];
+
+    if (requiredParameters.length) {
+      for (const parametro of requiredParameters) {
+        const placeholder = parametro.tipo === "number" ? "0" : parametro.tipo === "boolean" ? "false" : `'${parametro.nome}-valor'`;
+        contextLines.push(`    ${parametro.nome}: ${placeholder},`);
+      }
+    } else {
+      contextLines.push("    id: 'uuid-123',");
+    }
+
+    return [
+      "<!-- 1) Cole este bloco no HTML/layout para carregar o chat na abertura da pagina -->",
+      "<script",
+      `  src=\"${base}/chat.js\"`,
+      `  data-projeto=\"${projetoRef}\"`,
+      `  data-agente=\"${agenteRef}\"`,
+      "></script>",
+      "",
+      "<!-- 2) Depois, no JavaScript da pagina ou do framework, envie contexto e personalize se quiser -->",
+      "<script>",
+      "  // Exemplo: execute quando a pagina carregar ou quando tiver os dados do cliente",
+      "  InfraChat.setContext({",
+      ...contextLines,
+      "  });",
+      "</script>",
+    ].join("\n");
   };
 
   const handleAgenteSubmit = async () => {
@@ -731,6 +1021,37 @@ export default function AdminProjetoDetalhePage() {
     setFeedbackApi(message);
   };
 
+  const handleWidgetSubmit = async () => {
+    setSavingWidget(true);
+    setFeedbackWidget(null);
+
+    const response = await fetch("/api/admin/chat-widgets", {
+      method: widgetForm.id ? "PUT" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...widgetForm,
+        projetoId: params.id,
+      }),
+    });
+
+    const payload = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      setFeedbackWidget(payload.error ?? "Nao foi possivel salvar o widget.");
+      setSavingWidget(false);
+      return;
+    }
+
+    await loadProjeto();
+    const message = widgetForm.id ? "Widget atualizado com sucesso." : "Widget criado com sucesso.";
+    resetWidgetForm();
+    setSavingWidget(false);
+    setWidgetModalOpen(false);
+    setFeedbackWidget(message);
+  };
+
   const persistApiBeforeTest = async () => {
     const endpoint = apiForm.id ? `/api/apis/${apiForm.id}` : `/api/projetos/${params.id}/apis`;
     const method = apiForm.id ? "PUT" : "POST";
@@ -849,6 +1170,15 @@ export default function AdminProjetoDetalhePage() {
     setApiModalOpen(true);
   };
 
+  const handleEditWidget = (widget: ChatWidget) => {
+    setWidgetForm({
+      ...widget,
+      projetoId: params.id,
+    });
+    setFeedbackWidget(null);
+    setWidgetModalOpen(true);
+  };
+
   const handleDeleteApi = async (api: Api) => {
     const confirmed = window.confirm(`Tem certeza que deseja excluir a API "${api.nome}"?`);
     if (!confirmed) {
@@ -947,8 +1277,11 @@ export default function AdminProjetoDetalhePage() {
           <a href="#apis" className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100">
             APIs
           </a>
+          <a href="#widgets" className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white">
+            Widgets
+          </a>
         </div>
-        <div className="mt-6 grid gap-4 md:grid-cols-5">
+        <div className="mt-6 grid gap-4 md:grid-cols-6">
           <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Slug</p>
             <p className="mt-2 text-lg font-bold text-white">{data.projeto.slug ?? "sem-slug"}</p>
@@ -962,6 +1295,10 @@ export default function AdminProjetoDetalhePage() {
             <p className="mt-2 text-lg font-bold text-white">{data.stats.totalApis}</p>
           </div>
           <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Widgets</p>
+            <p className="mt-2 text-lg font-bold text-white">{data.stats.totalWidgets}</p>
+          </div>
+          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Chats</p>
             <p className="mt-2 text-lg font-bold text-white">{data.stats.totalChats}</p>
           </div>
@@ -972,10 +1309,11 @@ export default function AdminProjetoDetalhePage() {
         </div>
       </section>
 
-      {(feedbackAgente || feedbackApi) && (
+      {(feedbackAgente || feedbackApi || feedbackWidget) && (
         <section className="grid gap-3">
           {feedbackAgente ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackAgente}</div> : null}
           {feedbackApi ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackApi}</div> : null}
+          {feedbackWidget ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackWidget}</div> : null}
         </section>
       )}
 
@@ -1094,6 +1432,70 @@ export default function AdminProjetoDetalhePage() {
 
       </div>
 
+      <section id="widgets" className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+        <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-white">Widgets do projeto</h3>
+            <p className="mt-1 text-sm text-slate-400">O widget agora nasce dentro deste projeto, com o contexto correto desde a criacao.</p>
+          </div>
+          <button type="button" onClick={openNewWidgetModal} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
+            <Plus size={16} />
+            Novo widget
+          </button>
+        </div>
+        <div className="space-y-4 p-6">
+          {data.widgets.length ? (
+            data.widgets.map((widget) => {
+              const agente = getResolvedWidgetAgent(widget);
+
+              return (
+                <div key={widget.id ?? widget.slug} className="rounded-xl border border-white/10 bg-slate-950/30 p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-3">
+                        <h4 className="text-lg font-bold text-white">{widget.nome}</h4>
+                        <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${widget.ativo ? "bg-emerald-500/10 text-emerald-200" : "bg-slate-800 text-slate-400"}`}>
+                          {widget.ativo ? "ativo" : "inativo"}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">slug: {widget.slug}</p>
+                      <p className="mt-3 text-sm text-slate-300">Projeto: {data.projeto.nome}</p>
+                      <p className="mt-1 text-sm text-slate-400">Agente: {agente?.nome ?? "agente ativo do projeto"}</p>
+                      <p className="mt-1 text-sm text-slate-400">Dominio/contexto: {widget.dominio || "nao informado"}</p>
+                      <p className="mt-1 text-sm text-slate-400">Tema: {widget.tema === "light" ? "claro" : "escuro"} | cor: {widget.corPrimaria}</p>
+                      <p className="mt-1 text-sm text-slate-400">Fundo: {widget.fundoTransparente ? "transparente" : "solido"}</p>
+                      <div className="mt-4 w-full rounded-xl border border-white/10 bg-slate-950/60 p-3">
+                        <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Codigo de injecao</p>
+                        <div className="w-full overflow-x-auto rounded-lg border border-white/10 bg-[#07111f]">
+                          <pre className="min-h-[170px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
+                            {buildWidgetSnippet(widget)
+                              .split("\n")
+                              .map((line, index) => (
+                                <div key={`${widget.slug}-line-${index}`}>{renderSnippetLine(line)}</div>
+                              ))}
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleEditWidget(widget)}
+                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200"
+                    >
+                      Editar
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">
+              Nenhum widget cadastrado para este projeto ainda.
+            </div>
+          )}
+        </div>
+      </section>
+
       <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
           <div className="border-b border-white/10 px-6 py-5">
             <h3 className="text-xl font-bold text-white">Chats recentes</h3>
@@ -1153,6 +1555,19 @@ export default function AdminProjetoDetalhePage() {
         onToggleObrigatorio={toggleApiParametroObrigatorio}
         onSubmit={() => void handleApiSubmit()}
         onTest={() => void handleTestApi()}
+      />
+      <WidgetModal
+        open={widgetModalOpen}
+        form={widgetForm}
+        agentes={data.agentes}
+        saving={savingWidget}
+        feedback={feedbackWidget}
+        onClose={() => {
+          setWidgetModalOpen(false);
+          resetWidgetForm();
+        }}
+        onChange={(next) => setWidgetForm((prev) => ({ ...prev, ...next, projetoId: params.id }))}
+        onSubmit={() => void handleWidgetSubmit()}
       />
     </main>
   );

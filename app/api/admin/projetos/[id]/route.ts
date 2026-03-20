@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { canAccessAdmin, canManageProject } from "@/lib/access";
 import { listAgentes } from "@/lib/agentes";
 import { listApis } from "@/lib/apis";
+import { listChatWidgets } from "@/lib/chat-widgets";
 import { listChats } from "@/lib/chats";
 import { listProjetos } from "@/lib/projetos";
 import { getSessionUser } from "@/lib/session";
@@ -25,8 +26,15 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
   }
 
-  const [projetos, agentes, chats, apis] = await Promise.all([listProjetos(), listAgentes(id), listChats(id), listApis(id)]);
+  const [projetos, agentes, chats, apis, allWidgets] = await Promise.all([
+    listProjetos(),
+    listAgentes(id),
+    listChats(id),
+    listApis(id),
+    listChatWidgets(),
+  ]);
   const projeto = projetos.find((item) => item.id === id) ?? null;
+  const widgets = allWidgets.filter((widget) => widget.projetoId === id);
 
   if (!projeto) {
     return NextResponse.json({ error: "Projeto não encontrado." }, { status: 404 });
@@ -37,11 +45,13 @@ export async function GET(_request: Request, context: RouteContext) {
       projeto,
       agentes,
       apis,
+      widgets,
       chats,
       stats: {
         totalAgentes: agentes.length,
         agenteAtivoId: agentes.find((agente) => agente.ativo)?.id ?? null,
         totalApis: apis.length,
+        totalWidgets: widgets.length,
         totalChats: chats.length,
       },
     },

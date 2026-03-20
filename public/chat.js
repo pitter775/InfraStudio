@@ -103,6 +103,8 @@
     var style = document.createElement("style");
     style.textContent = [
       ":host { all: initial; }",
+      ".chat-icon { display: inline-flex; align-items: center; justify-content: center; }",
+      ".chat-icon svg { width: 100%; height: 100%; display: block; }",
       ".chat-wrap {",
       "  position: fixed;",
       "  right: 24px;",
@@ -121,7 +123,8 @@
       "  --input-text: #ffffff;",
       "  --shadow-color: rgba(2,6,23,0.45);",
       "}",
-      ".chat-button { width: 60px; height: 60px; border: 0; border-radius: 999px; background: var(--accent); color: white; font-size: 14px; font-weight: 700; letter-spacing: 0.04em; cursor: pointer; box-shadow: 0 20px 40px var(--shadow-color); }",
+      ".chat-button { width: 60px; height: 60px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: var(--accent); color: white; cursor: pointer; box-shadow: 0 20px 40px var(--shadow-color); }",
+      ".chat-button .chat-icon { width: 24px; height: 24px; }",
       ".chat-panel { width: min(380px, calc(100vw - 32px)); height: min(620px, calc(100vh - 110px)); display: none; flex-direction: column; overflow: hidden; border-radius: 26px; border: 1px solid var(--header-border); background: var(--panel-bg); color: var(--panel-text); box-shadow: 0 24px 70px var(--shadow-color); backdrop-filter: blur(14px); margin-bottom: 16px; }",
       ".chat-panel.open { display: flex; }",
       ".chat-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--header-border); }",
@@ -135,9 +138,14 @@
       ".chat-bubble { max-width: 88%; border-radius: 18px; border: 1px solid var(--header-border); padding: 12px 14px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }",
       ".chat-bubble.ai { background: var(--ai-bg); color: var(--ai-text); border-bottom-left-radius: 6px; }",
       ".chat-bubble.user { margin-left: auto; background: var(--accent); color: white; border-color: var(--accent); border-bottom-right-radius: 6px; }",
-      ".chat-form { display: flex; gap: 10px; padding: 16px; border-top: 1px solid var(--header-border); }",
-      ".chat-input { flex: 1; min-height: 48px; max-height: 120px; resize: vertical; border-radius: 16px; border: 1px solid var(--header-border); background: var(--input-bg); color: var(--input-text); padding: 12px 14px; font: inherit; }",
-      ".chat-send { border: 0; border-radius: 16px; background: var(--accent); color: white; min-width: 72px; padding: 0 16px; font-weight: 700; cursor: pointer; }",
+      ".chat-form { display: flex; align-items: flex-end; gap: 10px; padding: 16px; border-top: 1px solid var(--header-border); }",
+      ".chat-input { flex: 1; height: 46px; min-height: 46px; max-height: 110px; resize: none; overflow-y: hidden; border-radius: 16px; border: 1px solid var(--header-border); background: var(--input-bg); color: var(--input-text); padding: 12px 14px; font: inherit; line-height: 22px; scrollbar-width: thin; scrollbar-color: rgba(148,163,184,0.18) transparent; }",
+      ".chat-input::-webkit-scrollbar { width: 4px; }",
+      ".chat-input::-webkit-scrollbar-track { background: transparent; }",
+      ".chat-input::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.18); border-radius: 999px; }",
+      ".chat-input::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.28); }",
+      ".chat-send { width: 46px; height: 46px; flex: 0 0 46px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 16px; background: var(--accent); color: white; padding: 0; cursor: pointer; }",
+      ".chat-send .chat-icon { width: 18px; height: 18px; }",
       ".chat-send[disabled] { opacity: 0.6; cursor: wait; }",
       "@media (max-width: 640px) { .chat-wrap { right: 12px; bottom: 12px; } .chat-panel { width: calc(100vw - 24px); height: calc(100vh - 100px); } }",
     ].join("");
@@ -200,19 +208,29 @@
     var input = document.createElement("textarea");
     input.className = "chat-input";
     input.placeholder = "Digite sua mensagem...";
+    input.rows = 1;
     form.appendChild(input);
 
     var sendButton = document.createElement("button");
     sendButton.className = "chat-send";
     sendButton.type = "submit";
-    sendButton.textContent = "Enviar";
+    sendButton.innerHTML = createPlaneIcon();
     form.appendChild(sendButton);
 
     var triggerButton = document.createElement("button");
     triggerButton.className = "chat-button";
     triggerButton.type = "button";
-    triggerButton.textContent = "CHAT";
+    triggerButton.setAttribute("aria-label", "Abrir chat");
+    triggerButton.innerHTML = createChatBubbleIcon();
     wrap.appendChild(triggerButton);
+
+    function createChatBubbleIcon() {
+      return '<span class="chat-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M7 18.5H5.5A2.5 2.5 0 0 1 3 16V7.5A2.5 2.5 0 0 1 5.5 5h13A2.5 2.5 0 0 1 21 7.5V16a2.5 2.5 0 0 1-2.5 2.5H11l-4 3v-3Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+    }
+
+    function createPlaneIcon() {
+      return '<span class="chat-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M20.2 4.8 3.9 11.2c-.7.3-.7 1.3.1 1.5l5.9 1.9 1.9 5.9c.2.8 1.2.8 1.5.1l6.4-16.3c.3-.8-.5-1.6-1.5-1.3Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="m9.8 14.2 4.5-4.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+    }
 
     function persist() {
       try {
@@ -231,6 +249,15 @@
 
     function scrollToBottom() {
       messagesWrap.scrollTop = messagesWrap.scrollHeight;
+    }
+
+    function autoResizeInput() {
+      input.style.height = "46px";
+      var lineHeight = parseFloat(window.getComputedStyle(input).lineHeight) || 22;
+      var maxHeight = Math.round(lineHeight * 3 + 24);
+      var nextHeight = Math.min(input.scrollHeight, maxHeight);
+      input.style.height = nextHeight + "px";
+      input.style.overflowY = input.scrollHeight > maxHeight ? "auto" : "hidden";
     }
 
     function renderMessages() {
@@ -257,6 +284,7 @@
       state.open = nextOpen;
       if (state.open) {
         panel.classList.add("open");
+        autoResizeInput();
         input.focus();
       } else {
         panel.classList.remove("open");
@@ -266,7 +294,7 @@
     function setLoading(nextLoading) {
       state.loading = nextLoading;
       sendButton.disabled = nextLoading;
-      sendButton.textContent = nextLoading ? "..." : "Enviar";
+      sendButton.innerHTML = nextLoading ? '<span class="chat-icon" aria-hidden="true">...</span>' : createPlaneIcon();
     }
 
     function setContext(nextContext) {
@@ -350,6 +378,7 @@
       persist();
       renderMessages();
       input.value = "";
+      autoResizeInput();
       setLoading(true);
 
       try {
@@ -411,6 +440,8 @@
       void sendMessage(input.value);
     });
 
+    input.addEventListener("input", autoResizeInput);
+
     window.addEventListener("infrastudio-chat:open", function (event) {
       var detail = event && event.detail ? event.detail : {};
       var requestedProject = detail.projeto || null;
@@ -428,6 +459,7 @@
     });
 
     applyUiConfig(state.ui);
+    autoResizeInput();
     while (queue.length) {
       setContext(queue.shift());
     }

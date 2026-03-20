@@ -3,7 +3,7 @@ import { appendMessage, createChat, getChatById, getChatContext, listChatMessage
 import { enrichLeadContext, generateSalesReply, shouldRefreshSummary, summarizeConversation } from "@/lib/chat-orchestrator";
 import { getAgenteAtivo, getAgenteById, getAgenteByIdentifier } from "@/lib/agentes";
 import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetByProjetoAgente, getChatWidgetBySlug } from "@/lib/chat-widgets";
-import { getProjetoById, getProjetoByIdentifier, getProjetoBySlug } from "@/lib/projetos";
+import { getProjetoById, getProjetoByIdentifier } from "@/lib/projetos";
 
 type ChatRequestBody = {
   chatId?: string;
@@ -58,7 +58,19 @@ async function resolveChatChannel(body: ChatRequestBody) {
 
   const widgetSlug = body.widgetSlug?.trim() || DEFAULT_HOME_WIDGET_SLUG;
   const widget = await getChatWidgetBySlug(widgetSlug);
-  const projeto = widget?.projetoId ? await getProjetoById(widget.projetoId) : await getProjetoBySlug("infrastudio");
+
+  if (!widget?.projetoId) {
+    return {
+      projeto: null,
+      agente: null,
+      widget: null,
+      channel: {
+        widgetSlug,
+      },
+    };
+  }
+
+  const projeto = await getProjetoById(widget.projetoId);
   const agente =
     widget?.agenteId && projeto
       ? await getAgenteById(widget.agenteId)
@@ -107,6 +119,14 @@ export async function POST(request: Request) {
 
     if (!chat) {
       const resolved = await resolveChatChannel(body);
+
+      if (!resolved.projeto) {
+        return NextResponse.json(
+          { error: "Projeto ou widget do chat nao encontrado. Revise o embed configurado para este site." },
+          { status: 400, headers: corsHeaders },
+        );
+      }
+
       const extraContext = isPlainObject(body.context) ? body.context : null;
       const baseContext = {
         source: "site_widget",
@@ -120,8 +140,8 @@ export async function POST(request: Request) {
           : null,
         projeto: {
           id: resolved.projeto?.id ?? null,
-          slug: resolved.projeto?.slug ?? (body.projeto?.trim() || "infrastudio"),
-          nome: resolved.projeto?.nome ?? "InfraStudio",
+          slug: resolved.projeto?.slug ?? body.projeto?.trim() ?? null,
+          nome: resolved.projeto?.nome ?? null,
         },
         agente: {
           id: resolved.agente?.id ?? null,
