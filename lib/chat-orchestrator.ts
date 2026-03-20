@@ -107,10 +107,30 @@ function buildStructuredReplyInstruction(context?: ConversationContext) {
     "- Prefira respostas escaneaveis, nunca em bloco corrido quando houver mais de uma ideia.",
     "- Use quebras de linha entre contexto, diagnostico, proximos passos e CTA.",
     "- Quando fizer sentido, use listas curtas com '-' ou '1.'.",
-    "- Destaque pontos-chave com **negrito**.",
+    "- Destaque a conclusao e pontos-chave com **negrito**.",
     "- Pode usar icones simples e pontuais como ✓, →, • ou icons discretos para melhorar leitura.",
     "- Pode usar marcadores curtos como '-', '->' e pontos de destaque para melhorar leitura.",
     "- Mantenha o texto elegante e curto, sem excesso de enfeite.",
+  ].join("\n");
+}
+
+function isAnalyticalQuery(message: string) {
+  const normalized = normalizeText(message);
+
+  return ANALYTICAL_QUERY_SIGNALS.some((signal) => normalized.includes(signal));
+}
+
+function buildAnalyticalReplyInstruction(message: string) {
+  if (!isAnalyticalQuery(message)) {
+    return "";
+  }
+
+  return [
+    "Pergunta analitica: responda com conclusao curta e motivos principais.",
+    "Use **negrito** na conclusao e nos pontos mais importantes.",
+    "Nao despeje campos crus.",
+    "Aponte risco, trade-off ou incerteza relevante.",
+    "Se faltar base para opinar, diga o que falta e faca 1 pergunta curta.",
   ].join("\n");
 }
 
@@ -454,6 +474,47 @@ const DIRECT_REPLY_FACTUAL_SIGNALS = [
   "area construida",
 ];
 
+const ANALYTICAL_QUERY_SIGNALS = [
+  "vale a pena",
+  "vale apena",
+  "compensa",
+  "e uma boa",
+  "e bom",
+  "e ruim",
+  "o que acha",
+  "o que voce acha",
+  "sua opiniao",
+  "sua opinião",
+  "opiniao",
+  "opinião",
+  "recomenda",
+  "recomendaria",
+  "voce faria",
+  "você faria",
+  "devo",
+  "deveria",
+  "melhor opcao",
+  "melhor opção",
+  "faz sentido",
+  "quais os riscos",
+  "quais são os riscos",
+  "principais riscos",
+  "pontos de atencao",
+  "pontos de atenção",
+  "ponto de atencao",
+  "ponto de atenção",
+  "analise",
+  "analisa",
+  "analisar",
+  "resuma",
+  "resumo",
+  "compare",
+  "comparar",
+  "comparacao",
+  "comparação",
+  "cuidado",
+];
+
 const KNOWN_SEARCH_TERMS = [
   ...new Set([
     ...API_FIELD_INTENTS.flatMap((intent) => [...intent.triggers, ...intent.targets]),
@@ -603,7 +664,7 @@ function buildFocusedApiContext(message: string, apiContexts: ApiRuntimeContext[
     .sort((left, right) => right.score - left.score || left.nome.localeCompare(right.nome))
     .slice(0, 6);
 
-  const preferredFields = ["titulo", "descricao", "cidade", "estado", "valor_minimo", "data_leilao", "status"];
+  const preferredFields = ["titulo", "nome", "descricao", "resumo", "categoria", "status", "valor", "preco"];
   const baselineFields = preferredFields.flatMap((field) =>
     availableApis.flatMap((api) =>
       api.campos.flatMap((campo) =>
@@ -620,11 +681,22 @@ function buildFocusedApiContext(message: string, apiContexts: ApiRuntimeContext[
     ),
   );
 
-  const selectedFields = matches.length ? matches : baselineFields.slice(0, 5);
+  const fallbackFields = baselineFields.length
+    ? baselineFields.slice(0, 5)
+    : availableApis.flatMap((api) =>
+        api.campos.slice(0, 5).map((campo) => ({
+          ...campo,
+          apiNome: api.nome,
+          score: 1,
+        })),
+      ).slice(0, 5);
+
+  const selectedFields = matches.length ? matches : fallbackFields;
   const fieldLines = selectedFields.map(
     (campo) => `- ${formatApiFieldLabel(campo.nome)} (${campo.nome}): ${String(campo.valor)}`,
   );
   const failedLines = failedApis.map((api) => `- API indisponivel: ${api.nome}. Motivo: ${api.erro}`);
+  const analytical = isAnalyticalQuery(message);
 
   return {
     fields: selectedFields,
@@ -632,6 +704,7 @@ function buildFocusedApiContext(message: string, apiContexts: ApiRuntimeContext[
       "Use somente os dados compactados abaixo como fonte da verdade.",
       "Responda apenas com base nesses campos e no historico recente da conversa.",
       "Se a informacao pedida nao estiver presente, diga isso com clareza.",
+      analytical ? "Sintetize os dados em conclusao util; nao apenas liste campos." : "",
       fieldLines.length ? "Campos relevantes para esta pergunta:\n" + fieldLines.join("\n") : "",
       failedLines.length ? "APIs indisponiveis:\n" + failedLines.join("\n") : "",
     ]
@@ -669,13 +742,22 @@ function buildDirectApiReply(message: string, apiContexts: ApiRuntimeContext[]) 
 }
 
 function buildApiFallbackReply(message: string, apiContexts: ApiRuntimeContext[]) {
+  const analytical = isAnalyticalQuery(message);
   const directReply = buildDirectApiReply(message, apiContexts);
-  if (directReply) {
+  if (directReply && !analytical) {
     return directReply;
   }
 
   const focused = buildFocusedApiContext(message, apiContexts);
   if (focused.fields.length) {
+    if (analytical) {
+      return [
+        "Com base nos dados disponiveis, estes sao os pontos mais relevantes para avaliar isso:",
+        ...focused.fields.slice(0, 4).map((campo) => `- ${formatApiFieldLabel(campo.nome)}: ${String(campo.valor)}`),
+        "Se quiser, eu posso aprofundar a recomendacao assim que houver mais contexto ou uma regra especifica para esse agente.",
+      ].join("\n");
+    }
+
     return focused.fields.map((campo) => formatDirectFieldReply(campo.nome, campo.valor)).join("\n");
   }
 
@@ -881,9 +963,10 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const openai = await getProjetoOpenAIConfig(projectId);
   const systemPrompt = buildSystemPrompt(agent);
   const structuredReplyInstruction = buildStructuredReplyInstruction(context);
+  const analyticalReplyInstruction = buildAnalyticalReplyInstruction(latestUserMessage);
   const focusedApiContext = buildFocusedApiContext(latestUserMessage, apiContexts);
   const catalogPricingReply = channelPolicy.allowCatalogPricing ? buildCatalogPricingReply(history, context) : null;
-  const canUseDirectReply = shouldUseDirectFieldReply(latestUserMessage);
+  const canUseDirectReply = shouldUseDirectFieldReply(latestUserMessage) && !isAnalyticalQuery(latestUserMessage);
   const directApiReply = canUseDirectReply ? buildDirectApiReply(latestUserMessage, apiContexts) : null;
 
   if (catalogPricingReply && apiContexts.length === 0) {
@@ -963,7 +1046,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
         model: openai.model,
         temperature: 0.5,
         max_output_tokens: 220,
-        instructions: [systemPrompt, structuredReplyInstruction, focusedApiContext.instructions, summary, lead, qualification]
+        instructions: [systemPrompt, structuredReplyInstruction, analyticalReplyInstruction, focusedApiContext.instructions, summary, lead, qualification]
           .filter(Boolean)
           .join("\n\n"),
         input: buildInput(recentMessages),

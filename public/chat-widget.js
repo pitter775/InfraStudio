@@ -112,7 +112,7 @@
       ".chat-send { width: 46px; height: 46px; flex: 0 0 46px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 16px; background: " + accent + "; color: white; padding: 0; cursor: pointer; }",
       ".chat-send .chat-icon { width: 18px; height: 18px; }",
       ".chat-send[disabled] { opacity: .6; cursor: wait; }",
-      "@media (max-width: 640px) { .chat-wrap { right: 12px; left: 12px; top: calc(max(env(safe-area-inset-top, 0px), var(--viewport-offset-top, 0px)) + 12px); bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end; } .chat-wrap > * { pointer-events: auto; } .chat-panel { width: 100%; max-width: 100%; height: 100%; max-height: calc(var(--viewport-height, 100dvh) - max(env(safe-area-inset-top, 0px), var(--viewport-offset-top, 0px)) - env(safe-area-inset-bottom, 0px) - 24px); margin-bottom: 0; border-radius: 24px; } .chat-header { padding: 14px 14px 12px; } .chat-form { padding: 12px; } .chat-input { border-radius: 18px; } }",
+      "@media (max-width: 640px) { .chat-wrap { right: 12px; left: 12px; top: calc(env(safe-area-inset-top, 0px) + 12px); bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end; } .chat-wrap > * { pointer-events: auto; } .chat-panel { width: 100%; max-width: 100%; height: auto; max-height: calc(var(--viewport-height, 100dvh) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px); margin-bottom: 0; border-radius: 24px; } .chat-header { padding: 14px 14px 12px; } .chat-form { padding: 12px; } .chat-input { border-radius: 18px; } }",
     ].join("");
     shadow.appendChild(style);
 
@@ -319,9 +319,7 @@
     function syncViewportMetrics() {
       var viewport = window.visualViewport;
       var viewportHeight = viewport && viewport.height ? viewport.height : window.innerHeight;
-      var viewportOffsetTop = viewport && typeof viewport.offsetTop === "number" ? viewport.offsetTop : 0;
       wrap.style.setProperty("--viewport-height", Math.round(viewportHeight) + "px");
-      wrap.style.setProperty("--viewport-offset-top", Math.max(0, Math.round(viewportOffsetTop)) + "px");
     }
 
     function setOpen(nextOpen) {
