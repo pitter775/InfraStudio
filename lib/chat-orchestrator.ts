@@ -126,7 +126,7 @@ function buildAnalyticalReplyInstruction(message: string) {
   }
 
   return [
-    "Pergunta analitica: responda com conclusao curta e motivos principais.",
+    "Pergunta analitica: responda em 3 blocos curtos: **Conclusao**, **Motivos**, **Proximo passo**.",
     "Use **negrito** na conclusao e nos pontos mais importantes.",
     "Nao despeje campos crus.",
     "Aponte risco, trade-off ou incerteza relevante.",
@@ -751,10 +751,15 @@ function buildApiFallbackReply(message: string, apiContexts: ApiRuntimeContext[]
   const focused = buildFocusedApiContext(message, apiContexts);
   if (focused.fields.length) {
     if (analytical) {
+      const highlights = focused.fields.slice(0, 3).map((campo) => `- **${formatApiFieldLabel(campo.nome)}:** ${String(campo.valor)}`);
+
       return [
-        "Com base nos dados disponiveis, estes sao os pontos mais relevantes para avaliar isso:",
-        ...focused.fields.slice(0, 4).map((campo) => `- ${formatApiFieldLabel(campo.nome)}: ${String(campo.valor)}`),
-        "Se quiser, eu posso aprofundar a recomendacao assim que houver mais contexto ou uma regra especifica para esse agente.",
+        "**Conclusao:** com os dados atuais, da para fazer uma avaliacao inicial, mas a recomendacao depende do peso desses pontos no seu contexto.",
+        "",
+        "**Motivos:**",
+        ...highlights,
+        "",
+        "**Proximo passo:** se voce quiser, eu posso aprofundar a analise com base no criterio que mais importa para voce, como risco, custo, retorno, qualidade ou prioridade.",
       ].join("\n");
     }
 
