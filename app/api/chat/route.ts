@@ -45,6 +45,10 @@ function mergeContext(base: Record<string, unknown>, extra?: Record<string, unkn
 async function resolveChatChannel(body: ChatRequestBody) {
   const projetoIdentifier = body.projeto?.trim() || null;
   const agenteIdentifier = body.agente?.trim() || null;
+  const requestedChannelKind =
+    isPlainObject(body.context) && isPlainObject(body.context.channel) && typeof body.context.channel.kind === "string"
+      ? body.context.channel.kind.trim()
+      : null;
 
   if (projetoIdentifier) {
     const projeto = await getProjetoByIdentifier(projetoIdentifier);
@@ -63,6 +67,7 @@ async function resolveChatChannel(body: ChatRequestBody) {
       agente,
       widget,
       channel: {
+        kind: requestedChannelKind || "external_widget",
         projeto: projetoIdentifier,
         agente: agenteIdentifier,
       },
@@ -78,6 +83,7 @@ async function resolveChatChannel(body: ChatRequestBody) {
       agente: null,
       widget: null,
       channel: {
+        kind: requestedChannelKind || "external_widget",
         widgetSlug,
       },
     };
@@ -96,6 +102,7 @@ async function resolveChatChannel(body: ChatRequestBody) {
     agente,
     widget,
     channel: {
+      kind: requestedChannelKind || "external_widget",
       widgetSlug,
     },
   };
@@ -204,11 +211,28 @@ export async function POST(request: Request) {
     const currentContext = getChatContext(chat) as Record<string, unknown>;
     const extraContext = isPlainObject(body.context) ? body.context : null;
     const mergedCurrentContext = mergeContext(currentContext, extraContext);
-    const nextContext = enrichLeadContext(
+    const enrichedContext = enrichLeadContext(
       mergedCurrentContext,
       history.map((item) => ({ role: item.role, content: item.conteudo })),
       message,
     );
+    const enrichedContextRecord = enrichedContext as Record<string, unknown>;
+    const nextContext = {
+      ...mergedCurrentContext,
+      ...enrichedContext,
+      channel: isPlainObject(enrichedContextRecord.channel)
+        ? { ...(isPlainObject(mergedCurrentContext.channel) ? mergedCurrentContext.channel : {}), ...enrichedContextRecord.channel }
+        : mergedCurrentContext.channel,
+      ui: isPlainObject(enrichedContextRecord.ui)
+        ? { ...(isPlainObject(mergedCurrentContext.ui) ? mergedCurrentContext.ui : {}), ...enrichedContextRecord.ui }
+        : mergedCurrentContext.ui,
+      sdk: isPlainObject(enrichedContextRecord.sdk)
+        ? { ...(isPlainObject(mergedCurrentContext.sdk) ? mergedCurrentContext.sdk : {}), ...enrichedContextRecord.sdk }
+        : mergedCurrentContext.sdk,
+      widget: isPlainObject(enrichedContextRecord.widget)
+        ? { ...(isPlainObject(mergedCurrentContext.widget) ? mergedCurrentContext.widget : {}), ...enrichedContextRecord.widget }
+        : mergedCurrentContext.widget,
+    };
 
     if (!nextContext.lead?.telefone && history.length >= 2 && history.length < 6) {
       nextContext.qualificacao = {
@@ -222,7 +246,7 @@ export async function POST(request: Request) {
         role: item.role,
         content: item.conteudo,
       })),
-      nextContext,
+      nextContext as Parameters<typeof generateSalesReply>[1],
     );
 
     nextContext.agente = {
@@ -285,9 +309,12 @@ export async function POST(request: Request) {
       typeof widgetContext?.whatsapp_celular === "string" && widgetContext.whatsapp_celular.trim()
         ? widgetContext.whatsapp_celular.trim()
         : null;
+    const shouldOfferCommercialCta =
+      /whats\s?app/i.test(ai.reply) ||
+      /estimativa|orcamento|orçamento|proximo passo|pr[oó]ximo passo|encaixe inicial|fecharmos/i.test(ai.reply);
     const shouldShowWhatsappButton =
       Boolean(widgetPhone) &&
-      (Boolean(nextContext.qualificacao?.pronto_para_whatsapp) || /whats\s?app/i.test(ai.reply));
+      (Boolean(nextContext.qualificacao?.pronto_para_whatsapp) || shouldOfferCommercialCta);
     const whatsappMessage = [
       "Ola! Vim do chat do site",
       nextContext.projeto?.nome ? "do projeto " + String(nextContext.projeto.nome) : "",

@@ -19,6 +19,7 @@ import {
 export const WHATSAPP_NUMBER = "5511949506267";
 export const DEFAULT_CHAT_PROJECT = "infrastudio";
 export const DEFAULT_CHAT_AGENT = "default";
+export const HOME_CHAT_WIDGET_SLUG = "infrastudio-home";
 
 export const TECH_STACK = [
   "OpenAI",

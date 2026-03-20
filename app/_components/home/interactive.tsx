@@ -5,7 +5,7 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, Lock, LogOut, Menu, MessageCircle, Send, UserRound, X } from "lucide-react";
 import type { AppUser } from "@/lib/app-user";
-import { DEFAULT_CHAT_AGENT, DEFAULT_CHAT_PROJECT } from "@/app/_components/home/data";
+import { HOME_CHAT_WIDGET_SLUG, WHATSAPP_NUMBER } from "@/app/_components/home/data";
 import { cn } from "@/lib/utils";
 
 export function ExternalChatEmbed({
@@ -464,6 +464,45 @@ function formatChatRichText(value: string) {
     .join("");
 }
 
+function normalizeHomeAiMessage(value: string) {
+  const trimmed = value.trim();
+
+  const multiItemMatch = trimmed.match(
+    /^Pelo que voce descreveu, isso encaixa no nosso catalogo como (.+?)\. Nesse cenario, a estimativa inicial fica em R\$ ([\d.,]+) no total\. Se quiser, eu posso te direcionar no WhatsApp para alinharmos os detalhes finais\.$/i,
+  );
+  if (multiItemMatch) {
+    const items = multiItemMatch[1]
+      .split(" + ")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    return [
+      "✓ **Melhor encaixe inicial**",
+      ...items.map((item) => `- ${item}`),
+      "",
+      `**Estimativa inicial:** R$ ${multiItemMatch[2]}`,
+      "",
+      "→ Se quiser, eu posso te direcionar no WhatsApp para alinharmos os detalhes finais.",
+    ].join("\n");
+  }
+
+  const singleItemMatch = trimmed.match(
+    /^Pelo que voce descreveu, isso encaixa em (.+?)\. Se quiser, eu sigo com voce por aqui ou te encaminho no WhatsApp para fecharmos o proximo passo\.$/i,
+  );
+  if (singleItemMatch) {
+    return [
+      "✓ **Melhor encaixe inicial**",
+      singleItemMatch[1].trim(),
+      "",
+      "→ Se quiser, eu sigo com voce por aqui ou te encaminho no WhatsApp para fecharmos o proximo passo.",
+    ].join("\n");
+  }
+
+  return trimmed
+    .replace(/\. ([A-ZÀ-Ú0-9✓→-])/g, ".\n\n$1")
+    .replace(/\? ([A-ZÀ-Ú0-9✓→-])/g, "?\n\n$1");
+}
+
 function autoResizeChatTextarea(element: HTMLTextAreaElement | null) {
   if (!element) {
     return;
@@ -480,7 +519,20 @@ function autoResizeChatTextarea(element: HTMLTextAreaElement | null) {
 export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidgetProps) {
   const chatStorageKey = "infrastudio-site-chat";
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const initialMessages = [
+  type ChatWidgetCta = {
+    url: string;
+    label?: string;
+    phone?: string;
+  };
+
+  type ChatWidgetMessage = {
+    id: string;
+    text: string;
+    isAi: boolean;
+    cta?: ChatWidgetCta | null;
+  };
+
+  const initialMessages: ChatWidgetMessage[] = [
     { id: "intro-1", text: "Olá! Sou o atendimento inicial da InfraStudio.", isAi: true },
     { id: "intro-2", text: "Me conte rapidamente o que você quer automatizar.", isAi: true },
     { id: "intro-3", text: "Se preferir, eu já te levo direto para o WhatsApp.", isAi: true },
@@ -490,6 +542,24 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
   const [loading, setLoading] = useState(false);
   const [chatId, setChatId] = useState<string | null>(null);
   const quickReplies: string[] = [];
+  const fallbackWhatsappCta: ChatWidgetCta = {
+    url: `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Ola! Vim pelo chat da home da InfraStudio e quero falar com o time comercial.")}`,
+    label: "Ir para o WhatsApp",
+    phone: WHATSAPP_NUMBER,
+  };
+
+  const buildWhatsappMessage = (cta?: ChatWidgetCta | null): ChatWidgetMessage | null => {
+    if (!cta?.url) {
+      return null;
+    }
+
+    return {
+      id: `ai-cta-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      text: "Se preferir, eu te levo para o WhatsApp agora:",
+      isAi: true,
+      cta,
+    };
+  };
 
   const resetConversation = () => {
     setChatId(null);
@@ -511,7 +581,7 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
     try {
       const payload = JSON.parse(stored) as {
         chatId: string | null;
-        messages: typeof initialMessages;
+        messages: ChatWidgetMessage[];
       };
       setChatId(payload.chatId);
       if (payload.messages?.length) {
@@ -595,31 +665,63 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ chatId, message: trimmed, projeto: DEFAULT_CHAT_PROJECT, agente: DEFAULT_CHAT_AGENT }),
+        body: JSON.stringify({
+          chatId,
+          message: trimmed,
+          widgetSlug: HOME_CHAT_WIDGET_SLUG,
+          context: {
+            channel: {
+              kind: "home_chat_widget",
+            },
+            ui: {
+              structured_response: true,
+              allow_icons: true,
+            },
+          },
+        }),
       });
 
-      const payload = (await response.json()) as { reply?: string; error?: string; chatId?: string };
+      const payload = (await response.json()) as {
+        reply?: string;
+        error?: string;
+        chatId?: string;
+        whatsapp?: ChatWidgetCta | null;
+      };
       if (payload.chatId) {
         setChatId(payload.chatId);
       }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `ai-${Date.now()}`,
-          text: payload.reply ?? payload.error ?? "Não consegui responder agora, mas posso te levar para o WhatsApp.",
-          isAi: true,
-        },
-      ]);
+      setMessages((prev) => {
+        const nextMessages: ChatWidgetMessage[] = [
+          ...prev,
+          {
+            id: `ai-${Date.now()}`,
+            text: normalizeHomeAiMessage(payload.reply ?? payload.error ?? "Não consegui responder agora, mas posso te levar para o WhatsApp."),
+            isAi: true,
+          },
+        ];
+        const whatsappMessage = buildWhatsappMessage(payload.whatsapp ?? null);
+        if (whatsappMessage) {
+          nextMessages.push(whatsappMessage);
+        }
+        return nextMessages;
+      });
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `ai-${Date.now()}`,
-          text: "Não consegui responder agora, mas posso te levar para o WhatsApp.",
-          isAi: true,
-        },
-      ]);
+      setMessages((prev) => {
+        const nextMessages: ChatWidgetMessage[] = [
+          ...prev,
+          {
+            id: `ai-${Date.now()}`,
+            text: normalizeHomeAiMessage("Não consegui responder agora, mas posso te levar para o WhatsApp."),
+            isAi: true,
+          },
+        ];
+        const whatsappMessage = buildWhatsappMessage(fallbackWhatsappCta);
+        if (whatsappMessage) {
+          nextMessages.push(whatsappMessage);
+        }
+        return nextMessages;
+      });
     } finally {
       setLoading(false);
     }
@@ -703,6 +805,17 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
                   className="[&_ol]:m-0 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol_+_p]:mt-2.5 [&_p]:m-0 [&_p_+_ol]:mt-2.5 [&_p_+_p]:mt-2.5 [&_p_+_ul]:mt-2.5 [&_strong]:font-bold [&_strong]:text-white [&_ul]:m-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ul_+_p]:mt-2.5 [&_ul_+_ul]:mt-2.5 [&_li_+_li]:mt-1.5"
                   dangerouslySetInnerHTML={{ __html: formatChatRichText(message.text) }}
                 />
+                {message.isAi && message.cta?.url ? (
+                  <a
+                    href={message.cta.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-500/14 px-3 py-1.5 text-[11px] font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/18"
+                  >
+                    <MessageCircle size={13} />
+                    {message.cta.label || "Ir para o WhatsApp"}
+                  </a>
+                ) : null}
               </div>
             ))}
 

@@ -168,7 +168,7 @@
       ".chat-rich ul, .chat-rich ol { margin: 0; padding-left: 20px; }",
       ".chat-rich li + li { margin-top: 6px; }",
       ".chat-rich strong { font-weight: 700; color: white; }",
-      ".chat-cta { margin-top: 10px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: white; padding: 10px 14px; font-size: 13px; font-weight: 700; text-decoration: none; transition: transform .18s ease, background-color .18s ease, border-color .18s ease; }",
+      ".chat-cta { margin-top: 8px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: white; padding: 7px 11px; font-size: 11px; font-weight: 700; text-decoration: none; transition: transform .18s ease, background-color .18s ease, border-color .18s ease; }",
       ".chat-cta:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--accent) 20%, transparent); }",
       ".chat-typing { display: inline-flex; width: fit-content; max-width: 88%; align-items: center; gap: 10px; border-radius: 18px; border: 1px solid var(--header-border); background: var(--ai-bg); color: #94a3b8; padding: 12px 14px; animation: chatBubbleIn .22s ease both; }",
       ".chat-typing-dots { display: inline-flex; gap: 4px; }",
@@ -335,6 +335,19 @@
       link.rel = "noreferrer noopener";
       link.textContent = cta.label || "Continuar no WhatsApp";
       return link;
+    }
+
+    function createWhatsAppMessage(cta) {
+      if (!cta || !cta.url) {
+        return null;
+      }
+
+      return {
+        id: "ai-cta-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+        text: "Se preferir, eu te levo para o WhatsApp agora:",
+        isAi: true,
+        cta: cta,
+      };
     }
 
     function persist() {
@@ -547,6 +560,45 @@
       setLoading(true);
 
       try {
+        var mergedContext = {
+          channel: {
+            kind: "external_widget",
+          },
+          ui: {
+            structured_response: true,
+          },
+        };
+
+        for (var contextKey in state.context) {
+          if (Object.prototype.hasOwnProperty.call(state.context, contextKey)) {
+            mergedContext[contextKey] = state.context[contextKey];
+          }
+        }
+
+        if (state.context && typeof state.context.channel === "object" && !Array.isArray(state.context.channel)) {
+          mergedContext.channel = {
+            kind: "external_widget",
+          };
+
+          for (var channelKey in state.context.channel) {
+            if (Object.prototype.hasOwnProperty.call(state.context.channel, channelKey)) {
+              mergedContext.channel[channelKey] = state.context.channel[channelKey];
+            }
+          }
+        }
+
+        if (state.context && typeof state.context.ui === "object" && !Array.isArray(state.context.ui)) {
+          mergedContext.ui = {
+            structured_response: true,
+          };
+
+          for (var uiKey in state.context.ui) {
+            if (Object.prototype.hasOwnProperty.call(state.context.ui, uiKey)) {
+              mergedContext.ui[uiKey] = state.context.ui[uiKey];
+            }
+          }
+        }
+
         var response = await fetch(apiBase + "/api/chat", {
           method: "POST",
           headers: {
@@ -557,7 +609,7 @@
             message: trimmed,
             projeto: projeto,
             agente: agente,
-            context: state.context,
+            context: mergedContext,
           }),
         });
 
@@ -570,8 +622,14 @@
           id: "ai-" + Date.now(),
           text: payload.reply || payload.error || "Nao consegui responder agora.",
           isAi: true,
-          cta: payload.whatsapp && payload.whatsapp.url ? payload.whatsapp : null,
+          cta: null,
         });
+        if (payload.whatsapp && payload.whatsapp.url) {
+          var whatsappMessage = createWhatsAppMessage(payload.whatsapp);
+          if (whatsappMessage) {
+            state.messages.push(whatsappMessage);
+          }
+        }
       } catch (error) {
         state.messages.push({
           id: "ai-" + Date.now(),

@@ -2,6 +2,7 @@ import "server-only";
 
 import { getAgenteAtivo, getAgenteById } from "@/lib/agentes";
 import { buildAgenteApiRuntimeContext, type ApiRuntimeContext } from "@/lib/apis";
+import { getChatChannelPolicy } from "@/lib/chat-channel-policy";
 import { getProjetoOpenAIConfig } from "@/lib/segredos";
 import type { ChatMessageRole } from "@/lib/chats";
 
@@ -11,6 +12,13 @@ type ConversationMessage = {
 };
 
 type ConversationContext = {
+  channel?: {
+    kind?: string | null;
+  };
+  ui?: {
+    structured_response?: boolean;
+    allow_icons?: boolean;
+  };
   projeto?: {
     id?: string | null;
     slug?: string | null;
@@ -41,22 +49,87 @@ function heuristicReply(message: string) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("whatsapp") || normalized.includes("atendimento")) {
-    return "Perfeito. A InfraStudio monta fluxos de WhatsApp para captar, qualificar e responder clientes com muito menos trabalho manual. Me diga seu segmento e eu ja te proponho um fluxo inicial.";
+    return [
+      "✓ **Fluxo recomendado**",
+      "A InfraStudio monta fluxos de WhatsApp para captar, qualificar e responder clientes com muito menos trabalho manual.",
+      "",
+      "→ Me diga seu segmento e eu ja te proponho um fluxo inicial.",
+    ].join("\n");
   }
 
   if (normalized.includes("crm") || normalized.includes("erp") || normalized.includes("integra")) {
-    return "A gente costuma integrar CRM, ERP, formularios, pagamentos e atendimento para eliminar retrabalho e centralizar dados. Se quiser, me diga qual ferramenta voce usa hoje.";
+    return [
+      "✓ **Isso encaixa bem em integracao**",
+      "A gente costuma integrar CRM, ERP, formularios, pagamentos e atendimento para eliminar retrabalho e centralizar dados.",
+      "",
+      "→ Se quiser, me diga qual ferramenta voce usa hoje.",
+    ].join("\n");
   }
 
   if (normalized.includes("site") || normalized.includes("chat")) {
-    return "Da para colocar um agente no seu site para captar leads, responder duvidas e encaminhar oportunidades para o WhatsApp do time comercial.";
+    return [
+      "✓ **Isso encaixa bem**",
+      "Da para colocar um agente no seu site para captar leads, responder duvidas e encaminhar oportunidades para o WhatsApp do time comercial.",
+    ].join("\n");
   }
 
   if (normalized.includes("preco") || normalized.includes("orcamento") || normalized.includes("valor")) {
-    return "Para te passar um caminho comercial melhor, me diz em uma frase o que voce quer automatizar e qual etapa hoje mais trava o fechamento.";
+    return [
+      "✓ **Para estimar melhor**",
+      "Me diga em uma frase:",
+      "- o que voce quer automatizar",
+      "- qual etapa hoje mais trava o fechamento",
+    ].join("\n");
   }
 
-  return "Entendi. Me conta qual processo voce quer automatizar hoje e se isso envolve site, WhatsApp, vendas, agenda ou integracoes. Com isso eu consigo te orientar e te levar para o WhatsApp no momento certo.";
+  return [
+    "✓ **Posso te orientar por aqui**",
+    "Me conta qual processo voce quer automatizar hoje.",
+    "",
+    "Se ajudar, pode me dizer se isso envolve:",
+    "- site",
+    "- WhatsApp",
+    "- vendas",
+    "- agenda",
+    "- integracoes",
+  ].join("\n");
+}
+
+function buildStructuredReplyInstruction(context?: ConversationContext) {
+  const shouldStructure = prefersStructuredReply(context);
+
+  if (!shouldStructure) {
+    return "";
+  }
+
+  return [
+    "Formato da resposta:",
+    "- Prefira respostas escaneaveis, nunca em bloco corrido quando houver mais de uma ideia.",
+    "- Use quebras de linha entre contexto, diagnostico, proximos passos e CTA.",
+    "- Quando fizer sentido, use listas curtas com '-' ou '1.'.",
+    "- Destaque pontos-chave com **negrito**.",
+    "- Pode usar icones simples e pontuais como ✓, →, • ou icons discretos para melhorar leitura.",
+    "- Pode usar marcadores curtos como '-', '->' e pontos de destaque para melhorar leitura.",
+    "- Mantenha o texto elegante e curto, sem excesso de enfeite.",
+  ].join("\n");
+}
+
+function prefersStructuredReply(context?: ConversationContext) {
+  if (context?.ui?.structured_response === false) {
+    return false;
+  }
+
+  return true;
+}
+
+function formatHeuristicReply(reply: string, context?: ConversationContext) {
+  if (!prefersStructuredReply(context)) {
+    return reply;
+  }
+
+  return reply
+    .replace(/\. ([A-ZÀ-Ú0-9✓→-])/g, ".\n\n$1")
+    .replace(/\? ([A-ZÀ-Ú0-9✓→-])/g, "?\n\n$1");
 }
 
 function normalizeText(value: string) {
@@ -714,7 +787,7 @@ function detectCatalogItems(history: ConversationMessage[]) {
     items.push({ slug: "integracao-crm", nome: "Integracao CRM", preco: 1000 });
   }
 
-  if (has(/\bsistema\b|\bpainel\b/)) {
+  if (has(/\bsistema\b|\bpainel\b|\bcadastro\b|\bproduto\b|\bprodutos\b|\badmin\b|\badm\b|\blistagem\b|\bcatalogo\b|\bcatalogo\b/)) {
     items.push({ slug: "sistema-sob-medida-simples", nome: "Sistema sob medida simples", preco: 2000 });
   }
 
@@ -744,7 +817,7 @@ function isOutOfScopeForCatalog(history: ConversationMessage[]) {
   return catalogItems.length === 0 || complexSignals.some((pattern) => pattern.test(userText));
 }
 
-function buildCatalogPricingReply(history: ConversationMessage[]) {
+function buildCatalogPricingReply(history: ConversationMessage[], context?: ConversationContext) {
   const catalogItems = detectCatalogItems(history);
   if (catalogItems.length === 0 || isOutOfScopeForCatalog(history)) {
     return null;
@@ -755,10 +828,26 @@ function buildCatalogPricingReply(history: ConversationMessage[]) {
   const joinedLabels = labels.join(" + ");
 
   if (catalogItems.length === 1) {
-    return `Pelo que voce descreveu, isso encaixa em ${joinedLabels}. Se quiser, eu sigo com voce por aqui ou te encaminho no WhatsApp para fecharmos o proximo passo.`;
+    return prefersStructuredReply(context)
+      ? [
+          "✓ **Melhor encaixe inicial**",
+          labels[0],
+          "",
+          "→ Se quiser, eu sigo com voce por aqui ou te encaminho no WhatsApp para fecharmos o proximo passo.",
+        ].join("\n")
+      : `Pelo que voce descreveu, isso encaixa em ${joinedLabels}. Se quiser, eu sigo com voce por aqui ou te encaminho no WhatsApp para fecharmos o proximo passo.`;
   }
 
-  return `Pelo que voce descreveu, isso encaixa no nosso catalogo como ${joinedLabels}. Nesse cenario, a estimativa inicial fica em R$ ${total.toLocaleString("pt-BR")} no total. Se quiser, eu posso te direcionar no WhatsApp para alinharmos os detalhes finais.`;
+  return prefersStructuredReply(context)
+    ? [
+        "✓ **Melhor encaixe inicial**",
+        ...labels.map((label) => `- ${label}`),
+        "",
+        `**Estimativa inicial:** R$ ${total.toLocaleString("pt-BR")}`,
+        "",
+        "→ Se quiser, eu posso te direcionar no WhatsApp para alinharmos os detalhes finais.",
+      ].join("\n")
+    : `Pelo que voce descreveu, isso encaixa no nosso catalogo como ${joinedLabels}. Nesse cenario, a estimativa inicial fica em R$ ${total.toLocaleString("pt-BR")} no total. Se quiser, eu posso te direcionar no WhatsApp para alinharmos os detalhes finais.`;
 }
 
 function maybeAskForLeadIdentification(context: ConversationContext, history: ConversationMessage[], latestUserMessage: string) {
@@ -784,14 +873,16 @@ function maybeAskForLeadIdentification(context: ConversationContext, history: Co
 
 export async function generateSalesReply(history: ConversationMessage[], context?: ConversationContext) {
   const latestUserMessage = [...history].reverse().find((item) => item.role === "user")?.content ?? "";
+  const channelPolicy = getChatChannelPolicy(context);
   const projectId = context?.projeto?.id ?? null;
   const agentId = context?.agente?.id ?? null;
   const agent = agentId ? await getAgenteById(agentId) : projectId ? await getAgenteAtivo(projectId) : null;
   const apiContexts = agent?.id ? await buildAgenteApiRuntimeContext(agent.id, (context ?? {}) as Record<string, unknown>) : [];
   const openai = await getProjetoOpenAIConfig(projectId);
   const systemPrompt = buildSystemPrompt(agent);
+  const structuredReplyInstruction = buildStructuredReplyInstruction(context);
   const focusedApiContext = buildFocusedApiContext(latestUserMessage, apiContexts);
-  const catalogPricingReply = buildCatalogPricingReply(history);
+  const catalogPricingReply = channelPolicy.allowCatalogPricing ? buildCatalogPricingReply(history, context) : null;
   const canUseDirectReply = shouldUseDirectFieldReply(latestUserMessage);
   const directApiReply = canUseDirectReply ? buildDirectApiReply(latestUserMessage, apiContexts) : null;
 
@@ -808,11 +899,13 @@ export async function generateSalesReply(history: ConversationMessage[], context
     };
   }
 
-  const identificationPrompt = maybeAskForLeadIdentification(context ?? {}, history, latestUserMessage);
+  const identificationPrompt = channelPolicy.allowLeadGate
+    ? maybeAskForLeadIdentification(context ?? {}, history, latestUserMessage)
+    : null;
 
   if (identificationPrompt && apiContexts.length === 0) {
-    return {
-      reply: identificationPrompt,
+      return {
+      reply: formatHeuristicReply(identificationPrompt, context),
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
         provider: "heuristic",
@@ -824,7 +917,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   }
 
   if (directApiReply) {
-    return {
+      return {
       reply: directApiReply,
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
@@ -839,7 +932,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   if (!openai.apiKey) {
     const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
     return {
-      reply: apiFallbackReply ?? heuristicReply(latestUserMessage),
+      reply: formatHeuristicReply(apiFallbackReply ?? heuristicReply(latestUserMessage), context),
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: { provider: "heuristic", model: "fallback", agenteId: agent?.id ?? null, agenteNome: agent?.nome ?? null },
     };
@@ -870,7 +963,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
         model: openai.model,
         temperature: 0.5,
         max_output_tokens: 220,
-        instructions: [systemPrompt, focusedApiContext.instructions, summary, lead, qualification]
+        instructions: [systemPrompt, structuredReplyInstruction, focusedApiContext.instructions, summary, lead, qualification]
           .filter(Boolean)
           .join("\n\n"),
         input: buildInput(recentMessages),
@@ -884,7 +977,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
       console.error("[chat] openai response failed", payload.error?.message ?? payload);
       const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
       return {
-        reply: apiFallbackReply ?? heuristicReply(latestUserMessage),
+        reply: formatHeuristicReply(apiFallbackReply ?? heuristicReply(latestUserMessage), context),
         usage: { inputTokens: 0, outputTokens: 0 },
         metadata: {
           provider: "heuristic",
@@ -912,7 +1005,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     console.error("[chat] failed to call openai", error);
     const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
     return {
-      reply: apiFallbackReply ?? heuristicReply(latestUserMessage),
+      reply: formatHeuristicReply(apiFallbackReply ?? heuristicReply(latestUserMessage), context),
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
         provider: "heuristic",
