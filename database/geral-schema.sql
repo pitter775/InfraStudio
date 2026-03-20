@@ -46,6 +46,7 @@ CREATE TABLE public.apis (
   ativo boolean NOT NULL DEFAULT true,
   created_at timestamp without time zone NOT NULL DEFAULT now(),
   updated_at timestamp without time zone NOT NULL DEFAULT now(),
+  configuracoes jsonb NOT NULL DEFAULT '{}'::jsonb,
   CONSTRAINT apis_pkey PRIMARY KEY (id),
   CONSTRAINT apis_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id)
 );

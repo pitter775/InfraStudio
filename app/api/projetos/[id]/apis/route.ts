@@ -45,6 +45,11 @@ export async function POST(request: Request, context: RouteContext) {
     metodo?: string;
     descricao?: string;
     ativo?: boolean;
+    parametros?: Array<{
+      nome?: string;
+      tipo?: "string" | "number" | "boolean";
+      obrigatorio?: boolean;
+    }>;
     campos?: Array<{
       nome?: string;
       tipo?: "string" | "number" | "boolean";
@@ -67,6 +72,15 @@ export async function POST(request: Request, context: RouteContext) {
     metodo: "GET",
     descricao: body.descricao,
     ativo: body.ativo,
+    parametros: Array.isArray(body.parametros)
+      ? body.parametros
+          .filter((parametro) => parametro?.nome && parametro?.tipo)
+          .map((parametro) => ({
+            nome: String(parametro.nome),
+            tipo: parametro.tipo as "string" | "number" | "boolean",
+            obrigatorio: parametro.obrigatorio === true,
+          }))
+      : [],
     campos: Array.isArray(body.campos)
       ? body.campos
           .filter((campo) => campo?.nome && campo?.tipo)

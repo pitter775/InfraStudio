@@ -20,8 +20,23 @@ type Projeto = {
 type Agente = {
   id: string;
   nome: string;
+  slug?: string | null;
   projetoId: string | null;
   ativo: boolean;
+  apiIds?: string[];
+};
+
+type ApiParametro = {
+  nome: string;
+  tipo: "string" | "number" | "boolean";
+  obrigatorio: boolean;
+};
+
+type Api = {
+  id: string;
+  projetoId: string | null;
+  nome: string;
+  parametros: ApiParametro[];
 };
 
 type ChatWidget = {
@@ -72,15 +87,19 @@ function renderSnippetLine(line: string) {
     return <span className="text-slate-500"> </span>;
   }
 
+  if (trimmed.startsWith("<!--") || trimmed.startsWith("//")) {
+    return <span className="text-amber-300">{line}</span>;
+  }
+
   if (trimmed.startsWith("<script") || trimmed.startsWith("></script>") || trimmed.startsWith("</script>")) {
     return <span className="text-fuchsia-300">{line}</span>;
   }
 
-  const parts = line.split(/(data-[\w-]+|src)/g);
+  const parts = line.split(/(data-[\w-]+|src|InfraChat\.setContext)/g);
   return (
     <>
       {parts.map((part, index) => {
-        if (part === "src" || part.startsWith("data-")) {
+        if (part === "src" || part.startsWith("data-") || part === "InfraChat.setContext") {
           return (
             <span key={`${part}-${index}`} className="text-cyan-300">
               {part}
@@ -146,6 +165,7 @@ export default function AdminProjetosPage() {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [agentes, setAgentes] = useState<Agente[]>([]);
+  const [apis, setApis] = useState<Api[]>([]);
   const [widgets, setWidgets] = useState<ChatWidget[]>([]);
   const [projetoForm, setProjetoForm] = useState<ProjetoFormState>(emptyProjetoForm);
   const [widgetForm, setWidgetForm] = useState<ChatWidget>(emptyWidgetForm);
@@ -173,9 +193,10 @@ export default function AdminProjetosPage() {
       return;
     }
 
-    const payload = (await response.json()) as { widgets?: ChatWidget[]; projetos?: Projeto[]; agentes?: Agente[] };
+    const payload = (await response.json()) as { widgets?: ChatWidget[]; projetos?: Projeto[]; agentes?: Agente[]; apis?: Api[] };
     setWidgets(payload.widgets ?? []);
     setAgentes(payload.agentes ?? []);
+    setApis(payload.apis ?? []);
     if ((payload.projetos ?? []).length) {
       setProjetos(payload.projetos ?? []);
     }
@@ -203,9 +224,75 @@ export default function AdminProjetosPage() {
     [agentes, widgetForm.projetoId],
   );
 
+  const getResolvedWidgetAgent = (widget: ChatWidget) => {
+    if (widget.agenteId) {
+      return agentes.find((agente) => agente.id === widget.agenteId) ?? null;
+    }
+
+    return agentes.find((agente) => agente.projetoId === widget.projetoId && agente.ativo) ?? null;
+  };
+
+  const getWidgetRequiredParameters = (widget: ChatWidget) => {
+    const agente = getResolvedWidgetAgent(widget);
+    if (!agente?.apiIds?.length) {
+      return [];
+    }
+
+    const allowedApiIds = new Set(agente.apiIds);
+    const required = apis
+      .filter((api) => allowedApiIds.has(api.id))
+      .flatMap((api) => api.parametros.filter((parametro) => parametro.obrigatorio));
+
+    return required.filter(
+      (parametro, index, array) => array.findIndex((item) => item.nome.toLowerCase() === parametro.nome.toLowerCase()) === index,
+    );
+  };
+
+  const buildContextSnippet = (widget: ChatWidget) => {
+    const requiredParameters = getWidgetRequiredParameters(widget);
+    const lines = [
+      `    title: '${widget.nome.replace(/'/g, "\\'")}',`,
+      `    theme: '${widget.tema}',`,
+      `    accent: '${widget.corPrimaria}',`,
+      `    transparent: ${widget.fundoTransparente ? "true" : "false"},`,
+    ];
+
+    if (requiredParameters.length) {
+      for (const parametro of requiredParameters) {
+        const placeholder = parametro.tipo === "number" ? "0" : parametro.tipo === "boolean" ? "false" : `'${parametro.nome}-valor'`;
+        lines.push(`    ${parametro.nome}: ${placeholder},`);
+      }
+    } else {
+      lines.push("    id: 'uuid-123',");
+    }
+
+    return lines;
+  };
+
   const buildWidgetSnippet = (widget: ChatWidget) => {
     const base = origin || "https://seu-dominio";
-    return `<script src="${base}/chat-widget.js" data-widget="${widget.slug}" data-title="${widget.nome}" data-theme="${widget.tema}" data-accent="${widget.corPrimaria}" data-transparent="${widget.fundoTransparente ? "true" : "false"}"></script>`;
+    const projeto = projetos.find((item) => item.id === widget.projetoId);
+    const agente = getResolvedWidgetAgent(widget);
+    const projetoRef = projeto?.slug || projeto?.id || "seu-projeto";
+    const agenteRef = agente?.slug || agente?.id || "default";
+    const contextLines = buildContextSnippet(widget);
+
+    return [
+      "<!-- 1) Cole este bloco no HTML/layout para carregar o chat na abertura da pagina -->",
+      "<script",
+      `  src="${base}/chat.js"`,
+      `  data-projeto="${projetoRef}"`,
+      `  data-agente="${agenteRef}"`,
+      "></script>",
+      "",
+      "<!-- 2) Depois, no JavaScript da pagina ou do framework, envie contexto e personalize se quiser -->",
+      "<script>",
+      "  // Exemplo: execute quando a pagina carregar ou quando tiver os dados do cliente",
+      "  InfraChat.setContext({",
+      ...contextLines,
+      "  });",
+      "</script>",
+    ].join("\n");
   };
 
   const resetProjetoForm = () => {
@@ -428,7 +515,7 @@ export default function AdminProjetosPage() {
           <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
             <div>
               <h3 className="text-xl font-bold text-white">Widgets de chat</h3>
-              <p className="mt-1 text-sm text-slate-400">Use um widget por canal, site, landing page ou embed externo.</p>
+              <p className="mt-1 text-sm text-slate-400">Use um canal por site, landing page ou embed externo com projeto/agente fixos e contexto dinamico.</p>
             </div>
             <button
               type="button"

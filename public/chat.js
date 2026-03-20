@@ -1,0 +1,443 @@
+(function () {
+  var existing = window.InfraChat;
+  var queue = existing && Array.isArray(existing.__queue) ? existing.__queue : [];
+
+  function enqueueContext(payload) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return;
+    }
+
+    queue.push(payload);
+  }
+
+  if (!existing || typeof existing.setContext !== "function") {
+    window.InfraChat = {
+      __queue: queue,
+      setContext: enqueueContext,
+    };
+  } else {
+    window.InfraChat.__queue = queue;
+  }
+
+  function whenReady(callback) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", callback, { once: true });
+      return;
+    }
+
+    callback();
+  }
+
+  function detectScript() {
+    if (document.currentScript) {
+      return document.currentScript;
+    }
+
+    var scripts = document.querySelectorAll("script[src]");
+    for (var index = scripts.length - 1; index >= 0; index -= 1) {
+      var script = scripts[index];
+      var src = script.getAttribute("src") || "";
+      if (src.indexOf("/chat.js") !== -1 && script.getAttribute("data-projeto")) {
+        return script;
+      }
+    }
+
+    return null;
+  }
+
+  var sourceScript = detectScript();
+
+  whenReady(function () {
+    if (!sourceScript) {
+      console.warn("[InfraStudio Chat] script tag not found.");
+      return;
+    }
+
+    var projeto = (sourceScript.getAttribute("data-projeto") || "").trim();
+    var agente = (sourceScript.getAttribute("data-agente") || "").trim();
+
+    if (!projeto || !agente) {
+      console.warn("[InfraStudio Chat] data-projeto and data-agente are required.");
+      return;
+    }
+
+    var instanceKey = projeto + "::" + agente;
+    if (sourceScript.__infraChatInitialized) {
+      return;
+    }
+    sourceScript.__infraChatInitialized = true;
+
+    var apiBase = sourceScript.getAttribute("data-api-base") || new URL(sourceScript.src, window.location.href).origin;
+    var storageKey = "infrastudio-chat:" + instanceKey;
+    var state = {
+      chatId: null,
+      messages: [],
+      context: {},
+      open: false,
+      loading: false,
+      ui: {
+        title: "Chat",
+        theme: "dark",
+        accent: "#2563eb",
+        transparent: true,
+      },
+    };
+
+    try {
+      var stored = window.localStorage.getItem(storageKey);
+      if (stored) {
+        var parsed = JSON.parse(stored);
+        state.chatId = typeof parsed.chatId === "string" ? parsed.chatId : null;
+        state.messages = Array.isArray(parsed.messages) ? parsed.messages : [];
+        state.context = parsed.context && typeof parsed.context === "object" && !Array.isArray(parsed.context) ? parsed.context : {};
+      }
+    } catch (error) {
+      console.warn("[InfraStudio Chat] failed to restore conversation.", error);
+    }
+
+    var host = document.createElement("div");
+    host.id = "infrastudio-chat-root-" + instanceKey.replace(/[^a-zA-Z0-9_-]/g, "-");
+    document.body.appendChild(host);
+
+    var shadow = host.attachShadow({ mode: "open" });
+    var style = document.createElement("style");
+    style.textContent = [
+      ":host { all: initial; }",
+      ".chat-wrap {",
+      "  position: fixed;",
+      "  right: 24px;",
+      "  bottom: 24px;",
+      "  z-index: 2147483000;",
+      "  font-family: Inter, Arial, sans-serif;",
+      "  --accent: #2563eb;",
+      "  --panel-bg: rgba(9,16,34,0.96);",
+      "  --panel-text: #e2e8f0;",
+      "  --header-border: rgba(255,255,255,0.08);",
+      "  --subtle-bg: rgba(255,255,255,0.04);",
+      "  --surface-bg: rgba(2,6,23,0.18);",
+      "  --ai-bg: rgba(30,41,59,0.92);",
+      "  --ai-text: #e2e8f0;",
+      "  --input-bg: rgba(2,6,23,0.45);",
+      "  --input-text: #ffffff;",
+      "  --shadow-color: rgba(2,6,23,0.45);",
+      "}",
+      ".chat-button { width: 60px; height: 60px; border: 0; border-radius: 999px; background: var(--accent); color: white; font-size: 14px; font-weight: 700; letter-spacing: 0.04em; cursor: pointer; box-shadow: 0 20px 40px var(--shadow-color); }",
+      ".chat-panel { width: min(380px, calc(100vw - 32px)); height: min(620px, calc(100vh - 110px)); display: none; flex-direction: column; overflow: hidden; border-radius: 26px; border: 1px solid var(--header-border); background: var(--panel-bg); color: var(--panel-text); box-shadow: 0 24px 70px var(--shadow-color); backdrop-filter: blur(14px); margin-bottom: 16px; }",
+      ".chat-panel.open { display: flex; }",
+      ".chat-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--header-border); }",
+      ".chat-title { font-size: 16px; font-weight: 700; color: var(--panel-text); }",
+      ".chat-subtitle { margin-top: 4px; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; }",
+      ".chat-reset, .chat-close { border: 1px solid var(--header-border); background: var(--subtle-bg); color: #94a3b8; border-radius: 12px; cursor: pointer; }",
+      ".chat-reset { padding: 8px 10px; font-size: 11px; font-weight: 600; }",
+      ".chat-close { width: 36px; height: 36px; font-size: 16px; }",
+      ".chat-messages { flex: 1; overflow-y: auto; padding: 16px; background: var(--surface-bg); }",
+      ".chat-stack { display: flex; flex-direction: column; gap: 12px; }",
+      ".chat-bubble { max-width: 88%; border-radius: 18px; border: 1px solid var(--header-border); padding: 12px 14px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }",
+      ".chat-bubble.ai { background: var(--ai-bg); color: var(--ai-text); border-bottom-left-radius: 6px; }",
+      ".chat-bubble.user { margin-left: auto; background: var(--accent); color: white; border-color: var(--accent); border-bottom-right-radius: 6px; }",
+      ".chat-form { display: flex; gap: 10px; padding: 16px; border-top: 1px solid var(--header-border); }",
+      ".chat-input { flex: 1; min-height: 48px; max-height: 120px; resize: vertical; border-radius: 16px; border: 1px solid var(--header-border); background: var(--input-bg); color: var(--input-text); padding: 12px 14px; font: inherit; }",
+      ".chat-send { border: 0; border-radius: 16px; background: var(--accent); color: white; min-width: 72px; padding: 0 16px; font-weight: 700; cursor: pointer; }",
+      ".chat-send[disabled] { opacity: 0.6; cursor: wait; }",
+      "@media (max-width: 640px) { .chat-wrap { right: 12px; bottom: 12px; } .chat-panel { width: calc(100vw - 24px); height: calc(100vh - 100px); } }",
+    ].join("");
+    shadow.appendChild(style);
+
+    var wrap = document.createElement("div");
+    wrap.className = "chat-wrap";
+    shadow.appendChild(wrap);
+
+    var panel = document.createElement("div");
+    panel.className = "chat-panel";
+    wrap.appendChild(panel);
+
+    var header = document.createElement("div");
+    header.className = "chat-header";
+    panel.appendChild(header);
+
+    var titleWrap = document.createElement("div");
+    header.appendChild(titleWrap);
+
+    var title = document.createElement("div");
+    title.className = "chat-title";
+    title.textContent = state.ui.title;
+    titleWrap.appendChild(title);
+
+    var subtitle = document.createElement("div");
+    subtitle.className = "chat-subtitle";
+    subtitle.textContent = "Assistente virtual";
+    titleWrap.appendChild(subtitle);
+
+    var headerActions = document.createElement("div");
+    headerActions.style.display = "flex";
+    headerActions.style.gap = "8px";
+    header.appendChild(headerActions);
+
+    var resetButton = document.createElement("button");
+    resetButton.className = "chat-reset";
+    resetButton.type = "button";
+    resetButton.textContent = "Novo atendimento";
+    headerActions.appendChild(resetButton);
+
+    var closeButton = document.createElement("button");
+    closeButton.className = "chat-close";
+    closeButton.type = "button";
+    closeButton.textContent = "x";
+    headerActions.appendChild(closeButton);
+
+    var messagesWrap = document.createElement("div");
+    messagesWrap.className = "chat-messages";
+    panel.appendChild(messagesWrap);
+
+    var stack = document.createElement("div");
+    stack.className = "chat-stack";
+    messagesWrap.appendChild(stack);
+
+    var form = document.createElement("form");
+    form.className = "chat-form";
+    panel.appendChild(form);
+
+    var input = document.createElement("textarea");
+    input.className = "chat-input";
+    input.placeholder = "Digite sua mensagem...";
+    form.appendChild(input);
+
+    var sendButton = document.createElement("button");
+    sendButton.className = "chat-send";
+    sendButton.type = "submit";
+    sendButton.textContent = "Enviar";
+    form.appendChild(sendButton);
+
+    var triggerButton = document.createElement("button");
+    triggerButton.className = "chat-button";
+    triggerButton.type = "button";
+    triggerButton.textContent = "CHAT";
+    wrap.appendChild(triggerButton);
+
+    function persist() {
+      try {
+        window.localStorage.setItem(
+          storageKey,
+          JSON.stringify({
+            chatId: state.chatId,
+            messages: state.messages,
+            context: state.context,
+          }),
+        );
+      } catch (error) {
+        console.warn("[InfraStudio Chat] failed to persist conversation.", error);
+      }
+    }
+
+    function scrollToBottom() {
+      messagesWrap.scrollTop = messagesWrap.scrollHeight;
+    }
+
+    function renderMessages() {
+      stack.innerHTML = "";
+
+      if (!state.messages.length) {
+        var welcome = document.createElement("div");
+        welcome.className = "chat-bubble ai";
+        welcome.textContent = "Oi! Como posso te ajudar agora?";
+        stack.appendChild(welcome);
+      } else {
+        state.messages.forEach(function (message) {
+          var bubble = document.createElement("div");
+          bubble.className = "chat-bubble " + (message.isAi ? "ai" : "user");
+          bubble.textContent = message.text;
+          stack.appendChild(bubble);
+        });
+      }
+
+      scrollToBottom();
+    }
+
+    function setOpen(nextOpen) {
+      state.open = nextOpen;
+      if (state.open) {
+        panel.classList.add("open");
+        input.focus();
+      } else {
+        panel.classList.remove("open");
+      }
+    }
+
+    function setLoading(nextLoading) {
+      state.loading = nextLoading;
+      sendButton.disabled = nextLoading;
+      sendButton.textContent = nextLoading ? "..." : "Enviar";
+    }
+
+    function setContext(nextContext) {
+      if (!nextContext || typeof nextContext !== "object" || Array.isArray(nextContext)) {
+        return;
+      }
+
+      for (var key in nextContext) {
+        if (Object.prototype.hasOwnProperty.call(nextContext, key)) {
+          state.context[key] = nextContext[key];
+        }
+      }
+
+      persist();
+    }
+
+    function applyUiConfig(ui) {
+      if (!ui || typeof ui !== "object") {
+        return;
+      }
+
+      if (typeof ui.title === "string" && ui.title.trim()) {
+        state.ui.title = ui.title.trim();
+      }
+
+      if (ui.theme === "light" || ui.theme === "dark") {
+        state.ui.theme = ui.theme;
+      }
+
+      if (typeof ui.accent === "string" && ui.accent.trim()) {
+        state.ui.accent = ui.accent.trim();
+      }
+
+      if (typeof ui.transparent === "boolean") {
+        state.ui.transparent = ui.transparent;
+      }
+
+      var light = state.ui.theme === "light";
+      wrap.style.setProperty("--accent", state.ui.accent);
+      wrap.style.setProperty("--panel-bg", light ? (state.ui.transparent ? "rgba(255,255,255,0.88)" : "#ffffff") : (state.ui.transparent ? "rgba(9,16,34,0.96)" : "#08101f"));
+      wrap.style.setProperty("--panel-text", light ? "#0f172a" : "#e2e8f0");
+      wrap.style.setProperty("--header-border", light ? "rgba(15,23,42,0.08)" : "rgba(255,255,255,0.08)");
+      wrap.style.setProperty("--subtle-bg", light ? "rgba(148,163,184,0.08)" : "rgba(255,255,255,0.04)");
+      wrap.style.setProperty("--surface-bg", light ? "rgba(248,250,252,0.86)" : "rgba(2,6,23,0.18)");
+      wrap.style.setProperty("--ai-bg", light ? "#f8fafc" : "rgba(30,41,59,0.92)");
+      wrap.style.setProperty("--ai-text", light ? "#0f172a" : "#e2e8f0");
+      wrap.style.setProperty("--input-bg", light ? "rgba(255,255,255,0.92)" : "rgba(2,6,23,0.45)");
+      wrap.style.setProperty("--input-text", light ? "#0f172a" : "#ffffff");
+      wrap.style.setProperty("--shadow-color", light ? "rgba(15,23,42,0.18)" : "rgba(2,6,23,0.45)");
+      title.textContent = state.ui.title;
+    }
+
+    async function loadRemoteConfig() {
+      try {
+        var params = new URLSearchParams({
+          projeto: projeto,
+          agente: agente,
+        });
+        var response = await fetch(apiBase + "/api/chat/config?" + params.toString(), {
+          method: "GET",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        var payload = await response.json();
+        applyUiConfig(payload.ui || null);
+      } catch (error) {
+        console.warn("[InfraStudio Chat] failed to load remote config.", error);
+      }
+    }
+
+    async function sendMessage(text) {
+      var trimmed = String(text || "").trim();
+      if (!trimmed || state.loading) {
+        return;
+      }
+
+      state.messages.push({ id: "user-" + Date.now(), text: trimmed, isAi: false });
+      persist();
+      renderMessages();
+      input.value = "";
+      setLoading(true);
+
+      try {
+        var response = await fetch(apiBase + "/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            chatId: state.chatId,
+            message: trimmed,
+            projeto: projeto,
+            agente: agente,
+            context: state.context,
+          }),
+        });
+
+        var payload = await response.json();
+        if (payload.chatId) {
+          state.chatId = payload.chatId;
+        }
+
+        state.messages.push({
+          id: "ai-" + Date.now(),
+          text: payload.reply || payload.error || "Nao consegui responder agora.",
+          isAi: true,
+        });
+      } catch (error) {
+        state.messages.push({
+          id: "ai-" + Date.now(),
+          text: "Nao consegui responder agora.",
+          isAi: true,
+        });
+      } finally {
+        persist();
+        renderMessages();
+        setLoading(false);
+      }
+    }
+
+    triggerButton.addEventListener("click", function () {
+      setOpen(!state.open);
+    });
+
+    closeButton.addEventListener("click", function () {
+      setOpen(false);
+    });
+
+    resetButton.addEventListener("click", function () {
+      state.chatId = null;
+      state.messages = [];
+      persist();
+      renderMessages();
+      input.focus();
+    });
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      void sendMessage(input.value);
+    });
+
+    window.addEventListener("infrastudio-chat:open", function (event) {
+      var detail = event && event.detail ? event.detail : {};
+      var requestedProject = detail.projeto || null;
+      var requestedAgent = detail.agente || null;
+
+      if (requestedProject && requestedProject !== projeto) {
+        return;
+      }
+
+      if (requestedAgent && requestedAgent !== agente) {
+        return;
+      }
+
+      setOpen(true);
+    });
+
+    applyUiConfig(state.ui);
+    while (queue.length) {
+      setContext(queue.shift());
+    }
+
+    window.InfraChat = {
+      __queue: queue,
+      setContext: setContext,
+    };
+
+    renderMessages();
+    void loadRemoteConfig();
+  });
+})();

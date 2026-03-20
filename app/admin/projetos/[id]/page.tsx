@@ -21,6 +21,12 @@ type ApiCampo = {
   descricao: string;
 };
 
+type ApiParametro = {
+  nome: string;
+  tipo: "string" | "number" | "boolean";
+  obrigatorio: boolean;
+};
+
 type Api = {
   id: string;
   projetoId: string | null;
@@ -32,6 +38,7 @@ type Api = {
   createdAt: string;
   updatedAt: string;
   campos: ApiCampo[];
+  parametros: ApiParametro[];
 };
 
 type Agente = {
@@ -77,6 +84,26 @@ function summarizeApiFields(campos: ApiCampo[], limit = 6) {
   return `${labels.join(", ")} +${campos.length - limit}`;
 }
 
+function mergeDetectedApiCampos(campos: ApiCampo[], parametros: ApiParametro[]) {
+  const map = new Map<string, ApiCampo>();
+
+  for (const campo of campos) {
+    map.set(campo.nome, campo);
+  }
+
+  for (const parametro of parametros) {
+    if (!map.has(parametro.nome)) {
+      map.set(parametro.nome, {
+        nome: parametro.nome,
+        tipo: parametro.tipo,
+        descricao: "",
+      });
+    }
+  }
+
+  return Array.from(map.values()).sort((left, right) => left.nome.localeCompare(right.nome, "pt-BR"));
+}
+
 type AgenteFormState = {
   id?: string;
   projetoId: string;
@@ -97,6 +124,7 @@ type ApiFormState = {
   descricao: string;
   ativo: boolean;
   campos: ApiCampo[];
+  parametros: ApiParametro[];
 };
 
 type ApiCampoTreeNode = {
@@ -142,6 +170,7 @@ const emptyApiForm: ApiFormState = {
   descricao: "",
   ativo: true,
   campos: [],
+  parametros: [],
 };
 
 function buildApiCampoTree(campos: ApiCampo[]): ApiCampoTreeNode[] {
@@ -193,12 +222,20 @@ function buildApiCampoTree(campos: ApiCampo[]): ApiCampoTreeNode[] {
 function ApiCampoTree({
   nodes,
   selectedNames,
+  parameterNames,
+  requiredNames,
   onToggleCampo,
+  onToggleParametro,
+  onToggleObrigatorio,
   depth = 0,
 }: {
   nodes: ApiCampoTreeNode[];
   selectedNames: Set<string>;
+  parameterNames: Set<string>;
+  requiredNames: Set<string>;
   onToggleCampo: (campo: ApiCampo) => void;
+  onToggleParametro: (campo: ApiCampo) => void;
+  onToggleObrigatorio: (campo: ApiCampo) => void;
   depth?: number;
 }) {
   return (
@@ -206,27 +243,77 @@ function ApiCampoTree({
       {nodes.map((node) => {
         const isLeaf = Boolean(node.fullPath && node.tipo);
         const isChecked = node.fullPath ? selectedNames.has(node.fullPath) : false;
+        const isParameter = node.fullPath ? parameterNames.has(node.fullPath) : false;
+        const isRequired = node.fullPath ? requiredNames.has(node.fullPath) : false;
 
         return (
           <div key={node.key}>
             <div
-              className="flex items-center gap-2 rounded-md px-1.5 py-0.5 text-[13px] text-slate-300"
+              className="grid grid-cols-[minmax(0,1fr)_110px_150px_110px] items-center gap-2 rounded-md px-1.5 py-1 text-[13px] text-slate-300"
               style={{ paddingLeft: `${depth * 12 + 6}px` }}
             >
+              <div className="flex min-w-0 items-center gap-2">
+                {isLeaf ? (
+                  <span className="inline-block h-3.5 w-3.5 rounded-sm border border-cyan-500/20 bg-cyan-500/10" />
+                ) : (
+                  <span className="inline-block h-3.5 w-3.5 rounded-sm border border-white/10 bg-white/[0.03]" />
+                )}
+                <span className={isLeaf ? "truncate font-medium text-white" : "truncate font-medium text-slate-300"}>{node.label}</span>
+                {isLeaf ? <span className="rounded bg-slate-800/80 px-1.5 py-0 text-[10px] uppercase tracking-[0.14em] text-cyan-200">{node.tipo}</span> : null}
+              </div>
               {isLeaf ? (
-                <input
-                  type="checkbox"
-                  checked={isChecked}
-                  onChange={() => onToggleCampo({ nome: node.fullPath!, tipo: node.tipo!, descricao: "" })}
-                  className="h-3.5 w-3.5"
-                />
+                <label className="inline-flex items-center gap-2 text-xs text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => onToggleCampo({ nome: node.fullPath!, tipo: node.tipo!, descricao: "" })}
+                    className="h-3.5 w-3.5"
+                  />
+                  usar na IA
+                </label>
               ) : (
-                <span className="inline-block h-3.5 w-3.5 rounded-sm border border-white/10 bg-white/[0.03]" />
+                <span />
               )}
-              <span className={isLeaf ? "font-medium text-white" : "font-medium text-slate-300"}>{node.label}</span>
-              {isLeaf ? <span className="rounded bg-slate-800/80 px-1.5 py-0 text-[10px] uppercase tracking-[0.14em] text-cyan-200">{node.tipo}</span> : null}
+              {isLeaf ? (
+                <label className="inline-flex items-center gap-2 text-xs text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={isParameter}
+                    onChange={() => onToggleParametro({ nome: node.fullPath!, tipo: node.tipo!, descricao: "" })}
+                    className="h-3.5 w-3.5"
+                  />
+                  usar como parametro
+                </label>
+              ) : (
+                <span />
+              )}
+              {isLeaf ? (
+                <label className="inline-flex items-center gap-2 text-xs text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={isRequired}
+                    disabled={!isParameter}
+                    onChange={() => onToggleObrigatorio({ nome: node.fullPath!, tipo: node.tipo!, descricao: "" })}
+                    className="h-3.5 w-3.5"
+                  />
+                  obrigatorio
+                </label>
+              ) : (
+                <span />
+              )}
             </div>
-            {node.children.length ? <ApiCampoTree nodes={node.children} selectedNames={selectedNames} onToggleCampo={onToggleCampo} depth={depth + 1} /> : null}
+            {node.children.length ? (
+              <ApiCampoTree
+                nodes={node.children}
+                selectedNames={selectedNames}
+                parameterNames={parameterNames}
+                requiredNames={requiredNames}
+                onToggleCampo={onToggleCampo}
+                onToggleParametro={onToggleParametro}
+                onToggleObrigatorio={onToggleObrigatorio}
+                depth={depth + 1}
+              />
+            ) : null}
           </div>
         );
       })}
@@ -344,6 +431,8 @@ function ApiModal({
   onClose,
   onChange,
   onToggleCampo,
+  onToggleParametro,
+  onToggleObrigatorio,
   onSubmit,
   onTest,
 }: {
@@ -356,6 +445,8 @@ function ApiModal({
   onClose: () => void;
   onChange: (next: Partial<ApiFormState>) => void;
   onToggleCampo: (campo: ApiCampo) => void;
+  onToggleParametro: (campo: ApiCampo) => void;
+  onToggleObrigatorio: (campo: ApiCampo) => void;
   onSubmit: () => void;
   onTest: () => void;
 }) {
@@ -365,6 +456,8 @@ function ApiModal({
 
   const campoTree = buildApiCampoTree(detectedApiCampos);
   const selectedCampoNames = new Set(form.campos.map((campo) => campo.nome));
+  const parameterNames = new Set(form.parametros.map((parametro) => parametro.nome));
+  const requiredNames = new Set(form.parametros.filter((parametro) => parametro.obrigatorio).map((parametro) => parametro.nome));
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
@@ -408,12 +501,37 @@ function ApiModal({
 
               <div className="mt-3 max-h-[44vh] overflow-y-auto rounded-lg border border-white/8 bg-white/[0.02] p-2">
                 {campoTree.length ? (
-                  <ApiCampoTree nodes={campoTree} selectedNames={selectedCampoNames} onToggleCampo={onToggleCampo} />
+                  <ApiCampoTree
+                    nodes={campoTree}
+                    selectedNames={selectedCampoNames}
+                    parameterNames={parameterNames}
+                    requiredNames={requiredNames}
+                    onToggleCampo={onToggleCampo}
+                    onToggleParametro={onToggleParametro}
+                    onToggleObrigatorio={onToggleObrigatorio}
+                  />
                 ) : (
                   <p className="text-sm text-slate-400">Teste a API para detectar automaticamente campos simples e aninhados.</p>
                 )}
               </div>
             </div>
+            {form.parametros.length ? (
+              <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
+                <p className="text-sm font-semibold text-white">Parametros configurados</p>
+                <div className="mt-3 space-y-2">
+                  {form.parametros.map((parametro) => (
+                    <div key={parametro.nome} className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-slate-300">
+                      <span>
+                        {parametro.nome} ({parametro.tipo})
+                      </span>
+                      <span className={parametro.obrigatorio ? "text-amber-200" : "text-slate-500"}>
+                        {parametro.obrigatorio ? "obrigatorio" : "opcional"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             </div>
           </div>
 
@@ -572,12 +690,19 @@ export default function AdminProjetoDetalhePage() {
     const message = apiForm.id ? "API atualizada com sucesso." : "API criada com sucesso.";
     if (payload.api) {
       setDetectedApiCampos(
-        payload.api.campos.map((campo) => ({
-          id: campo.id,
-          nome: campo.nome,
-          tipo: campo.tipo,
-          descricao: campo.descricao,
-        })),
+        mergeDetectedApiCampos(
+          payload.api.campos.map((campo) => ({
+            id: campo.id,
+            nome: campo.nome,
+            tipo: campo.tipo,
+            descricao: campo.descricao,
+          })),
+          payload.api.parametros.map((parametro) => ({
+            nome: parametro.nome,
+            tipo: parametro.tipo,
+            obrigatorio: parametro.obrigatorio,
+          })),
+        ),
       );
       setApiForm({
         id: payload.api.id,
@@ -591,6 +716,11 @@ export default function AdminProjetoDetalhePage() {
           nome: campo.nome,
           tipo: campo.tipo,
           descricao: campo.descricao,
+        })),
+        parametros: payload.api.parametros.map((parametro) => ({
+          nome: parametro.nome,
+          tipo: parametro.tipo,
+          obrigatorio: parametro.obrigatorio,
         })),
       });
     } else {
@@ -638,12 +768,19 @@ export default function AdminProjetoDetalhePage() {
       }
 
       setDetectedApiCampos(
-        payload.api.campos.map((campo) => ({
-          id: campo.id,
-          nome: campo.nome,
-          tipo: campo.tipo,
-          descricao: campo.descricao,
-        })),
+        mergeDetectedApiCampos(
+          payload.api.campos.map((campo) => ({
+            id: campo.id,
+            nome: campo.nome,
+            tipo: campo.tipo,
+            descricao: campo.descricao,
+          })),
+          payload.api.parametros.map((parametro) => ({
+            nome: parametro.nome,
+            tipo: parametro.tipo,
+            obrigatorio: parametro.obrigatorio,
+          })),
+        ),
       );
       setApiForm({
         id: payload.api.id,
@@ -658,6 +795,11 @@ export default function AdminProjetoDetalhePage() {
           tipo: campo.tipo,
           descricao: campo.descricao,
         })),
+        parametros: payload.api.parametros.map((parametro) => ({
+          nome: parametro.nome,
+          tipo: parametro.tipo,
+          obrigatorio: parametro.obrigatorio,
+        })),
       });
       await loadProjeto();
       setFeedbackApi("API testada e campos detectados com sucesso.");
@@ -670,12 +812,19 @@ export default function AdminProjetoDetalhePage() {
 
   const handleEditApi = (api: Api) => {
     setDetectedApiCampos(
-      api.campos.map((campo) => ({
-        id: campo.id,
-        nome: campo.nome,
-        tipo: campo.tipo,
-        descricao: campo.descricao,
-      })),
+      mergeDetectedApiCampos(
+        api.campos.map((campo) => ({
+          id: campo.id,
+          nome: campo.nome,
+          tipo: campo.tipo,
+          descricao: campo.descricao,
+        })),
+        api.parametros.map((parametro) => ({
+          nome: parametro.nome,
+          tipo: parametro.tipo,
+          obrigatorio: parametro.obrigatorio,
+        })),
+      ),
     );
     setApiForm({
       id: api.id,
@@ -689,6 +838,11 @@ export default function AdminProjetoDetalhePage() {
         nome: campo.nome,
         tipo: campo.tipo,
         descricao: campo.descricao,
+      })),
+      parametros: api.parametros.map((parametro) => ({
+        nome: parametro.nome,
+        tipo: parametro.tipo,
+        obrigatorio: parametro.obrigatorio,
       })),
     });
     setFeedbackApi(null);
@@ -722,6 +876,45 @@ export default function AdminProjetoDetalhePage() {
       return {
         ...prev,
         campos: exists ? prev.campos.filter((item) => item.nome !== campo.nome) : [...prev.campos, campo],
+      };
+    });
+  };
+
+  const toggleApiParametro = (campo: ApiCampo) => {
+    setApiForm((prev) => {
+      const exists = prev.parametros.some((item) => item.nome === campo.nome);
+      return {
+        ...prev,
+        parametros: exists
+          ? prev.parametros.filter((item) => item.nome !== campo.nome)
+          : [
+              ...prev.parametros,
+              {
+                nome: campo.nome,
+                tipo: campo.tipo,
+                obrigatorio: false,
+              },
+            ],
+      };
+    });
+  };
+
+  const toggleApiParametroObrigatorio = (campo: ApiCampo) => {
+    setApiForm((prev) => {
+      if (!prev.parametros.some((item) => item.nome === campo.nome)) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        parametros: prev.parametros.map((item) =>
+          item.nome === campo.nome
+            ? {
+                ...item,
+                obrigatorio: !item.obrigatorio,
+              }
+            : item,
+        ),
       };
     });
   };
@@ -864,6 +1057,10 @@ export default function AdminProjetoDetalhePage() {
                           <span className="block text-[10px] uppercase tracking-[0.16em] text-slate-500">Campos</span>
                           <span className="mt-1 block font-semibold text-white">{api.campos.length}</span>
                         </div>
+                        <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2">
+                          <span className="block text-[10px] uppercase tracking-[0.16em] text-slate-500">Parametros</span>
+                          <span className="mt-1 block font-semibold text-white">{api.parametros.length}</span>
+                        </div>
                         <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2 sm:col-span-2">
                           <span className="block text-[10px] uppercase tracking-[0.16em] text-slate-500">Resumo</span>
                           <span className="mt-1 block text-cyan-200/80">
@@ -871,6 +1068,11 @@ export default function AdminProjetoDetalhePage() {
                           </span>
                         </div>
                       </div>
+                      {api.parametros.length ? (
+                        <p className="mt-2 text-xs text-amber-200/80">
+                          Parametros: {api.parametros.map((parametro) => `${parametro.nome}${parametro.obrigatorio ? "*" : ""}`).join(", ")}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => handleEditApi(api)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200">
@@ -947,6 +1149,8 @@ export default function AdminProjetoDetalhePage() {
         }}
         onChange={(next) => setApiForm((prev) => ({ ...prev, ...next }))}
         onToggleCampo={toggleApiCampo}
+        onToggleParametro={toggleApiParametro}
+        onToggleObrigatorio={toggleApiParametroObrigatorio}
         onSubmit={() => void handleApiSubmit()}
         onTest={() => void handleTestApi()}
       />

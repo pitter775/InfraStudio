@@ -1,15 +1,80 @@
 import { NextResponse } from "next/server";
 import { appendMessage, createChat, getChatById, getChatContext, listChatMessages, updateChatContext, updateChatStats } from "@/lib/chats";
 import { enrichLeadContext, generateSalesReply, shouldRefreshSummary, summarizeConversation } from "@/lib/chat-orchestrator";
-import { getAgenteAtivo, getAgenteById } from "@/lib/agentes";
-import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetBySlug } from "@/lib/chat-widgets";
-import { getProjetoById, getProjetoBySlug } from "@/lib/projetos";
+import { getAgenteAtivo, getAgenteById, getAgenteByIdentifier } from "@/lib/agentes";
+import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetByProjetoAgente, getChatWidgetBySlug } from "@/lib/chat-widgets";
+import { getProjetoById, getProjetoByIdentifier, getProjetoBySlug } from "@/lib/projetos";
 
 type ChatRequestBody = {
   chatId?: string;
   message?: string;
+  projeto?: string;
+  agente?: string;
+  context?: Record<string, unknown> | null;
   widgetSlug?: string;
 };
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeContext(base: Record<string, unknown>, extra?: Record<string, unknown> | null) {
+  if (!extra) {
+    return base;
+  }
+
+  return {
+    ...base,
+    ...extra,
+  };
+}
+
+async function resolveChatChannel(body: ChatRequestBody) {
+  const projetoIdentifier = body.projeto?.trim() || null;
+  const agenteIdentifier = body.agente?.trim() || null;
+
+  if (projetoIdentifier) {
+    const projeto = await getProjetoByIdentifier(projetoIdentifier);
+    let agente = agenteIdentifier
+      ? await getAgenteByIdentifier(agenteIdentifier, projeto?.id ?? null)
+      : null;
+
+    if (!agente && projeto) {
+      agente = await getAgenteAtivo(projeto.id);
+    }
+
+    const widget = projeto ? await getChatWidgetByProjetoAgente({ projetoId: projeto.id, agenteId: agente?.id ?? null }) : null;
+
+    return {
+      projeto,
+      agente,
+      widget,
+      channel: {
+        projeto: projetoIdentifier,
+        agente: agenteIdentifier,
+      },
+    };
+  }
+
+  const widgetSlug = body.widgetSlug?.trim() || DEFAULT_HOME_WIDGET_SLUG;
+  const widget = await getChatWidgetBySlug(widgetSlug);
+  const projeto = widget?.projetoId ? await getProjetoById(widget.projetoId) : await getProjetoBySlug("infrastudio");
+  const agente =
+    widget?.agenteId && projeto
+      ? await getAgenteById(widget.agenteId)
+      : projeto
+        ? await getAgenteAtivo(projeto.id)
+        : null;
+
+  return {
+    projeto,
+    agente,
+    widget,
+    channel: {
+      widgetSlug,
+    },
+  };
+}
 
 function buildCorsHeaders(origin: string | null) {
   return {
@@ -41,38 +106,40 @@ export async function POST(request: Request) {
     let chat = body.chatId ? await getChatById(body.chatId) : null;
 
     if (!chat) {
-      const widgetSlug = body.widgetSlug?.trim() || DEFAULT_HOME_WIDGET_SLUG;
-      const widget = await getChatWidgetBySlug(widgetSlug);
-      const projeto = widget?.projetoId ? await getProjetoById(widget.projetoId) : await getProjetoBySlug("infrastudio");
-      const agente =
-        widget?.agenteId && projeto
-          ? await getAgenteById(widget.agenteId)
-          : projeto
-            ? await getAgenteAtivo(projeto.id)
-            : null;
+      const resolved = await resolveChatChannel(body);
+      const extraContext = isPlainObject(body.context) ? body.context : null;
+      const baseContext = {
+        source: "site_widget",
+        canal: "site",
+        objetivo: "captacao_comercial",
+        widget: resolved.widget
+          ? {
+              slug: resolved.widget.slug,
+              nome: resolved.widget.nome,
+            }
+          : null,
+        projeto: {
+          id: resolved.projeto?.id ?? null,
+          slug: resolved.projeto?.slug ?? (body.projeto?.trim() || "infrastudio"),
+          nome: resolved.projeto?.nome ?? "InfraStudio",
+        },
+        agente: {
+          id: resolved.agente?.id ?? null,
+          slug: resolved.agente?.slug ?? body.agente?.trim() ?? null,
+          nome: resolved.agente?.nome ?? null,
+        },
+        sdk: {
+          version: "1",
+          channel: "chat.js",
+        },
+        channel: resolved.channel,
+      };
 
       chat = await createChat({
         titulo: message.length > 60 ? `${message.slice(0, 57)}...` : message,
-        projetoId: projeto?.id ?? null,
-        agenteId: agente?.id ?? null,
-        contexto: {
-          source: "site_widget",
-          canal: "site",
-          objetivo: "captacao_comercial",
-          widget: {
-            slug: widget?.slug ?? widgetSlug,
-            nome: widget?.nome ?? "Chat",
-          },
-          projeto: {
-            id: projeto?.id ?? null,
-            slug: projeto?.slug ?? "infrastudio",
-            nome: projeto?.nome ?? "InfraStudio",
-          },
-          agente: {
-            id: agente?.id ?? null,
-            nome: agente?.nome ?? null,
-          },
-        },
+        projetoId: resolved.projeto?.id ?? null,
+        agenteId: resolved.agente?.id ?? null,
+        contexto: mergeContext(baseContext, extraContext),
       });
     }
 
@@ -100,9 +167,11 @@ export async function POST(request: Request) {
     }
 
     const history = await listChatMessages(chat.id);
-    const currentContext = getChatContext(chat);
+    const currentContext = getChatContext(chat) as Record<string, unknown>;
+    const extraContext = isPlainObject(body.context) ? body.context : null;
+    const mergedCurrentContext = mergeContext(currentContext, extraContext);
     const nextContext = enrichLeadContext(
-      currentContext,
+      mergedCurrentContext,
       history.map((item) => ({ role: item.role, content: item.conteudo })),
       message,
     );

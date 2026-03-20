@@ -85,6 +85,52 @@ export async function getChatWidgetBySlug(slug: string) {
   return mapChatWidget(data as ChatWidgetRow);
 }
 
+export async function getChatWidgetByProjetoAgente(input: {
+  projetoId: string;
+  agenteId?: string | null;
+}) {
+  const supabase = getSupabaseAdminClient();
+
+  if (input.agenteId) {
+    const { data, error } = await supabase
+      .from("chat_widgets")
+      .select("id, nome, slug, projeto_id, agente_id, dominio, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
+      .eq("projeto_id", input.projetoId)
+      .eq("agente_id", input.agenteId)
+      .eq("ativo", true)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (data) {
+      return mapChatWidget(data as ChatWidgetRow);
+    }
+
+    if (error) {
+      console.error("[chat-widgets] failed to load widget by projeto/agente", error);
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("chat_widgets")
+    .select("id, nome, slug, projeto_id, agente_id, dominio, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
+    .eq("projeto_id", input.projetoId)
+    .is("agente_id", null)
+    .eq("ativo", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) {
+    if (error) {
+      console.error("[chat-widgets] failed to load fallback widget by projeto", error);
+    }
+    return null;
+  }
+
+  return mapChatWidget(data as ChatWidgetRow);
+}
+
 export async function createChatWidget(input: {
   nome: string;
   slug: string;

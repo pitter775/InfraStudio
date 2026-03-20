@@ -8,6 +8,12 @@ export type ApiCampoInput = {
   descricao?: string | null;
 };
 
+export type ApiParametroInput = {
+  nome: string;
+  tipo: "string" | "number" | "boolean";
+  obrigatorio?: boolean;
+};
+
 export type ApiCampoRecord = {
   id: string;
   apiId: string;
@@ -28,6 +34,7 @@ export type ApiRecord = {
   createdAt: string;
   updatedAt: string;
   campos: ApiCampoRecord[];
+  parametros: ApiParametroInput[];
 };
 
 export type ApiRuntimeField = {
@@ -44,6 +51,7 @@ export type ApiRuntimeContext = {
   campos: ApiRuntimeField[];
   resumo: string;
   erro: string | null;
+  parametros: ApiParametroInput[];
 };
 
 type ApiCampoRow = {
@@ -65,8 +73,57 @@ type ApiRow = {
   ativo: boolean | null;
   created_at: string | null;
   updated_at: string | null;
+  configuracoes: Record<string, unknown> | null;
   api_campos?: ApiCampoRow[] | null;
 };
+
+function sanitizeParametros(parametros: ApiParametroInput[]) {
+  const seen = new Set<string>();
+
+  return parametros
+    .map((parametro) => ({
+      nome: parametro.nome.trim(),
+      tipo: parametro.tipo,
+      obrigatorio: parametro.obrigatorio === true,
+    }))
+    .filter((parametro) => {
+      if (!parametro.nome || seen.has(parametro.nome.toLowerCase())) {
+        return false;
+      }
+
+      seen.add(parametro.nome.toLowerCase());
+      return true;
+    });
+}
+
+function mapParametros(configuracoes: Record<string, unknown> | null | undefined) {
+  const raw = configuracoes?.parametros;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return sanitizeParametros(
+    raw.flatMap((parametro) => {
+      if (!parametro || typeof parametro !== "object" || Array.isArray(parametro)) {
+        return [];
+      }
+
+      const item = parametro as Record<string, unknown>;
+      const nome = typeof item.nome === "string" ? item.nome : "";
+      const tipo = item.tipo === "number" || item.tipo === "boolean" ? item.tipo : "string";
+
+      return nome
+        ? [
+            {
+              nome,
+              tipo,
+              obrigatorio: item.obrigatorio === true,
+            } satisfies ApiParametroInput,
+          ]
+        : [];
+    }),
+  );
+}
 
 function mapApiCampo(row: ApiCampoRow): ApiCampoRecord {
   return {
@@ -91,6 +148,7 @@ function mapApi(row: ApiRow): ApiRecord {
     createdAt: row.created_at ?? new Date().toISOString(),
     updatedAt: row.updated_at ?? row.created_at ?? new Date().toISOString(),
     campos: (row.api_campos ?? []).map((campo) => mapApiCampo(campo)),
+    parametros: mapParametros(row.configuracoes),
   };
 }
 
@@ -170,8 +228,13 @@ function formatRuntimeSummary(api: ApiRecord, campos: ApiRuntimeField[]) {
   return text.length > 3500 ? `${text.slice(0, 3497)}...` : text;
 }
 
-async function fetchApiPayload(api: ApiRecord) {
-  const response = await fetch(api.url, {
+async function fetchApiPayload(api: ApiRecord, context?: Record<string, unknown> | null) {
+  const resolved = buildApiUrlWithParameters(api, context);
+  if (resolved.error) {
+    throw new Error(resolved.error);
+  }
+
+  const response = await fetch(resolved.url, {
     method: "GET",
     headers: { Accept: "application/json" },
     cache: "no-store",
@@ -182,7 +245,61 @@ async function fetchApiPayload(api: ApiRecord) {
     throw new Error(`A requisicao retornou status ${response.status}.`);
   }
 
-  return (await response.json()) as unknown;
+  return {
+    payload: (await response.json()) as unknown,
+    url: resolved.url,
+  };
+}
+
+function stringifyParameterValue(value: string | number | boolean) {
+  return typeof value === "string" ? value : String(value);
+}
+
+function resolveParameterValue(context: Record<string, unknown> | null | undefined, nome: string) {
+  if (!context) {
+    return null;
+  }
+
+  const direct = context[nome];
+  if (typeof direct === "string" || typeof direct === "number" || typeof direct === "boolean") {
+    return direct;
+  }
+
+  const resolved = resolveFieldValue(context, nome);
+  if (typeof resolved === "string" || typeof resolved === "number" || typeof resolved === "boolean") {
+    return resolved;
+  }
+
+  return null;
+}
+
+function buildApiUrlWithParameters(api: ApiRecord, context: Record<string, unknown> | null | undefined) {
+  const missing = api.parametros
+    .filter((parametro) => parametro.obrigatorio && resolveParameterValue(context, parametro.nome) === null)
+    .map((parametro) => parametro.nome);
+
+  if (missing.length) {
+    return {
+      url: api.url,
+      error: `Parametros obrigatorios ausentes: ${missing.join(", ")}.`,
+    };
+  }
+
+  let nextUrl = api.url;
+  for (const parametro of api.parametros) {
+    const value = resolveParameterValue(context, parametro.nome);
+    if (value === null) {
+      continue;
+    }
+
+    const encoded = encodeURIComponent(stringifyParameterValue(value));
+    nextUrl = nextUrl.replace(new RegExp(`\\{${parametro.nome}\\}`, "g"), encoded);
+  }
+
+  return {
+    url: nextUrl,
+    error: null,
+  };
 }
 
 function pickRuntimeFields(api: ApiRecord, payload: unknown) {
@@ -318,7 +435,7 @@ export async function listApis(projetoId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("apis")
-    .select("id, projeto_id, nome, url, metodo, descricao, ativo, created_at, updated_at, api_campos(id, api_id, nome, tipo, descricao, created_at)")
+    .select("id, projeto_id, nome, url, metodo, descricao, ativo, created_at, updated_at, configuracoes, api_campos(id, api_id, nome, tipo, descricao, created_at)")
     .eq("projeto_id", projetoId)
     .order("created_at", { ascending: true });
 
@@ -339,7 +456,7 @@ export async function listApisByIds(ids: string[]) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("apis")
-    .select("id, projeto_id, nome, url, metodo, descricao, ativo, created_at, updated_at, api_campos(id, api_id, nome, tipo, descricao, created_at)")
+    .select("id, projeto_id, nome, url, metodo, descricao, ativo, created_at, updated_at, configuracoes, api_campos(id, api_id, nome, tipo, descricao, created_at)")
     .in("id", sanitizedIds)
     .order("created_at", { ascending: true });
 
@@ -355,7 +472,7 @@ export async function getApiById(id: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("apis")
-    .select("id, projeto_id, nome, url, metodo, descricao, ativo, created_at, updated_at, api_campos(id, api_id, nome, tipo, descricao, created_at)")
+    .select("id, projeto_id, nome, url, metodo, descricao, ativo, created_at, updated_at, configuracoes, api_campos(id, api_id, nome, tipo, descricao, created_at)")
     .eq("id", id)
     .maybeSingle();
 
@@ -377,6 +494,7 @@ export async function createApi(input: {
   descricao?: string | null;
   ativo?: boolean;
   campos?: ApiCampoInput[];
+  parametros?: ApiParametroInput[];
 }) {
   const supabase = getSupabaseAdminClient();
   const now = new Date().toISOString();
@@ -389,10 +507,13 @@ export async function createApi(input: {
       metodo: sanitizeMetodo(input.metodo),
       descricao: input.descricao?.trim() || null,
       ativo: input.ativo ?? true,
+      configuracoes: {
+        parametros: sanitizeParametros(input.parametros ?? []),
+      },
       created_at: now,
       updated_at: now,
     } as never)
-    .select("id, projeto_id, nome, url, metodo, descricao, ativo, created_at, updated_at, api_campos(id, api_id, nome, tipo, descricao, created_at)")
+    .select("id, projeto_id, nome, url, metodo, descricao, ativo, created_at, updated_at, configuracoes, api_campos(id, api_id, nome, tipo, descricao, created_at)")
     .single();
 
   if (error || !data) {
@@ -417,8 +538,10 @@ export async function updateApi(input: {
   descricao?: string | null;
   ativo?: boolean;
   campos?: ApiCampoInput[];
+  parametros?: ApiParametroInput[];
 }) {
   const supabase = getSupabaseAdminClient();
+  const { data: current } = await supabase.from("apis").select("configuracoes").eq("id", input.id).maybeSingle<{ configuracoes: Record<string, unknown> | null }>();
   const { data, error } = await supabase
     .from("apis")
     .update({
@@ -427,10 +550,14 @@ export async function updateApi(input: {
       metodo: sanitizeMetodo(input.metodo),
       descricao: input.descricao?.trim() || null,
       ativo: input.ativo ?? true,
+      configuracoes: {
+        ...(current?.configuracoes ?? {}),
+        parametros: sanitizeParametros(input.parametros ?? []),
+      },
       updated_at: new Date().toISOString(),
     } as never)
     .eq("id", input.id)
-    .select("id, projeto_id, nome, url, metodo, descricao, ativo, created_at, updated_at, api_campos(id, api_id, nome, tipo, descricao, created_at)")
+    .select("id, projeto_id, nome, url, metodo, descricao, ativo, created_at, updated_at, configuracoes, api_campos(id, api_id, nome, tipo, descricao, created_at)")
     .single();
 
   if (error || !data) {
@@ -578,7 +705,7 @@ export async function syncAgenteApis(agenteId: string, projetoId: string, apiIds
   return true;
 }
 
-export async function buildAgenteApiRuntimeContext(agenteId: string) {
+export async function buildAgenteApiRuntimeContext(agenteId: string, context?: Record<string, unknown> | null) {
   const apiIdsByAgente = await listApiIdsByAgentes([agenteId]);
   const apiIds = apiIdsByAgente.get(agenteId) ?? [];
 
@@ -591,17 +718,18 @@ export async function buildAgenteApiRuntimeContext(agenteId: string) {
   return await Promise.all(
     apis.map(async (api) => {
       try {
-        const payload = await fetchApiPayload(api);
-        const campos = pickRuntimeFields(api, payload);
+        const response = await fetchApiPayload(api, context);
+        const campos = pickRuntimeFields(api, response.payload);
 
         return {
           apiId: api.id,
           nome: api.nome,
-          url: api.url,
+          url: response.url,
           descricao: api.descricao,
           campos,
           resumo: formatRuntimeSummary(api, campos),
           erro: null,
+          parametros: api.parametros,
         } satisfies ApiRuntimeContext;
       } catch (error) {
         const message = error instanceof Error ? error.message : "Nao foi possivel consultar a API.";
@@ -615,6 +743,7 @@ export async function buildAgenteApiRuntimeContext(agenteId: string) {
           campos: [],
           resumo: "",
           erro: message,
+          parametros: api.parametros,
         } satisfies ApiRuntimeContext;
       }
     }),

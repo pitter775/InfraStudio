@@ -134,6 +134,45 @@ export async function getAgenteById(id: string) {
   return agente ?? null;
 }
 
+export async function getAgenteBySlug(slug: string, projetoId?: string | null) {
+  const supabase = getSupabaseAdminClient();
+  let query = supabase
+    .from("agentes")
+    .select("id, slug, nome, descricao, prompt_base, configuracoes, ativo, projeto_id, projetos(nome, slug), modelo_id, created_at")
+    .eq("slug", slug)
+    .limit(1);
+
+  if (projetoId) {
+    query = query.eq("projeto_id", projetoId);
+  }
+
+  const { data, error } = await query.maybeSingle();
+
+  if (error || !data) {
+    if (error) {
+      console.error("[agentes] failed to load agent by slug", error);
+    }
+    return null;
+  }
+
+  const [agente] = await attachApiIds([mapAgente(data as AgenteRow)]);
+  return agente ?? null;
+}
+
+export async function getAgenteByIdentifier(identifier: string, projetoId?: string | null) {
+  const value = identifier.trim();
+  if (!value) {
+    return null;
+  }
+
+  const bySlug = await getAgenteBySlug(value, projetoId);
+  if (bySlug) {
+    return bySlug;
+  }
+
+  return await getAgenteById(value);
+}
+
 async function disableOtherAgents(exceptId: string, projetoId: string | null) {
   if (!projetoId) {
     return;

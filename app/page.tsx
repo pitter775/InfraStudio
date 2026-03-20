@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { AnimatePresence } from "motion/react";
 import { getAuthProviderLabel, getCurrentProjectUser, signInWithProjectAuth, signOutProjectAuth } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
+import { DEFAULT_CHAT_AGENT, DEFAULT_CHAT_PROJECT } from "@/app/_components/home/data";
 import {
   ChatWidget,
   ExternalChatEmbed,
@@ -29,12 +30,9 @@ function HomePageContent() {
   const [chatOpen, setChatOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const authProvider = getAuthProviderLabel();
-  const embeddedWidgetSlug = searchParams.get("widget")?.trim() ?? "";
-  const embeddedWidgetTheme = searchParams.get("theme") === "light" ? "light" : "dark";
-  const embeddedWidgetAccent = searchParams.get("accent")?.trim() || "#2563eb";
-  const embeddedWidgetTransparent = searchParams.get("transparent") !== "false";
-  const embeddedWidgetTitle = searchParams.get("title")?.trim() || "Chat";
-  const externalWidgetTestMode = searchParams.get("embed") === "1" && Boolean(embeddedWidgetSlug);
+  const embeddedProjeto = searchParams.get("projeto")?.trim() || DEFAULT_CHAT_PROJECT;
+  const embeddedAgente = searchParams.get("agente")?.trim() || DEFAULT_CHAT_AGENT;
+  const externalWidgetTestMode = searchParams.get("embed") === "1" && Boolean(embeddedProjeto && embeddedAgente);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -65,7 +63,7 @@ function HomePageContent() {
     if (externalWidgetTestMode) {
       window.dispatchEvent(
         new CustomEvent("infrastudio-chat:open", {
-          detail: { widgetSlug: embeddedWidgetSlug },
+          detail: { projeto: embeddedProjeto, agente: embeddedAgente },
         }),
       );
       return;
@@ -84,13 +82,7 @@ function HomePageContent() {
       />
 
       {externalWidgetTestMode ? (
-        <ExternalChatEmbed
-          widgetSlug={embeddedWidgetSlug}
-          title={embeddedWidgetTitle}
-          theme={embeddedWidgetTheme}
-          accent={embeddedWidgetAccent}
-          transparent={embeddedWidgetTransparent}
-        />
+        <ExternalChatEmbed projeto={embeddedProjeto} agente={embeddedAgente} />
       ) : null}
 
       <HeroSection onOpenChat={openPreferredChat} />

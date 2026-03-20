@@ -5,49 +5,40 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, Lock, LogOut, Menu, MessageCircle, Send, UserRound, X } from "lucide-react";
 import type { AppUser } from "@/lib/app-user";
-import { DEFAULT_CHAT_WIDGET_SLUG } from "@/app/_components/home/data";
+import { DEFAULT_CHAT_AGENT, DEFAULT_CHAT_PROJECT } from "@/app/_components/home/data";
 import { cn } from "@/lib/utils";
 
 export function ExternalChatEmbed({
-  widgetSlug,
-  title,
-  theme,
-  accent,
-  transparent,
+  projeto,
+  agente,
 }: {
-  widgetSlug: string;
-  title: string;
-  theme: "dark" | "light";
-  accent: string;
-  transparent: boolean;
+  projeto: string;
+  agente: string;
 }) {
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
 
-    const scriptId = `infrastudio-embed-script-${widgetSlug}`;
+    const scriptId = `infrastudio-embed-script-${projeto}-${agente}`;
     if (document.getElementById(scriptId)) {
       return;
     }
 
     const script = document.createElement("script");
     script.id = scriptId;
-    script.src = `${window.location.origin}/chat-widget.js`;
+    script.src = `${window.location.origin}/chat.js`;
     script.async = true;
-    script.setAttribute("data-widget", widgetSlug);
-    script.setAttribute("data-title", title);
-    script.setAttribute("data-theme", theme);
-    script.setAttribute("data-accent", accent);
-    script.setAttribute("data-transparent", transparent ? "true" : "false");
+    script.setAttribute("data-projeto", projeto);
+    script.setAttribute("data-agente", agente);
     document.body.appendChild(script);
 
     return () => {
       script.remove();
-      const host = document.getElementById(`infrastudio-chat-widget-root-${widgetSlug}`);
+      const host = document.getElementById(`infrastudio-chat-root-${`${projeto}::${agente}`.replace(/[^a-zA-Z0-9_-]/g, "-")}`);
       host?.remove();
     };
-  }, [accent, theme, title, transparent, widgetSlug]);
+  }, [agente, projeto]);
 
   return null;
 }
@@ -506,7 +497,7 @@ export function ChatWidget({ open, onClose }: ChatWidgetProps) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ chatId, message: trimmed, widgetSlug: DEFAULT_CHAT_WIDGET_SLUG }),
+        body: JSON.stringify({ chatId, message: trimmed, projeto: DEFAULT_CHAT_PROJECT, agente: DEFAULT_CHAT_AGENT }),
       });
 
       const payload = (await response.json()) as { reply?: string; error?: string; chatId?: string };

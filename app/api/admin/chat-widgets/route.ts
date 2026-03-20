@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin } from "@/lib/access";
 import { getAgenteById, listAgentes } from "@/lib/agentes";
+import { listApis } from "@/lib/apis";
 import { createChatWidget, listChatWidgets, updateChatWidget } from "@/lib/chat-widgets";
 import { listProjetos } from "@/lib/projetos";
 import { getSessionUser } from "@/lib/session";
@@ -26,7 +27,15 @@ export async function GET() {
   }
 
   const [widgets, projetos, agentes] = await Promise.all([listChatWidgets(), listProjetos(), listAgentes()]);
-  return NextResponse.json({ widgets, projetos, agentes }, { status: 200 });
+  const apisByProjeto = await Promise.all(
+    projetos.map(async (projeto) => ({
+      projetoId: projeto.id,
+      apis: await listApis(projeto.id),
+    })),
+  );
+  const apis = apisByProjeto.flatMap((item) => item.apis);
+
+  return NextResponse.json({ widgets, projetos, agentes, apis }, { status: 200 });
 }
 
 async function validateAgentProject(projetoId: string | null | undefined, agenteId: string | null | undefined) {

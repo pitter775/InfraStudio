@@ -87,6 +87,20 @@ export async function getProjetoById(id: string) {
   return mapProjeto(data as ProjetoRow);
 }
 
+export async function getProjetoByIdentifier(identifier: string) {
+  const value = identifier.trim();
+  if (!value) {
+    return null;
+  }
+
+  const bySlug = await getProjetoBySlug(value);
+  if (bySlug) {
+    return bySlug;
+  }
+
+  return await getProjetoById(value);
+}
+
 export async function createProjeto(input: {
   nome: string;
   slug?: string | null;

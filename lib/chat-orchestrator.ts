@@ -86,6 +86,40 @@ function singularizeToken(token: string) {
   return token;
 }
 
+function levenshteinDistance(left: string, right: string) {
+  if (left === right) {
+    return 0;
+  }
+
+  if (!left.length) {
+    return right.length;
+  }
+
+  if (!right.length) {
+    return left.length;
+  }
+
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  const current = new Array(right.length + 1).fill(0);
+
+  for (let i = 0; i < left.length; i += 1) {
+    current[0] = i + 1;
+
+    for (let j = 0; j < right.length; j += 1) {
+      const insertion = current[j] + 1;
+      const deletion = previous[j + 1] + 1;
+      const substitution = previous[j] + (left[i] === right[j] ? 0 : 1);
+      current[j + 1] = Math.min(insertion, deletion, substitution);
+    }
+
+    for (let j = 0; j <= right.length; j += 1) {
+      previous[j] = current[j];
+    }
+  }
+
+  return previous[right.length];
+}
+
 function buildSearchTokens(message: string) {
   const stopwords = new Set([
     "qual",
@@ -119,7 +153,16 @@ function buildSearchTokens(message: string) {
     .split(/\W+/)
     .filter((token) => token.length >= 3 && !stopwords.has(token));
 
-  return [...new Set(tokens.flatMap((token) => [token, singularizeToken(token)]).filter(Boolean))];
+  return [
+    ...new Set(
+      tokens
+        .flatMap((token) => {
+          const corrected = correctTokenTypos(token);
+          return [token, corrected, singularizeToken(token), singularizeToken(corrected)];
+        })
+        .filter(Boolean),
+    ),
+  ];
 }
 
 function formatApiFieldLabel(path: string) {
@@ -247,25 +290,7 @@ function shouldUseDirectFieldReply(message: string) {
     "bom",
     "ruim",
   ];
-  const factualSignals = [
-    "matricula",
-    "cartorio",
-    "cep",
-    "rua",
-    "numero",
-    "cidade",
-    "estado",
-    "ocupacao",
-    "status",
-    "data leilao",
-    "data do leilao",
-    "valor minimo",
-    "valor de avaliacao",
-    "quartos",
-    "banheiros",
-    "area total",
-    "area construida",
-  ];
+  const factualSignals = DIRECT_REPLY_FACTUAL_SIGNALS;
   const tokenCount = buildSearchTokens(message).length;
 
   if (blockedSignals.some((signal) => normalized.includes(signal))) {
@@ -326,23 +351,78 @@ const API_FIELD_INTENTS = [
   },
 ];
 
+const API_KEYWORD_GROUPS = [
+  ["endereco", "rua", "numero", "complemento", "cep", "cidade", "estado", "localizacao"],
+  ["valor", "preco", "avaliacao", "minimo", "mercado", "lance", "roi", "lucro"],
+  ["leilao", "data", "status"],
+  ["ocupacao", "ocupado", "desocupado"],
+  ["matricula", "cartorio", "juridico", "documento", "observacoes", "risco", "riscos", "estrategia"],
+  ["quarto", "quartos", "banheiro", "banheiros", "area", "construida", "total", "tipo", "propriedade"],
+  ["resumo", "descricao", "detalhe", "detalhes", "analise"],
+];
+
+const DIRECT_REPLY_FACTUAL_SIGNALS = [
+  "matricula",
+  "cartorio",
+  "cep",
+  "rua",
+  "numero",
+  "cidade",
+  "estado",
+  "ocupacao",
+  "status",
+  "data leilao",
+  "data do leilao",
+  "valor minimo",
+  "valor de avaliacao",
+  "quartos",
+  "banheiros",
+  "area total",
+  "area construida",
+];
+
+const KNOWN_SEARCH_TERMS = [
+  ...new Set([
+    ...API_FIELD_INTENTS.flatMap((intent) => [...intent.triggers, ...intent.targets]),
+    ...API_KEYWORD_GROUPS.flat(),
+    ...DIRECT_REPLY_FACTUAL_SIGNALS.flatMap((signal) => signal.split(/\s+/)),
+  ]),
+];
+
+function correctTokenTypos(token: string) {
+  if (token.length < 4) {
+    return token;
+  }
+
+  let bestMatch = token;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const candidate of KNOWN_SEARCH_TERMS) {
+    if (Math.abs(candidate.length - token.length) > 2) {
+      continue;
+    }
+
+    const distance = levenshteinDistance(token, candidate);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestMatch = candidate;
+    }
+  }
+
+  return bestDistance <= 2 ? bestMatch : token;
+}
+
 function getApiKeywordGroups(message: string) {
   const normalizedMessage = normalizeText(message);
   const directTokens = buildSearchTokens(message);
   const intentTokens = API_FIELD_INTENTS.flatMap((intent) =>
     intent.triggers.some((trigger) => directTokens.includes(trigger) || normalizedMessage.includes(trigger)) ? intent.targets : [],
   );
-  const keywordGroups = [
-    ["endereco", "rua", "numero", "complemento", "cep", "cidade", "estado", "localizacao"],
-    ["valor", "preco", "avaliacao", "minimo", "mercado", "lance", "roi", "lucro"],
-    ["leilao", "data", "status"],
-    ["ocupacao", "ocupado", "desocupado"],
-    ["matricula", "cartorio", "juridico", "documento", "observacoes", "risco", "riscos", "estrategia"],
-    ["quarto", "quartos", "banheiro", "banheiros", "area", "construida", "total", "tipo", "propriedade"],
-    ["resumo", "descricao", "detalhe", "detalhes", "analise"],
-  ];
-
-  const matchedGroup = keywordGroups.find((group) => group.some((keyword) => normalizedMessage.includes(keyword))) ?? [];
+  const matchedGroup =
+    API_KEYWORD_GROUPS.find(
+      (group) =>
+        group.some((keyword) => normalizedMessage.includes(keyword)) || group.some((keyword) => directTokens.includes(keyword)),
+    ) ?? [];
   return {
     directTokens,
     intentTokens: [...new Set(intentTokens.flatMap((token) => [token, singularizeToken(token)]))],
@@ -707,7 +787,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const projectId = context?.projeto?.id ?? null;
   const agentId = context?.agente?.id ?? null;
   const agent = agentId ? await getAgenteById(agentId) : projectId ? await getAgenteAtivo(projectId) : null;
-  const apiContexts = agent?.id ? await buildAgenteApiRuntimeContext(agent.id) : [];
+  const apiContexts = agent?.id ? await buildAgenteApiRuntimeContext(agent.id, (context ?? {}) as Record<string, unknown>) : [];
   const openai = await getProjetoOpenAIConfig(projectId);
   const systemPrompt = buildSystemPrompt(agent);
   const focusedApiContext = buildFocusedApiContext(latestUserMessage, apiContexts);
