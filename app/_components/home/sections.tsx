@@ -13,7 +13,7 @@ import {
   TECH_STACK,
   WHATSAPP_NUMBER,
 } from "@/app/_components/home/data";
-import { ChatDemo } from "@/app/_components/home/interactive";
+import { PremiumHomeChatDemo } from "@/app/_components/home/chat-demo-premium";
 import { cn } from "@/lib/utils";
 
 function ServiceCard({
@@ -185,7 +185,7 @@ export function DemoSection() {
           </div>
 
           <div className="flex w-full justify-center lg:w-1/2 lg:justify-end">
-            <ChatDemo />
+            <PremiumHomeChatDemo />
           </div>
         </div>
       </div>

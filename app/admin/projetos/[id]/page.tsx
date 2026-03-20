@@ -69,6 +69,7 @@ type ChatWidget = {
   projetoId: string | null;
   agenteId: string | null;
   dominio: string;
+  whatsappCelular: string;
   tema: "dark" | "light";
   corPrimaria: string;
   fundoTransparente: boolean;
@@ -93,6 +94,41 @@ type ProjetoDetalhe = {
 type WidgetFormState = ChatWidget & {
   id?: string;
 };
+
+function sanitizePhoneDigits(value: string) {
+  const digits = value.replace(/\D/g, "");
+  const localDigits = digits.startsWith("55") && digits.length > 11 ? digits.slice(2) : digits;
+
+  return localDigits.slice(0, 11);
+}
+
+function formatWhatsAppPhone(value: string) {
+  const digits = sanitizePhoneDigits(value);
+
+  if (!digits) {
+    return "";
+  }
+
+  const area = digits.slice(0, 2);
+  const local = digits.slice(2);
+  let formatted = "+55";
+
+  if (area) {
+    formatted += ` ${area}`;
+  }
+
+  if (local) {
+    if (local.length <= 4) {
+      formatted += ` ${local}`;
+    } else if (local.length <= 8) {
+      formatted += ` ${local.slice(0, 4)}-${local.slice(4)}`;
+    } else {
+      formatted += ` ${local.slice(0, 5)}-${local.slice(5, 9)}`;
+    }
+  }
+
+  return formatted;
+}
 
 function summarizeApiFields(campos: ApiCampo[], limit = 6) {
   const labels = campos.slice(0, limit).map((campo) => campo.nome);
@@ -198,6 +234,7 @@ const emptyWidgetForm: WidgetFormState = {
   projetoId: null,
   agenteId: null,
   dominio: "",
+  whatsappCelular: "",
   tema: "dark",
   corPrimaria: "#2563eb",
   fundoTransparente: true,
@@ -691,6 +728,15 @@ function WidgetModal({
               placeholder="Dominio permitido ou contexto do embed"
               className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
             />
+            <input
+              value={form.whatsappCelular}
+              onChange={(event) => onChange({ whatsappCelular: formatWhatsAppPhone(event.target.value) })}
+              placeholder="+55 11 99999-9999"
+              inputMode="tel"
+              autoComplete="tel"
+              maxLength={17}
+              className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+            />
             <div className="grid gap-4 sm:grid-cols-[0.7fr_0.3fr]">
               <select
                 value={form.tema}
@@ -874,8 +920,9 @@ export default function AdminProjetoDetalhePage() {
     ];
 
     if (requiredParameters.length) {
+      contextLines.push("    // Campos obrigatorios das APIs vinculadas ao agente");
       for (const parametro of requiredParameters) {
-        const placeholder = parametro.tipo === "number" ? "0" : parametro.tipo === "boolean" ? "false" : `'${parametro.nome}-valor'`;
+        const placeholder = parametro.tipo === "number" ? "0" : parametro.tipo === "boolean" ? "false" : "'XXX'";
         contextLines.push(`    ${parametro.nome}: ${placeholder},`);
       }
     } else {
@@ -1032,6 +1079,7 @@ export default function AdminProjetoDetalhePage() {
       },
       body: JSON.stringify({
         ...widgetForm,
+        whatsappCelular: sanitizePhoneDigits(widgetForm.whatsappCelular),
         projetoId: params.id,
       }),
     });
@@ -1173,6 +1221,7 @@ export default function AdminProjetoDetalhePage() {
   const handleEditWidget = (widget: ChatWidget) => {
     setWidgetForm({
       ...widget,
+      whatsappCelular: formatWhatsAppPhone(widget.whatsappCelular),
       projetoId: params.id,
     });
     setFeedbackWidget(null);
@@ -1462,6 +1511,7 @@ export default function AdminProjetoDetalhePage() {
                       <p className="mt-3 text-sm text-slate-300">Projeto: {data.projeto.nome}</p>
                       <p className="mt-1 text-sm text-slate-400">Agente: {agente?.nome ?? "agente ativo do projeto"}</p>
                       <p className="mt-1 text-sm text-slate-400">Dominio/contexto: {widget.dominio || "nao informado"}</p>
+                      <p className="mt-1 text-sm text-slate-400">WhatsApp: {widget.whatsappCelular || "nao informado"}</p>
                       <p className="mt-1 text-sm text-slate-400">Tema: {widget.tema === "light" ? "claro" : "escuro"} | cor: {widget.corPrimaria}</p>
                       <p className="mt-1 text-sm text-slate-400">Fundo: {widget.fundoTransparente ? "transparente" : "solido"}</p>
                       <div className="mt-4 w-full rounded-xl border border-white/10 bg-slate-950/60 p-3">
@@ -1566,7 +1616,15 @@ export default function AdminProjetoDetalhePage() {
           setWidgetModalOpen(false);
           resetWidgetForm();
         }}
-        onChange={(next) => setWidgetForm((prev) => ({ ...prev, ...next, projetoId: params.id }))}
+        onChange={(next) =>
+          setWidgetForm((prev) => ({
+            ...prev,
+            ...next,
+            whatsappCelular:
+              next.whatsappCelular !== undefined ? formatWhatsAppPhone(next.whatsappCelular) : prev.whatsappCelular,
+            projetoId: params.id,
+          }))
+        }
         onSubmit={() => void handleWidgetSubmit()}
       />
     </main>

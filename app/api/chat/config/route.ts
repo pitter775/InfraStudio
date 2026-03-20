@@ -62,6 +62,7 @@ export async function GET(request: Request) {
           theme: widget?.tema ?? null,
           accent: widget?.corPrimaria ?? null,
           transparent: widget?.fundoTransparente ?? null,
+          whatsappCelular: widget?.whatsappCelular ?? null,
         },
       },
       { status: 200, headers: corsHeaders },

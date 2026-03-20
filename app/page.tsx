@@ -28,6 +28,7 @@ function HomePageContent() {
   const searchParams = useSearchParams();
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatDocked, setChatDocked] = useState(false);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const authProvider = getAuthProviderLabel();
   const embeddedProjeto = searchParams.get("projeto")?.trim() || DEFAULT_CHAT_PROJECT;
@@ -106,9 +107,26 @@ function HomePageContent() {
       {!externalWidgetTestMode ? (
         <>
           <AnimatePresence>
-            <ChatWidget open={chatOpen} onClose={() => setChatOpen(false)} />
+            <ChatWidget
+              open={chatOpen}
+              docked={chatDocked}
+              onDockedChange={setChatDocked}
+              onClose={() => {
+                setChatDocked(false);
+                setChatOpen(false);
+              }}
+            />
           </AnimatePresence>
-          <FloatingChatButton open={chatOpen} onToggle={() => setChatOpen((value) => !value)} />
+          <FloatingChatButton
+            open={chatOpen}
+            hidden={chatOpen && chatDocked}
+            onToggle={() => {
+              if (chatOpen) {
+                setChatDocked(false);
+              }
+              setChatOpen((value) => !value);
+            }}
+          />
         </>
       ) : null}
     </div>

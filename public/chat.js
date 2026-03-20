@@ -119,6 +119,7 @@
       ".chat-icon svg { width: 100%; height: 100%; display: block; }",
       "@keyframes chatBubbleIn { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }",
       "@keyframes chatDotsPulse { 0%, 80%, 100% { opacity: .28; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-1px); } }",
+      "@keyframes chatLauncherSwap { 0% { opacity: 0; transform: scale(.72) rotate(-18deg); } 100% { opacity: 1; transform: scale(1) rotate(0deg); } }",
       ".chat-wrap {",
       "  position: fixed;",
       "  right: 24px;",
@@ -139,13 +140,14 @@
       "  --dock-width: 420px;",
       "}",
       ".chat-wrap.docked { right: 0; left: auto; bottom: 0; top: 0; }",
-      ".chat-button { width: 60px; height: 60px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: var(--accent); color: white; cursor: pointer; box-shadow: 0 20px 40px var(--shadow-color); }",
-      ".chat-button .chat-icon { width: 24px; height: 24px; }",
+      ".chat-button { width: 60px; height: 60px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: var(--accent); color: white; cursor: pointer; box-shadow: 0 20px 40px var(--shadow-color); transition: transform .2s ease, background-color .2s ease, box-shadow .2s ease; }",
+      ".chat-button:hover { transform: translateY(-1px) scale(1.02); }",
+      ".chat-button .chat-icon { width: 24px; height: 24px; animation: chatLauncherSwap .22s ease both; }",
       ".chat-button.is-open { background: color-mix(in srgb, var(--accent) 88%, #0f172a 12%); }",
       ".chat-panel { width: min(380px, calc(100vw - 32px)); height: min(620px, calc(100vh - 110px)); display: none; flex-direction: column; overflow: hidden; border-radius: 26px; border: 1px solid var(--header-border); background: var(--panel-bg); color: var(--panel-text); box-shadow: 0 24px 70px var(--shadow-color); backdrop-filter: blur(14px); margin-bottom: 16px; transform-origin: bottom right; animation: chatBubbleIn .22s ease both; }",
       ".chat-panel.open { display: flex; }",
       ".chat-wrap.docked .chat-panel { width: var(--dock-width); height: 100vh; margin-bottom: 0; border-radius: 28px 0 0 28px; border-right: 0; box-shadow: -18px 0 42px var(--shadow-color); }",
-      ".chat-wrap.docked .chat-button { position: fixed; right: 20px; bottom: 20px; }",
+      ".chat-wrap.docked .chat-button { position: fixed; right: 20px; bottom: 20px; opacity: 0; pointer-events: none; transform: scale(.9); }",
       ".chat-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--header-border); }",
       ".chat-title { font-size: 16px; font-weight: 700; color: var(--panel-text); }",
       ".chat-subtitle { margin-top: 4px; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; }",
@@ -166,6 +168,8 @@
       ".chat-rich ul, .chat-rich ol { margin: 0; padding-left: 20px; }",
       ".chat-rich li + li { margin-top: 6px; }",
       ".chat-rich strong { font-weight: 700; color: white; }",
+      ".chat-cta { margin-top: 10px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: white; padding: 10px 14px; font-size: 13px; font-weight: 700; text-decoration: none; transition: transform .18s ease, background-color .18s ease, border-color .18s ease; }",
+      ".chat-cta:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--accent) 20%, transparent); }",
       ".chat-typing { display: inline-flex; width: fit-content; max-width: 88%; align-items: center; gap: 10px; border-radius: 18px; border: 1px solid var(--header-border); background: var(--ai-bg); color: #94a3b8; padding: 12px 14px; animation: chatBubbleIn .22s ease both; }",
       ".chat-typing-dots { display: inline-flex; gap: 4px; }",
       ".chat-typing-dots span { width: 7px; height: 7px; border-radius: 999px; background: currentColor; animation: chatDotsPulse 1.2s infinite ease-in-out; }",
@@ -183,7 +187,7 @@
       ".chat-send .chat-icon { width: 18px; height: 18px; }",
       ".chat-send[disabled] { opacity: 0.6; cursor: wait; }",
       "@media (max-width: 960px) { .chat-wrap.docked .chat-panel { width: 100vw; border-radius: 0; } }",
-      "@media (max-width: 640px) { .chat-wrap { right: 12px; bottom: 12px; } .chat-panel { width: calc(100vw - 24px); height: calc(100vh - 100px); } .chat-wrap.docked .chat-button { right: 12px; bottom: 12px; } }",
+      "@media (max-width: 640px) { .chat-wrap { right: 12px; bottom: 12px; } .chat-panel { width: calc(100vw - 24px); height: calc(100vh - 100px); } .chat-wrap.docked .chat-button { right: 12px; bottom: 12px; opacity: 0; pointer-events: none; transform: scale(.9); } }",
     ].join("");
     shadow.appendChild(style);
 
@@ -319,6 +323,20 @@
         .join("");
     }
 
+    function createWhatsAppButton(cta) {
+      if (!cta || !cta.url) {
+        return null;
+      }
+
+      var link = document.createElement("a");
+      link.className = "chat-cta";
+      link.href = cta.url;
+      link.target = "_blank";
+      link.rel = "noreferrer noopener";
+      link.textContent = cta.label || "Continuar no WhatsApp";
+      return link;
+    }
+
     function persist() {
       try {
         window.localStorage.setItem(
@@ -397,6 +415,12 @@
           var bubble = document.createElement("div");
           bubble.className = "chat-bubble " + (message.isAi ? "ai" : "user");
           bubble.innerHTML = '<div class="chat-rich">' + formatRichText(message.text) + "</div>";
+          if (message.isAi && message.cta && message.cta.url) {
+            var cta = createWhatsAppButton(message.cta);
+            if (cta) {
+              bubble.appendChild(cta);
+            }
+          }
           stack.appendChild(bubble);
         });
       }
@@ -546,12 +570,14 @@
           id: "ai-" + Date.now(),
           text: payload.reply || payload.error || "Nao consegui responder agora.",
           isAi: true,
+          cta: payload.whatsapp && payload.whatsapp.url ? payload.whatsapp : null,
         });
       } catch (error) {
         state.messages.push({
           id: "ai-" + Date.now(),
           text: "Nao consegui responder agora.",
           isAi: true,
+          cta: null,
         });
       } finally {
         persist();
@@ -593,6 +619,12 @@
     });
 
     input.addEventListener("input", autoResizeInput);
+    input.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        void sendMessage(input.value);
+      }
+    });
     window.addEventListener("resize", applyDockLayout);
 
     window.addEventListener("infrastudio-chat:open", function (event) {

@@ -74,14 +74,13 @@ function Sidebar({
         )}
       >
         <div className="flex items-center justify-between px-2">
-            <Link href="/" className="flex items-center gap-3 overflow-hidden rounded-2xl px-2 py-2">
-              <div className="infra-premium-panel flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl">
+            <Link href="/" className="flex items-center gap-3 overflow-hidden px-2 py-2">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center">
                 <img src="/logo.png" alt="InfraStudio" className="h-8 w-8 object-contain" />
               </div>
               {!collapsed ? (
                 <div className="min-w-0">
                   <p className="truncate text-lg font-extrabold text-white">InfraStudio</p>
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-sky-200/55">Premium cockpit</p>
                 </div>
               ) : null}
             </Link>

@@ -258,8 +258,9 @@ export default function AdminProjetosPage() {
     ];
 
     if (requiredParameters.length) {
+      lines.push("    // Campos obrigatorios das APIs vinculadas ao agente");
       for (const parametro of requiredParameters) {
-        const placeholder = parametro.tipo === "number" ? "0" : parametro.tipo === "boolean" ? "false" : `'${parametro.nome}-valor'`;
+        const placeholder = parametro.tipo === "number" ? "0" : parametro.tipo === "boolean" ? "false" : "'XXX'";
         lines.push(`    ${parametro.nome}: ${placeholder},`);
       }
     } else {

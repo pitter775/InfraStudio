@@ -14,6 +14,19 @@ type ChatRequestBody = {
   widgetSlug?: string;
 };
 
+function sanitizePhone(phone: string | null | undefined) {
+  return String(phone || "").replace(/\D/g, "");
+}
+
+function buildWhatsAppLink(phone: string | null | undefined, message: string) {
+  var sanitizedPhone = sanitizePhone(phone);
+  if (!sanitizedPhone) {
+    return null;
+  }
+
+  return "https://wa.me/" + sanitizedPhone + "?text=" + encodeURIComponent(message);
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -136,6 +149,7 @@ export async function POST(request: Request) {
           ? {
               slug: resolved.widget.slug,
               nome: resolved.widget.nome,
+              whatsapp_celular: resolved.widget.whatsappCelular || null,
             }
           : null,
         projeto: {
@@ -264,10 +278,39 @@ export async function POST(request: Request) {
       contexto: nextContext,
     });
 
+    const widgetContext = isPlainObject((nextContext as Record<string, unknown>).widget)
+      ? ((nextContext as Record<string, unknown>).widget as Record<string, unknown>)
+      : null;
+    const widgetPhone =
+      typeof widgetContext?.whatsapp_celular === "string" && widgetContext.whatsapp_celular.trim()
+        ? widgetContext.whatsapp_celular.trim()
+        : null;
+    const shouldShowWhatsappButton =
+      Boolean(widgetPhone) &&
+      (Boolean(nextContext.qualificacao?.pronto_para_whatsapp) || /whats\s?app/i.test(ai.reply));
+    const whatsappMessage = [
+      "Ola! Vim do chat do site",
+      nextContext.projeto?.nome ? "do projeto " + String(nextContext.projeto.nome) : "",
+      ".",
+      "",
+      "Ultima mensagem:",
+      message,
+    ]
+      .join(" ")
+      .replace(/\s+\./g, ".")
+      .trim();
+
     return NextResponse.json(
       {
         chatId: chat.id,
         reply: assistantMessage.conteudo ?? ai.reply,
+        whatsapp: shouldShowWhatsappButton
+          ? {
+              url: buildWhatsAppLink(widgetPhone, whatsappMessage),
+              label: "Continuar no WhatsApp",
+              phone: widgetPhone,
+            }
+          : null,
       },
       { status: 200, headers: corsHeaders },
     );

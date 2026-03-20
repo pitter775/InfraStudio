@@ -57,6 +57,7 @@ CREATE TABLE public.chat_widgets (
   projeto_id uuid,
   agente_id uuid,
   dominio text,
+  whatsapp_celular text,
   ativo boolean NOT NULL DEFAULT true,
   created_at timestamp without time zone NOT NULL DEFAULT now(),
   updated_at timestamp without time zone NOT NULL DEFAULT now(),

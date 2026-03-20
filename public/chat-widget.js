@@ -67,9 +67,11 @@
       ".chat-icon svg { width: 100%; height: 100%; display: block; }",
       "@keyframes chatBubbleIn { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }",
       "@keyframes chatDotsPulse { 0%, 80%, 100% { opacity: .28; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-1px); } }",
+      "@keyframes chatLauncherSwap { 0% { opacity: 0; transform: scale(.72) rotate(-18deg); } 100% { opacity: 1; transform: scale(1) rotate(0deg); } }",
       ".chat-wrap { position: fixed; right: 24px; bottom: 24px; z-index: 2147483000; font-family: Inter, Arial, sans-serif; }",
-      ".chat-button { width: 60px; height: 60px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: " + accent + "; color: white; cursor: pointer; box-shadow: 0 20px 40px " + shadowColor + "; }",
-      ".chat-button .chat-icon { width: 24px; height: 24px; }",
+      ".chat-button { width: 60px; height: 60px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: " + accent + "; color: white; cursor: pointer; box-shadow: 0 20px 40px " + shadowColor + "; transition: transform .2s ease, background-color .2s ease, box-shadow .2s ease; }",
+      ".chat-button:hover { transform: translateY(-1px) scale(1.02); }",
+      ".chat-button .chat-icon { width: 24px; height: 24px; animation: chatLauncherSwap .22s ease both; }",
       ".chat-button.is-open { filter: brightness(.92); }",
       ".chat-panel { width: min(380px, calc(100vw - 32px)); height: min(620px, calc(100vh - 110px)); display: none; flex-direction: column; overflow: hidden; border-radius: 26px; border: 1px solid " + headerBorder + "; background: " + panelBackground + "; color: " + panelText + "; box-shadow: 0 24px 70px " + shadowColor + "; backdrop-filter: blur(14px); margin-bottom: 16px; animation: chatBubbleIn .22s ease both; }",
       ".chat-panel.open { display: flex; }",
@@ -90,6 +92,8 @@
       ".chat-rich ul, .chat-rich ol { margin: 0; padding-left: 20px; }",
       ".chat-rich li + li { margin-top: 6px; }",
       ".chat-rich strong { font-weight: 700; color: white; }",
+      ".chat-cta { margin-top: 10px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid color-mix(in srgb, " + accent + " 30%, transparent); background: color-mix(in srgb, " + accent + " 14%, transparent); color: white; padding: 10px 14px; font-size: 13px; font-weight: 700; text-decoration: none; transition: transform .18s ease, background-color .18s ease, border-color .18s ease; }",
+      ".chat-cta:hover { transform: translateY(-1px); background: color-mix(in srgb, " + accent + " 20%, transparent); }",
       ".chat-typing { display: inline-flex; width: fit-content; max-width: 88%; align-items: center; gap: 10px; border-radius: 18px; border: 1px solid " + headerBorder + "; background: " + aiBubbleBg + "; color: #94a3b8; padding: 12px 14px; animation: chatBubbleIn .22s ease both; }",
       ".chat-typing-dots { display: inline-flex; gap: 4px; }",
       ".chat-typing-dots span { width: 7px; height: 7px; border-radius: 999px; background: currentColor; animation: chatDotsPulse 1.2s infinite ease-in-out; }",
@@ -230,6 +234,20 @@
         .join("");
     }
 
+    function createWhatsAppButton(cta) {
+      if (!cta || !cta.url) {
+        return null;
+      }
+
+      var link = document.createElement("a");
+      link.className = "chat-cta";
+      link.href = cta.url;
+      link.target = "_blank";
+      link.rel = "noreferrer noopener";
+      link.textContent = cta.label || "Continuar no WhatsApp";
+      return link;
+    }
+
     function persist() {
       try {
         window.localStorage.setItem(
@@ -276,6 +294,12 @@
           var bubble = document.createElement("div");
           bubble.className = "chat-bubble " + (message.isAi ? "ai" : "user");
           bubble.innerHTML = '<div class="chat-rich">' + formatRichText(message.text) + "</div>";
+          if (message.isAi && message.cta && message.cta.url) {
+            var cta = createWhatsAppButton(message.cta);
+            if (cta) {
+              bubble.appendChild(cta);
+            }
+          }
           stack.appendChild(bubble);
         });
       }
@@ -347,12 +371,14 @@
           id: "ai-" + Date.now(),
           text: payload.reply || payload.error || "Nao consegui responder agora.",
           isAi: true,
+          cta: payload.whatsapp && payload.whatsapp.url ? payload.whatsapp : null,
         });
       } catch (error) {
         messages.push({
           id: "ai-" + Date.now(),
           text: "Nao consegui responder agora.",
           isAi: true,
+          cta: null,
         });
       } finally {
         persist();
@@ -387,6 +413,12 @@
     });
 
     input.addEventListener("input", autoResizeInput);
+    input.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        void sendMessage(input.value);
+      }
+    });
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();

@@ -11,6 +11,7 @@ export type ChatWidgetRecord = {
   projetoId: string | null;
   agenteId: string | null;
   dominio: string;
+  whatsappCelular: string;
   tema: "dark" | "light";
   corPrimaria: string;
   fundoTransparente: boolean;
@@ -26,6 +27,7 @@ type ChatWidgetRow = {
   projeto_id: string | null;
   agente_id: string | null;
   dominio: string | null;
+  whatsapp_celular: string | null;
   tema: "dark" | "light" | null;
   cor_primaria: string | null;
   fundo_transparente: boolean | null;
@@ -42,6 +44,7 @@ function mapChatWidget(row: ChatWidgetRow): ChatWidgetRecord {
     projetoId: row.projeto_id,
     agenteId: row.agente_id,
     dominio: row.dominio?.trim() || "",
+    whatsappCelular: row.whatsapp_celular?.trim() || "",
     tema: row.tema === "light" ? "light" : "dark",
     corPrimaria: row.cor_primaria?.trim() || "#2563eb",
     fundoTransparente: Boolean(row.fundo_transparente),
@@ -55,7 +58,7 @@ export async function listChatWidgets() {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("chat_widgets")
-    .select("id, nome, slug, projeto_id, agente_id, dominio, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
+    .select("id, nome, slug, projeto_id, agente_id, dominio, whatsapp_celular, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
     .order("created_at", { ascending: true });
 
   if (error || !data) {
@@ -70,7 +73,7 @@ export async function getChatWidgetBySlug(slug: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("chat_widgets")
-    .select("id, nome, slug, projeto_id, agente_id, dominio, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
+    .select("id, nome, slug, projeto_id, agente_id, dominio, whatsapp_celular, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
     .eq("slug", slug)
     .eq("ativo", true)
     .maybeSingle();
@@ -94,7 +97,7 @@ export async function getChatWidgetByProjetoAgente(input: {
   if (input.agenteId) {
     const { data, error } = await supabase
       .from("chat_widgets")
-      .select("id, nome, slug, projeto_id, agente_id, dominio, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
+      .select("id, nome, slug, projeto_id, agente_id, dominio, whatsapp_celular, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
       .eq("projeto_id", input.projetoId)
       .eq("agente_id", input.agenteId)
       .eq("ativo", true)
@@ -113,7 +116,7 @@ export async function getChatWidgetByProjetoAgente(input: {
 
   const { data, error } = await supabase
     .from("chat_widgets")
-    .select("id, nome, slug, projeto_id, agente_id, dominio, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
+    .select("id, nome, slug, projeto_id, agente_id, dominio, whatsapp_celular, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
     .eq("projeto_id", input.projetoId)
     .is("agente_id", null)
     .eq("ativo", true)
@@ -137,6 +140,7 @@ export async function createChatWidget(input: {
   projetoId?: string | null;
   agenteId?: string | null;
   dominio?: string | null;
+  whatsappCelular?: string | null;
   tema?: "dark" | "light";
   corPrimaria?: string | null;
   fundoTransparente?: boolean;
@@ -152,6 +156,7 @@ export async function createChatWidget(input: {
         projeto_id: input.projetoId ?? null,
         agente_id: input.agenteId ?? null,
         dominio: input.dominio?.trim() || null,
+        whatsapp_celular: input.whatsappCelular?.trim() || null,
         tema: input.tema === "light" ? "light" : "dark",
         cor_primaria: input.corPrimaria?.trim() || "#2563eb",
         fundo_transparente: input.fundoTransparente ?? true,
@@ -159,7 +164,7 @@ export async function createChatWidget(input: {
         created_at: now,
         updated_at: now,
     } as never)
-    .select("id, nome, slug, projeto_id, agente_id, dominio, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
+    .select("id, nome, slug, projeto_id, agente_id, dominio, whatsapp_celular, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
     .single();
 
   if (error || !data) {
@@ -177,6 +182,7 @@ export async function updateChatWidget(input: {
   projetoId?: string | null;
   agenteId?: string | null;
   dominio?: string | null;
+  whatsappCelular?: string | null;
   tema?: "dark" | "light";
   corPrimaria?: string | null;
   fundoTransparente?: boolean;
@@ -191,6 +197,7 @@ export async function updateChatWidget(input: {
       projeto_id: input.projetoId ?? null,
       agente_id: input.agenteId ?? null,
       dominio: input.dominio?.trim() || null,
+      whatsapp_celular: input.whatsappCelular?.trim() || null,
       tema: input.tema === "light" ? "light" : "dark",
       cor_primaria: input.corPrimaria?.trim() || "#2563eb",
       fundo_transparente: input.fundoTransparente ?? true,
@@ -198,7 +205,7 @@ export async function updateChatWidget(input: {
       updated_at: new Date().toISOString(),
     } as never)
     .eq("id", input.id)
-    .select("id, nome, slug, projeto_id, agente_id, dominio, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
+    .select("id, nome, slug, projeto_id, agente_id, dominio, whatsapp_celular, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
     .single();
 
   if (error || !data) {

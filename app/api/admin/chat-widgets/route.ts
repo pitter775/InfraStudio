@@ -13,6 +13,7 @@ type ChatWidgetBody = {
   projetoId?: string | null;
   agenteId?: string | null;
   dominio?: string | null;
+  whatsappCelular?: string | null;
   tema?: "dark" | "light";
   corPrimaria?: string | null;
   fundoTransparente?: boolean;
@@ -79,6 +80,7 @@ export async function POST(request: Request) {
     projetoId: body.projetoId,
     agenteId: body.agenteId ?? null,
     dominio: body.dominio ?? null,
+    whatsappCelular: body.whatsappCelular ?? null,
     tema: body.tema,
     corPrimaria: body.corPrimaria ?? null,
     fundoTransparente: body.fundoTransparente ?? true,
@@ -121,6 +123,7 @@ export async function PUT(request: Request) {
     projetoId: body.projetoId,
     agenteId: body.agenteId ?? null,
     dominio: body.dominio ?? null,
+    whatsappCelular: body.whatsappCelular ?? null,
     tema: body.tema,
     corPrimaria: body.corPrimaria ?? null,
     fundoTransparente: body.fundoTransparente ?? true,
