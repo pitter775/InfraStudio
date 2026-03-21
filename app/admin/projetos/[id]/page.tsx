@@ -598,7 +598,7 @@ type ApiCampoTreeDraftNode = {
   children: Map<string, ApiCampoTreeDraftNode>;
 };
 
-type ProjectTab = "agentes" | "apis" | "chats";
+type ProjectTab = "agentes" | "apis" | "whatsapp" | "chats";
 
 const defaultConfiguracoes = {
   objetivo: "Qualificar leads e operar o atendimento do projeto com contexto de negocio.",
@@ -1755,7 +1755,7 @@ export default function AdminProjetoDetalhePage() {
   const [chatDetail, setChatDetail] = useState<ChatDetailState | null>(null);
   const [pendingAgenteArquivos, setPendingAgenteArquivos] = useState<PendingAgenteArquivo[]>([]);
   const [origin, setOrigin] = useState("");
-  const [copiedWidgetSlug, setCopiedWidgetSlug] = useState<string | null>(null);
+  const [copiedSnippetKey, setCopiedSnippetKey] = useState<string | null>(null);
 
   const loadProjeto = async () => {
     const response = await fetch(`/api/admin/projetos/${params.id}`, { cache: "no-store" });
@@ -1932,15 +1932,59 @@ export default function AdminProjetoDetalhePage() {
     ].join("\n");
   };
 
-  const handleCopyWidgetSnippet = async (widget: ChatWidget) => {
+  const buildWhatsappSnippet = (widget: ChatWidget) => {
+    const digits = sanitizePhoneDigits(widget.whatsappCelular);
+    const phone = digits ? `55${digits}` : "5511999999999";
+    const buttonLabel = widget.nome.replace(/'/g, "\\'") || "Falar no WhatsApp";
+    const defaultMessage = `Ola! Vim do site ${data?.projeto.nome ?? "do projeto"} e quero falar sobre ${widget.nome}.`;
+
+    return [
+      "<script>",
+      "  (function () {",
+      "    if (document.getElementById('infra-whatsapp-free-button')) return;",
+      "",
+      `    const phone = '${phone}';`,
+      `    const message = ${JSON.stringify(defaultMessage)};`,
+      "    const link = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;",
+      "",
+      "    const button = document.createElement('a');",
+      "    button.id = 'infra-whatsapp-free-button';",
+      "    button.href = link;",
+      "    button.target = '_blank';",
+      "    button.rel = 'noopener noreferrer';",
+      `    button.setAttribute('aria-label', '${buttonLabel}');`,
+      "    button.textContent = 'WhatsApp';",
+      "    Object.assign(button.style, {",
+      "      position: 'fixed',",
+      "      right: '24px',",
+      "      bottom: '24px',",
+      "      zIndex: '9999',",
+      `      background: '${widget.corPrimaria}',`,
+      "      color: '#ffffff',",
+      "      padding: '14px 18px',",
+      "      borderRadius: '999px',",
+      "      textDecoration: 'none',",
+      "      fontFamily: 'Arial, sans-serif',",
+      "      fontSize: '14px',",
+      "      fontWeight: '700',",
+      "      boxShadow: '0 18px 40px rgba(15, 23, 42, 0.28)'",
+      "    });",
+      "",
+      "    document.body.appendChild(button);",
+      "  })();",
+      "</script>",
+    ].join("\n");
+  };
+
+  const handleCopySnippet = async (key: string, value: string) => {
     try {
-      await navigator.clipboard.writeText(buildWidgetSnippet(widget));
-      setCopiedWidgetSlug(widget.slug);
+      await navigator.clipboard.writeText(value);
+      setCopiedSnippetKey(key);
       window.setTimeout(() => {
-        setCopiedWidgetSlug((current) => (current === widget.slug ? null : current));
+        setCopiedSnippetKey((current) => (current === key ? null : current));
       }, 1800);
     } catch {
-      setCopiedWidgetSlug(null);
+      setCopiedSnippetKey(null);
     }
   };
 
@@ -2559,6 +2603,17 @@ export default function AdminProjetoDetalhePage() {
             >
               Chats
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("whatsapp")}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                activeTab === "whatsapp"
+                  ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
+                  : "border border-white/10 bg-white/5 text-white"
+              }`}
+            >
+              WhatsApp
+            </button>
           </div>
         </div>
       </section>
@@ -2702,98 +2757,152 @@ export default function AdminProjetoDetalhePage() {
 
       </div>
 
-      <section className={`${activeTab === "chats" ? "block" : "hidden"}`}>
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-            <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+      <section className={`${activeTab === "whatsapp" ? "block" : "hidden"}`}>
+        <div className="space-y-6">
+          <section className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h3 className="text-xl font-bold text-white">Widget do chat</h3>
-                <p className="mt-1 text-sm text-slate-400">Do lado esquerdo fica a operacao do chat: widget, embed e configuracao.</p>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">Modo free com JS</p>
+                <h3 className="mt-2 text-xl font-bold text-white">Canal rapido de WhatsApp sem API oficial</h3>
+                <p className="mt-2 max-w-3xl text-sm text-emerald-50/80">
+                  Esta aba entrega um botao flutuante em JavaScript puro para qualquer site. E o caminho mais leve para abrir conversa no WhatsApp sem depender de integracao paga.
+                </p>
               </div>
-              <button type="button" onClick={openNewWidgetModal} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
+              <button type="button" onClick={openNewWidgetModal} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 px-4 py-3 font-semibold text-slate-950">
                 <Plus size={16} />
-                Novo widget de chat
+                Novo canal WhatsApp
               </button>
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+            <div className="border-b border-white/10 px-6 py-5">
+              <h3 className="text-xl font-bold text-white">Canais configurados</h3>
+              <p className="mt-1 text-sm text-slate-400">Cada widget pode virar um botao free de WhatsApp com copia pronta em JS.</p>
             </div>
             <div className="space-y-4 p-6">
               {data.widgets.length ? (
                 data.widgets.map((widget) => {
                   const agente = getResolvedWidgetAgent(widget);
+                  const hasWhatsapp = Boolean(sanitizePhoneDigits(widget.whatsappCelular));
+                  const whatsappSnippetKey = `whatsapp:${widget.slug}`;
+                  const widgetSnippetKey = `widget:${widget.slug}`;
 
                   return (
-                    <div key={widget.id ?? widget.slug} className="rounded-xl border border-white/10 bg-slate-950/30 p-5">
-                      <div className="flex items-start justify-between gap-4">
+                    <div key={`whatsapp-${widget.id ?? widget.slug}`} className="rounded-xl border border-white/10 bg-slate-950/30 p-5">
+                      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-3">
+                          <div className="flex flex-wrap items-center gap-3">
                             <h4 className="text-lg font-bold text-white">{widget.nome}</h4>
                             <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${widget.ativo ? "bg-emerald-500/10 text-emerald-200" : "bg-slate-800 text-slate-400"}`}>
                               {widget.ativo ? "ativo" : "inativo"}
                             </span>
+                            <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${hasWhatsapp ? "bg-cyan-500/10 text-cyan-100" : "bg-amber-500/10 text-amber-100"}`}>
+                              {hasWhatsapp ? "pronto para whatsapp" : "faltando numero"}
+                            </span>
                           </div>
-                          <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">slug: {widget.slug}</p>
-                          <p className="mt-3 text-sm text-slate-300">Projeto: {data.projeto.nome}</p>
-                          <p className="mt-1 text-sm text-slate-400">Agente: {agente?.nome ?? "agente ativo do projeto"}</p>
+                          <p className="mt-3 text-sm text-slate-300">Agente: {agente?.nome ?? "agente ativo do projeto"}</p>
                           <p className="mt-1 text-sm text-slate-400">Dominio/contexto: {widget.dominio || "nao informado"}</p>
                           <p className="mt-1 text-sm text-slate-400">WhatsApp: {widget.whatsappCelular || "nao informado"}</p>
-                          <p className="mt-1 text-sm text-slate-400">Tema: {widget.tema === "light" ? "claro" : "escuro"} | cor: {widget.corPrimaria}</p>
-                          <p className="mt-1 text-sm text-slate-400">Fundo: {widget.fundoTransparente ? "transparente" : "solido"}</p>
-                          <div className="mt-4 w-full rounded-xl border border-white/10 bg-slate-950/60 p-3">
+                          <p className="mt-1 text-sm text-slate-400">Cor do botao: {widget.corPrimaria}</p>
+
+                          <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/60 p-3">
+                            <div className="mb-4 rounded-xl border border-white/10 bg-[#07111f] p-3">
+                              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Widget do site</p>
+                                  <p className="mt-1 text-xs text-slate-400">Snippet atual do chat/widget para embed controlado.</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <a
+                                    href="/docs/chat-widget-host-control"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                                  >
+                                    <ExternalLink size={13} />
+                                    Documentacao
+                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleCopySnippet(widgetSnippetKey, buildWidgetSnippet(widget))}
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+                                  >
+                                    {copiedSnippetKey === widgetSnippetKey ? <CheckCircle2 size={13} /> : <Copy size={13} />}
+                                    {copiedSnippetKey === widgetSnippetKey ? "Copiado" : "Copiar widget"}
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="w-full overflow-x-auto rounded-lg border border-white/10 bg-[#07111f]">
+                                <pre className="min-h-[170px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
+                                  {buildWidgetSnippet(widget)
+                                    .split("\n")
+                                    .map((line, index) => (
+                                      <div key={`${widget.slug}-widget-line-${index}`}>{renderSnippetLine(line)}</div>
+                                    ))}
+                                </pre>
+                              </div>
+                            </div>
+
                             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Codigo de injecao</p>
+                              <div>
+                                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Snippet JS free</p>
+                                <p className="mt-1 text-xs text-slate-400">Cole antes do fechamento de `&lt;/body&gt;` no site do cliente.</p>
+                              </div>
                               <div className="flex items-center gap-2">
-                                <a
-                                  href="/docs/chat-widget-host-control"
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
-                                >
-                                  <ExternalLink size={13} />
-                                  Documentacao
-                                </a>
                                 <button
                                   type="button"
-                                  onClick={() => void handleCopyWidgetSnippet(widget)}
-                                  className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+                                  onClick={() => void handleCopySnippet(whatsappSnippetKey, buildWhatsappSnippet(widget))}
+                                  className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/15 hover:text-white"
                                 >
-                                  {copiedWidgetSlug === widget.slug ? <CheckCircle2 size={13} /> : <Copy size={13} />}
-                                  {copiedWidgetSlug === widget.slug ? "Copiado" : "Copiar"}
+                                  {copiedSnippetKey === whatsappSnippetKey ? <CheckCircle2 size={13} /> : <Copy size={13} />}
+                                  {copiedSnippetKey === whatsappSnippetKey ? "Copiado" : "Copiar JS"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditWidget(widget)}
+                                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                                >
+                                  Editar
                                 </button>
                               </div>
                             </div>
                             <div className="w-full overflow-x-auto rounded-lg border border-white/10 bg-[#07111f]">
                               <pre className="min-h-[170px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
-                                {buildWidgetSnippet(widget)
+                                {buildWhatsappSnippet(widget)
                                   .split("\n")
                                   .map((line, index) => (
-                                    <div key={`${widget.slug}-line-${index}`}>{renderSnippetLine(line)}</div>
+                                    <div key={`${widget.slug}-whatsapp-line-${index}`}>{renderSnippetLine(line)}</div>
                                   ))}
                               </pre>
                             </div>
+                            {!hasWhatsapp ? (
+                              <p className="mt-3 text-xs text-amber-200/80">Preencha um numero de WhatsApp para gerar o link final com o telefone correto.</p>
+                            ) : null}
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleEditWidget(widget)}
-                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200"
-                        >
-                          Editar
-                        </button>
                       </div>
                     </div>
                   );
                 })
               ) : (
                 <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">
-                  Nenhum widget de chat cadastrado para este projeto ainda.
+                  Nenhum canal WhatsApp configurado para este projeto ainda.
                 </div>
               )}
             </div>
           </section>
+        </div>
+      </section>
 
+      <section className={`${activeTab === "chats" ? "block" : "hidden"}`}>
+        <div className="grid gap-6">
           <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-            <div className="border-b border-white/10 px-6 py-5">
-              <h3 className="text-xl font-bold text-white">Conversas</h3>
-              <p className="mt-1 text-sm text-slate-400">Do lado direito ficam as conversas. Clique para abrir o historico completo.</p>
+            <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-white">Conversas do projeto</h3>
+                <p className="mt-1 text-sm text-slate-400">Historico recente dos chats para auditoria, contexto e acompanhamento comercial.</p>
+              </div>
             </div>
             <div className="space-y-4 p-6">
               {data.chats.length ? (
