@@ -1337,9 +1337,6 @@ export default function AdminProjetoDetalhePage() {
     const agenteRef = agente?.slug || agente?.id || "agente-do-projeto";
     const requiredParameters = getWidgetRequiredParameters(widget);
     const contextLines = [
-      "      tenant: { id: 'cliente-atual' },",
-      "      user: { id: 'usuario-atual', tipo: 'lead' },",
-      "      resource: { id: 'recurso-atual', tipo: 'imovel' },",
       "      route: { path: window.location.pathname },",
       "      ui: {",
       `        title: '${widget.nome.replace(/'/g, "\\'")}',`,
@@ -1350,57 +1347,30 @@ export default function AdminProjetoDetalhePage() {
     ];
 
     if (requiredParameters.length) {
-      contextLines.push("      // Campos obrigatorios das APIs vinculadas ao agente");
+      contextLines.push("      resource: { id: 'recurso-atual', tipo: 'recurso' },");
       for (const parametro of requiredParameters) {
         const placeholder = parametro.tipo === "number" ? "0" : parametro.tipo === "boolean" ? "false" : "'XXX'";
         contextLines.push(`      ${parametro.nome}: ${placeholder},`);
       }
-    } else {
-      contextLines.push("      id: 'identificador-do-contexto',");
     }
 
     return [
-      "<!-- 1) Carregue o SDK uma vez -->",
       "<script",
       `  src=\"${base}/chat.js\"`,
       `  data-projeto=\"${projetoRef}\"`,
       `  data-agente=\"${agenteRef}\"`,
       "></script>",
       "",
-      "<!-- 2) O host decide quando o chat pode existir -->",
       "<script>",
-      `  // Projeto: ${data?.projeto.nome ?? "Projeto atual"}`,
-      `  // Agente sugerido: ${agente?.nome ?? "Agente ativo do projeto"}`,
-      "  const canShowChat = window.location.pathname.startsWith('/rota-autorizada');",
-      "",
-      "  if (!canShowChat) {",
-      "    window.InfraChat.destroy();",
-      "  } else {",
-      "    window.InfraChat.mount({",
-      `      projeto: '${projetoRef}',`,
-      `      agente: '${agenteRef}',`,
-      `      apiBase: '${base}',`,
-      "      strictHostControl: true,",
-      "      context: {",
+      "  window.InfraChat.mount({",
+      `    projeto: '${projetoRef}',`,
+      `    agente: '${agenteRef}',`,
+      `    apiBase: '${base}',`,
+      "    strictHostControl: true,",
+      "    context: {",
       ...contextLines,
-      "      },",
-      "      policy: {",
-        "        allowed: true,",
-      `        allowedRoutes: ['/${widget.slug}/*'],`,
-      "      },",
-      "    });",
-      "  }",
-      "",
-      "  // 3) Ao trocar cliente, agente, usuario, recurso ou rota, atualize o contexto",
-      "  InfraChat.updateContext({",
-      "    tenant: { id: 'novo-cliente' },",
-      "    user: { id: 'novo-usuario' },",
-      "    resource: { id: 'novo-recurso', tipo: 'imovel' },",
-      "    route: { path: window.location.pathname },",
+      "    },",
       "  });",
-      "",
-      "  // 4) Ao sair do contexto autorizado, destrua completamente",
-      "  InfraChat.destroy();",
       "</script>",
     ].join("\n");
   };
