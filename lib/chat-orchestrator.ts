@@ -167,7 +167,7 @@ function buildAgentAssetInstruction(assets: RuntimeReplyAsset[], latestUserMessa
     return "";
   }
 
-  const userAskedForAsset = ASSET_REQUEST_SIGNALS.some((signal) => normalizeText(latestUserMessage).includes(signal));
+  const userAskedForAsset = userExplicitlyRequestedAsset(latestUserMessage);
   const catalog = assets
     .map((asset) => `- ${asset.key} | ${asset.categoria} | ${asset.nome}${asset.descricao ? ` | ${asset.descricao}` : ""}`)
     .join("\n");
@@ -179,6 +179,11 @@ function buildAgentAssetInstruction(assets: RuntimeReplyAsset[], latestUserMessa
       ? "O usuario sinalizou interesse em imagem ou arquivo. Se ajudar, inclua no fim da resposta 1 ou 2 tags como [[asset:asset_1]]."
       : "Use tags [[asset:asset_n]] no fim da resposta apenas quando um arquivo ou imagem agregar valor real.",
   ].join("\n");
+}
+
+function userExplicitlyRequestedAsset(message: string) {
+  const normalized = normalizeText(message);
+  return ASSET_REQUEST_SIGNALS.some((signal) => normalized.includes(signal));
 }
 
 function extractTaggedAssets(reply: string, assets: RuntimeReplyAsset[]) {
@@ -211,7 +216,7 @@ function selectRelevantAssetsHeuristically(message: string, assets: RuntimeReply
   }
 
   const normalized = normalizeText(message);
-  const explicitlyRequested = ASSET_REQUEST_SIGNALS.some((signal) => normalized.includes(signal));
+  const explicitlyRequested = userExplicitlyRequestedAsset(message);
   const tokens = buildSearchTokens(message);
 
   const scored = assets
@@ -1224,9 +1229,14 @@ export async function generateSalesReply(history: ConversationMessage[], context
     }
 
     const resolvedReply = extractTaggedAssets(outputText, runtimeAssets);
+    const fallbackAssets =
+      resolvedReply.assets.length === 0 && userExplicitlyRequestedAsset(latestUserMessage)
+        ? selectRelevantAssetsHeuristically(latestUserMessage, runtimeAssets)
+        : resolvedReply.assets;
+
     return {
       reply: resolvedReply.reply,
-      assets: resolvedReply.assets,
+      assets: fallbackAssets,
       usage: {
         inputTokens: payload.usage?.input_tokens ?? 0,
         outputTokens: payload.usage?.output_tokens ?? 0,
