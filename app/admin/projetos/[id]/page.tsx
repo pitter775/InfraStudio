@@ -2270,6 +2270,113 @@ function WidgetModal({
   );
 }
 
+function WhatsAppChannelModal({
+  open,
+  form,
+  agentes,
+  saving,
+  feedback,
+  onClose,
+  onChange,
+  onSubmit,
+}: {
+  open: boolean;
+  form: WhatsAppChannelFormState;
+  agentes: Agente[];
+  saving: boolean;
+  feedback: string | null;
+  onClose: () => void;
+  onChange: (next: Partial<WhatsAppChannelFormState>) => void;
+  onSubmit: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
+      <div className="max-h-[92vh] w-full max-w-xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">WhatsApp oficial</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar canal" : "Novo canal"}</h2>
+            <p className="mt-1 text-sm text-slate-400">Cadastre o numero principal e escolha qual agente vai responder por esse canal.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Fechar modal"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="max-h-[calc(92vh-88px)] overflow-y-auto p-6">
+          <div className="space-y-4">
+            <div>
+              <FormLabel>Numero</FormLabel>
+              <input
+                value={form.numero}
+                onChange={(event) => onChange({ numero: formatWhatsAppPhone(event.target.value) })}
+                placeholder="+55 11 99999-9999"
+                inputMode="tel"
+                autoComplete="tel"
+                maxLength={17}
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+              />
+            </div>
+            <div>
+              <FormLabel>Agente</FormLabel>
+              <select
+                value={form.agenteId ?? ""}
+                onChange={(event) => onChange({ agenteId: event.target.value || null })}
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
+              >
+                <option value="">Agente ativo do projeto</option>
+                {agentes.map((agente) => (
+                  <option key={agente.id} value={agente.id}>
+                    {agente.nome}
+                    {agente.ativo ? " (ativo)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <FormLabel>Status</FormLabel>
+              <select
+                value={form.status}
+                onChange={(event) => onChange({ status: event.target.value === "inativo" ? "inativo" : "ativo" })}
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
+              >
+                <option value="ativo">ativo</option>
+                <option value="inativo">inativo</option>
+              </select>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onSubmit}
+                disabled={saving}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
+              >
+                {form.id ? <Pencil size={16} /> : <Plus size={16} />}
+                {saving ? "Salvando..." : form.id ? "Salvar alteracoes" : "Criar canal"}
+              </button>
+              <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
+                Cancelar
+              </button>
+            </div>
+
+            {feedback ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</div> : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ChatHistoryModal({
   open,
   loading,
@@ -2364,6 +2471,7 @@ export default function AdminProjetoDetalhePage() {
   const [agenteModalOpen, setAgenteModalOpen] = useState(false);
   const [apiModalOpen, setApiModalOpen] = useState(false);
   const [widgetModalOpen, setWidgetModalOpen] = useState(false);
+  const [whatsAppChannelModalOpen, setWhatsAppChannelModalOpen] = useState(false);
   const [chatHistoryOpen, setChatHistoryOpen] = useState(false);
   const [chatHistoryLoading, setChatHistoryLoading] = useState(false);
   const [chatHistoryError, setChatHistoryError] = useState<string | null>(null);
@@ -2442,6 +2550,11 @@ export default function AdminProjetoDetalhePage() {
   const resetWhatsAppChannelForm = () => {
     setWhatsAppChannelForm(emptyWhatsAppChannelForm);
     setFeedbackWhatsApp(null);
+  };
+
+  const openNewWhatsAppChannelModal = () => {
+    resetWhatsAppChannelForm();
+    setWhatsAppChannelModalOpen(true);
   };
 
   const openNewAgenteModal = () => {
@@ -3100,6 +3213,7 @@ export default function AdminProjetoDetalhePage() {
       status: channel.status,
     });
     setFeedbackWhatsApp(null);
+    setWhatsAppChannelModalOpen(true);
   };
 
   const handleSaveWhatsAppChannel = async () => {
@@ -3130,6 +3244,7 @@ export default function AdminProjetoDetalhePage() {
     await loadProjeto();
     setSavingWhatsAppChannel(false);
     setFeedbackWhatsApp(whatsAppChannelForm.id ? "Canal WhatsApp atualizado com sucesso." : "Canal WhatsApp criado com sucesso.");
+    setWhatsAppChannelModalOpen(false);
     resetWhatsAppChannelForm();
   };
 
@@ -3679,63 +3794,56 @@ export default function AdminProjetoDetalhePage() {
                   </div>
                 );
               })() : (
-                <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr),360px]">
-                  <div className="rounded-[28px] border border-dashed border-cyan-500/20 bg-slate-950/30 p-8">
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Primeiro passo</p>
-                    <h4 className="mt-3 text-3xl font-black text-white">Crie o numero que vai atender no WhatsApp</h4>
-                    <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-                      Assim que o canal for criado, esta area passa a mostrar o QR bem grande para escanear ou o estado “WhatsApp conectado”.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-5">
-                    <h4 className="text-base font-bold text-white">Novo canal</h4>
-                    <p className="mt-1 text-sm text-slate-400">Cadastre o numero e vincule o agente que vai responder nesse canal.</p>
-                    <div className="mt-5 space-y-4">
-                      <div>
-                        <FormLabel>Numero</FormLabel>
-                        <input
-                          value={whatsAppChannelForm.numero}
-                          onChange={(event) =>
-                            setWhatsAppChannelForm((prev) => ({
-                              ...prev,
-                              numero: formatWhatsAppPhone(event.target.value),
-                            }))
-                          }
-                          placeholder="+55 11 99999-9999"
-                          className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
-                        />
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr),420px]">
+                  <div className="grid gap-4">
+                    <div className="rounded-[28px] border border-dashed border-cyan-500/20 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),rgba(8,47,73,0.08)_35%,rgba(2,6,23,0.78)_75%)] p-7">
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Primeiro passo</p>
+                      <h4 className="mt-3 text-3xl font-black text-white">Crie o numero que vai atender no WhatsApp</h4>
+                      <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+                        Assim que o canal for criado, esta area passa a mostrar o QR bem grande para escanear ou o estado “WhatsApp conectado”.
+                      </p>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Canal oficial</p>
+                        <p className="mt-3 text-lg font-bold text-white">1 numero principal</p>
+                        <p className="mt-2 text-xs leading-6 text-slate-400">A tela agora prioriza um unico WhatsApp para ficar mais clara e rapida.</p>
                       </div>
+                      <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">QR em destaque</p>
+                        <p className="mt-3 text-lg font-bold text-white">Escaneamento facil</p>
+                        <p className="mt-2 text-xs leading-6 text-slate-400">Depois de criar o canal, o QR ocupa o bloco principal da direita.</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Resposta automatica</p>
+                        <p className="mt-3 text-lg font-bold text-white">Mesmo agente</p>
+                        <p className="mt-2 text-xs leading-6 text-slate-400">O atendimento reutiliza o fluxo atual do chat sem duplicar logica.</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-[28px] border border-white/10 bg-slate-950/42 p-5">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <FormLabel>Agente</FormLabel>
-                        <select
-                          value={whatsAppChannelForm.agenteId ?? ""}
-                          onChange={(event) =>
-                            setWhatsAppChannelForm((prev) => ({
-                              ...prev,
-                              agenteId: event.target.value || null,
-                            }))
-                          }
-                          className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
-                        >
-                          <option value="">Agente ativo do projeto</option>
-                          {data.agentes.map((agente) => (
-                            <option key={agente.id} value={agente.id}>
-                              {agente.nome}
-                            </option>
-                          ))}
-                        </select>
+                        <h4 className="text-base font-bold text-white">Criar canal oficial</h4>
+                        <p className="mt-1 text-sm text-slate-400">Abra o modal para cadastrar o numero principal.</p>
+                      </div>
+                      <div className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100">
+                        2 passos
                       </div>
                     </div>
                     <div className="mt-5 flex flex-wrap gap-3">
                       <button
                         type="button"
-                        onClick={() => void handleSaveWhatsAppChannel()}
-                        disabled={savingWhatsAppChannel}
-                        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3 font-semibold text-slate-950 disabled:opacity-60"
+                        onClick={openNewWhatsAppChannelModal}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
                       >
                         <Plus size={16} />
-                        {savingWhatsAppChannel ? "Salvando..." : "Criar canal"}
+                        Novo canal oficial
                       </button>
+                    </div>
+                    <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Depois disso</p>
+                      <p className="mt-2 text-sm text-slate-300">O card principal muda para mostrar o QR em destaque ou o estado “WhatsApp conectado”.</p>
                     </div>
                   </div>
                 </div>
@@ -3746,80 +3854,46 @@ export default function AdminProjetoDetalhePage() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Configuracao do canal</p>
-                      <h4 className="mt-2 text-lg font-bold text-white">{whatsAppChannelForm.id ? "Editar canal atual" : "Atualizar cadastro"}</h4>
+                      <h4 className="mt-2 text-lg font-bold text-white">Acoes rapidas do canal atual</h4>
                     </div>
                     {data.whatsappChannels.length > 1 ? (
                       <p className="text-xs text-amber-100/80">Existem {data.whatsappChannels.length} canais cadastrados. A interface esta priorizando o primeiro.</p>
                     ) : null}
                   </div>
                   <div className="mt-5 grid gap-4 md:grid-cols-3">
-                    <div>
-                      <FormLabel>Numero</FormLabel>
-                      <input
-                        value={whatsAppChannelForm.numero}
-                        onChange={(event) =>
-                          setWhatsAppChannelForm((prev) => ({
-                            ...prev,
-                            numero: formatWhatsAppPhone(event.target.value),
-                          }))
-                        }
-                        placeholder="+55 11 99999-9999"
-                        className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
-                      />
+                    <div className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Numero atual</p>
+                      <p className="mt-2 text-base font-bold text-white">{formatWhatsAppPhone(primaryWhatsAppChannel.numero)}</p>
                     </div>
-                    <div>
-                      <FormLabel>Agente</FormLabel>
-                      <select
-                        value={whatsAppChannelForm.agenteId ?? ""}
-                        onChange={(event) =>
-                          setWhatsAppChannelForm((prev) => ({
-                            ...prev,
-                            agenteId: event.target.value || null,
-                          }))
-                        }
-                        className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
-                      >
-                        <option value="">Agente ativo do projeto</option>
-                        {data.agentes.map((agente) => (
-                          <option key={agente.id} value={agente.id}>
-                            {agente.nome}
-                          </option>
-                        ))}
-                      </select>
+                    <div className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Agente atual</p>
+                      <p className="mt-2 text-base font-bold text-white">
+                        {primaryWhatsAppChannel.agenteId
+                          ? data.agentes.find((agente) => agente.id === primaryWhatsAppChannel.agenteId)?.nome ?? "Agente nao encontrado"
+                          : agenteAtivo?.nome ?? "Agente ativo do projeto"}
+                      </p>
                     </div>
-                    <div>
-                      <FormLabel>Status</FormLabel>
-                      <select
-                        value={whatsAppChannelForm.status}
-                        onChange={(event) =>
-                          setWhatsAppChannelForm((prev) => ({
-                            ...prev,
-                            status: event.target.value === "inativo" ? "inativo" : "ativo",
-                          }))
-                        }
-                        className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
-                      >
-                        <option value="ativo">ativo</option>
-                        <option value="inativo">inativo</option>
-                      </select>
+                    <div className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Status</p>
+                      <p className="mt-2 text-base font-bold text-white">{primaryWhatsAppChannel.status}</p>
                     </div>
                   </div>
                   <div className="mt-5 flex flex-wrap gap-3">
                     <button
                       type="button"
-                      onClick={() => void handleSaveWhatsAppChannel()}
-                      disabled={savingWhatsAppChannel}
-                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3 font-semibold text-slate-950 disabled:opacity-60"
+                      onClick={() => handleEditWhatsAppChannel(primaryWhatsAppChannel)}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
                     >
-                      <Plus size={16} />
-                      {savingWhatsAppChannel ? "Salvando..." : whatsAppChannelForm.id ? "Salvar alteracoes" : "Salvar canal"}
+                      <Pencil size={16} />
+                      Editar canal
                     </button>
                     <button
                       type="button"
-                      onClick={resetWhatsAppChannelForm}
-                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200"
+                      onClick={openNewWhatsAppChannelModal}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
                     >
-                      Limpar
+                      <Plus size={16} />
+                      Novo canal
                     </button>
                   </div>
                 </div>
@@ -3827,8 +3901,8 @@ export default function AdminProjetoDetalhePage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <section className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),auto] lg:items-center">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">Modo free com JS</p>
                 <h3 className="mt-2 text-xl font-bold text-white">Canal rapido de WhatsApp sem API oficial</h3>
@@ -4091,6 +4165,25 @@ export default function AdminProjetoDetalhePage() {
           }))
         }
         onSubmit={() => void handleWidgetSubmit()}
+      />
+      <WhatsAppChannelModal
+        open={whatsAppChannelModalOpen}
+        form={whatsAppChannelForm}
+        agentes={data.agentes}
+        saving={savingWhatsAppChannel}
+        feedback={feedbackWhatsApp}
+        onClose={() => {
+          setWhatsAppChannelModalOpen(false);
+          resetWhatsAppChannelForm();
+        }}
+        onChange={(next) =>
+          setWhatsAppChannelForm((prev) => ({
+            ...prev,
+            ...next,
+            numero: next.numero !== undefined ? formatWhatsAppPhone(next.numero) : prev.numero,
+          }))
+        }
+        onSubmit={() => void handleSaveWhatsAppChannel()}
       />
       <ChatHistoryModal
         open={chatHistoryOpen}
