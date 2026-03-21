@@ -444,6 +444,145 @@ function inferShortDescription(summary: string) {
   return `${firstParagraph.slice(0, 157).trimEnd()}...`;
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function applyInlineFormatting(value: string) {
+  return escapeHtml(value).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
+function plainTextToEditorHtml(value: string) {
+  const normalized = normalizeAgentText(value);
+  if (!normalized) {
+    return "<p></p>";
+  }
+
+  const lines = normalized.split("\n");
+  const parts: string[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
+
+    if (!line.trim()) {
+      parts.push("<p><br></p>");
+      index += 1;
+      continue;
+    }
+
+    if (/^- /.test(line.trim())) {
+      const items: string[] = [];
+      while (index < lines.length && /^- /.test((lines[index] ?? "").trim())) {
+        items.push(`<li>${applyInlineFormatting((lines[index] ?? "").trim().replace(/^- /, ""))}</li>`);
+        index += 1;
+      }
+      parts.push(`<ul>${items.join("")}</ul>`);
+      continue;
+    }
+
+    if (/^\d+\.\s/.test(line.trim())) {
+      const items: string[] = [];
+      while (index < lines.length && /^\d+\.\s/.test((lines[index] ?? "").trim())) {
+        items.push(`<li>${applyInlineFormatting((lines[index] ?? "").trim().replace(/^\d+\.\s/, ""))}</li>`);
+        index += 1;
+      }
+      parts.push(`<ol>${items.join("")}</ol>`);
+      continue;
+    }
+
+    if (/:$/.test(line.trim())) {
+      parts.push(`<h3>${applyInlineFormatting(line.trim().replace(/:$/, ""))}</h3>`);
+      index += 1;
+      continue;
+    }
+
+    parts.push(`<p>${applyInlineFormatting(line)}</p>`);
+    index += 1;
+  }
+
+  return parts.join("");
+}
+
+function serializeRichInline(node: ChildNode): string {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node.textContent ?? "";
+  }
+
+  if (!(node instanceof HTMLElement)) {
+    return "";
+  }
+
+  const content = Array.from(node.childNodes).map((child) => serializeRichInline(child)).join("");
+
+  if (node.tagName === "STRONG" || node.tagName === "B") {
+    return content ? `**${content}**` : "";
+  }
+
+  if (node.tagName === "BR") {
+    return "\n";
+  }
+
+  return content;
+}
+
+function richTextToStructuredText(html: string) {
+  if (typeof window === "undefined") {
+    return html;
+  }
+
+  const container = window.document.createElement("div");
+  container.innerHTML = html;
+  const lines: string[] = [];
+
+  const pushLine = (value: string) => {
+    const cleaned = value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+    lines.push(cleaned);
+  };
+
+  for (const node of Array.from(container.childNodes)) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      pushLine(node.textContent ?? "");
+      continue;
+    }
+
+    if (!(node instanceof HTMLElement)) {
+      continue;
+    }
+
+    if (node.tagName === "UL") {
+      Array.from(node.children).forEach((child) => {
+        pushLine(`- ${serializeRichInline(child)}`);
+      });
+      continue;
+    }
+
+    if (node.tagName === "OL") {
+      Array.from(node.children).forEach((child, index) => {
+        pushLine(`${index + 1}. ${serializeRichInline(child)}`);
+      });
+      continue;
+    }
+
+    if (/^H\d$/.test(node.tagName)) {
+      pushLine(`${serializeRichInline(node)}:`);
+      continue;
+    }
+
+    if (node.tagName === "P" || node.tagName === "DIV") {
+      pushLine(serializeRichInline(node));
+      continue;
+    }
+
+    pushLine(serializeRichInline(node));
+  }
+
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function parseAgentSummarySections(summary: string) {
   const normalized = compactAgentSummary(summary);
   const lines = normalized ? normalized.split("\n") : [];
@@ -1202,7 +1341,8 @@ function AgenteModal({
 }) {
   const [showRawConfig, setShowRawConfig] = useState(false);
   const [promptExpanded, setPromptExpanded] = useState(false);
-  const promptRef = useRef<HTMLTextAreaElement | null>(null);
+  const [editorHtml, setEditorHtml] = useState("");
+  const promptRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -1211,11 +1351,26 @@ function AgenteModal({
     }
   }, [open]);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const nextHtml = plainTextToEditorHtml(form.promptBase);
+    const currentStructured = richTextToStructuredText(editorHtml);
+    if (normalizeAgentText(currentStructured) !== normalizeAgentText(form.promptBase)) {
+      setEditorHtml(nextHtml);
+    }
+  }, [editorHtml, form.promptBase, open]);
+
   if (!open) {
     return null;
   }
 
-  const updatePromptBase = (nextValue: string) => onChange({ promptBase: nextValue });
+  const updatePromptBase = (nextHtml: string) => {
+    setEditorHtml(nextHtml);
+    onChange({ promptBase: richTextToStructuredText(nextHtml) });
+  };
 
   const applyPromptFormat = (mode: "bold" | "title" | "bullet" | "numbered") => {
     const element = promptRef.current;
@@ -1223,51 +1378,25 @@ function AgenteModal({
       return;
     }
 
-    const currentValue = form.promptBase;
-    const start = element.selectionStart ?? currentValue.length;
-    const end = element.selectionEnd ?? currentValue.length;
-    const selectedText = currentValue.slice(start, end);
-
-    let replacement = selectedText;
+    element.focus();
 
     if (mode === "bold") {
-      replacement = selectedText ? `**${selectedText}**` : "**texto**";
+      document.execCommand("bold");
     }
 
     if (mode === "title") {
-      replacement = selectedText ? `${selectedText.trim()}:` : "Titulo:";
+      document.execCommand("formatBlock", false, "h3");
     }
 
     if (mode === "bullet") {
-      replacement = selectedText
-        ? selectedText
-            .split("\n")
-            .map((line) => (line.trim() ? `- ${line.replace(/^[-*]\s*/, "").trim()}` : line))
-            .join("\n")
-        : "- item";
+      document.execCommand("insertUnorderedList");
     }
 
     if (mode === "numbered") {
-      replacement = selectedText
-        ? selectedText
-            .split("\n")
-            .map((line, index) => (line.trim() ? `${index + 1}. ${line.replace(/^(\d+)[.)]\s*/, "").trim()}` : line))
-            .join("\n")
-        : "1. item";
+      document.execCommand("insertOrderedList");
     }
 
-    const nextValue = `${currentValue.slice(0, start)}${replacement}${currentValue.slice(end)}`;
-    updatePromptBase(nextValue);
-
-    window.requestAnimationFrame(() => {
-      if (!promptRef.current) {
-        return;
-      }
-
-      promptRef.current.focus();
-      const cursorEnd = start + replacement.length;
-      promptRef.current.setSelectionRange(cursorEnd, cursorEnd);
-    });
+    updatePromptBase(element.innerHTML);
   };
 
   return (
@@ -1370,13 +1499,13 @@ function AgenteModal({
                   Numerada
                 </button>
               </div>
-              <textarea
+              <div
                 ref={promptRef}
-                value={form.promptBase}
-                onChange={(event) => onChange({ promptBase: event.target.value })}
-                placeholder="Descreva como o agente deve atuar, o que oferecer, como qualificar, regras de preco, handoff e CTA."
-                rows={promptExpanded ? 24 : 12}
-                className={`w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none placeholder:text-slate-500 transition-all duration-300 ${promptExpanded ? "min-h-[560px]" : "min-h-[290px]"}`}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={(event) => updatePromptBase(event.currentTarget.innerHTML)}
+                className={`w-full overflow-y-auto rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none transition-all duration-300 [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-base [&_h3]:font-bold [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-2 [&_strong]:font-extrabold [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 ${promptExpanded ? "min-h-[560px]" : "min-h-[290px]"}`}
+                dangerouslySetInnerHTML={{ __html: editorHtml || "<p>Descreva como o agente deve atuar, o que oferecer, como qualificar, regras de preco, handoff e CTA.</p>" }}
               />
               <p className="mt-2 text-xs text-slate-400">Ao validar, o texto e reorganizado para leitura humana e o JSON tecnico e regenerado automaticamente sem virar um resumao podado.</p>
             </div>
