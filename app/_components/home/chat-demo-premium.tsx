@@ -298,10 +298,10 @@ export function PremiumHomeChatDemo() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
                     className={cn(
-                      "max-w-[88%] whitespace-pre-line rounded-[24px] px-4 py-3 text-[15px] leading-relaxed shadow-[0_12px_30px_-20px_rgba(15,23,42,0.9)]",
+                      "max-w-[88%] whitespace-pre-line rounded-[24px] px-4 py-3 text-[15px] leading-relaxed",
                       message.isAi
-                        ? "mr-auto text-slate-100"
-                        : "ml-auto rounded-br-lg border border-blue-400/25 bg-blue-500/18 text-blue-50",
+                        ? "mr-auto bg-transparent text-slate-100 shadow-none"
+                        : "ml-auto rounded-br-lg border border-blue-400/25 bg-blue-500/18 text-blue-50 shadow-[0_12px_30px_-20px_rgba(15,23,42,0.9)]",
                     )}
                   >
                     {message.text}
@@ -331,7 +331,7 @@ export function PremiumHomeChatDemo() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    className="mr-auto inline-flex rounded-[20px] bg-white/[0.045] px-4 py-3"
+                    className="mr-auto inline-flex rounded-[20px] bg-transparent px-4 py-3"
                   >
                     <div className="flex items-center gap-1.5">
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />

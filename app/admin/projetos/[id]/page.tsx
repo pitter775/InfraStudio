@@ -1707,7 +1707,7 @@ function ChatHistoryModal({
                     key={message.id}
                     className={`rounded-2xl border px-4 py-3 ${
                       message.role === "assistant"
-                        ? "border-cyan-500/20 bg-cyan-500/10"
+                        ? "border-transparent bg-transparent"
                         : message.role === "user"
                           ? "border-white/10 bg-slate-950/40"
                           : "border-amber-500/20 bg-amber-500/10"
