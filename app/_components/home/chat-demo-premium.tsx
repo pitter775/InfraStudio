@@ -474,17 +474,6 @@ export function PremiumHomeChatDemo() {
         </motion.div>
       </div>
 
-      <style jsx>{`
-        .chat-demo-scroll {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-        }
-
-        .chat-demo-scroll::-webkit-scrollbar {
-          width: 0;
-          height: 0;
-        }
-      `}</style>
     </>
   );
 }

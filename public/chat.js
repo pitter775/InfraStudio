@@ -171,10 +171,17 @@
       ".chat-cta:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--accent) 20%, transparent); }",
       ".chat-assets { margin-top: 10px; display: grid; gap: 10px; }",
       ".chat-asset { display: block; overflow: hidden; border-radius: 16px; border: 1px solid var(--header-border); background: color-mix(in srgb, var(--panel-bg) 88%, transparent); color: inherit; text-decoration: none; }",
-      ".chat-asset.image { padding: 0; }",
-      ".chat-asset.image img { display: block; width: 100%; max-height: 210px; object-fit: cover; background: rgba(15,23,42,.35); }",
+      ".chat-asset.image, .chat-asset.video, .chat-asset.preview { padding: 0; }",
+      ".chat-asset.image img, .chat-asset.video video { display: block; width: 100%; max-height: 210px; object-fit: cover; background: rgba(15,23,42,.35); }",
+      ".chat-asset-preview { display: flex; align-items: center; justify-content: center; min-height: 138px; padding: 18px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 22%, #0f172a 78%), rgba(15,23,42,.94)); }",
+      ".chat-asset-preview-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 72px; padding: 10px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.08); color: white; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }",
       ".chat-asset.file { padding: 12px; }",
       ".chat-asset-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; }",
+      ".chat-asset-body { padding: 12px; }",
+      ".chat-asset-actions { margin-top: 10px; display: flex; gap: 8px; }",
+      ".chat-asset-action { display: inline-flex; align-items: center; justify-content: center; min-width: 78px; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--header-border); background: rgba(255,255,255,0.05); color: inherit; font-size: 11px; font-weight: 700; text-decoration: none; transition: transform .18s ease, background-color .18s ease; }",
+      ".chat-asset-action:hover { transform: translateY(-1px); background: rgba(255,255,255,0.09); }",
+      ".chat-asset-action.primary { border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: color-mix(in srgb, var(--accent) 18%, transparent); color: white; }",
       ".chat-asset-title { font-size: 12px; font-weight: 700; color: inherit; }",
       ".chat-asset-subtitle { margin-top: 4px; font-size: 11px; color: #94a3b8; }",
       ".chat-asset-open { font-size: 11px; font-weight: 700; color: var(--accent); white-space: nowrap; }",
@@ -184,14 +191,14 @@
       ".chat-typing-dots span:nth-child(2) { animation-delay: .16s; }",
       ".chat-typing-dots span:nth-child(3) { animation-delay: .32s; }",
       ".chat-form { flex-shrink: 0; display: flex; align-items: flex-end; gap: 10px; padding: 16px; border-top: 1px solid var(--header-border); background: color-mix(in srgb, var(--panel-bg) 96%, transparent); }",
-      ".chat-input { flex: 1; box-sizing: border-box; height: 46px; min-height: 46px; max-height: 110px; resize: none; overflow-y: hidden; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--header-border) 72%, transparent); outline: none; background: var(--input-bg); color: var(--input-text); padding: 11px 14px; font-family: inherit; font-size: 14px; line-height: 20px; scrollbar-width: thin; scrollbar-color: rgba(148,163,184,0.18) transparent; transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease; }",
+      ".chat-input { flex: 1; box-sizing: border-box; height: 46px; min-height: 46px; max-height: 110px; resize: none; overflow-y: hidden; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--header-border) 72%, transparent); outline: none; background: var(--input-bg); color: var(--input-text); padding: 11px 14px; font-family: inherit; font-size: 14px; line-height: 20px; scrollbar-width: thin; scrollbar-color: rgba(59,130,246,0.55) rgba(255,255,255,0.05); transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease; }",
       ".chat-input::placeholder { font-size: 13px; color: #94a3b8; }",
       ".chat-input:focus { border-color: color-mix(in srgb, var(--accent) 72%, white 28%); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); background: var(--input-bg); }",
       ".chat-input.is-waiting::placeholder { font-style: italic; color: #94a3b8; }",
-      ".chat-input::-webkit-scrollbar { width: 4px; }",
-      ".chat-input::-webkit-scrollbar-track { background: transparent; }",
-      ".chat-input::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.18); border-radius: 999px; }",
-      ".chat-input::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.28); }",
+      ".chat-input::-webkit-scrollbar { width: 10px; }",
+      ".chat-input::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 999px; }",
+      ".chat-input::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(59,130,246,0.9), rgba(14,165,233,0.7)); border-radius: 999px; border: 2px solid rgba(9,16,34,0.75); }",
+      ".chat-input::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(96,165,250,0.95), rgba(34,211,238,0.8)); }",
       ".chat-send { width: 46px; height: 46px; flex: 0 0 46px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 16px; background: var(--accent); color: white; padding: 0; cursor: pointer; }",
       ".chat-send .chat-icon { width: 18px; height: 18px; }",
       ".chat-send[disabled] { opacity: 0.6; cursor: wait; }",
@@ -384,18 +391,28 @@
           return;
         }
 
-        var link = document.createElement("a");
-        link.className = "chat-asset " + (asset.categoria === "image" ? "image" : "file");
-        link.href = asset.publicUrl;
-        link.target = "_blank";
-        link.rel = "noreferrer noopener";
+        var previewKind = getAssetPreviewKind(asset);
+        var card = document.createElement("div");
+        card.className = "chat-asset " + previewKind;
 
-        if (asset.categoria === "image") {
+        if (previewKind === "image") {
           var image = document.createElement("img");
           image.src = asset.publicUrl;
           image.alt = asset.nome || asset.arquivoNome || "Imagem do agente";
-          link.appendChild(image);
+          card.appendChild(image);
+        } else if (previewKind === "video") {
+          var video = document.createElement("video");
+          video.src = asset.publicUrl;
+          video.muted = true;
+          video.preload = "metadata";
+          video.playsInline = true;
+          card.appendChild(video);
+        } else if (previewKind === "preview") {
+          card.appendChild(createAssetPreviewBadge(asset));
         }
+
+        var body = document.createElement("div");
+        body.className = "chat-asset-body";
 
         var meta = document.createElement("div");
         meta.className = "chat-asset-meta";
@@ -417,14 +434,107 @@
 
         var openLabel = document.createElement("div");
         openLabel.className = "chat-asset-open";
-        openLabel.textContent = asset.categoria === "image" ? "Abrir imagem" : "Abrir arquivo";
+        openLabel.textContent = getAssetOpenLabel(asset, previewKind);
         meta.appendChild(openLabel);
 
-        link.appendChild(meta);
-        wrap.appendChild(link);
+        body.appendChild(meta);
+
+        var actions = document.createElement("div");
+        actions.className = "chat-asset-actions";
+        actions.appendChild(createAssetAction(asset, false));
+        actions.appendChild(createAssetAction(asset, true));
+        body.appendChild(actions);
+
+        card.appendChild(body);
+        wrap.appendChild(card);
       });
 
       return wrap;
+    }
+
+    function getAssetExtension(asset) {
+      var fileName = String((asset && (asset.arquivoNome || asset.nome)) || "");
+      var match = fileName.toLowerCase().match(/\.([a-z0-9]+)$/);
+      return match ? match[1] : "";
+    }
+
+    function getAssetPreviewKind(asset) {
+      var mimeType = String((asset && asset.mimeType) || "").toLowerCase();
+      var extension = getAssetExtension(asset);
+
+      if (asset && asset.categoria === "image") {
+        return "image";
+      }
+
+      if (mimeType.indexOf("video/") === 0 || ["mp4", "webm", "mov"].indexOf(extension) !== -1) {
+        return "video";
+      }
+
+      if (
+        mimeType === "application/pdf" ||
+        ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx"].indexOf(extension) !== -1
+      ) {
+        return "preview";
+      }
+
+      return "file";
+    }
+
+    function getAssetPreviewLabel(asset) {
+      var mimeType = String((asset && asset.mimeType) || "").toLowerCase();
+      var extension = getAssetExtension(asset).toUpperCase();
+
+      if (mimeType === "application/pdf" || extension === "PDF") {
+        return "PDF";
+      }
+
+      if (extension) {
+        return extension;
+      }
+
+      return "ARQ";
+    }
+
+    function createAssetPreviewBadge(asset) {
+      var preview = document.createElement("div");
+      preview.className = "chat-asset-preview";
+
+      var badge = document.createElement("div");
+      badge.className = "chat-asset-preview-badge";
+      badge.textContent = getAssetPreviewLabel(asset);
+      preview.appendChild(badge);
+
+      return preview;
+    }
+
+    function createAssetAction(asset, download) {
+      var action = document.createElement("a");
+      action.className = "chat-asset-action" + (download ? "" : " primary");
+      action.href = asset.publicUrl;
+      action.target = "_blank";
+      action.rel = "noreferrer noopener";
+
+      if (download) {
+        action.setAttribute("download", asset.arquivoNome || asset.nome || "arquivo");
+        action.textContent = "Baixar";
+      } else {
+        action.textContent = "Abrir";
+      }
+
+      return action;
+    }
+
+    function getAssetOpenLabel(asset, previewKind) {
+      if (previewKind === "image") {
+        return "Abrir imagem";
+      }
+
+      if (previewKind === "video") {
+        return "Abrir video";
+      }
+
+      var label = getAssetPreviewLabel(asset);
+      return label === "ARQ" ? "Abrir arquivo" : "Abrir " + label;
     }
 
     function createWhatsAppMessage(cta) {

@@ -12,6 +12,8 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(59, 130, 246, 0.55) rgba(255, 255, 255, 0.05);
   }
 
   body {
@@ -20,6 +22,8 @@
 
   * {
     box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(59, 130, 246, 0.55) rgba(255, 255, 255, 0.05);
   }
 
   button:not(:disabled),
@@ -37,6 +41,26 @@
   textarea:disabled,
   select:disabled {
     cursor: not-allowed;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.9), rgba(14, 165, 233, 0.7));
+    border-radius: 999px;
+    border: 2px solid rgba(9, 16, 34, 0.75);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(96, 165, 250, 0.95), rgba(34, 211, 238, 0.8));
   }
 }
 
@@ -135,30 +159,6 @@
   background: linear-gradient(180deg, rgba(37, 99, 235, 0.18), rgba(14, 165, 233, 0.1));
   border: 1px solid rgba(96, 165, 250, 0.22);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-.chat-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(59, 130, 246, 0.55) rgba(255, 255, 255, 0.05);
-}
-
-.chat-scroll::-webkit-scrollbar {
-  width: 10px;
-}
-
-.chat-scroll::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 999px;
-}
-
-.chat-scroll::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(59, 130, 246, 0.9), rgba(14, 165, 233, 0.7));
-  border-radius: 999px;
-  border: 2px solid rgba(9, 16, 34, 0.75);
-}
-
-.chat-scroll::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(96, 165, 250, 0.95), rgba(34, 211, 238, 0.8));
 }
 
 .tech-marquee {

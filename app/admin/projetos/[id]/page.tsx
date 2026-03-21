@@ -579,8 +579,8 @@ function AgenteModal({
           </button>
         </div>
 
-        <div className="grid max-h-[calc(92vh-88px)] gap-0 overflow-y-auto lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="space-y-4 p-6">
+        <div className="grid max-h-[calc(92vh-88px)] gap-0 overflow-x-hidden overflow-y-auto lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="min-w-0 space-y-4 p-6">
             <input value={form.slug} onChange={(event) => onChange({ slug: event.target.value })} placeholder="Slug do agente" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
             <input value={form.nome} onChange={(event) => onChange({ nome: event.target.value })} placeholder="Nome do agente" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
             <input value={form.descricao} onChange={(event) => onChange({ descricao: event.target.value })} placeholder="Descricao curta do agente" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
@@ -611,8 +611,8 @@ function AgenteModal({
               {form.arquivos.length ? (
                 <div className="mt-4 space-y-2">
                   {form.arquivos.map((asset) => (
-                    <div key={asset.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3">
-                      <div className="flex min-w-0 items-center gap-3">
+                    <div key={asset.id} className="flex items-start justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3">
+                      <div className="flex min-w-0 items-start gap-3">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/[0.05] text-cyan-100">
                           {asset.categoria === "image" ? <FileImage size={18} /> : <Paperclip size={18} />}
                         </div>
@@ -621,6 +621,15 @@ function AgenteModal({
                           <p className="text-xs text-slate-400">
                             {asset.arquivoNome} • {formatFileSize(asset.tamanhoBytes)}
                           </p>
+                          <a
+                            href={asset.publicUrl}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="mt-1 block break-all text-[11px] leading-relaxed text-cyan-200/80 transition-colors hover:text-cyan-100"
+                            title={asset.publicUrl}
+                          >
+                            {asset.publicUrl}
+                          </a>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -650,8 +659,8 @@ function AgenteModal({
               {pendingArquivos.length ? (
                 <div className="mt-4 space-y-2">
                   {pendingArquivos.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-cyan-500/15 bg-cyan-500/10 px-3 py-3">
-                      <div className="flex min-w-0 items-center gap-3">
+                    <div key={item.id} className="flex items-start justify-between gap-3 rounded-xl border border-cyan-500/15 bg-cyan-500/10 px-3 py-3">
+                      <div className="flex min-w-0 items-start gap-3">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950/20 text-cyan-100">
                           {item.file.type.startsWith("image/") ? <FileImage size={18} /> : <Paperclip size={18} />}
                         </div>
@@ -675,7 +684,7 @@ function AgenteModal({
             </div>
           </div>
 
-          <div className="border-t border-white/10 bg-white/[0.03] p-6 lg:border-l lg:border-t-0">
+          <div className="min-w-0 border-t border-white/10 bg-white/[0.03] p-6 lg:border-l lg:border-t-0">
             <div className="mb-5 rounded-2xl border border-cyan-500/15 bg-cyan-500/10 p-5">
               <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950/20 text-cyan-100">
                 <Bot size={22} />
