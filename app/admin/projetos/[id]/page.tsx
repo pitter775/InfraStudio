@@ -204,12 +204,56 @@ function normalizeSummaryKey(value: string) {
     .trim();
 }
 
+function stripDecorativeCharacters(value: string) {
+  return value
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
+    .replace(/[\u2600-\u27BF]/gu, "")
+    .replace(/[✓✔✕✖✳⭐🔥💬📌🎯⚙️❓🔁]/gu, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function sanitizeTechnicalText(value: string) {
+  return stripDecorativeCharacters(value)
+    .replace(/^[-*]\s*/, "")
+    .replace(/^(\d+)[.)]\s*/, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function sanitizeTechnicalValue<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => sanitizeTechnicalValue(item))
+      .filter((item) => {
+        if (typeof item === "string") {
+          return item.trim().length > 0;
+        }
+        return item !== null && item !== undefined;
+      }) as T;
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nested]) => [key, sanitizeTechnicalValue(nested)]),
+    ) as T;
+  }
+
+  if (typeof value === "string") {
+    return sanitizeTechnicalText(value) as T;
+  }
+
+  return value;
+}
+
 function compactHumanLine(value: string) {
-  const cleaned = value
+  const cleaned = stripDecorativeCharacters(
+    value
     .replace(/\s{2,}/g, " ")
     .replace(/^[-*]\s*/, "- ")
     .replace(/^(\d+)[.)]\s*/, "$1. ")
-    .trim();
+    .trim(),
+  );
 
   const normalized = normalizeSummaryKey(cleaned);
 
@@ -408,7 +452,7 @@ function buildAgentConfigFromSummary(summary: string) {
     config.observacoes = observacoes.slice(0, 6);
   }
 
-  return config;
+  return sanitizeTechnicalValue(config);
 }
 
 function summarizePublicUrl(value: string, max = 72) {
