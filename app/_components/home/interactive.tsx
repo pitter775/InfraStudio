@@ -834,7 +834,7 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
             <button
               type="button"
               onClick={() => onDockedChange(!docked)}
-              className="mr-2 rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+              className="mr-2 rounded-full border border-white/10 bg-white/5 p-2 text-blue-400 transition-colors hover:bg-white/10 hover:text-blue-300"
               aria-label={docked ? "Reduzir chat" : "Maximizar chat"}
             >
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
@@ -848,7 +848,7 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
                 onDockedChange(false);
                 onClose();
               }}
-              className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+              className="rounded-full border border-white/10 bg-white/5 p-2 text-blue-400 transition-colors hover:bg-white/10 hover:text-blue-300"
               aria-label="Fechar chat"
             >
               <X size={16} />
