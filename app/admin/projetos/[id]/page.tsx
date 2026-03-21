@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Bot, CheckCircle2, Copy, ExternalLink, FileImage, MessageSquare, Paperclip, Pencil, Plus, Sparkles, TestTube2, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Bold, Bot, CheckCircle2, Copy, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, MessageSquare, Minimize2, Paperclip, Pencil, Plus, Sparkles, TestTube2, Trash2, X } from "lucide-react";
 import { getAgentRuntimeBlockEntries, normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
 
 type Projeto = {
@@ -485,6 +485,7 @@ function RuntimeRoutePill({ label, blocks }: { label: string; blocks: string[] }
 }
 
 function AgentRuntimePreview({ rawConfig }: { rawConfig: string }) {
+  const [expanded, setExpanded] = useState(false);
   let parsed: Record<string, unknown> | null = null;
 
   try {
@@ -506,40 +507,64 @@ function AgentRuntimePreview({ rawConfig }: { rawConfig: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-4">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-200">Kit de execucao</p>
-        <p className="mt-2 text-sm font-semibold text-white">{runtime.overview.descricao_curta || runtime.overview.objetivo}</p>
-        <p className="mt-2 text-xs leading-6 text-emerald-50/80">
-          Esse e o pacote curto que o orquestrador deve preferir no runtime, em vez de carregar o resumo inteiro a cada mensagem.
-        </p>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2">
-        <RuntimeRoutePill label="Saudacao" blocks={runtime.routes.greeting} />
-        <RuntimeRoutePill label="Inicio" blocks={runtime.routes.default} />
-        <RuntimeRoutePill label="Preco" blocks={runtime.routes.pricing} />
-        <RuntimeRoutePill label="WhatsApp" blocks={runtime.routes.whatsapp} />
-        <RuntimeRoutePill label="API" blocks={runtime.routes.api} />
-      </div>
-
-      <div className="space-y-3">
-        {entries.map((entry) => (
-          <div key={entry.key} className="rounded-xl border border-white/8 bg-slate-950/45 px-4 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-white">{entry.key}</p>
-              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300">
-                {entry.lines.length} linhas
-              </span>
-            </div>
-            <div className="mt-3 space-y-2">
-              {entry.lines.map((line) => (
-                <p key={`${entry.key}-${line}`} className="text-xs leading-5 text-slate-300">
-                  - {line}
-                </p>
-              ))}
-            </div>
+      <button
+        type="button"
+        onClick={() => setExpanded((current) => !current)}
+        className="group w-full rounded-[22px] border border-emerald-500/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(3,105,80,0.1))] px-4 py-4 text-left transition-all duration-300 hover:border-emerald-400/35 hover:bg-[linear-gradient(135deg,rgba(16,185,129,0.22),rgba(5,150,105,0.14))]"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-200">Kit de execucao</p>
+            <p className="mt-2 text-sm font-semibold text-white">{runtime.overview.descricao_curta || runtime.overview.objetivo}</p>
+            <p className="mt-2 text-xs leading-6 text-emerald-50/80">
+              Esse e o pacote curto que o orquestrador deve preferir no runtime, em vez de carregar o resumo inteiro a cada mensagem.
+            </p>
           </div>
-        ))}
+          <div className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-semibold text-white transition-colors group-hover:bg-white/15">
+            {expanded ? "Recolher" : "Expandir"}
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {entries.slice(0, 4).map((entry) => (
+            <span key={`pill-${entry.key}`} className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-50">
+              {entry.key}
+            </span>
+          ))}
+        </div>
+      </button>
+
+      <div
+        className={`grid overflow-hidden transition-all duration-300 ${expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+      >
+        <div className="min-h-0 space-y-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <RuntimeRoutePill label="Saudacao" blocks={runtime.routes.greeting} />
+            <RuntimeRoutePill label="Inicio" blocks={runtime.routes.default} />
+            <RuntimeRoutePill label="Preco" blocks={runtime.routes.pricing} />
+            <RuntimeRoutePill label="WhatsApp" blocks={runtime.routes.whatsapp} />
+            <RuntimeRoutePill label="API" blocks={runtime.routes.api} />
+          </div>
+
+          <div className="space-y-3">
+            {entries.map((entry) => (
+              <div key={entry.key} className="rounded-xl border border-white/8 bg-slate-950/45 px-4 py-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-white">{entry.key}</p>
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300">
+                    {entry.lines.length} linhas
+                  </span>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {entry.lines.map((line) => (
+                    <p key={`${entry.key}-${line}`} className="text-xs leading-5 text-slate-300">
+                      - {line}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1012,10 +1037,13 @@ function AgenteModal({
   onSubmit: () => void;
 }) {
   const [showRawConfig, setShowRawConfig] = useState(false);
+  const [promptExpanded, setPromptExpanded] = useState(false);
+  const promptRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     if (open) {
       setShowRawConfig(false);
+      setPromptExpanded(false);
     }
   }, [open]);
 
@@ -1023,9 +1051,64 @@ function AgenteModal({
     return null;
   }
 
+  const updatePromptBase = (nextValue: string) => onChange({ promptBase: nextValue });
+
+  const applyPromptFormat = (mode: "bold" | "title" | "bullet" | "numbered") => {
+    const element = promptRef.current;
+    if (!element) {
+      return;
+    }
+
+    const currentValue = form.promptBase;
+    const start = element.selectionStart ?? currentValue.length;
+    const end = element.selectionEnd ?? currentValue.length;
+    const selectedText = currentValue.slice(start, end);
+
+    let replacement = selectedText;
+
+    if (mode === "bold") {
+      replacement = selectedText ? `**${selectedText}**` : "**texto**";
+    }
+
+    if (mode === "title") {
+      replacement = selectedText ? `${selectedText.trim()}:` : "Titulo:";
+    }
+
+    if (mode === "bullet") {
+      replacement = selectedText
+        ? selectedText
+            .split("\n")
+            .map((line) => (line.trim() ? `- ${line.replace(/^[-*]\s*/, "").trim()}` : line))
+            .join("\n")
+        : "- item";
+    }
+
+    if (mode === "numbered") {
+      replacement = selectedText
+        ? selectedText
+            .split("\n")
+            .map((line, index) => (line.trim() ? `${index + 1}. ${line.replace(/^(\d+)[.)]\s*/, "").trim()}` : line))
+            .join("\n")
+        : "1. item";
+    }
+
+    const nextValue = `${currentValue.slice(0, start)}${replacement}${currentValue.slice(end)}`;
+    updatePromptBase(nextValue);
+
+    window.requestAnimationFrame(() => {
+      if (!promptRef.current) {
+        return;
+      }
+
+      promptRef.current.focus();
+      const cursorEnd = start + replacement.length;
+      promptRef.current.setSelectionRange(cursorEnd, cursorEnd);
+    });
+  };
+
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
-      <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
+      <div className={`max-h-[92vh] w-full overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl transition-all duration-300 ${promptExpanded ? "max-w-6xl" : "max-w-5xl"}`}>
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Agente</p>
@@ -1059,23 +1142,68 @@ function AgenteModal({
             <div>
               <div className="mb-2 flex items-center justify-between gap-3">
                 <FormLabel>Resumo do agente</FormLabel>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPromptExpanded((current) => !current)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                  >
+                    {promptExpanded ? <Minimize2 size={14} /> : <Expand size={14} />}
+                    {promptExpanded ? "Recolher" : "Maximizar"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onValidateSummary}
+                    className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/20"
+                  >
+                    <Sparkles size={14} />
+                    Validar e organizar
+                  </button>
+                </div>
+              </div>
+              <div className="mb-3 flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-slate-950/35 p-2">
                 <button
                   type="button"
-                  onClick={onValidateSummary}
-                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/20"
+                  onClick={() => applyPromptFormat("bold")}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
                 >
-                  <Sparkles size={14} />
-                  Validar e organizar
+                  <Bold size={14} />
+                  Negrito
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPromptFormat("title")}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  <Heading size={14} />
+                  Titulo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPromptFormat("bullet")}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  <List size={14} />
+                  Lista
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPromptFormat("numbered")}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  <ListOrdered size={14} />
+                  Numerada
                 </button>
               </div>
               <textarea
+                ref={promptRef}
                 value={form.promptBase}
                 onChange={(event) => onChange({ promptBase: event.target.value })}
                 placeholder="Descreva como o agente deve atuar, o que oferecer, como qualificar, regras de preco, handoff e CTA."
-                rows={12}
-                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none placeholder:text-slate-500"
+                rows={promptExpanded ? 24 : 12}
+                className={`w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none placeholder:text-slate-500 transition-all duration-300 ${promptExpanded ? "min-h-[560px]" : "min-h-[290px]"}`}
               />
-              <p className="mt-2 text-xs text-slate-400">Ao validar, o texto e reorganizado para leitura humana e o JSON tecnico e regenerado automaticamente.</p>
+              <p className="mt-2 text-xs text-slate-400">Ao validar, o texto e reorganizado para leitura humana e o JSON tecnico e regenerado automaticamente sem virar um resumao podado.</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
               <div className="flex items-center justify-between gap-3">
