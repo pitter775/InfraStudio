@@ -525,11 +525,22 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
     phone?: string;
   };
 
+  type ChatWidgetAsset = {
+    id: string;
+    nome: string;
+    descricao: string;
+    arquivoNome: string;
+    mimeType: string;
+    categoria: "image" | "file";
+    publicUrl: string;
+  };
+
   type ChatWidgetMessage = {
     id: string;
     text: string;
     isAi: boolean;
     cta?: ChatWidgetCta | null;
+    assets?: ChatWidgetAsset[];
   };
 
   const initialMessages: ChatWidgetMessage[] = [
@@ -686,6 +697,7 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
         error?: string;
         chatId?: string;
         whatsapp?: ChatWidgetCta | null;
+        assets?: ChatWidgetAsset[];
       };
       if (payload.chatId) {
         setChatId(payload.chatId);
@@ -698,6 +710,7 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
             id: `ai-${Date.now()}`,
             text: normalizeHomeAiMessage(payload.reply ?? payload.error ?? "Não consegui responder agora, mas posso te levar para o WhatsApp."),
             isAi: true,
+            assets: Array.isArray(payload.assets) ? payload.assets : [],
           },
         ];
         const whatsappMessage = buildWhatsappMessage(payload.whatsapp ?? null);
@@ -714,6 +727,7 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
             id: `ai-${Date.now()}`,
             text: normalizeHomeAiMessage("Não consegui responder agora, mas posso te levar para o WhatsApp."),
             isAi: true,
+            assets: [],
           },
         ];
         const whatsappMessage = buildWhatsappMessage(fallbackWhatsappCta);
@@ -805,6 +819,36 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
                   className="[&_ol]:m-0 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol_+_p]:mt-2.5 [&_p]:m-0 [&_p_+_ol]:mt-2.5 [&_p_+_p]:mt-2.5 [&_p_+_ul]:mt-2.5 [&_strong]:font-bold [&_strong]:text-white [&_ul]:m-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ul_+_p]:mt-2.5 [&_ul_+_ul]:mt-2.5 [&_li_+_li]:mt-1.5"
                   dangerouslySetInnerHTML={{ __html: formatChatRichText(message.text) }}
                 />
+                {message.isAi && Array.isArray(message.assets) && message.assets.length ? (
+                  <div className="mt-3 space-y-3">
+                    {message.assets.slice(0, 2).map((asset) => (
+                      <a
+                        key={asset.id}
+                        href={asset.publicUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] transition-colors hover:bg-white/[0.06]"
+                      >
+                        {asset.categoria === "image" ? (
+                          <img
+                            src={asset.publicUrl}
+                            alt={asset.nome || asset.arquivoNome || "Imagem do agente"}
+                            className="block max-h-[220px] w-full object-cover"
+                          />
+                        ) : null}
+                        <div className="p-3">
+                          <div className="text-xs font-semibold text-white">{asset.nome || asset.arquivoNome || "Arquivo"}</div>
+                          {asset.descricao || asset.arquivoNome ? (
+                            <div className="mt-1 text-[11px] text-slate-400">{asset.descricao || asset.arquivoNome}</div>
+                          ) : null}
+                          <div className="mt-2 text-[11px] font-semibold text-blue-300">
+                            {asset.categoria === "image" ? "Abrir imagem" : "Abrir arquivo"}
+                          </div>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
                 {message.isAi && message.cta?.url ? (
                   <a
                     href={message.cta.url}
