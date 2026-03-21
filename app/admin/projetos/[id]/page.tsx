@@ -184,6 +184,171 @@ function formatFileSize(value: number) {
   return `${value} B`;
 }
 
+function normalizeAgentText(value: string) {
+  return value
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function compactAgentSummary(summary: string) {
+  const normalized = normalizeAgentText(summary);
+  if (!normalized) {
+    return "";
+  }
+
+  const lines = normalized.split("\n");
+  const compacted: string[] = [];
+
+  for (const line of lines) {
+    if (!line) {
+      if (compacted[compacted.length - 1] !== "") {
+        compacted.push("");
+      }
+      continue;
+    }
+
+    const normalizedLine = line
+      .replace(/\s{2,}/g, " ")
+      .replace(/^[-*]\s*/, "- ")
+      .replace(/^(\d+)[.)]\s*/, "$1. ");
+
+    compacted.push(normalizedLine);
+  }
+
+  return compacted.join("\n").trim();
+}
+
+function inferShortDescription(summary: string) {
+  const firstParagraph = compactAgentSummary(summary).split("\n").find((line) => line && !line.startsWith("- ") && !/^\d+\.\s/.test(line)) ?? "";
+  if (!firstParagraph) {
+    return "";
+  }
+
+  if (firstParagraph.length <= 160) {
+    return firstParagraph;
+  }
+
+  return `${firstParagraph.slice(0, 157).trimEnd()}...`;
+}
+
+function buildAgentConfigFromSummary(summary: string) {
+  const normalized = compactAgentSummary(summary);
+  const lines = normalized ? normalized.split("\n") : [];
+  const intro: string[] = [];
+  const capacidades: string[] = [];
+  const perguntasQualificacao: string[] = [];
+  const regrasPrecificacao: string[] = [];
+  const handoff: string[] = [];
+  const cta: string[] = [];
+  const observacoes: string[] = [];
+  let currentSection = "";
+
+  const classifySection = (rawTitle: string) => {
+    const title = rawTitle
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+    if (title.includes("preco") || title.includes("valor") || title.includes("orcamento")) {
+      return "pricing";
+    }
+    if (title.includes("qualifica") || title.includes("pergunta") || title.includes("descobrir")) {
+      return "qualification";
+    }
+    if (title.includes("handoff") || title.includes("humano") || title.includes("escal") || title.includes("encaminh")) {
+      return "handoff";
+    }
+    if (title.includes("cta") || title.includes("whatsapp") || title.includes("fechamento")) {
+      return "cta";
+    }
+    if (title.includes("capacidade") || title.includes("servico") || title.includes("solucao") || title.includes("oferta")) {
+      return "capabilities";
+    }
+    return "notes";
+  };
+
+  const pushLine = (line: string, preferSection = currentSection) => {
+    const cleaned = line.replace(/^-\s*/, "").replace(/^\d+\.\s*/, "").trim();
+    if (!cleaned) {
+      return;
+    }
+
+    if (preferSection === "pricing") {
+      regrasPrecificacao.push(cleaned);
+      return;
+    }
+    if (preferSection === "qualification") {
+      perguntasQualificacao.push(cleaned);
+      return;
+    }
+    if (preferSection === "handoff") {
+      handoff.push(cleaned);
+      return;
+    }
+    if (preferSection === "cta") {
+      cta.push(cleaned);
+      return;
+    }
+    if (preferSection === "capabilities") {
+      capacidades.push(cleaned);
+      return;
+    }
+
+    if (!currentSection && intro.length < 2) {
+      intro.push(cleaned);
+      return;
+    }
+
+    observacoes.push(cleaned);
+  };
+
+  for (const line of lines) {
+    if (!line) {
+      continue;
+    }
+
+    if (!line.startsWith("- ") && /:$/.test(line)) {
+      currentSection = classifySection(line.slice(0, -1));
+      continue;
+    }
+
+    if (line.startsWith("- ") || /^\d+\.\s/.test(line)) {
+      pushLine(line);
+      continue;
+    }
+
+    pushLine(line, currentSection || "notes");
+  }
+
+  const objetivo = intro.join(" ").trim() || "Qualificar leads e conduzir o atendimento com contexto do negocio.";
+  const config: Record<string, unknown> = {
+    objetivo,
+    capacidades: capacidades.length ? capacidades : [],
+    perguntas_qualificacao: perguntasQualificacao.length ? perguntasQualificacao : [],
+    handoff: {
+      enviar_para_humano_se: handoff.length ? handoff : [],
+    },
+  };
+
+  if (regrasPrecificacao.length) {
+    config.regras_precificacao = regrasPrecificacao;
+  }
+
+  if (cta.length) {
+    config.cta_whatsapp = cta.join(" ");
+  }
+
+  if (observacoes.length) {
+    config.observacoes = observacoes;
+  }
+
+  return config;
+}
+
 function mergeDetectedApiCampos(campos: ApiCampo[], parametros: ApiParametro[]) {
   const map = new Map<string, ApiCampo>();
 
@@ -336,6 +501,53 @@ const emptyWidgetForm: WidgetFormState = {
   fundoTransparente: true,
   ativo: true,
 };
+
+function FormLabel({ children }: { children: string }) {
+  return <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{children}</label>;
+}
+
+function AgenteAssetPreview({
+  file,
+  categoria,
+  publicUrl,
+  alt,
+}: {
+  file?: File;
+  categoria: "image" | "file";
+  publicUrl?: string;
+  alt: string;
+}) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(publicUrl ?? null);
+
+  useEffect(() => {
+    if (publicUrl) {
+      setPreviewUrl(publicUrl);
+      return;
+    }
+
+    if (!file || !file.type.startsWith("image/")) {
+      setPreviewUrl(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [file, publicUrl]);
+
+  if (categoria === "image" && previewUrl) {
+    return <img src={previewUrl} alt={alt} className="h-12 w-12 shrink-0 rounded-2xl object-cover" />;
+  }
+
+  return (
+    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/[0.05] text-cyan-100">
+      {categoria === "image" ? <FileImage size={18} /> : <Paperclip size={18} />}
+    </div>
+  );
+}
 
 function renderSnippetLine(line: string) {
   const trimmed = line.trim();
@@ -1921,41 +2133,6 @@ export default function AdminProjetoDetalhePage() {
         </div>
         <h1 className="text-4xl font-extrabold text-white">{data.projeto.nome}</h1>
         <p className="mt-3 max-w-3xl text-slate-400">{data.projeto.descricao || "Sem descricao cadastrada."}</p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={() => setActiveTab("agentes")}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-              activeTab === "agentes"
-                ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
-                : "border border-white/10 bg-white/5 text-white"
-            }`}
-          >
-            Agentes
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("apis")}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-              activeTab === "apis"
-                ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
-                : "border border-white/10 bg-white/5 text-white"
-            }`}
-          >
-            APIs
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("chats")}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-              activeTab === "chats"
-                ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
-                : "border border-white/10 bg-white/5 text-white"
-            }`}
-          >
-            Chats
-          </button>
-        </div>
         <div className="mt-6 grid gap-4 md:grid-cols-6">
           <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Slug</p>
@@ -1980,6 +2157,44 @@ export default function AdminProjetoDetalhePage() {
           <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Agente ativo</p>
             <p className="mt-2 text-lg font-bold text-white">{agenteAtivo?.nome ?? "Nenhum ativo"}</p>
+          </div>
+        </div>
+        <div className="mt-10">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Navegacao do projeto</p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => setActiveTab("agentes")}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                activeTab === "agentes"
+                  ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
+                  : "border border-white/10 bg-white/5 text-white"
+              }`}
+            >
+              Agentes
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("apis")}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                activeTab === "apis"
+                  ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
+                  : "border border-white/10 bg-white/5 text-white"
+              }`}
+            >
+              APIs
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("chats")}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                activeTab === "chats"
+                  ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
+                  : "border border-white/10 bg-white/5 text-white"
+              }`}
+            >
+              Chats
+            </button>
           </div>
         </div>
       </section>
