@@ -2,6 +2,7 @@ import "server-only";
 
 import type { AgenteAssetRecord } from "@/lib/agente-assets";
 import { getAgenteAtivo, getAgenteById } from "@/lib/agentes";
+import { normalizeAgentRuntimeConfig, selectAgentRuntimeLines } from "@/lib/agent-runtime";
 import { buildAgenteApiRuntimeContext, type ApiRuntimeContext } from "@/lib/apis";
 import { getChatChannelPolicy } from "@/lib/chat-channel-policy";
 import { getProjetoOpenAIConfig } from "@/lib/segredos";
@@ -938,6 +939,85 @@ function buildSystemPrompt(agent: Awaited<ReturnType<typeof getAgenteAtivo>>) {
   if (!agent) {
     return defaultPrompt;
   }
+  return [
+    defaultPrompt,
+    agent.nome ? `Nome do agente: ${agent.nome}` : "",
+    agent.descricao ? `Descricao curta: ${agent.descricao}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function detectPromptRoute(latestUserMessage: string, context: ConversationContext | undefined, apiContexts: ApiRuntimeContext[]) {
+  const normalized = normalizeText(latestUserMessage);
+  const channelKind = context?.channel?.kind ?? "";
+  const compact = normalized.replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  const greetingSignals = new Set(["oi", "ola", "olá", "opa", "e ai", "ei", "bom dia", "boa tarde", "boa noite"]);
+
+  if (
+    compact &&
+    compact.length <= 18 &&
+    [...greetingSignals].some((item) => compact === normalizeText(item))
+  ) {
+    return "greeting" as const;
+  }
+
+  if (channelKind.includes("whatsapp") || normalized.includes("whatsapp") || normalized.includes("zap")) {
+    return "whatsapp" as const;
+  }
+
+  if (
+    normalized.includes("preco") ||
+    normalized.includes("orcamento") ||
+    normalized.includes("valor") ||
+    normalized.includes("proposta") ||
+    normalized.includes("fechar")
+  ) {
+    return "pricing" as const;
+  }
+
+  if (apiContexts.length > 0 && /codigo|status|consulta|buscar|verifica|api|integr/i.test(normalized)) {
+    return "api" as const;
+  }
+
+  return "default" as const;
+}
+
+function buildRuntimePrompt(
+  agent: Awaited<ReturnType<typeof getAgenteAtivo>>,
+  latestUserMessage: string,
+  context: ConversationContext | undefined,
+  apiContexts: ApiRuntimeContext[],
+) {
+  const runtime = normalizeAgentRuntimeConfig(agent?.configuracoes?.runtime);
+  if (!runtime) {
+    return "";
+  }
+
+  const route = detectPromptRoute(latestUserMessage, context, apiContexts);
+  const blockKeys = runtime.routes[route];
+  const selectedLines = selectAgentRuntimeLines(runtime, blockKeys);
+
+  if (!selectedLines.length) {
+    return "";
+  }
+
+  return [
+    "Runtime operacional do agente:",
+    `Objetivo central: ${runtime.overview.objetivo}`,
+    runtime.overview.descricao_curta ? `Descricao curta: ${runtime.overview.descricao_curta}` : "",
+    `Rota atual: ${route}`,
+    `Blocos ativos: ${blockKeys.join(", ")}`,
+    ...selectedLines.map((line) => `- ${line}`),
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildLegacyAgentPrompt(agent: Awaited<ReturnType<typeof getAgenteAtivo>>) {
+  if (!agent) {
+    return "";
+  }
 
   const config = agent.configuracoes ?? {};
   const capabilities = Array.isArray(config.capacidades) ? config.capacidades.join(", ") : "";
@@ -949,7 +1029,6 @@ function buildSystemPrompt(agent: Awaited<ReturnType<typeof getAgenteAtivo>>) {
   const handoff = config.handoff ? `Regras de handoff: ${JSON.stringify(config.handoff)}` : "";
 
   return [
-    defaultPrompt,
     agent.nome ? `Nome do agente: ${agent.nome}` : "",
     agent.descricao ? `Descricao: ${agent.descricao}` : "",
     agent.promptBase ? `Prompt base: ${agent.promptBase}` : "",
@@ -1123,6 +1202,8 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const apiContexts = agent?.id ? await buildAgenteApiRuntimeContext(agent.id, (context ?? {}) as Record<string, unknown>) : [];
   const openai = await getProjetoOpenAIConfig(projectId);
   const systemPrompt = buildSystemPrompt(agent);
+  const runtimePrompt = buildRuntimePrompt(agent, latestUserMessage, context, apiContexts);
+  const legacyAgentPrompt = runtimePrompt ? "" : buildLegacyAgentPrompt(agent);
   const structuredReplyInstruction = buildStructuredReplyInstruction(context);
   const analyticalReplyInstruction = buildAnalyticalReplyInstruction(latestUserMessage);
   const agentAssetInstruction = buildAgentAssetInstruction(runtimeAssets, latestUserMessage);
@@ -1207,7 +1288,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
       model: openai.model,
       temperature: 0.5,
       max_output_tokens: 220,
-      instructions: [systemPrompt, structuredReplyInstruction, analyticalReplyInstruction, agentAssetInstruction, focusedApiContext.instructions, summary, lead, qualification]
+      instructions: [systemPrompt, runtimePrompt, legacyAgentPrompt, structuredReplyInstruction, analyticalReplyInstruction, agentAssetInstruction, focusedApiContext.instructions, summary, lead, qualification]
         .filter(Boolean)
         .join("\n\n"),
       input: buildInput(latestUserTurn ? [...recentMessages.filter((item) => item !== latestUserTurn), latestUserTurn] : recentMessages),
@@ -1261,6 +1342,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
         agenteNome: agent?.nome ?? null,
         debugRequest: {
           hasSummary,
+          hasRuntimePrompt: Boolean(runtimePrompt),
           allowIcons: context?.ui?.allow_icons !== false,
           structuredResponse: context?.ui?.structured_response !== false,
           historyLength: history.length,

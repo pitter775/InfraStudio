@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Bot, CheckCircle2, Copy, ExternalLink, FileImage, MessageSquare, Paperclip, Pencil, Plus, Sparkles, TestTube2, Trash2, X } from "lucide-react";
+import { getAgentRuntimeBlockEntries, normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
 
 type Projeto = {
   id: string;
@@ -431,6 +432,34 @@ function buildAgentConfigFromSummary(summary: string) {
   }
 
   const objetivo = intro.join(" ").trim() || "Qualificar leads e conduzir o atendimento com contexto do negocio.";
+  const descricaoCurta = inferShortDescription(normalized || summary) || objetivo;
+  const runtime = {
+    version: 1,
+    overview: {
+      objetivo,
+      descricao_curta: descricaoCurta,
+    },
+    blocks: {
+      core: [objetivo, ...capacidades.slice(0, 4)].filter(Boolean),
+      qualification: perguntasQualificacao.slice(0, 5),
+      pricing: regrasPrecificacao.slice(0, 6),
+      handoff: handoff.slice(0, 5),
+      whatsapp: [
+        cta.join(" ").trim(),
+        ...handoff.filter((item) => /whats|zap|telefone|fech|encaminh/i.test(item)),
+      ]
+        .filter(Boolean)
+        .slice(0, 5),
+      notes: observacoes.slice(0, 5),
+    },
+    routes: {
+      greeting: ["core"],
+      default: ["core", "qualification"],
+      pricing: ["core", "pricing", "qualification"],
+      whatsapp: ["core", "whatsapp", "handoff"],
+      api: ["core", "qualification"],
+    },
+  };
   const config: Record<string, unknown> = {
     objetivo,
     capacidades: capacidades.slice(0, 8),
@@ -438,6 +467,7 @@ function buildAgentConfigFromSummary(summary: string) {
     handoff: {
       enviar_para_humano_se: handoff.slice(0, 5),
     },
+    runtime,
   };
 
   if (regrasPrecificacao.length) {
@@ -453,6 +483,76 @@ function buildAgentConfigFromSummary(summary: string) {
   }
 
   return sanitizeTechnicalValue(config);
+}
+
+function RuntimeRoutePill({ label, blocks }: { label: string; blocks: string[] }) {
+  return (
+    <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className="mt-2 text-xs leading-5 text-slate-300">{blocks.join(" -> ")}</p>
+    </div>
+  );
+}
+
+function AgentRuntimePreview({ rawConfig }: { rawConfig: string }) {
+  let parsed: Record<string, unknown> | null = null;
+
+  try {
+    parsed = JSON.parse(rawConfig) as Record<string, unknown>;
+  } catch {
+    parsed = null;
+  }
+
+  const runtime = normalizeAgentRuntimeConfig(parsed?.runtime);
+  if (!runtime) {
+    return (
+      <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 px-4 py-4 text-sm text-slate-400">
+        Valide o resumo para gerar o kit operacional enxuto do agente.
+      </div>
+    );
+  }
+
+  const entries = getAgentRuntimeBlockEntries(runtime);
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-4">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-200">Kit de execucao</p>
+        <p className="mt-2 text-sm font-semibold text-white">{runtime.overview.descricao_curta || runtime.overview.objetivo}</p>
+        <p className="mt-2 text-xs leading-6 text-emerald-50/80">
+          Esse e o pacote curto que o orquestrador deve preferir no runtime, em vez de carregar o resumo inteiro a cada mensagem.
+        </p>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <RuntimeRoutePill label="Saudacao" blocks={runtime.routes.greeting} />
+        <RuntimeRoutePill label="Inicio" blocks={runtime.routes.default} />
+        <RuntimeRoutePill label="Preco" blocks={runtime.routes.pricing} />
+        <RuntimeRoutePill label="WhatsApp" blocks={runtime.routes.whatsapp} />
+        <RuntimeRoutePill label="API" blocks={runtime.routes.api} />
+      </div>
+
+      <div className="space-y-3">
+        {entries.map((entry) => (
+          <div key={entry.key} className="rounded-xl border border-white/8 bg-slate-950/45 px-4 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-white">{entry.key}</p>
+              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300">
+                {entry.lines.length} linhas
+              </span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {entry.lines.map((line) => (
+                <p key={`${entry.key}-${line}`} className="text-xs leading-5 text-slate-300">
+                  - {line}
+                </p>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function summarizePublicUrl(value: string, max = 72) {
@@ -1008,6 +1108,13 @@ function AgenteModal({
                   </div>
                 </div>
               ) : null}
+            </div>
+            <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+              <div className="mb-4">
+                <p className="text-sm font-semibold text-white">Runtime compilado</p>
+                <p className="mt-1 text-xs text-slate-400">Preview do kit enxuto que o orquestrador deve usar no atendimento para reduzir token sem perder o rumo.</p>
+              </div>
+              <AgentRuntimePreview rawConfig={form.configuracoes} />
             </div>
             <div className="hidden rounded-xl border border-white/10 bg-slate-950/30 p-4">
               <div className="flex items-center justify-between gap-3">
