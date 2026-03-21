@@ -200,8 +200,10 @@ function compactAgentSummary(summary: string) {
     return "";
   }
 
-  const lines = normalized.split("\n");
+  const withoutJsonBlocks = normalized.replace(/\{[\s\S]*\}$/g, "").trim();
+  const lines = withoutJsonBlocks.split("\n");
   const compacted: string[] = [];
+  let currentSection = "";
 
   for (const line of lines) {
     if (!line) {
@@ -216,10 +218,26 @@ function compactAgentSummary(summary: string) {
       .replace(/^[-*]\s*/, "- ")
       .replace(/^(\d+)[.)]\s*/, "$1. ");
 
+    if (!normalizedLine.startsWith("- ") && /:$/.test(normalizedLine)) {
+      const section = normalizedLine
+        .replace(/:$/, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      if (section && section !== currentSection) {
+        if (compacted[compacted.length - 1] && compacted[compacted.length - 1] !== "") {
+          compacted.push("");
+        }
+        compacted.push(`${section}:`);
+        currentSection = section;
+      }
+      continue;
+    }
+
     compacted.push(normalizedLine);
   }
 
-  return compacted.join("\n").trim();
+  return compacted.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function inferShortDescription(summary: string) {
@@ -347,6 +365,43 @@ function buildAgentConfigFromSummary(summary: string) {
   }
 
   return config;
+}
+
+function summarizePublicUrl(value: string, max = 72) {
+  const url = value.trim();
+  if (!url) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(url);
+    const compact = `${parsed.hostname}${parsed.pathname}`;
+    if (compact.length <= max) {
+      return compact;
+    }
+
+    return `${compact.slice(0, max - 3)}...`;
+  } catch {
+    return url.length <= max ? url : `${url.slice(0, max - 3)}...`;
+  }
+}
+
+function JsonHighlight({ value }: { value: string }) {
+  const html = value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/(\"(?:\\.|[^\"\\])*\")(\s*:)?/g, (_match, stringLiteral: string, isKey: string) => {
+      if (isKey) {
+        return `<span class="text-sky-300">${stringLiteral}</span><span class="text-slate-400">:</span>`;
+      }
+
+      return `<span class="text-emerald-300">${stringLiteral}</span>`;
+    })
+    .replace(/\b(true|false|null)\b/g, '<span class="text-fuchsia-300">$1</span>')
+    .replace(/(-?\b\d+(?:\.\d+)?\b)/g, '<span class="text-amber-300">$1</span>');
+
+  return <pre className="overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-slate-100 [scrollbar-width:thin]" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 function mergeDetectedApiCampos(campos: ApiCampo[], parametros: ApiParametro[]) {
@@ -842,13 +897,13 @@ function AgenteModal({
                 rows={12}
                 className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none placeholder:text-slate-500"
               />
-              <p className="mt-2 text-xs text-slate-400">Ao validar, o texto e compactado e o JSON tecnico e gerado a partir das informacoes escritas aqui.</p>
+              <p className="mt-2 text-xs text-slate-400">Ao validar, o texto e reorganizado para leitura humana e o JSON tecnico e regenerado automaticamente.</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-white">Configuracao tecnica</p>
-                  <p className="mt-1 text-xs text-slate-400">O JSON fica discreto. Abra somente quando quiser revisar ou ajustar manualmente.</p>
+                  <p className="mt-1 text-xs text-slate-400">O JSON e gerado automaticamente e fica bloqueado para edicao manual.</p>
                 </div>
                 <button
                   type="button"
@@ -860,7 +915,9 @@ function AgenteModal({
               </div>
               {showRawConfig ? (
                 <div className="mt-4">
-                  <textarea value={form.configuracoes} onChange={(event) => onChange({ configuracoes: event.target.value })} rows={12} className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 font-mono text-xs leading-relaxed text-cyan-100 outline-none placeholder:text-slate-500" />
+                  <div className="rounded-xl border border-white/10 bg-slate-950/70 px-4 py-4">
+                    <JsonHighlight value={form.configuracoes} />
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -960,6 +1017,23 @@ function AgenteModal({
           </div>
 
           <div className="min-w-0 border-t border-white/10 bg-white/[0.03] p-6 lg:border-l lg:border-t-0">
+            <div className="sticky top-0 z-10 mb-5 rounded-2xl border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.16),rgba(6,95,70,0.1))] p-4 backdrop-blur-xl">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={form.ativo}
+                  onChange={(event) => onChange({ ativo: event.target.checked })}
+                  className="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950/60 text-emerald-400"
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-white">Agente ativo para este projeto</span>
+                  <span className="mt-1 block text-xs leading-relaxed text-emerald-50/85">
+                    Quando ativo, este agente fica em destaque no projeto e vira a referencia principal do chat.
+                  </span>
+                </span>
+              </label>
+            </div>
+
             <div className="hidden mb-5 rounded-2xl border border-cyan-500/15 bg-cyan-500/10 p-5">
               <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950/20 text-cyan-100">
                 <Bot size={22} />
@@ -1030,10 +1104,10 @@ function AgenteModal({
                             href={asset.publicUrl}
                             target="_blank"
                             rel="noreferrer noopener"
-                            className="mt-1 block break-all text-[11px] leading-relaxed text-cyan-200/80 transition-colors hover:text-cyan-100"
+                            className="mt-1 block text-[11px] leading-relaxed text-cyan-200/80 transition-colors hover:text-cyan-100"
                             title={asset.publicUrl}
                           >
-                            {asset.publicUrl}
+                            {summarizePublicUrl(asset.publicUrl)}
                           </a>
                         </div>
                       </div>
@@ -1115,11 +1189,6 @@ function AgenteModal({
                 ) : null}
               </div>
             ) : null}
-
-            <label className="mt-5 flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
-              <input type="checkbox" checked={form.ativo} onChange={(event) => onChange({ ativo: event.target.checked })} />
-              Agente ativo para este projeto
-            </label>
 
             <div className="mt-6 flex gap-3">
               <button type="button" onClick={onSubmit} disabled={saving} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
@@ -1847,11 +1916,22 @@ export default function AdminProjetoDetalhePage() {
   const prepareAgenteForm = (form: AgenteFormState) => {
     const compactPromptBase = compactAgentSummary(form.promptBase);
     const generatedConfig = buildAgentConfigFromSummary(compactPromptBase);
+    const condensedPromptBase = [
+      inferShortDescription(compactPromptBase),
+      ...compactPromptBase
+        .split("\n")
+        .filter((line) => line && line !== inferShortDescription(compactPromptBase))
+        .slice(0, 18),
+    ]
+      .filter(Boolean)
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
 
     return {
       ...form,
-      descricao: form.descricao.trim() || inferShortDescription(compactPromptBase),
-      promptBase: compactPromptBase,
+      descricao: form.descricao.trim() || inferShortDescription(condensedPromptBase),
+      promptBase: condensedPromptBase,
       configuracoes: JSON.stringify(generatedConfig, null, 2),
     };
   };
