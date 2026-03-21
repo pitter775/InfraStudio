@@ -41,6 +41,8 @@ type IaUsageSummary = {
   periodLabel: string;
   startDate: string;
   endDate: string;
+  costModel: string;
+  costCurrency: "USD";
   tokensInput: number;
   tokensOutput: number;
   totalTokens: number;
@@ -58,22 +60,22 @@ function formatInteger(value: number) {
   return value.toLocaleString("pt-BR");
 }
 
-function formatCurrency(value: number) {
+function formatCurrency(value: number, currency: "USD" | "BRL" = "USD") {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
-    currency: "BRL",
+    currency,
     minimumFractionDigits: value >= 1 ? 2 : 4,
     maximumFractionDigits: value >= 1 ? 2 : 4,
   }).format(value);
 }
 
-function formatTokensWithCost(tokens: number, cost?: number | null) {
+function formatTokensWithCost(tokens: number, cost?: number | null, currency: "USD" | "BRL" = "USD") {
   const label = `${formatInteger(tokens)} tokens`;
   if (!cost || cost <= 0) {
     return label;
   }
 
-  return `${label} | ${formatCurrency(cost)}`;
+  return `${label} | ${formatCurrency(cost, currency)}`;
 }
 
 function summarizeTitle(value: string, max = 52) {
@@ -130,16 +132,16 @@ export default function AdminIaTokensPage() {
     ? [
         {
           label: "Tokens do periodo",
-          value: formatTokensWithCost(summary.totalTokens, summary.totalCost),
+          value: formatTokensWithCost(summary.totalTokens, summary.totalCost, summary.costCurrency),
           detail: summary.hasCostData
-            ? `${formatInteger(summary.tokensInput)} entrada | ${formatInteger(summary.tokensOutput)} saida | ${formatCurrency(summary.totalCost)}`
+            ? `${formatInteger(summary.tokensInput)} entrada | ${formatInteger(summary.tokensOutput)} saida | ${formatCurrency(summary.totalCost, summary.costCurrency)}`
             : `${formatInteger(summary.tokensInput)} entrada | ${formatInteger(summary.tokensOutput)} saida`,
           icon: Sparkles,
         },
         {
           label: "Custo estimado",
-          value: summary.hasCostData ? formatCurrency(summary.totalCost) : "Pendente",
-          detail: summary.hasCostData ? "Baseado no custo salvo por mensagem" : "O backend ainda nao persiste custo real",
+          value: summary.hasCostData ? formatCurrency(summary.totalCost, summary.costCurrency) : "Pendente",
+          detail: summary.hasCostData ? `Estimado com ${summary.costModel}` : "Ainda sem mensagens com consumo no intervalo",
           icon: Coins,
         },
         {
@@ -261,7 +263,7 @@ export default function AdminIaTokensPage() {
         <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-5">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Total geral no periodo</p>
-            <p className="mt-3 text-3xl font-extrabold text-white">{formatTokensWithCost(summary.totalTokens, summary.totalCost)}</p>
+            <p className="mt-3 text-3xl font-extrabold text-white">{formatTokensWithCost(summary.totalTokens, summary.totalCost, summary.costCurrency)}</p>
             <p className="mt-2 text-sm text-cyan-50">
               Entre {summary.startDate.split("-").reverse().join("/")} e {summary.endDate.split("-").reverse().join("/")}
             </p>
@@ -307,7 +309,7 @@ export default function AdminIaTokensPage() {
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Total tokens</p>
                     <p className="mt-2 text-xl font-bold text-white">{formatInteger(chat.totalTokens)}</p>
                     <p className="mt-1 text-xs text-emerald-300">
-                      {chat.custo > 0 ? formatCurrency(chat.custo) : "Sem valor monetario salvo"}
+                      {chat.custo > 0 ? formatCurrency(chat.custo, summary.costCurrency) : "Sem valor monetario salvo"}
                     </p>
                     <p className="mt-1 text-xs text-slate-400">
                       In {formatInteger(chat.tokensInput)} / Out {formatInteger(chat.tokensOutput)}
@@ -381,7 +383,7 @@ export default function AdminIaTokensPage() {
                       <div className="text-right">
                         <p className="text-lg font-extrabold text-white">{formatInteger(item.totalTokens)} tokens</p>
                         <p className="mt-1 text-xs text-emerald-300">
-                          {item.custo > 0 ? formatCurrency(item.custo) : "Sem valor monetario salvo"}
+                          {item.custo > 0 ? formatCurrency(item.custo, summary.costCurrency) : "Sem valor monetario salvo"}
                         </p>
                         <p className="mt-1 text-xs text-slate-400">
                           In {formatInteger(item.tokensInput)} / Out {formatInteger(item.tokensOutput)}

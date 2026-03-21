@@ -3,6 +3,7 @@ import { appendMessage, createChat, getChatById, getChatContext, listChatMessage
 import { enrichLeadContext, generateSalesReply, shouldRefreshSummary, summarizeConversation } from "@/lib/chat-orchestrator";
 import { getAgenteAtivo, getAgenteById, getAgenteByIdentifier } from "@/lib/agentes";
 import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetByProjetoAgente, getChatWidgetBySlug } from "@/lib/chat-widgets";
+import { estimateOpenAICostUsd } from "@/lib/openai-pricing";
 import { getProjetoById, getProjetoByIdentifier } from "@/lib/projetos";
 
 type ChatRequestBody = {
@@ -254,13 +255,18 @@ export async function POST(request: Request) {
       nome: typeof ai.metadata?.agenteNome === "string" ? ai.metadata.agenteNome : null,
     };
 
+    const estimatedCostUsd =
+      ai.metadata?.provider === "openai"
+        ? estimateOpenAICostUsd(ai.usage.inputTokens, ai.usage.outputTokens, typeof ai.metadata?.model === "string" ? ai.metadata.model : null)
+        : 0;
+
     const assistantMessage = await appendMessage({
       chatId: chat.id,
       role: "assistant",
       conteudo: ai.reply,
       tokensInput: ai.usage.inputTokens,
       tokensOutput: ai.usage.outputTokens,
-      custo: 0,
+      custo: estimatedCostUsd,
       metadata: {
         ...ai.metadata,
         assets: ai.assets ?? [],
@@ -301,7 +307,7 @@ export async function POST(request: Request) {
     await updateChatStats({
       chatId: chat.id,
       totalTokensToAdd: ai.usage.inputTokens + ai.usage.outputTokens,
-      totalCustoToAdd: 0,
+      totalCustoToAdd: estimatedCostUsd,
       contexto: nextContext,
     });
 

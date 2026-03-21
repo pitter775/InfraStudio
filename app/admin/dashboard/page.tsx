@@ -80,6 +80,8 @@ type IaUsageSummary = {
   periodLabel: string;
   startDate: string;
   endDate: string;
+  costModel: string;
+  costCurrency: "USD";
   tokensInput: number;
   tokensOutput: number;
   totalTokens: number;
@@ -114,10 +116,10 @@ function formatCompact(value: number) {
   }).format(value);
 }
 
-function formatCurrency(value: number) {
+function formatCurrency(value: number, currency: "BRL" | "USD" = "USD") {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
-    currency: "BRL",
+    currency,
     minimumFractionDigits: value >= 1 ? 2 : 4,
     maximumFractionDigits: value >= 1 ? 2 : 4,
   }).format(value);
@@ -343,8 +345,8 @@ export default function AdminDashboardPage() {
     },
     {
       label: "Custo",
-      value: formatCurrency(usage?.totalCost ?? totalChatCost),
-      detail: usage?.hasCostData ? "Mes atual" : "Sem custo salvo",
+      value: formatCurrency(usage?.totalCost ?? totalChatCost, usage?.costCurrency ?? "USD"),
+      detail: usage?.hasCostData ? `Estimado em ${usage?.costModel ?? "gpt-4o-mini"}` : "Sem custo calculado",
       icon: Coins,
       tint: "from-lime-400/20 to-emerald-500/10",
     },
@@ -412,7 +414,7 @@ export default function AdminDashboardPage() {
               </div>
               <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
                 <p className="text-slate-500">Custo</p>
-                <p className="mt-1 font-bold text-white">{formatCurrency(usage?.totalCost ?? 0)}</p>
+                <p className="mt-1 font-bold text-white">{formatCurrency(usage?.totalCost ?? 0, usage?.costCurrency ?? "USD")}</p>
               </div>
             </div>
           </div>
@@ -500,7 +502,7 @@ export default function AdminDashboardPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-bold text-white">{formatCompact(chat.totalTokens)}</p>
-                    <p className="text-[11px] text-emerald-300">{chat.custo > 0 ? formatCurrency(chat.custo) : "sem R$"}</p>
+                    <p className="text-[11px] text-emerald-300">{chat.custo > 0 ? formatCurrency(chat.custo, usage?.costCurrency ?? "USD") : "sem valor"}</p>
                   </div>
                 </div>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
@@ -590,7 +592,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-white">{formatCompact(item.totalTokens)}</p>
-                  <p className="mt-1 text-[11px] text-emerald-300">{item.custo > 0 ? formatCurrency(item.custo) : "sem R$"}</p>
+                  <p className="mt-1 text-[11px] text-emerald-300">{item.custo > 0 ? formatCurrency(item.custo, usage?.costCurrency ?? "USD") : "sem valor"}</p>
                 </div>
               </div>
             ))}

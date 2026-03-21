@@ -1,4 +1,4 @@
-const lifecycleEvents = ["mounted", "context_updated", "hidden", "destroyed", "blocked_by_route", "blocked_by_policy"];
+const lifecycleEvents = ["mounted", "context_updated", "hidden", "shown", "destroyed", "blocked_by_route", "blocked_by_policy"];
 
 const integrationPrinciples = [
   "O host decide quando o chat pode existir. O widget nao assume autonomia.",
@@ -11,7 +11,7 @@ const integrationPrinciples = [
 const apiReference = [
   {
     name: "window.InfraChat.mount(config)",
-    description: "Cria o widget do zero. Se ja existir uma instancia montada, a ideia do host e destruir antes e montar de novo com o novo contexto.",
+    description: "Monta o widget. Se ja existir uma instancia do mesmo projeto/agente, o SDK reaproveita a sessao, atualiza contexto/UI e pode reexibir um chat oculto.",
   },
   {
     name: "window.InfraChat.updateContext(context)",
@@ -20,6 +20,10 @@ const apiReference = [
   {
     name: "window.InfraChat.hide()",
     description: "Oculta visualmente o widget sem destruir a instancia. Use apenas quando fizer sentido manter a mesma sessao ainda autorizada.",
+  },
+  {
+    name: "window.InfraChat.show({ open? })",
+    description: "Reexibe uma instancia previamente ocultada. Pode opcionalmente abrir o painel na volta com `open: true`.",
   },
   {
     name: "window.InfraChat.destroy()",
@@ -177,6 +181,10 @@ const lifecycleActions = [
     situation: "Quer apenas ocultar temporariamente o mesmo chat ainda autorizado",
     action: "Usar `hide()`.",
   },
+  {
+    situation: "O chat foi ocultado e precisa voltar sem perder a sessao",
+    action: "Usar `show({ open: true })` ou chamar `mount(...)` novamente com o mesmo projeto/agente.",
+  },
 ];
 
 const minimalExample = [
@@ -229,6 +237,13 @@ const updateExample = [
   "  resource: { id: 'imovel-123', tipo: 'imovel' },",
   "  route: { path: window.location.pathname },",
   "});",
+].join("\n");
+
+const showExample = [
+  "window.InfraChat.hide();",
+  "",
+  "// Mais tarde, para voltar a exibir o mesmo chat",
+  "window.InfraChat.show({ open: true });",
 ].join("\n");
 
 const realEstateExample = [
@@ -372,6 +387,14 @@ export default function ChatWidgetHostControlDocsPage() {
           </p>
           <div className="mt-4">
             <CodeBlock code={updateExample} />
+          </div>
+
+          <h3 className="mt-8 text-lg font-bold text-white">Ocultando e exibindo novamente</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            `hide()` some com o widget, mas preserva a sessao em memoria. Para voltar, use `show()` ou monte outra vez com o mesmo projeto e agente.
+          </p>
+          <div className="mt-4">
+            <CodeBlock code={showExample} />
           </div>
         </section>
 

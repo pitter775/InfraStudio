@@ -1179,8 +1179,9 @@ export async function generateSalesReply(history: ConversationMessage[], context
 
   try {
     const hasSummary = Boolean(context?.memoria?.resumo);
-    const recentMessages = history.slice(hasSummary ? -3 : -5);
-    const summary = context?.memoria?.resumo ? `Resumo atual do chat: ${context.memoria.resumo}` : "";
+    const recentMessages = history.slice(hasSummary ? -2 : -4);
+    const latestUserTurn = [...history].reverse().find((item) => item.role === "user");
+    const summary = context?.memoria?.resumo ? `Resumo estruturado atual do chat (JSON compacto): ${context.memoria.resumo}` : "";
     const lead = context?.lead?.identificado
       ? `Lead identificado: nome=${context.lead?.nome ?? ""}; telefone=${context.lead?.telefone ?? ""}.`
       : "Lead ainda nao identificado.";
@@ -1205,7 +1206,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
         instructions: [systemPrompt, structuredReplyInstruction, analyticalReplyInstruction, agentAssetInstruction, focusedApiContext.instructions, summary, lead, qualification]
           .filter(Boolean)
           .join("\n\n"),
-        input: buildInput(recentMessages),
+        input: buildInput(latestUserTurn ? [...recentMessages.filter((item) => item !== latestUserTurn), latestUserTurn] : recentMessages),
       }),
     });
 
@@ -1380,11 +1381,16 @@ export async function summarizeConversation(
 
   if (!openai.apiKey) {
     const compact = recent
-      .map((item) => `${item.role === "assistant" ? "Assistente" : "Cliente"}: ${item.content}`)
+      .map((item) => `${item.role === "assistant" ? "assistente" : "cliente"}:${item.content}`)
       .join(" | ")
-      .slice(0, 500);
+      .slice(0, 320);
 
-    return currentSummary ? `${currentSummary} ${compact}`.slice(0, 900) : compact;
+    return JSON.stringify({
+      objetivo: null,
+      lead: null,
+      restricoes: compact || null,
+      proximo_passo: currentSummary ? String(currentSummary).slice(0, 180) : null,
+    });
   }
 
   try {
@@ -1399,7 +1405,7 @@ export async function summarizeConversation(
         temperature: 0.2,
         max_output_tokens: 110,
         instructions:
-          "Resuma a conversa em portugues de forma extremamente compacta. Guarde somente fatos uteis para continuar o atendimento: pedido do usuario, dados identificados, restricoes e proximo passo. Use no maximo 5 linhas curtas.",
+          'Resuma a conversa em portugues usando JSON compacto valido, sem markdown. Use somente as chaves: objetivo, lead, restricoes, proximo_passo. Cada valor deve ser curto. Em lead, use um objeto com nome, telefone e identificado quando existir.',
         input: buildInput([
           ...(currentSummary ? [{ role: "system" as const, content: `Resumo anterior: ${currentSummary}` }] : []),
           ...recent,

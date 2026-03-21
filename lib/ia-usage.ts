@@ -1,5 +1,6 @@
 import "server-only";
 
+import { estimateOpenAICostUsd, getDefaultOpenAIModel } from "@/lib/openai-pricing";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type ChatUsageRow = {
@@ -62,6 +63,8 @@ export type IaUsageSummary = {
   periodLabel: string;
   startDate: string;
   endDate: string;
+  costModel: string;
+  costCurrency: "USD";
   tokensInput: number;
   tokensOutput: number;
   totalTokens: number;
@@ -132,6 +135,15 @@ function getContextName(contexto: Record<string, unknown> | null, key: "lead" | 
   return typeof section?.nome === "string" && section.nome.trim() ? section.nome.trim() : null;
 }
 
+function resolveMessageCost(message: MessageUsageRow) {
+  const savedCost = Number(message.custo ?? 0);
+  if (savedCost > 0) {
+    return savedCost;
+  }
+
+  return estimateOpenAICostUsd(message.tokens_input ?? 0, message.tokens_output ?? 0, getDefaultOpenAIModel());
+}
+
 export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsageRange): Promise<IaUsageSummary> {
   const supabase = getSupabaseAdminClient();
   const { startIso, endIso, startDate, endDate, label } = resolveRange(range);
@@ -153,6 +165,8 @@ export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsa
       periodLabel: label,
       startDate,
       endDate,
+      costModel: getDefaultOpenAIModel(),
+      costCurrency: "USD",
       tokensInput: 0,
       tokensOutput: 0,
       totalTokens: 0,
@@ -176,6 +190,8 @@ export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsa
       periodLabel: label,
       startDate,
       endDate,
+      costModel: getDefaultOpenAIModel(),
+      costCurrency: "USD",
       tokensInput: 0,
       tokensOutput: 0,
       totalTokens: 0,
@@ -204,6 +220,8 @@ export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsa
       periodLabel: label,
       startDate,
       endDate,
+      costModel: getDefaultOpenAIModel(),
+      costCurrency: "USD",
       tokensInput: 0,
       tokensOutput: 0,
       totalTokens: 0,
@@ -223,8 +241,8 @@ export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsa
 
   const tokensInput = processedMessages.reduce((sum, message) => sum + (message.tokens_input ?? 0), 0);
   const tokensOutput = processedMessages.reduce((sum, message) => sum + (message.tokens_output ?? 0), 0);
-  const totalCost = processedMessages.reduce((sum, message) => sum + Number(message.custo ?? 0), 0);
-  const hasCostData = processedMessages.some((message) => Number(message.custo ?? 0) > 0);
+  const totalCost = processedMessages.reduce((sum, message) => sum + resolveMessageCost(message), 0);
+  const hasCostData = processedMessages.some((message) => resolveMessageCost(message) > 0);
 
   const perChat = new Map<string, ChatUsageAggregate>();
   for (const message of processedMessages) {
@@ -251,7 +269,7 @@ export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsa
     aggregate.tokensInput += message.tokens_input ?? 0;
     aggregate.tokensOutput += message.tokens_output ?? 0;
     aggregate.totalTokens += (message.tokens_input ?? 0) + (message.tokens_output ?? 0);
-    aggregate.custo += Number(message.custo ?? 0);
+    aggregate.custo += resolveMessageCost(message);
     perChat.set(chatId, aggregate);
   }
 
@@ -285,7 +303,7 @@ export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsa
       totalTokens: (message.tokens_input ?? 0) + (message.tokens_output ?? 0),
       tokensInput: message.tokens_input ?? 0,
       tokensOutput: message.tokens_output ?? 0,
-      custo: Number(message.custo ?? 0),
+      custo: resolveMessageCost(message),
       createdAt: message.created_at ?? new Date().toISOString(),
     };
   });
@@ -294,6 +312,8 @@ export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsa
     periodLabel: label.charAt(0).toUpperCase() + label.slice(1),
     startDate,
     endDate,
+    costModel: getDefaultOpenAIModel(),
+    costCurrency: "USD",
     tokensInput,
     tokensOutput,
     totalTokens: tokensInput + tokensOutput,
