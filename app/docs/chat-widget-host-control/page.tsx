@@ -273,6 +273,18 @@ const serviceExample = [
   "}",
 ].join("\n");
 
+const docSections = [
+  { id: "overview", label: "Visao geral" },
+  { id: "principles", label: "Principios" },
+  { id: "api", label: "API global" },
+  { id: "logs", label: "Lifecycle" },
+  { id: "config", label: "Configuracao" },
+  { id: "examples", label: "Exemplos" },
+  { id: "context", label: "Contexto" },
+  { id: "lifecycle-actions", label: "Fluxo recomendado" },
+  { id: "domains", label: "Dominios" },
+];
+
 function CodeBlock({ code }: { code: string }) {
   return (
     <pre className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-xs leading-6 text-slate-200">
@@ -281,224 +293,319 @@ function CodeBlock({ code }: { code: string }) {
   );
 }
 
+function Section({
+  id,
+  eyebrow,
+  title,
+  description,
+  children,
+  className = "",
+}: {
+  id: string;
+  eyebrow?: string;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section id={id} className={`scroll-mt-24 rounded-[28px] border border-white/10 bg-white/[0.045] p-6 md:p-8 ${className}`}>
+      {eyebrow ? <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-300">{eyebrow}</p> : null}
+      <h2 className="mt-3 text-2xl font-bold text-white md:text-[2rem]">{title}</h2>
+      {description ? <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-400 md:text-[15px]">{description}</p> : null}
+      <div className="mt-6">{children}</div>
+    </section>
+  );
+}
+
 export default function ChatWidgetHostControlDocsPage() {
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-14 text-slate-100">
-      <div className="mx-auto max-w-6xl">
-        <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-300">InfraStudio Docs</p>
-        <h1 className="mt-4 text-4xl font-extrabold text-white">Widget de chat em modo host-controlled</h1>
-        <p className="mt-4 max-w-4xl text-base leading-7 text-slate-300">
-          Esta documentacao define o contrato recomendado para integrar o widget white-label da InfraStudio em qualquer aplicacao hospedeira. A ideia central e
-          simples: o chat so existe quando o host permitir. Fora desse contexto, ele deve ser completamente destruido.
-        </p>
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.14),transparent_24%),linear-gradient(180deg,#020617_0%,#07111f_42%,#020617_100%)] px-4 py-10 text-slate-100 md:px-6 md:py-14">
+      <div className="mx-auto max-w-7xl">
+        <div className="rounded-[32px] border border-white/10 bg-white/[0.03] p-6 shadow-[0_24px_80px_-34px_rgba(8,15,30,0.92)] backdrop-blur-xl md:p-8">
+          <div className="grid gap-10 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
+            <aside className="lg:sticky lg:top-6 lg:self-start">
+              <div className="rounded-[28px] border border-white/10 bg-slate-950/60 p-5">
+                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-300">InfraStudio Docs</p>
+                <h1 className="mt-3 text-2xl font-extrabold text-white">Host-controlled chat widget</h1>
+                <p className="mt-3 text-sm leading-6 text-slate-400">
+                  Navegacao rapida para uma documentacao longa, no estilo de docs de produto.
+                </p>
 
-        <section className="mt-10 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-            <h2 className="text-2xl font-bold text-white">Princípios de integracao</h2>
-            <div className="mt-5 space-y-3">
-              {integrationPrinciples.map((item, index) => (
-                <div key={item} className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-300">Principio {index + 1}</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-200">{item}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+                <nav className="mt-6 space-y-1">
+                  {docSections.map((section, index) => (
+                    <a
+                      key={section.id}
+                      href={`#${section.id}`}
+                      className="group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+                    >
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[11px] font-bold text-cyan-200 group-hover:border-cyan-400/30 group-hover:bg-cyan-500/10">
+                        {index + 1}
+                      </span>
+                      <span>{section.label}</span>
+                    </a>
+                  ))}
+                </nav>
 
-          <div className="space-y-6">
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <h2 className="text-2xl font-bold text-white">API global</h2>
-              <div className="mt-4 space-y-4">
-                {apiReference.map((item) => (
-                  <div key={item.name} className="rounded-2xl border border-white/8 bg-slate-950/50 p-4">
-                    <p className="text-sm font-bold text-white">
-                      <code>{item.name}</code>
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-slate-300">{item.description}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <h2 className="text-2xl font-bold text-white">Logs de ciclo de vida</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-400">
-                Esses eventos ajudam a diagnosticar por que o widget montou, atualizou, ocultou, destruiu ou foi bloqueado.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {lifecycleEvents.map((item) => (
-                  <span key={item} className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-100">
-                    {item}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-2xl font-bold text-white">O que e obrigatorio e o que e opcional</h2>
-          <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-400">
-            Abaixo esta o contrato mais importante para o `mount`. Nem todo campo do contexto precisa existir sempre. O host deve mandar o que ele realmente sabe,
-            sem inventar identificadores.
-          </p>
-
-          <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
-            <div className="grid grid-cols-[170px_180px_minmax(0,1fr)] bg-slate-950/70 px-4 py-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-              <div>Campo</div>
-              <div>Status</div>
-              <div>Descricao</div>
-            </div>
-            {configTable.map((row) => (
-              <div key={row.field} className="grid grid-cols-[170px_180px_minmax(0,1fr)] border-t border-white/8 bg-white/[0.03] px-4 py-4 text-sm">
-                <div className="font-semibold text-white">
-                  <code>{row.field}</code>
-                  <p className="mt-2 text-xs text-cyan-200">{row.example}</p>
-                </div>
-                <div className="pr-4 text-slate-300">{row.required}</div>
-                <div className="leading-6 text-slate-300">{row.description}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-10 rounded-3xl border border-white/10 bg-[#07111f] p-6">
-          <h2 className="text-2xl font-bold text-white">Exemplo mínimo válido</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-400">
-            Este e o menor exemplo que ainda respeita o modelo host-controlled. Ele cria o widget, mas nao traz contexto rico.
-          </p>
-          <div className="mt-5">
-            <CodeBlock code={minimalExample} />
-          </div>
-        </section>
-
-        <section className="mt-10 rounded-3xl border border-white/10 bg-[#07111f] p-6">
-          <h2 className="text-2xl font-bold text-white">Exemplo prático recomendado</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-400">
-            Este exemplo cobre rota autorizada, unlock, tenant, usuario, recurso, personalizacao visual e destruicao fora do contexto permitido.
-          </p>
-          <div className="mt-5">
-            <CodeBlock code={practicalExample} />
-          </div>
-
-          <h3 className="mt-8 text-lg font-bold text-white">Atualizando o contexto sem recarregar o script</h3>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            Use isso quando a tela continua autorizada, mas o recurso ou o usuario mudou.
-          </p>
-          <div className="mt-4">
-            <CodeBlock code={updateExample} />
-          </div>
-
-          <h3 className="mt-8 text-lg font-bold text-white">Ocultando e exibindo novamente</h3>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            `hide()` some com o widget, mas preserva a sessao em memoria. Para voltar, use `show()` ou monte outra vez com o mesmo projeto e agente.
-          </p>
-          <div className="mt-4">
-            <CodeBlock code={showExample} />
-          </div>
-        </section>
-
-        <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-2xl font-bold text-white">O que significa cada campo</h2>
-          <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-400">
-            O host pode adaptar os nomes internos do seu dominio, mas a semantica recomendada e esta: informar quem e o tenant, quem e o usuario, qual e o
-            recurso da tela, em qual rota esta e qual politica permite a existencia do chat.
-          </p>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            {contextFields.map((field) => (
-              <div key={field.name} className="rounded-2xl border border-white/8 bg-slate-950/50 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm font-bold text-white">
-                    <code>{field.name}</code>
+                <div className="mt-6 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Contrato central</p>
+                  <p className="mt-2 text-sm leading-6 text-cyan-50">
+                    O chat so deve existir quando o host permitir. Fora do contexto autorizado, a acao esperada e `destroy()`.
                   </p>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-slate-200">{field.required}</span>
                 </div>
-                <code className="mt-3 block rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-[11px] leading-5 text-cyan-100">
-                  {field.example}
-                </code>
-                <p className="mt-3 text-sm leading-6 text-slate-300">{field.description}</p>
-                <div className="mt-3 space-y-2">
-                  {field.notes.map((note) => (
-                    <p key={note} className="text-xs leading-5 text-slate-400">
-                      {note}
-                    </p>
+              </div>
+            </aside>
+
+            <div className="min-w-0 space-y-8">
+              <Section
+                id="overview"
+                eyebrow="Visao geral"
+                title="Widget de chat em modo host-controlled"
+                description="Esta documentacao define o contrato recomendado para integrar o widget white-label da InfraStudio em qualquer aplicacao hospedeira. A ideia central e simples: o chat so existe quando o host permitir. Fora desse contexto, ele deve ser completamente destruido."
+                className="bg-[linear-gradient(180deg,rgba(8,15,30,0.86),rgba(6,10,24,0.74))]"
+              >
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-300">Montagem</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">O host decide quando chamar `mount(...)`.</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-300">Contexto</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">Tenant, usuario, recurso e rota devem refletir o momento atual.</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-300">Isolamento</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">Ao sair do contexto autorizado, destrua o widget imediatamente.</p>
+                  </div>
+                </div>
+              </Section>
+
+              <Section id="principles" eyebrow="Base" title="Principios de integracao">
+                <div className="grid gap-4 md:grid-cols-2">
+                  {integrationPrinciples.map((item, index) => (
+                    <div key={item} className="rounded-2xl border border-white/8 bg-slate-950/55 px-4 py-4">
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-300">Principio {index + 1}</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-200">{item}</p>
+                    </div>
                   ))}
                 </div>
-              </div>
-            ))}
-          </div>
+              </Section>
 
-          <div className="mt-6 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 text-sm leading-6 text-cyan-50">
-            <p className="font-semibold text-white">Sobre `resource`</p>
-            <p className="mt-2">
-              `resource` nao significa necessariamente "imovel". Ele significa "o recurso principal da pagina atual". Se o cliente for imobiliaria, costuma ser
-              um imovel. Se for e-commerce, pode ser um produto. Se for oficina, pode ser um veiculo. Se for SaaS, pode ser uma assinatura, ticket ou projeto.
-            </p>
-            <p className="mt-2">
-              O mais importante e que, ao trocar esse recurso, o host atualize ou destrua o chat. Esse e um dos pontos mais sensiveis para evitar vazamento de
-              contexto entre uma tela e outra.
-            </p>
-          </div>
+              <Section id="api" eyebrow="Referencia" title="API global">
+                <div className="space-y-4">
+                  {apiReference.map((item) => (
+                    <div key={item.name} className="rounded-2xl border border-white/8 bg-slate-950/55 p-4">
+                      <p className="text-sm font-bold text-white">
+                        <code>{item.name}</code>
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-slate-300">{item.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </Section>
 
-          <div className="mt-6 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm leading-6 text-amber-50">
-            <p className="font-semibold text-white">Sobre `user.id`</p>
-            <p className="mt-2">
-              `user.id` nao e obrigatorio. Se o host conhece a identidade da pessoa, ele deve enviar. Se ainda nao conhece, pode omitir `user` inteiro ou mandar
-              apenas dados parciais, como `tipo`, `origem` ou `segmento`.
-            </p>
-            <p className="mt-2">Nao invente IDs apenas para preencher o campo. Use somente identificadores reais e confiaveis do sistema hospedeiro.</p>
-          </div>
-        </section>
+              <Section
+                id="logs"
+                eyebrow="Observabilidade"
+                title="Logs de ciclo de vida"
+                description="Esses eventos ajudam a diagnosticar por que o widget montou, atualizou, ocultou, destruiu ou foi bloqueado."
+              >
+                <div className="flex flex-wrap gap-2">
+                  {lifecycleEvents.map((item) => (
+                    <span key={item} className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </Section>
 
-        <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-2xl font-bold text-white">Quando usar `updateContext` e quando destruir</h2>
-          <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] bg-slate-950/70 px-4 py-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-              <div>Situacao</div>
-              <div>Acao recomendada</div>
+              <Section
+                id="config"
+                eyebrow="Contrato"
+                title="O que e obrigatorio e o que e opcional"
+                description="Abaixo esta o contrato mais importante para o `mount`. Nem todo campo do contexto precisa existir sempre. O host deve mandar o que ele realmente sabe, sem inventar identificadores."
+              >
+                <div className="overflow-hidden rounded-2xl border border-white/10">
+                  <div className="hidden grid-cols-[170px_180px_minmax(0,1fr)] bg-slate-950/70 px-4 py-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:grid">
+                    <div>Campo</div>
+                    <div>Status</div>
+                    <div>Descricao</div>
+                  </div>
+                  {configTable.map((row) => (
+                    <div key={row.field} className="border-t border-white/8 bg-white/[0.03] px-4 py-4 text-sm md:grid md:grid-cols-[170px_180px_minmax(0,1fr)] md:gap-0">
+                      <div className="font-semibold text-white">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 md:hidden">Campo</p>
+                        <code>{row.field}</code>
+                        <p className="mt-2 text-xs text-cyan-200">{row.example}</p>
+                      </div>
+                      <div className="mt-4 pr-4 text-slate-300 md:mt-0">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 md:hidden">Status</p>
+                        {row.required}
+                      </div>
+                      <div className="mt-4 leading-6 text-slate-300 md:mt-0">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 md:hidden">Descricao</p>
+                        {row.description}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+
+              <Section
+                id="examples"
+                eyebrow="Implementacao"
+                title="Exemplos principais"
+                description="Comece pelo minimo valido e avance para o exemplo completo quando quiser contexto, branding e regras de exibicao."
+                className="bg-[linear-gradient(180deg,rgba(8,17,31,0.94),rgba(6,12,24,0.84))]"
+              >
+                <div className="space-y-8">
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Exemplo minimo valido</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-400">
+                      Este e o menor exemplo que ainda respeita o modelo host-controlled. Ele cria o widget, mas nao traz contexto rico.
+                    </p>
+                    <div className="mt-4">
+                      <CodeBlock code={minimalExample} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Exemplo pratico recomendado</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-400">
+                      Este exemplo cobre rota autorizada, unlock, tenant, usuario, recurso, personalizacao visual e destruicao fora do contexto permitido.
+                    </p>
+                    <div className="mt-4">
+                      <CodeBlock code={practicalExample} />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-6 xl:grid-cols-2">
+                    <div>
+                      <h3 className="text-lg font-bold text-white">Atualizando o contexto</h3>
+                      <p className="mt-2 text-sm leading-6 text-slate-400">Use isso quando a tela continua autorizada, mas o recurso ou o usuario mudou.</p>
+                      <div className="mt-4">
+                        <CodeBlock code={updateExample} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-bold text-white">Ocultando e exibindo novamente</h3>
+                      <p className="mt-2 text-sm leading-6 text-slate-400">
+                        `hide()` some com o widget, mas preserva a sessao em memoria. Para voltar, use `show()` ou monte outra vez com o mesmo projeto e agente.
+                      </p>
+                      <div className="mt-4">
+                        <CodeBlock code={showExample} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Section>
+
+              <Section
+                id="context"
+                eyebrow="Semantica"
+                title="O que significa cada campo"
+                description="O host pode adaptar os nomes internos do seu dominio, mas a semantica recomendada e esta: informar quem e o tenant, quem e o usuario, qual e o recurso da tela, em qual rota esta e qual politica permite a existencia do chat."
+              >
+                <div className="grid gap-4 md:grid-cols-2">
+                  {contextFields.map((field) => (
+                    <div key={field.name} className="rounded-2xl border border-white/8 bg-slate-950/50 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm font-bold text-white">
+                          <code>{field.name}</code>
+                        </p>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-slate-200">{field.required}</span>
+                      </div>
+                      <code className="mt-3 block rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-[11px] leading-5 text-cyan-100">
+                        {field.example}
+                      </code>
+                      <p className="mt-3 text-sm leading-6 text-slate-300">{field.description}</p>
+                      <div className="mt-3 space-y-2">
+                        {field.notes.map((note) => (
+                          <p key={note} className="text-xs leading-5 text-slate-400">
+                            {note}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 text-sm leading-6 text-cyan-50">
+                  <p className="font-semibold text-white">Sobre `resource`</p>
+                  <p className="mt-2">
+                    `resource` nao significa necessariamente "imovel". Ele significa "o recurso principal da pagina atual". Se o cliente for imobiliaria, costuma ser um imovel. Se for e-commerce, pode ser um produto. Se for oficina, pode ser um veiculo. Se for SaaS, pode ser uma assinatura, ticket ou projeto.
+                  </p>
+                  <p className="mt-2">
+                    O mais importante e que, ao trocar esse recurso, o host atualize ou destrua o chat. Esse e um dos pontos mais sensiveis para evitar vazamento de contexto entre uma tela e outra.
+                  </p>
+                </div>
+
+                <div className="mt-6 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm leading-6 text-amber-50">
+                  <p className="font-semibold text-white">Sobre `user.id`</p>
+                  <p className="mt-2">
+                    `user.id` nao e obrigatorio. Se o host conhece a identidade da pessoa, ele deve enviar. Se ainda nao conhece, pode omitir `user` inteiro ou mandar apenas dados parciais, como `tipo`, `origem` ou `segmento`.
+                  </p>
+                  <p className="mt-2">Nao invente IDs apenas para preencher o campo. Use somente identificadores reais e confiaveis do sistema hospedeiro.</p>
+                </div>
+              </Section>
+
+              <Section id="lifecycle-actions" eyebrow="Operacao" title="Quando usar `updateContext` e quando destruir">
+                <div className="overflow-hidden rounded-2xl border border-white/10">
+                  <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)] bg-slate-950/70 px-4 py-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-400 md:grid">
+                    <div>Situacao</div>
+                    <div>Acao recomendada</div>
+                  </div>
+                  {lifecycleActions.map((row) => (
+                    <div key={row.situation} className="border-t border-white/8 bg-white/[0.03] px-4 py-4 text-sm md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                      <div className="pr-4 leading-6 text-white">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 md:hidden">Situacao</p>
+                        {row.situation}
+                      </div>
+                      <div className="mt-3 leading-6 text-slate-300 md:mt-0">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 md:hidden">Acao</p>
+                        {row.action}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+
+              <Section
+                id="domains"
+                eyebrow="Adaptacao"
+                title="Exemplos por dominio"
+                description="O formato do contexto e sempre o mesmo, mas o significado de `resource` muda de acordo com o negocio do cliente."
+              >
+                <div className="grid gap-6 lg:grid-cols-3">
+                  <div className="rounded-2xl border border-white/8 bg-slate-950/50 p-4">
+                    <h3 className="text-lg font-bold text-white">Imobiliaria</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-400">O recurso principal costuma ser o imovel.</p>
+                    <div className="mt-4">
+                      <CodeBlock code={realEstateExample} />
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/8 bg-slate-950/50 p-4">
+                    <h3 className="text-lg font-bold text-white">E-commerce</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-400">O recurso principal costuma ser o produto em exibicao.</p>
+                    <div className="mt-4">
+                      <CodeBlock code={commerceExample} />
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/8 bg-slate-950/50 p-4">
+                    <h3 className="text-lg font-bold text-white">Servico</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-400">O recurso principal pode ser um veiculo, atendimento ou ordem de servico.</p>
+                    <div className="mt-4">
+                      <CodeBlock code={serviceExample} />
+                    </div>
+                  </div>
+                </div>
+              </Section>
             </div>
-            {lifecycleActions.map((row) => (
-              <div key={row.situation} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] border-t border-white/8 bg-white/[0.03] px-4 py-4 text-sm">
-                <div className="pr-4 leading-6 text-white">{row.situation}</div>
-                <div className="leading-6 text-slate-300">{row.action}</div>
-              </div>
-            ))}
           </div>
-        </section>
-
-        <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-2xl font-bold text-white">Exemplos por dominio</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-400">
-            O formato do contexto e sempre o mesmo, mas o significado de `resource` muda de acordo com o negocio do cliente.
-          </p>
-
-          <div className="mt-6 grid gap-6 lg:grid-cols-3">
-            <div className="rounded-2xl border border-white/8 bg-slate-950/50 p-4">
-              <h3 className="text-lg font-bold text-white">Imobiliaria</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-400">O recurso principal costuma ser o imovel.</p>
-              <div className="mt-4">
-                <CodeBlock code={realEstateExample} />
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/8 bg-slate-950/50 p-4">
-              <h3 className="text-lg font-bold text-white">E-commerce</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-400">O recurso principal costuma ser o produto em exibicao.</p>
-              <div className="mt-4">
-                <CodeBlock code={commerceExample} />
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/8 bg-slate-950/50 p-4">
-              <h3 className="text-lg font-bold text-white">Servico</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-400">O recurso principal pode ser um veiculo, atendimento ou ordem de servico.</p>
-              <div className="mt-4">
-                <CodeBlock code={serviceExample} />
-              </div>
-            </div>
-          </div>
-        </section>
+        </div>
       </div>
     </main>
   );
