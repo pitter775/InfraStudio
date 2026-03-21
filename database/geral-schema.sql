@@ -26,6 +26,25 @@ CREATE TABLE public.agentes (
   CONSTRAINT agentes_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id),
   CONSTRAINT agentes_modelo_id_fkey FOREIGN KEY (modelo_id) REFERENCES public.modelos(id)
 );
+CREATE TABLE public.agente_arquivos (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  agente_id uuid NOT NULL,
+  projeto_id uuid,
+  nome character varying NOT NULL,
+  descricao text,
+  arquivo_nome character varying NOT NULL,
+  mime_type character varying NOT NULL,
+  tamanho_bytes integer NOT NULL DEFAULT 0,
+  categoria character varying NOT NULL CHECK (categoria::text = ANY (ARRAY['image'::character varying, 'file'::character varying]::text[])),
+  storage_path text NOT NULL,
+  public_url text NOT NULL,
+  created_at timestamp without time zone NOT NULL DEFAULT now(),
+  updated_at timestamp without time zone NOT NULL DEFAULT now(),
+  CONSTRAINT agente_arquivos_pkey PRIMARY KEY (id),
+  CONSTRAINT agente_arquivos_storage_path_key UNIQUE (storage_path),
+  CONSTRAINT agente_arquivos_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id),
+  CONSTRAINT agente_arquivos_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id)
+);
 CREATE TABLE public.api_campos (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   api_id uuid NOT NULL,

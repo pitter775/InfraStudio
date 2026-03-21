@@ -1,5 +1,6 @@
 import "server-only";
 
+import { listAgenteAssetsByAgenteIds, type AgenteAssetRecord } from "@/lib/agente-assets";
 import { listApiIdsByAgentes, syncAgenteApis } from "@/lib/apis";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -16,6 +17,7 @@ export type AgenteRecord = {
   projetoSlug?: string | null;
   modeloId: string | null;
   apiIds: string[];
+  arquivos: AgenteAssetRecord[];
   createdAt: string;
 };
 
@@ -56,19 +58,26 @@ function mapAgente(row: AgenteRow): AgenteRecord {
     projetoSlug: Array.isArray(row.projetos) ? row.projetos[0]?.slug ?? null : row.projetos?.slug ?? null,
     modeloId: row.modelo_id,
     apiIds: [],
+    arquivos: [],
     createdAt: row.created_at ?? new Date().toISOString(),
   };
 }
 
-async function attachApiIds(agentes: AgenteRecord[]) {
+async function attachRelations(agentes: AgenteRecord[]) {
   if (!agentes.length) {
     return agentes;
   }
 
-  const apiIdsByAgente = await listApiIdsByAgentes(agentes.map((agente) => agente.id));
+  const agenteIds = agentes.map((agente) => agente.id);
+  const [apiIdsByAgente, assetsByAgente] = await Promise.all([
+    listApiIdsByAgentes(agenteIds),
+    listAgenteAssetsByAgenteIds(agenteIds),
+  ]);
+
   return agentes.map((agente) => ({
     ...agente,
     apiIds: apiIdsByAgente.get(agente.id) ?? [],
+    arquivos: assetsByAgente.get(agente.id) ?? [],
   }));
 }
 
@@ -90,7 +99,7 @@ export async function listAgentes(projetoId?: string | null) {
     return [];
   }
 
-  return await attachApiIds(data.map((row) => mapAgente(row as AgenteRow)));
+  return await attachRelations(data.map((row) => mapAgente(row as AgenteRow)));
 }
 
 export async function getAgenteAtivo(projetoId: string) {
@@ -111,7 +120,7 @@ export async function getAgenteAtivo(projetoId: string) {
     return null;
   }
 
-  const [agente] = await attachApiIds([mapAgente(data as AgenteRow)]);
+  const [agente] = await attachRelations([mapAgente(data as AgenteRow)]);
   return agente ?? null;
 }
 
@@ -130,7 +139,7 @@ export async function getAgenteById(id: string) {
     return null;
   }
 
-  const [agente] = await attachApiIds([mapAgente(data as AgenteRow)]);
+  const [agente] = await attachRelations([mapAgente(data as AgenteRow)]);
   return agente ?? null;
 }
 
@@ -155,7 +164,7 @@ export async function getAgenteBySlug(slug: string, projetoId?: string | null) {
     return null;
   }
 
-  const [agente] = await attachApiIds([mapAgente(data as AgenteRow)]);
+  const [agente] = await attachRelations([mapAgente(data as AgenteRow)]);
   return agente ?? null;
 }
 
@@ -229,7 +238,7 @@ export async function createAgente(input: {
   }
 
   await syncAgenteApis(agente.id, input.projetoId, input.apiIds ?? []);
-  const [withApis] = await attachApiIds([agente]);
+  const [withApis] = await attachRelations([agente]);
   return withApis ?? null;
 }
 
@@ -275,6 +284,6 @@ export async function updateAgente(input: {
     await syncAgenteApis(agente.id, agente.projetoId, input.apiIds ?? []);
   }
 
-  const [withApis] = await attachApiIds([agente]);
+  const [withApis] = await attachRelations([agente]);
   return withApis ?? null;
 }

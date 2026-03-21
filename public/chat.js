@@ -69,7 +69,7 @@
     sourceScript.__infraChatInitialized = true;
 
     var apiBase = sourceScript.getAttribute("data-api-base") || new URL(sourceScript.src, window.location.href).origin;
-    var storageKey = "infrastudio-chat:" + instanceKey;
+    var storageKey = null;
     var dockWidth = 420;
     var originalBodyStyles = {
       marginLeft: document.body.style.marginLeft,
@@ -94,19 +94,6 @@
       },
     };
 
-    try {
-      var stored = window.localStorage.getItem(storageKey);
-      if (stored) {
-        var parsed = JSON.parse(stored);
-        state.chatId = typeof parsed.chatId === "string" ? parsed.chatId : null;
-        state.messages = Array.isArray(parsed.messages) ? parsed.messages : [];
-        state.context = parsed.context && typeof parsed.context === "object" && !Array.isArray(parsed.context) ? parsed.context : {};
-        state.docked = Boolean(parsed.docked);
-      }
-    } catch (error) {
-      console.warn("[InfraStudio Chat] failed to restore conversation.", error);
-    }
-
     var host = document.createElement("div");
     host.id = "infrastudio-chat-root-" + instanceKey.replace(/[^a-zA-Z0-9_-]/g, "-");
     document.body.appendChild(host);
@@ -125,6 +112,7 @@
       "  right: 24px;",
       "  bottom: 24px;",
       "  z-index: 2147483000;",
+      "  pointer-events: none;",
       "  font-family: Inter, Arial, sans-serif;",
       "  --accent: #64748b;",
       "  --panel-bg: rgba(9,16,34,0.96);",
@@ -143,12 +131,12 @@
       "  --safe-bottom: env(safe-area-inset-bottom, 0px);",
       "}",
       ".chat-wrap.docked { right: 0; left: auto; bottom: 0; top: 0; }",
-      ".chat-button { width: 60px; height: 60px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: var(--accent); color: white; cursor: pointer; box-shadow: 0 20px 40px var(--shadow-color); transition: transform .2s ease, background-color .2s ease, box-shadow .2s ease, opacity .18s ease; }",
+      ".chat-button { width: 60px; height: 60px; display: inline-flex; align-items: center; justify-content: center; pointer-events: auto; border: 0; border-radius: 999px; background: var(--accent); color: white; cursor: pointer; box-shadow: 0 20px 40px var(--shadow-color); transition: transform .2s ease, background-color .2s ease, box-shadow .2s ease, opacity .18s ease; }",
       ".chat-button:hover { transform: translateY(-1px) scale(1.02); }",
       ".chat-button .chat-icon { width: 24px; height: 24px; animation: chatLauncherSwap .22s ease both; }",
       ".chat-button.is-open { background: color-mix(in srgb, var(--accent) 88%, #0f172a 12%); }",
       ".chat-wrap.open .chat-button { opacity: 0; pointer-events: none; transform: translateY(8px) scale(.94); }",
-      ".chat-panel { width: min(380px, calc(100vw - 32px)); height: min(620px, calc(100dvh - 110px)); display: none; flex-direction: column; overflow: hidden; border-radius: 26px; border: 1px solid var(--header-border); background: var(--panel-bg); color: var(--panel-text); box-shadow: 0 24px 70px var(--shadow-color); backdrop-filter: blur(14px); margin-bottom: 16px; transform-origin: bottom right; animation: chatBubbleIn .22s ease both; }",
+      ".chat-panel { width: min(380px, calc(100vw - 32px)); height: min(620px, calc(100dvh - 110px)); display: none; pointer-events: auto; flex-direction: column; overflow: hidden; border-radius: 26px; border: 1px solid var(--header-border); background: var(--panel-bg); color: var(--panel-text); box-shadow: 0 24px 70px var(--shadow-color); backdrop-filter: blur(14px); margin-bottom: 16px; transform-origin: bottom right; animation: chatBubbleIn .22s ease both; }",
       ".chat-panel.open { display: flex; }",
       ".chat-wrap.docked .chat-panel { width: var(--dock-width); height: 100dvh; margin-bottom: 0; border-radius: 28px 0 0 28px; border-right: 0; box-shadow: -18px 0 42px var(--shadow-color); }",
       ".chat-wrap.docked .chat-button { position: fixed; right: 20px; bottom: 20px; opacity: 0; pointer-events: none; transform: scale(.9); }",
@@ -176,6 +164,15 @@
       ".chat-bubble.user .chat-rich strong { color: white; }",
       ".chat-cta { margin-top: 8px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: white; padding: 7px 11px; font-size: 11px; font-weight: 700; text-decoration: none; transition: transform .18s ease, background-color .18s ease, border-color .18s ease; }",
       ".chat-cta:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--accent) 20%, transparent); }",
+      ".chat-assets { margin-top: 10px; display: grid; gap: 10px; }",
+      ".chat-asset { display: block; overflow: hidden; border-radius: 16px; border: 1px solid var(--header-border); background: color-mix(in srgb, var(--panel-bg) 88%, transparent); color: inherit; text-decoration: none; }",
+      ".chat-asset.image { padding: 0; }",
+      ".chat-asset.image img { display: block; width: 100%; max-height: 210px; object-fit: cover; background: rgba(15,23,42,.35); }",
+      ".chat-asset.file { padding: 12px; }",
+      ".chat-asset-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; }",
+      ".chat-asset-title { font-size: 12px; font-weight: 700; color: inherit; }",
+      ".chat-asset-subtitle { margin-top: 4px; font-size: 11px; color: #94a3b8; }",
+      ".chat-asset-open { font-size: 11px; font-weight: 700; color: var(--accent); white-space: nowrap; }",
       ".chat-typing { display: inline-flex; width: fit-content; max-width: 88%; align-items: center; gap: 10px; border-radius: 18px; border: 1px solid var(--header-border); background: var(--ai-bg); color: #94a3b8; padding: 12px 14px; animation: chatBubbleIn .22s ease both; }",
       ".chat-typing-dots { display: inline-flex; gap: 4px; }",
       ".chat-typing-dots span { width: 7px; height: 7px; border-radius: 999px; background: currentColor; animation: chatDotsPulse 1.2s infinite ease-in-out; }",
@@ -194,7 +191,7 @@
       ".chat-send .chat-icon { width: 18px; height: 18px; }",
       ".chat-send[disabled] { opacity: 0.6; cursor: wait; }",
       "@media (max-width: 960px) { .chat-wrap.docked .chat-panel { width: 100vw; border-radius: 0; } }",
-      "@media (max-width: 640px) { .chat-wrap { right: 12px; left: 12px; top: calc(var(--safe-top) + 12px); bottom: calc(var(--safe-bottom) + 12px); display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end; } .chat-wrap > * { pointer-events: auto; } .chat-panel { width: 100%; max-width: 100%; height: auto; max-height: calc(var(--viewport-height) - var(--safe-top) - var(--safe-bottom) - 24px); margin-bottom: 0; border-radius: 24px; } .chat-header { padding: 14px 14px 12px; } .chat-form { padding: 12px; } .chat-input { border-radius: 18px; } .chat-wrap.docked .chat-button { right: 12px; bottom: 12px; opacity: 0; pointer-events: none; transform: scale(.9); } }",
+      "@media (max-width: 640px) { .chat-wrap { right: 12px; left: 12px; top: auto; bottom: calc(var(--safe-bottom) + 12px); display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end; } .chat-wrap.open { top: calc(var(--safe-top) + 12px); } .chat-panel { width: 100%; max-width: 100%; height: auto; max-height: calc(var(--viewport-height) - var(--safe-top) - var(--safe-bottom) - 24px); margin-bottom: 0; border-radius: 24px; } .chat-header { padding: 14px 14px 12px; } .chat-form { padding: 12px; } .chat-input { border-radius: 18px; } .chat-wrap.docked .chat-button { right: 12px; bottom: 12px; opacity: 0; pointer-events: none; transform: scale(.9); } }",
     ].join("");
     shadow.appendChild(style);
 
@@ -344,6 +341,62 @@
       return link;
     }
 
+    function createAssetGallery(assets) {
+      if (!Array.isArray(assets) || !assets.length) {
+        return null;
+      }
+
+      var wrap = document.createElement("div");
+      wrap.className = "chat-assets";
+
+      assets.slice(0, 2).forEach(function (asset) {
+        if (!asset || !asset.publicUrl) {
+          return;
+        }
+
+        var link = document.createElement("a");
+        link.className = "chat-asset " + (asset.categoria === "image" ? "image" : "file");
+        link.href = asset.publicUrl;
+        link.target = "_blank";
+        link.rel = "noreferrer noopener";
+
+        if (asset.categoria === "image") {
+          var image = document.createElement("img");
+          image.src = asset.publicUrl;
+          image.alt = asset.nome || asset.arquivoNome || "Imagem do agente";
+          link.appendChild(image);
+        }
+
+        var meta = document.createElement("div");
+        meta.className = "chat-asset-meta";
+
+        var textWrap = document.createElement("div");
+        var title = document.createElement("div");
+        title.className = "chat-asset-title";
+        title.textContent = asset.nome || asset.arquivoNome || "Arquivo";
+        textWrap.appendChild(title);
+
+        if (asset.descricao || asset.arquivoNome) {
+          var subtitle = document.createElement("div");
+          subtitle.className = "chat-asset-subtitle";
+          subtitle.textContent = asset.descricao || asset.arquivoNome;
+          textWrap.appendChild(subtitle);
+        }
+
+        meta.appendChild(textWrap);
+
+        var openLabel = document.createElement("div");
+        openLabel.className = "chat-asset-open";
+        openLabel.textContent = asset.categoria === "image" ? "Abrir imagem" : "Abrir arquivo";
+        meta.appendChild(openLabel);
+
+        link.appendChild(meta);
+        wrap.appendChild(link);
+      });
+
+      return wrap;
+    }
+
     function createWhatsAppMessage(cta) {
       if (!cta || !cta.url) {
         return null;
@@ -358,6 +411,10 @@
     }
 
     function persist() {
+      if (!storageKey) {
+        return;
+      }
+
       try {
         window.localStorage.setItem(
           storageKey,
@@ -371,6 +428,128 @@
       } catch (error) {
         console.warn("[InfraStudio Chat] failed to persist conversation.", error);
       }
+    }
+
+    function getValueByPath(source, path) {
+      return path.split(".").reduce(function (current, segment) {
+        if (!current || typeof current !== "object" || Array.isArray(current)) {
+          return null;
+        }
+
+        return Object.prototype.hasOwnProperty.call(current, segment) ? current[segment] : null;
+      }, source);
+    }
+
+    function sanitizeStorageToken(value) {
+      return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 80);
+    }
+
+    function getIdentityToken(context) {
+      var identityCandidates = [
+        "usuario.id",
+        "usuario.email",
+        "user.id",
+        "user.email",
+        "lead.telefone",
+        "lead.email",
+      ];
+
+      for (var index = 0; index < identityCandidates.length; index += 1) {
+        var candidate = getValueByPath(context, identityCandidates[index]);
+        var sanitized = sanitizeStorageToken(candidate);
+        if (sanitized) {
+          return sanitized;
+        }
+      }
+
+      return "";
+    }
+
+    function getScopeToken(context) {
+      var scopeCandidates = [
+        "imovel.id",
+        "imovel.slug",
+        "imovel.codigo",
+        "imovel.matricula",
+        "produto.id",
+        "produto.slug",
+        "produto.sku",
+        "item.id",
+        "item.slug",
+        "veiculo.id",
+        "veiculo.placa",
+        "pagina.id",
+        "pagina.slug",
+      ];
+
+      for (var index = 0; index < scopeCandidates.length; index += 1) {
+        var candidate = getValueByPath(context, scopeCandidates[index]);
+        var sanitized = sanitizeStorageToken(candidate);
+        if (sanitized) {
+          return sanitized;
+        }
+      }
+
+      var pathToken = sanitizeStorageToken(window.location.pathname || "");
+      return pathToken || "page";
+    }
+
+    function buildScopedStorageKey(context) {
+      var identityToken = getIdentityToken(context);
+      if (!identityToken) {
+        return null;
+      }
+
+      return "infrastudio-chat:" + instanceKey + ":" + identityToken + ":" + getScopeToken(context);
+    }
+
+    function restorePersistedState(nextStorageKey) {
+      if (!nextStorageKey) {
+        state.chatId = null;
+        state.messages = [];
+        state.docked = false;
+        return;
+      }
+
+      try {
+        var stored = window.localStorage.getItem(nextStorageKey);
+        if (!stored) {
+          state.chatId = null;
+          state.messages = [];
+          state.docked = false;
+          return;
+        }
+
+        var parsed = JSON.parse(stored);
+        state.chatId = typeof parsed.chatId === "string" ? parsed.chatId : null;
+        state.messages = Array.isArray(parsed.messages) ? parsed.messages : [];
+        state.docked = Boolean(parsed.docked);
+      } catch (error) {
+        console.warn("[InfraStudio Chat] failed to restore scoped conversation.", error);
+        state.chatId = null;
+        state.messages = [];
+        state.docked = false;
+      }
+    }
+
+    function refreshStorageScope() {
+      var nextStorageKey = buildScopedStorageKey(state.context);
+      if (nextStorageKey === storageKey) {
+        return;
+      }
+
+      storageKey = nextStorageKey;
+      restorePersistedState(storageKey);
+      renderMessages();
+      updateLauncherVisual();
+      applyDockLayout();
+      autoResizeInput();
     }
 
     function scrollToBottom() {
@@ -447,6 +626,12 @@
               bubble.appendChild(cta);
             }
           }
+          if (message.isAi && Array.isArray(message.assets) && message.assets.length) {
+            var assetGallery = createAssetGallery(message.assets);
+            if (assetGallery) {
+              bubble.appendChild(assetGallery);
+            }
+          }
           stack.appendChild(bubble);
         });
       }
@@ -500,6 +685,7 @@
         }
       }
 
+      refreshStorageScope();
       persist();
     }
 
@@ -637,6 +823,7 @@
           text: payload.reply || payload.error || "Nao consegui responder agora.",
           isAi: true,
           cta: null,
+          assets: Array.isArray(payload.assets) ? payload.assets : [],
         });
         if (payload.whatsapp && payload.whatsapp.url) {
           var whatsappMessage = createWhatsAppMessage(payload.whatsapp);

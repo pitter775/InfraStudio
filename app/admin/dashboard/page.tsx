@@ -1,123 +1,614 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, ArrowUpRight, Bot, Clock3, Layers3, Users } from "lucide-react";
+import {
+  Activity,
+  Bot,
+  BriefcaseBusiness,
+  Coins,
+  Layers3,
+  MessageSquare,
+  Sparkles,
+  Users,
+  Waypoints,
+} from "lucide-react";
 import { listProjectUsers } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
 
-const recentEvents = [
-  "Novo lead captado via WhatsApp imobiliario.",
-  "Usuario admin revisou permissoes de equipe.",
-  "Fluxo de agendamento disparou 14 mensagens.",
-  "Dashboard consolidou indicadores do dia.",
-];
+type Projeto = {
+  id: string;
+  nome: string;
+  slug: string | null;
+  tipo: string | null;
+  descricao: string;
+  status: string;
+};
+
+type Agente = {
+  id: string;
+  projetoId: string | null;
+};
+
+type Api = {
+  id: string;
+  projetoId: string | null;
+};
+
+type ChatWidget = {
+  id?: string;
+  projetoId: string | null;
+};
+
+type ChatRecord = {
+  id: string;
+  titulo: string;
+  totalTokens: number;
+  totalCusto: number;
+  projetoId: string | null;
+  updatedAt: string;
+};
+
+type TopChat = {
+  chatId: string;
+  titulo: string;
+  leadNome: string | null;
+  projetoNome: string | null;
+  agenteNome: string | null;
+  mensagens: number;
+  tokensInput: number;
+  tokensOutput: number;
+  totalTokens: number;
+  custo: number;
+  updatedAt: string;
+};
+
+type RecentActivity = {
+  id: string;
+  chatId: string;
+  titulo: string;
+  leadNome: string | null;
+  agenteNome: string | null;
+  role: string;
+  totalTokens: number;
+  tokensInput: number;
+  tokensOutput: number;
+  custo: number;
+  createdAt: string;
+};
+
+type IaUsageSummary = {
+  periodLabel: string;
+  startDate: string;
+  endDate: string;
+  tokensInput: number;
+  tokensOutput: number;
+  totalTokens: number;
+  totalCost: number;
+  hasCostData: boolean;
+  processedMessages: number;
+  activeChats: number;
+  activeAgents: number;
+  topChats: TopChat[];
+  topAgents: Array<{ agenteNome: string; chats: number; totalTokens: number }>;
+  recentActivity: RecentActivity[];
+};
+
+type DashboardState = {
+  users: AppUser[];
+  projetos: Projeto[];
+  agentes: Agente[];
+  apis: Api[];
+  widgets: ChatWidget[];
+  chats: ChatRecord[];
+  usage: IaUsageSummary | null;
+};
+
+function formatInteger(value: number) {
+  return value.toLocaleString("pt-BR");
+}
+
+function formatCompact(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: value >= 1 ? 2 : 4,
+    maximumFractionDigits: value >= 1 ? 2 : 4,
+  }).format(value);
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function summarizeTitle(value: string, max = 34) {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (compact.length <= max) {
+    return compact;
+  }
+
+  return `${compact.slice(0, max - 1).trimEnd()}...`;
+}
+
+function getDefaultMonthRange() {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  };
+}
+
+function MiniAreaChart({ values }: { values: number[] }) {
+  if (!values.length || values.every((value) => value <= 0)) {
+    return <div className="h-24 rounded-2xl border border-white/8 bg-white/[0.03]" />;
+  }
+
+  const width = 320;
+  const height = 96;
+  const max = Math.max(...values, 1);
+  const step = values.length > 1 ? width / (values.length - 1) : width;
+  const points = values.map((value, index) => {
+    const x = index * step;
+    const y = height - (value / max) * (height - 12) - 6;
+    return `${x},${y}`;
+  });
+
+  const line = points.join(" ");
+  const area = `0,${height} ${line} ${width},${height}`;
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-24 w-full overflow-visible">
+      <defs>
+        <linearGradient id="dashboard-area-fill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="rgba(56,189,248,0.38)" />
+          <stop offset="100%" stopColor="rgba(56,189,248,0.02)" />
+        </linearGradient>
+      </defs>
+      <path d={`M ${area}`} fill="url(#dashboard-area-fill)" />
+      <polyline
+        points={line}
+        fill="none"
+        stroke="rgba(103,232,249,0.95)"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function RingChart({
+  value,
+  total,
+  label,
+  accent,
+}: {
+  value: number;
+  total: number;
+  label: string;
+  accent: string;
+}) {
+  const radius = 28;
+  const circumference = 2 * Math.PI * radius;
+  const safeTotal = Math.max(total, 1);
+  const ratio = Math.max(0, Math.min(value / safeTotal, 1));
+  const dashOffset = circumference * (1 - ratio);
+
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3">
+      <div className="relative h-16 w-16 shrink-0">
+        <svg viewBox="0 0 72 72" className="h-16 w-16 -rotate-90">
+          <circle cx="36" cy="36" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
+          <circle
+            cx="36"
+            cy="36"
+            r={radius}
+            fill="none"
+            stroke={accent}
+            strokeWidth="8"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+            strokeLinecap="round"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-white">
+          {Math.round(ratio * 100)}%
+        </div>
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{label}</p>
+        <p className="mt-1 text-sm font-bold text-white">{formatInteger(value)}</p>
+        <p className="text-xs text-slate-400">de {formatInteger(total)}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminDashboardPage() {
-  const [users, setUsers] = useState<AppUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState<DashboardState>({
+    users: [],
+    projetos: [],
+    agentes: [],
+    apis: [],
+    widgets: [],
+    chats: [],
+    usage: null,
+  });
 
   useEffect(() => {
-    const loadUsers = async () => {
-      setUsers(await listProjectUsers());
+    const loadDashboard = async () => {
+      const range = getDefaultMonthRange();
+
+      const [users, projectResourcesResponse, chatsResponse, usageResponse] = await Promise.all([
+        listProjectUsers(),
+        fetch("/api/admin/chat-widgets", { cache: "no-store" }).then((response) => response.json()),
+        fetch("/api/admin/chats", { cache: "no-store" }).then((response) => response.json()),
+        fetch(`/api/admin/ia-usage?startDate=${range.startDate}&endDate=${range.endDate}`, { cache: "no-store" }).then((response) =>
+          response.json(),
+        ),
+      ]);
+
+      setState({
+        users,
+        projetos: projectResourcesResponse.projetos ?? [],
+        agentes: projectResourcesResponse.agentes ?? [],
+        apis: projectResourcesResponse.apis ?? [],
+        widgets: projectResourcesResponse.widgets ?? [],
+        chats: chatsResponse.chats ?? [],
+        usage: usageResponse.summary ?? null,
+      });
+
+      setLoading(false);
     };
 
-    void loadUsers();
+    void loadDashboard();
   }, []);
 
-  const stats = [
-    { label: "Usuarios", value: String(users.length), detail: "Tabela `usuarios` ou modo demo", icon: Users },
-    { label: "Leads no funil", value: "138", detail: "+18 hoje", icon: Layers3 },
-    { label: "Automacoes rodando", value: "9", detail: "3 criticas", icon: Bot },
-    { label: "Tempo medio", value: "1m 42s", detail: "-22% resposta", icon: Clock3 },
+  const { users, projetos, agentes, apis, widgets, chats, usage } = state;
+  const activeProjects = projetos.filter((projeto) => projeto.status === "ativo").length;
+  const totalChatTokens = chats.reduce((sum, chat) => sum + Number(chat.totalTokens ?? 0), 0);
+  const totalChatCost = chats.reduce((sum, chat) => sum + Number(chat.totalCusto ?? 0), 0);
+  const topChatSeries = (usage?.topChats ?? []).slice(0, 6).reverse().map((chat) => chat.totalTokens);
+
+  const projectRows = projetos
+    .map((projeto) => {
+      const totalAgentes = agentes.filter((agente) => agente.projetoId === projeto.id).length;
+      const totalApis = apis.filter((api) => api.projetoId === projeto.id).length;
+      const totalWidgets = widgets.filter((widget) => widget.projetoId === projeto.id).length;
+      const totalChats = chats.filter((chat) => chat.projetoId === projeto.id).length;
+      const totalTokens = chats
+        .filter((chat) => chat.projetoId === projeto.id)
+        .reduce((sum, chat) => sum + Number(chat.totalTokens ?? 0), 0);
+
+      return {
+        id: projeto.id,
+        nome: projeto.nome,
+        status: projeto.status,
+        totalAgentes,
+        totalApis,
+        totalWidgets,
+        totalChats,
+        totalTokens,
+      };
+    })
+    .sort((left, right) => right.totalTokens - left.totalTokens || right.totalChats - left.totalChats)
+    .slice(0, 5);
+
+  const maxProjectTokens = Math.max(...projectRows.map((item) => item.totalTokens), 1);
+  const maxTopChatTokens = Math.max(...(usage?.topChats ?? []).map((chat) => chat.totalTokens), 1);
+
+  const overviewCards = [
+    {
+      label: "Projetos",
+      value: formatInteger(projetos.length),
+      detail: `${formatInteger(activeProjects)} ativos`,
+      icon: BriefcaseBusiness,
+      tint: "from-cyan-400/20 to-sky-500/10",
+    },
+    {
+      label: "Usuarios",
+      value: formatInteger(users.length),
+      detail: "Equipe com acesso",
+      icon: Users,
+      tint: "from-emerald-400/20 to-teal-500/10",
+    },
+    {
+      label: "Chats",
+      value: formatInteger(chats.length),
+      detail: `${formatInteger(usage?.activeChats ?? 0)} com IA no periodo`,
+      icon: MessageSquare,
+      tint: "from-orange-400/20 to-amber-500/10",
+    },
+    {
+      label: "Tokens",
+      value: formatCompact(usage?.totalTokens ?? totalChatTokens),
+      detail: usage ? `${usage.periodLabel}` : "Historico geral",
+      icon: Sparkles,
+      tint: "from-fuchsia-400/18 to-violet-500/10",
+    },
+    {
+      label: "Custo",
+      value: formatCurrency(usage?.totalCost ?? totalChatCost),
+      detail: usage?.hasCostData ? "Mes atual" : "Sem custo salvo",
+      icon: Coins,
+      tint: "from-lime-400/20 to-emerald-500/10",
+    },
+    {
+      label: "Agentes",
+      value: formatInteger(agentes.length),
+      detail: `${formatInteger(widgets.length)} widgets | ${formatInteger(apis.length)} APIs`,
+      icon: Bot,
+      tint: "from-indigo-400/20 to-blue-500/10",
+    },
   ];
 
   return (
-    <main className="space-y-8">
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="px-1 py-2">
-          <div className="infra-premium-pill mb-6 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-blue-100">
-            <Activity size={14} />
-            Dashboard integrado
+    <main className="space-y-5">
+      <section className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+        <div className="rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.96))] px-5 py-5">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-200">
+            <Activity size={13} />
+            Dashboard
           </div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-white md:text-[2.8rem]">Visao geral da operacao</h1>
-          <p className="mt-4 max-w-2xl text-[15px] leading-7 text-slate-400">
-            Esta tela antecipa o tom do backoffice da InfraStudio: indicadores, fluxo recente e atalhos em uma
-            experiencia mais refinada, com cara de produto premium.
+          <h1 className="text-[2rem] font-extrabold tracking-tight text-white">Visao geral compacta da operacao</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
+            Projetos, uso de IA, volume de chats e custo em uma leitura mais limpa, densa e menor.
           </p>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {stats.map((item) => {
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {overviewCards.map((item) => {
               const Icon = item.icon;
 
               return (
-                <div key={item.label} className="infra-premium-panel infra-premium-hover rounded-[24px] p-5">
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/24 to-cyan-400/10 text-blue-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
-                    <Icon size={22} />
+                <div key={item.label} className="rounded-[20px] border border-white/8 bg-white/[0.04] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                  <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br ${item.tint} text-white`}>
+                    <Icon size={18} />
                   </div>
-                  <p className="text-sm text-slate-400">{item.label}</p>
-                  <p className="mt-2 text-3xl font-extrabold text-white">{item.value}</p>
-                  <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">{item.detail}</p>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
+                  <p className="mt-2 text-2xl font-extrabold text-white">{item.value}</p>
+                  <p className="mt-1 text-xs text-slate-400">{item.detail}</p>
                 </div>
               );
             })}
           </div>
         </div>
 
-        <div className="infra-premium-panel rounded-[28px] bg-[linear-gradient(180deg,rgba(14,165,233,0.18),rgba(8,15,32,0.92))] p-8">
-          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950/24 text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
-            <ArrowUpRight size={22} />
+        <div className="grid gap-3">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Pulso de IA</p>
+                <h2 className="mt-1 text-lg font-bold text-white">{usage?.periodLabel ?? "Mes atual"}</h2>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-right">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Mensagens</p>
+                <p className="text-sm font-bold text-white">{formatInteger(usage?.processedMessages ?? 0)}</p>
+              </div>
+            </div>
+            <MiniAreaChart values={topChatSeries} />
+            <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+                <p className="text-slate-500">Entrada</p>
+                <p className="mt-1 font-bold text-white">{formatCompact(usage?.tokensInput ?? 0)}</p>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+                <p className="text-slate-500">Saida</p>
+                <p className="mt-1 font-bold text-white">{formatCompact(usage?.tokensOutput ?? 0)}</p>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+                <p className="text-slate-500">Custo</p>
+                <p className="mt-1 font-bold text-white">{formatCurrency(usage?.totalCost ?? 0)}</p>
+              </div>
+            </div>
           </div>
-          <h2 className="text-2xl font-bold text-white">Proximo passo</h2>
-          <p className="mt-4 leading-7 text-cyan-50/92">
-            Na evolucao do produto, este dashboard vai puxar dados reais do banco da aplicacao e respeitar permissoes
-            vindas de `usuarios_projetos`, sem abrir mao do acabamento premium da InfraStudio.
-          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <RingChart value={usage?.activeChats ?? 0} total={Math.max(chats.length, 1)} label="Chats com IA" accent="rgba(34,197,94,0.95)" />
+            <RingChart value={activeProjects} total={Math.max(projetos.length, 1)} label="Projetos ativos" accent="rgba(251,191,36,0.95)" />
+          </div>
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
-        <div className="infra-premium-panel overflow-hidden rounded-[28px]">
-          <div className="border-b border-white/10 px-6 py-5">
-            <h2 className="text-xl font-bold text-white">Eventos recentes</h2>
-            <p className="mt-1 text-sm text-slate-400">Linha do tempo visual para acompanhar o ritmo da operacao.</p>
+      <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Workspace</p>
+              <h2 className="mt-1 text-lg font-bold text-white">Projetos e capacidade instalada</h2>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-right">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Estrutura</p>
+              <p className="text-sm font-bold text-white">
+                {formatInteger(agentes.length)} ag. | {formatInteger(apis.length)} APIs
+              </p>
+            </div>
           </div>
 
-          <div className="space-y-4 p-6">
-            {recentEvents.map((event, index) => (
-              <div key={event} className="infra-premium-hover flex gap-4 rounded-2xl border border-white/8 bg-slate-950/26 p-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/24 to-cyan-400/12 text-blue-100">
-                  0{index + 1}
+          <div className="space-y-3">
+            {projectRows.map((project) => (
+              <div key={project.id} className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-white">{project.nome}</p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{project.status}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-white">{formatCompact(project.totalTokens)}</p>
+                    <p className="text-[11px] text-slate-400">{formatInteger(project.totalChats)} chats</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-semibold text-white">{event}</p>
-                  <p className="mt-1 text-sm text-slate-400">Atualizado ha poucos instantes.</p>
+
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500"
+                    style={{ width: `${Math.max((project.totalTokens / maxProjectTokens) * 100, project.totalTokens > 0 ? 10 : 0)}%` }}
+                  />
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-300">
+                  <span className="rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1">{project.totalAgentes} agentes</span>
+                  <span className="rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1">{project.totalApis} APIs</span>
+                  <span className="rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1">{project.totalWidgets} widgets</span>
                 </div>
               </div>
             ))}
+
+            {!projectRows.length && (
+              <div className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-5 text-sm text-slate-400">
+                Nenhum projeto com dados suficientes para consolidar no dashboard.
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="infra-premium-panel overflow-hidden rounded-[28px]">
-          <div className="border-b border-white/10 px-6 py-5">
-            <h2 className="text-xl font-bold text-white">Usuarios em destaque</h2>
-            <p className="mt-1 text-sm text-slate-400">Resumo rapido da tabela de usuarios.</p>
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Consumo</p>
+              <h2 className="mt-1 text-lg font-bold text-white">Chats com mais peso em IA</h2>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-right">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Top</p>
+              <p className="text-sm font-bold text-white">{formatInteger(usage?.topChats.length ?? 0)} chats</p>
+            </div>
           </div>
 
-          <div className="space-y-3 p-6">
-            {users.map((user) => (
-              <div key={user.id} className="infra-premium-hover flex items-center justify-between rounded-2xl border border-white/8 bg-slate-950/26 p-4">
-                <div>
-                  <p className="font-semibold text-white">{user.name}</p>
-                  <p className="text-sm text-slate-400">{user.email}</p>
+          <div className="space-y-3">
+            {(usage?.topChats ?? []).slice(0, 5).map((chat) => (
+              <div key={chat.chatId} className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-white">{summarizeTitle(chat.titulo)}</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {chat.projetoNome ?? "Sem projeto"} | {chat.agenteNome ?? "Sem agente"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-white">{formatCompact(chat.totalTokens)}</p>
+                    <p className="text-[11px] text-emerald-300">{chat.custo > 0 ? formatCurrency(chat.custo) : "sem R$"}</p>
+                  </div>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 to-cyan-400"
+                    style={{ width: `${Math.max((chat.totalTokens / maxTopChatTokens) * 100, chat.totalTokens > 0 ? 12 : 0)}%` }}
+                  />
+                </div>
+                <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
+                  <span>In {formatInteger(chat.tokensInput)} / Out {formatInteger(chat.tokensOutput)}</span>
+                  <span>{formatDateTime(chat.updatedAt)}</span>
+                </div>
+              </div>
+            ))}
+
+            {!(usage?.topChats ?? []).length && (
+              <div className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-5 text-sm text-slate-400">
+                Ainda nao ha chats com consumo de IA para montar este ranking.
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/18 to-cyan-400/10 text-cyan-100">
+              <Layers3 size={18} />
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Distribuicao</p>
+              <h2 className="mt-1 text-lg font-bold text-white">Base consolidada</h2>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Recursos</p>
+              <p className="mt-2 text-lg font-bold text-white">{formatInteger(agentes.length + apis.length + widgets.length)}</p>
+              <p className="mt-1 text-xs text-slate-400">
+                {formatInteger(agentes.length)} agentes | {formatInteger(apis.length)} APIs | {formatInteger(widgets.length)} widgets
+              </p>
+            </div>
+            <div className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Historico de chats</p>
+              <p className="mt-2 text-lg font-bold text-white">{formatInteger(chats.length)}</p>
+              <p className="mt-1 text-xs text-slate-400">{formatCompact(totalChatTokens)} tokens acumulados</p>
+            </div>
+            <div className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Media por chat</p>
+              <p className="mt-2 text-lg font-bold text-white">
+                {formatInteger(usage?.activeChats ? Math.round((usage.totalTokens || 0) / usage.activeChats) : 0)}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">tokens no periodo filtrado</p>
+            </div>
+            <div className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Usuarios com acesso</p>
+              <p className="mt-2 text-lg font-bold text-white">{formatInteger(users.length)}</p>
+              <p className="mt-1 text-xs text-slate-400">visao administrativa geral</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500/18 to-amber-400/10 text-orange-100">
+              <Waypoints size={18} />
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Atividade recente</p>
+              <h2 className="mt-1 text-lg font-bold text-white">Ultimas mensagens com consumo</h2>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {(usage?.recentActivity ?? []).slice(0, 6).map((item) => (
+              <div key={item.id} className="flex items-start justify-between gap-4 rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-white">{summarizeTitle(item.titulo, 42)}</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {item.leadNome ?? "Lead nao identificado"} | {item.agenteNome ?? "Sem agente"}
+                  </p>
+                  <p className="mt-2 text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                    {item.role} | {formatDateTime(item.createdAt)}
+                  </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">{user.role}</p>
-                  <p className="text-xs text-emerald-300">{user.status}</p>
+                  <p className="text-sm font-bold text-white">{formatCompact(item.totalTokens)}</p>
+                  <p className="mt-1 text-[11px] text-emerald-300">{item.custo > 0 ? formatCurrency(item.custo) : "sem R$"}</p>
                 </div>
               </div>
             ))}
+
+            {!(usage?.recentActivity ?? []).length && (
+              <div className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-5 text-sm text-slate-400">
+                Nenhuma atividade recente com consumo de IA neste intervalo.
+              </div>
+            )}
           </div>
         </div>
       </section>
+
+      {loading ? (
+        <section className="rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-4 text-sm text-slate-400">
+          Carregando dados consolidados do dashboard...
+        </section>
+      ) : null}
     </main>
   );
 }

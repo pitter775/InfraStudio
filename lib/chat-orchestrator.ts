@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { AgenteAssetRecord } from "@/lib/agente-assets";
 import { getAgenteAtivo, getAgenteById } from "@/lib/agentes";
 import { buildAgenteApiRuntimeContext, type ApiRuntimeContext } from "@/lib/apis";
 import { getChatChannelPolicy } from "@/lib/chat-channel-policy";
@@ -9,6 +10,20 @@ import type { ChatMessageRole } from "@/lib/chats";
 type ConversationMessage = {
   role: ChatMessageRole;
   content: string;
+};
+
+type ReplyAsset = {
+  id: string;
+  nome: string;
+  descricao: string;
+  arquivoNome: string;
+  mimeType: string;
+  categoria: "image" | "file";
+  publicUrl: string;
+};
+
+type RuntimeReplyAsset = ReplyAsset & {
+  key: string;
 };
 
 type ConversationContext = {
@@ -132,6 +147,109 @@ function buildAnalyticalReplyInstruction(message: string) {
     "Aponte risco, trade-off ou incerteza relevante.",
     "Se faltar base para opinar, diga o que falta e faca 1 pergunta curta.",
   ].join("\n");
+}
+
+function buildRuntimeReplyAssets(assets: AgenteAssetRecord[]) {
+  return assets.slice(0, 12).map((asset, index) => ({
+    key: `asset_${index + 1}`,
+    id: asset.id,
+    nome: asset.nome,
+    descricao: asset.descricao,
+    arquivoNome: asset.arquivoNome,
+    mimeType: asset.mimeType,
+    categoria: asset.categoria,
+    publicUrl: asset.publicUrl,
+  }));
+}
+
+function buildAgentAssetInstruction(assets: RuntimeReplyAsset[], latestUserMessage: string) {
+  if (!assets.length) {
+    return "";
+  }
+
+  const userAskedForAsset = ASSET_REQUEST_SIGNALS.some((signal) => normalizeText(latestUserMessage).includes(signal));
+  const catalog = assets
+    .map((asset) => `- ${asset.key} | ${asset.categoria} | ${asset.nome}${asset.descricao ? ` | ${asset.descricao}` : ""}`)
+    .join("\n");
+
+  return [
+    "Arquivos disponiveis do agente:",
+    catalog,
+    userAskedForAsset
+      ? "O usuario sinalizou interesse em imagem ou arquivo. Se ajudar, inclua no fim da resposta 1 ou 2 tags como [[asset:asset_1]]."
+      : "Use tags [[asset:asset_n]] no fim da resposta apenas quando um arquivo ou imagem agregar valor real.",
+  ].join("\n");
+}
+
+function extractTaggedAssets(reply: string, assets: RuntimeReplyAsset[]) {
+  const matches = [...reply.matchAll(/\[\[asset:(asset_\d+)]]/gi)];
+  const keys = [...new Set(matches.map((match) => match[1]))];
+  const selectedAssets = keys
+    .map((key) => assets.find((asset) => asset.key.toLowerCase() === key.toLowerCase()))
+    .filter(Boolean)
+    .slice(0, 2) as RuntimeReplyAsset[];
+
+  const cleanedReply = reply.replace(/\n?\s*\[\[asset:(asset_\d+)]]\s*/gi, "\n").replace(/\n{3,}/g, "\n\n").trim();
+
+  return {
+    reply: cleanedReply,
+    assets: selectedAssets.map((asset) => ({
+      id: asset.id,
+      nome: asset.nome,
+      descricao: asset.descricao,
+      arquivoNome: asset.arquivoNome,
+      mimeType: asset.mimeType,
+      categoria: asset.categoria,
+      publicUrl: asset.publicUrl,
+    })),
+  };
+}
+
+function selectRelevantAssetsHeuristically(message: string, assets: RuntimeReplyAsset[]) {
+  if (!assets.length) {
+    return [];
+  }
+
+  const normalized = normalizeText(message);
+  const explicitlyRequested = ASSET_REQUEST_SIGNALS.some((signal) => normalized.includes(signal));
+  const tokens = buildSearchTokens(message);
+
+  const scored = assets
+    .map((asset) => {
+      const haystack = normalizeText(`${asset.nome} ${asset.descricao} ${asset.arquivoNome}`);
+      const score = tokens.reduce((sum, token) => (haystack.includes(token) ? sum + 8 : sum), 0) + (explicitlyRequested ? 6 : 0);
+      return { asset, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, explicitlyRequested ? 2 : 1)
+    .map((item) => ({
+      id: item.asset.id,
+      nome: item.asset.nome,
+      descricao: item.asset.descricao,
+      arquivoNome: item.asset.arquivoNome,
+      mimeType: item.asset.mimeType,
+      categoria: item.asset.categoria,
+      publicUrl: item.asset.publicUrl,
+    }));
+
+  if (scored.length) {
+    return scored;
+  }
+
+  if (explicitlyRequested) {
+    return assets.slice(0, 1).map((asset) => ({
+      id: asset.id,
+      nome: asset.nome,
+      descricao: asset.descricao,
+      arquivoNome: asset.arquivoNome,
+      mimeType: asset.mimeType,
+      categoria: asset.categoria,
+      publicUrl: asset.publicUrl,
+    }));
+  }
+
+  return [];
 }
 
 function prefersStructuredReply(context?: ConversationContext) {
@@ -513,6 +631,28 @@ const ANALYTICAL_QUERY_SIGNALS = [
   "comparacao",
   "comparação",
   "cuidado",
+];
+
+const ASSET_REQUEST_SIGNALS = [
+  "imagem",
+  "imagens",
+  "foto",
+  "fotos",
+  "arquivo",
+  "arquivos",
+  "pdf",
+  "documento",
+  "documentos",
+  "anexo",
+  "anexos",
+  "manual",
+  "catalogo",
+  "catálogo",
+  "planta",
+  "planta baixa",
+  "mostra",
+  "me envie",
+  "me manda",
 ];
 
 const KNOWN_SEARCH_TERMS = [
@@ -964,11 +1104,13 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const projectId = context?.projeto?.id ?? null;
   const agentId = context?.agente?.id ?? null;
   const agent = agentId ? await getAgenteById(agentId) : projectId ? await getAgenteAtivo(projectId) : null;
+  const runtimeAssets = buildRuntimeReplyAssets(agent?.arquivos ?? []);
   const apiContexts = agent?.id ? await buildAgenteApiRuntimeContext(agent.id, (context ?? {}) as Record<string, unknown>) : [];
   const openai = await getProjetoOpenAIConfig(projectId);
   const systemPrompt = buildSystemPrompt(agent);
   const structuredReplyInstruction = buildStructuredReplyInstruction(context);
   const analyticalReplyInstruction = buildAnalyticalReplyInstruction(latestUserMessage);
+  const agentAssetInstruction = buildAgentAssetInstruction(runtimeAssets, latestUserMessage);
   const focusedApiContext = buildFocusedApiContext(latestUserMessage, apiContexts);
   const catalogPricingReply = channelPolicy.allowCatalogPricing ? buildCatalogPricingReply(history, context) : null;
   const canUseDirectReply = shouldUseDirectFieldReply(latestUserMessage) && !isAnalyticalQuery(latestUserMessage);
@@ -977,6 +1119,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   if (catalogPricingReply && apiContexts.length === 0) {
     return {
       reply: catalogPricingReply,
+      assets: selectRelevantAssetsHeuristically(latestUserMessage, runtimeAssets),
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
         provider: "heuristic",
@@ -994,6 +1137,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   if (identificationPrompt && apiContexts.length === 0) {
       return {
       reply: formatHeuristicReply(identificationPrompt, context),
+      assets: [],
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
         provider: "heuristic",
@@ -1007,6 +1151,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   if (directApiReply) {
       return {
       reply: directApiReply,
+      assets: selectRelevantAssetsHeuristically(latestUserMessage, runtimeAssets),
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
         provider: "heuristic",
@@ -1021,6 +1166,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
     return {
       reply: formatHeuristicReply(apiFallbackReply ?? heuristicReply(latestUserMessage), context),
+      assets: selectRelevantAssetsHeuristically(latestUserMessage, runtimeAssets),
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: { provider: "heuristic", model: "fallback", agenteId: agent?.id ?? null, agenteNome: agent?.nome ?? null },
     };
@@ -1051,7 +1197,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
         model: openai.model,
         temperature: 0.5,
         max_output_tokens: 220,
-        instructions: [systemPrompt, structuredReplyInstruction, analyticalReplyInstruction, focusedApiContext.instructions, summary, lead, qualification]
+        instructions: [systemPrompt, structuredReplyInstruction, analyticalReplyInstruction, agentAssetInstruction, focusedApiContext.instructions, summary, lead, qualification]
           .filter(Boolean)
           .join("\n\n"),
         input: buildInput(recentMessages),
@@ -1066,6 +1212,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
       const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
       return {
         reply: formatHeuristicReply(apiFallbackReply ?? heuristicReply(latestUserMessage), context),
+        assets: selectRelevantAssetsHeuristically(latestUserMessage, runtimeAssets),
         usage: { inputTokens: 0, outputTokens: 0 },
         metadata: {
           provider: "heuristic",
@@ -1076,8 +1223,10 @@ export async function generateSalesReply(history: ConversationMessage[], context
       };
     }
 
+    const resolvedReply = extractTaggedAssets(outputText, runtimeAssets);
     return {
-      reply: outputText,
+      reply: resolvedReply.reply,
+      assets: resolvedReply.assets,
       usage: {
         inputTokens: payload.usage?.input_tokens ?? 0,
         outputTokens: payload.usage?.output_tokens ?? 0,
@@ -1094,6 +1243,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
     return {
       reply: formatHeuristicReply(apiFallbackReply ?? heuristicReply(latestUserMessage), context),
+      assets: selectRelevantAssetsHeuristically(latestUserMessage, runtimeAssets),
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
         provider: "heuristic",

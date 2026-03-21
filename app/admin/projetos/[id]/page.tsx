@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Bot, CheckCircle2, MessageSquare, Pencil, Plus, Sparkles, TestTube2, Trash2, X } from "lucide-react";
+import { Bot, CheckCircle2, ExternalLink, FileImage, MessageSquare, Paperclip, Pencil, Plus, Sparkles, TestTube2, Trash2, X } from "lucide-react";
 
 type Projeto = {
   id: string;
@@ -52,6 +52,22 @@ type Agente = {
   createdAt: string;
   projetoId: string | null;
   apiIds: string[];
+  arquivos: AgenteArquivo[];
+};
+
+type AgenteArquivo = {
+  id: string;
+  agenteId: string;
+  projetoId: string | null;
+  nome: string;
+  descricao: string;
+  arquivoNome: string;
+  mimeType: string;
+  tamanhoBytes: number;
+  categoria: "image" | "file";
+  storagePath: string;
+  publicUrl: string;
+  createdAt: string;
 };
 
 type Chat = {
@@ -107,6 +123,11 @@ type ChatDetailState = {
   messages: ChatMessage[];
 };
 
+type PendingAgenteArquivo = {
+  id: string;
+  file: File;
+};
+
 function sanitizePhoneDigits(value: string) {
   const digits = value.replace(/\D/g, "");
   const localDigits = digits.startsWith("55") && digits.length > 11 ? digits.slice(2) : digits;
@@ -151,6 +172,18 @@ function summarizeApiFields(campos: ApiCampo[], limit = 6) {
   return `${labels.join(", ")} +${campos.length - limit}`;
 }
 
+function formatFileSize(value: number) {
+  if (value >= 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  if (value >= 1024) {
+    return `${Math.round(value / 1024)} KB`;
+  }
+
+  return `${value} B`;
+}
+
 function mergeDetectedApiCampos(campos: ApiCampo[], parametros: ApiParametro[]) {
   const map = new Map<string, ApiCampo>();
 
@@ -181,6 +214,8 @@ type AgenteFormState = {
   configuracoes: string;
   ativo: boolean;
   apiIds: string[];
+  arquivos: AgenteArquivo[];
+  arquivoIdsRemovidos: string[];
 };
 
 type ApiFormState = {
@@ -275,6 +310,8 @@ const emptyAgenteForm: AgenteFormState = {
   configuracoes: JSON.stringify(defaultConfiguracoes, null, 2),
   ativo: true,
   apiIds: [],
+  arquivos: [],
+  arquivoIdsRemovidos: [],
 };
 
 const emptyApiForm: ApiFormState = {
@@ -496,19 +533,27 @@ function AgenteModal({
   open,
   form,
   apis,
+  pendingArquivos,
   saving,
   feedback,
   onClose,
   onChange,
+  onAddFiles,
+  onRemovePendingFile,
+  onRemoveUploadedFile,
   onSubmit,
 }: {
   open: boolean;
   form: AgenteFormState;
   apis: Api[];
+  pendingArquivos: PendingAgenteArquivo[];
   saving: boolean;
   feedback: string | null;
   onClose: () => void;
   onChange: (next: Partial<AgenteFormState>) => void;
+  onAddFiles: (files: FileList | null) => void;
+  onRemovePendingFile: (id: string) => void;
+  onRemoveUploadedFile: (id: string) => void;
   onSubmit: () => void;
 }) {
   if (!open) {
@@ -541,6 +586,93 @@ function AgenteModal({
             <input value={form.descricao} onChange={(event) => onChange({ descricao: event.target.value })} placeholder="Descricao curta do agente" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
             <textarea value={form.promptBase} onChange={(event) => onChange({ promptBase: event.target.value })} placeholder="Prompt base do agente" rows={8} className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none placeholder:text-slate-500" />
             <textarea value={form.configuracoes} onChange={(event) => onChange({ configuracoes: event.target.value })} rows={12} className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 font-mono text-xs leading-relaxed text-cyan-100 outline-none placeholder:text-slate-500" />
+            <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-white">Arquivos e imagens do agente</p>
+                  <p className="mt-1 text-xs text-slate-400">O agente pode usar esses anexos no momento certo e o chat exibe imagens e arquivos clicaveis.</p>
+                </div>
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100">
+                  <Paperclip size={14} />
+                  Adicionar arquivos
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                    onChange={(event) => {
+                      onAddFiles(event.target.files);
+                      event.currentTarget.value = "";
+                    }}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              {form.arquivos.length ? (
+                <div className="mt-4 space-y-2">
+                  {form.arquivos.map((asset) => (
+                    <div key={asset.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/[0.05] text-cyan-100">
+                          {asset.categoria === "image" ? <FileImage size={18} /> : <Paperclip size={18} />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-white">{asset.nome}</p>
+                          <p className="text-xs text-slate-400">
+                            {asset.arquivoNome} • {formatFileSize(asset.tamanhoBytes)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={asset.publicUrl}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                          aria-label="Abrir arquivo"
+                        >
+                          <ExternalLink size={15} />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => onRemoveUploadedFile(asset.id)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-100 transition-colors hover:bg-rose-500/20"
+                          aria-label="Remover arquivo"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {pendingArquivos.length ? (
+                <div className="mt-4 space-y-2">
+                  {pendingArquivos.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-cyan-500/15 bg-cyan-500/10 px-3 py-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950/20 text-cyan-100">
+                          {item.file.type.startsWith("image/") ? <FileImage size={18} /> : <Paperclip size={18} />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-white">{item.file.name}</p>
+                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} • aguardando upload</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onRemovePendingFile(item.id)}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                        aria-label="Remover arquivo pendente"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <div className="border-t border-white/10 bg-white/[0.03] p-6 lg:border-l lg:border-t-0">
@@ -1043,6 +1175,7 @@ export default function AdminProjetoDetalhePage() {
   const [chatHistoryLoading, setChatHistoryLoading] = useState(false);
   const [chatHistoryError, setChatHistoryError] = useState<string | null>(null);
   const [chatDetail, setChatDetail] = useState<ChatDetailState | null>(null);
+  const [pendingAgenteArquivos, setPendingAgenteArquivos] = useState<PendingAgenteArquivo[]>([]);
   const [origin, setOrigin] = useState("");
 
   const loadProjeto = async () => {
@@ -1071,6 +1204,7 @@ export default function AdminProjetoDetalhePage() {
       ...emptyAgenteForm,
       projetoId: params.id,
     });
+    setPendingAgenteArquivos([]);
     setFeedbackAgente(null);
   };
 
@@ -1213,6 +1347,63 @@ export default function AdminProjetoDetalhePage() {
     ].join("\n");
   };
 
+  const handleAddAgenteFiles = (files: FileList | null) => {
+    if (!files?.length) {
+      return;
+    }
+
+    const nextFiles = Array.from(files).map((file) => ({
+      id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+      file,
+    }));
+
+    setPendingAgenteArquivos((current) => [...current, ...nextFiles]);
+  };
+
+  const handleRemovePendingAgenteFile = (id: string) => {
+    setPendingAgenteArquivos((current) => current.filter((item) => item.id !== id));
+  };
+
+  const handleRemoveUploadedAgenteFile = (assetId: string) => {
+    setAgenteForm((current) => ({
+      ...current,
+      arquivos: current.arquivos.filter((item) => item.id !== assetId),
+      arquivoIdsRemovidos: current.arquivoIdsRemovidos.includes(assetId)
+        ? current.arquivoIdsRemovidos
+        : [...current.arquivoIdsRemovidos, assetId],
+    }));
+  };
+
+  const syncAgentAssets = async (agenteId: string, projetoId: string) => {
+    for (const assetId of agenteForm.arquivoIdsRemovidos) {
+      await fetch("/api/admin/agentes/assets", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: assetId }),
+      });
+    }
+
+    for (const pending of pendingAgenteArquivos) {
+      const formData = new FormData();
+      formData.set("agenteId", agenteId);
+      formData.set("projetoId", projetoId);
+      formData.set("nome", pending.file.name);
+      formData.set("file", pending.file);
+
+      const response = await fetch("/api/admin/agentes/assets", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        throw new Error(payload.error ?? "Nao foi possivel enviar um dos arquivos do agente.");
+      }
+    }
+  };
+
   const handleAgenteSubmit = async () => {
     setSavingAgente(true);
     setFeedbackAgente(null);
@@ -1242,6 +1433,18 @@ export default function AdminProjetoDetalhePage() {
       return;
     }
 
+    const savedAgente = (payload as { agente?: Agente }).agente ?? null;
+
+    try {
+      if (savedAgente?.id && savedAgente.projetoId) {
+        await syncAgentAssets(savedAgente.id, savedAgente.projetoId);
+      }
+    } catch (error) {
+      setFeedbackAgente(error instanceof Error ? error.message : "Nao foi possivel atualizar os arquivos do agente.");
+      setSavingAgente(false);
+      return;
+    }
+
     await loadProjeto();
     const message = agenteForm.id ? "Agente atualizado com sucesso." : "Agente criado com sucesso.";
     resetAgenteForm();
@@ -1261,7 +1464,10 @@ export default function AdminProjetoDetalhePage() {
       configuracoes: JSON.stringify(agente.configuracoes ?? defaultConfiguracoes, null, 2),
       ativo: agente.ativo,
       apiIds: agente.apiIds ?? [],
+      arquivos: agente.arquivos ?? [],
+      arquivoIdsRemovidos: [],
     });
+    setPendingAgenteArquivos([]);
     setFeedbackAgente(null);
     setAgenteModalOpen(true);
   };
@@ -1973,6 +2179,7 @@ export default function AdminProjetoDetalhePage() {
         open={agenteModalOpen}
         form={agenteForm}
         apis={data.apis}
+        pendingArquivos={pendingAgenteArquivos}
         saving={savingAgente}
         feedback={feedbackAgente}
         onClose={() => {
@@ -1980,6 +2187,9 @@ export default function AdminProjetoDetalhePage() {
           resetAgenteForm();
         }}
         onChange={(next) => setAgenteForm((prev) => ({ ...prev, ...next }))}
+        onAddFiles={handleAddAgenteFiles}
+        onRemovePendingFile={handleRemovePendingAgenteFile}
+        onRemoveUploadedFile={handleRemoveUploadedAgenteFile}
         onSubmit={() => void handleAgenteSubmit()}
       />
 

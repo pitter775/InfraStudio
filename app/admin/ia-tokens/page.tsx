@@ -62,9 +62,18 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-    minimumFractionDigits: 4,
-    maximumFractionDigits: 4,
+    minimumFractionDigits: value >= 1 ? 2 : 4,
+    maximumFractionDigits: value >= 1 ? 2 : 4,
   }).format(value);
+}
+
+function formatTokensWithCost(tokens: number, cost?: number | null) {
+  const label = `${formatInteger(tokens)} tokens`;
+  if (!cost || cost <= 0) {
+    return label;
+  }
+
+  return `${label} | ${formatCurrency(cost)}`;
 }
 
 function summarizeTitle(value: string, max = 52) {
@@ -121,8 +130,10 @@ export default function AdminIaTokensPage() {
     ? [
         {
           label: "Tokens do periodo",
-          value: formatInteger(summary.totalTokens),
-          detail: `${formatInteger(summary.tokensInput)} entrada • ${formatInteger(summary.tokensOutput)} saida`,
+          value: formatTokensWithCost(summary.totalTokens, summary.totalCost),
+          detail: summary.hasCostData
+            ? `${formatInteger(summary.tokensInput)} entrada | ${formatInteger(summary.tokensOutput)} saida | ${formatCurrency(summary.totalCost)}`
+            : `${formatInteger(summary.tokensInput)} entrada | ${formatInteger(summary.tokensOutput)} saida`,
           icon: Sparkles,
         },
         {
@@ -250,7 +261,7 @@ export default function AdminIaTokensPage() {
         <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-5">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Total geral no periodo</p>
-            <p className="mt-3 text-3xl font-extrabold text-white">{formatInteger(summary.totalTokens)} tokens</p>
+            <p className="mt-3 text-3xl font-extrabold text-white">{formatTokensWithCost(summary.totalTokens, summary.totalCost)}</p>
             <p className="mt-2 text-sm text-cyan-50">
               Entre {summary.startDate.split("-").reverse().join("/")} e {summary.endDate.split("-").reverse().join("/")}
             </p>
@@ -258,7 +269,7 @@ export default function AdminIaTokensPage() {
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Distribuicao</p>
             <p className="mt-3 text-lg font-bold text-white">
-              {formatInteger(summary.tokensInput)} entrada • {formatInteger(summary.tokensOutput)} saida
+              {formatInteger(summary.tokensInput)} entrada | {formatInteger(summary.tokensOutput)} saida
             </p>
             <p className="mt-2 text-sm text-slate-400">
               {formatInteger(summary.processedMessages)} mensagens processadas em {formatInteger(summary.activeChats)} chats.
@@ -277,7 +288,7 @@ export default function AdminIaTokensPage() {
           <div className="divide-y divide-white/8">
             {summary?.topChats.length ? (
               summary.topChats.map((chat, index) => (
-                <div key={chat.chatId} className="grid gap-4 px-6 py-5 md:grid-cols-[48px_minmax(0,1.3fr)_140px_140px] md:items-center">
+                <div key={chat.chatId} className="grid gap-4 px-6 py-5 md:grid-cols-[48px_minmax(0,1.3fr)_180px_140px] md:items-center">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500/10 text-lg font-extrabold text-orange-200">
                     {index + 1}
                   </div>
@@ -286,15 +297,18 @@ export default function AdminIaTokensPage() {
                       {summarizeTitle(chat.titulo)}
                     </p>
                     <p className="mt-1 text-sm text-slate-400">
-                      Lead: {chat.leadNome ?? "Nao identificado"} • Agente: {chat.agenteNome ?? "Sem agente"}
+                      Lead: {chat.leadNome ?? "Nao identificado"} | Agente: {chat.agenteNome ?? "Sem agente"}
                     </p>
                     <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
-                      {chat.projetoNome ?? "Sem projeto"} • {chat.mensagens} mensagens com token
+                      {chat.projetoNome ?? "Sem projeto"} | {chat.mensagens} mensagens com token
                     </p>
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Total tokens</p>
                     <p className="mt-2 text-xl font-bold text-white">{formatInteger(chat.totalTokens)}</p>
+                    <p className="mt-1 text-xs text-emerald-300">
+                      {chat.custo > 0 ? formatCurrency(chat.custo) : "Sem valor monetario salvo"}
+                    </p>
                     <p className="mt-1 text-xs text-slate-400">
                       In {formatInteger(chat.tokensInput)} / Out {formatInteger(chat.tokensOutput)}
                     </p>
@@ -358,14 +372,17 @@ export default function AdminIaTokensPage() {
                       <div>
                         <p className="font-semibold text-white">{item.titulo}</p>
                         <p className="mt-1 text-sm text-slate-400">
-                          {item.leadNome ?? "Lead nao identificado"} • {item.agenteNome ?? "Sem agente"}
+                          {item.leadNome ?? "Lead nao identificado"} | {item.agenteNome ?? "Sem agente"}
                         </p>
                         <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
-                          {item.role} • {new Date(item.createdAt).toLocaleString("pt-BR")}
+                          {item.role} | {new Date(item.createdAt).toLocaleString("pt-BR")}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-extrabold text-white">{formatInteger(item.totalTokens)} tokens</p>
+                        <p className="mt-1 text-xs text-emerald-300">
+                          {item.custo > 0 ? formatCurrency(item.custo) : "Sem valor monetario salvo"}
+                        </p>
                         <p className="mt-1 text-xs text-slate-400">
                           In {formatInteger(item.tokensInput)} / Out {formatInteger(item.tokensOutput)}
                         </p>

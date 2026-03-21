@@ -261,7 +261,10 @@ export async function POST(request: Request) {
       tokensInput: ai.usage.inputTokens,
       tokensOutput: ai.usage.outputTokens,
       custo: 0,
-      metadata: ai.metadata,
+      metadata: {
+        ...ai.metadata,
+        assets: ai.assets ?? [],
+      },
     });
 
     if (!assistantMessage) {
@@ -331,6 +334,7 @@ export async function POST(request: Request) {
       {
         chatId: chat.id,
         reply: assistantMessage.conteudo ?? ai.reply,
+        assets: ai.assets ?? [],
         whatsapp: shouldShowWhatsappButton
           ? {
               url: buildWhatsAppLink(widgetPhone, whatsappMessage),
