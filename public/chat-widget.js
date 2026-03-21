@@ -69,13 +69,14 @@
       ".chat-title { font-size: 16px; font-weight: 700; color: " + panelText + "; }",
       ".chat-subtitle { margin-top: 4px; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .08em; }",
       ".chat-reset, .chat-close { border: 1px solid " + headerBorder + "; background: " + subtleBg + "; color: #94a3b8; border-radius: 12px; cursor: pointer; }",
-      ".chat-reset { padding: 8px 10px; font-size: 11px; font-weight: 600; }",
+      ".chat-reset { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }",
+      ".chat-reset .chat-icon { width: 16px; height: 16px; }",
       ".chat-close { width: 36px; height: 36px; font-size: 16px; }",
       ".chat-messages { min-height: 0; flex: 1; overflow-y: auto; padding: 16px; background: " + surfaceBg + "; }",
       ".chat-stack { display: flex; flex-direction: column; gap: 12px; }",
       ".chat-bubble { max-width: 88%; border-radius: 18px; border: 1px solid " + headerBorder + "; padding: 12px 14px; font-size: 14px; line-height: 1.6; animation: chatBubbleIn .22s ease both; }",
       ".chat-bubble.ai { padding: 0; background: transparent; color: " + aiBubbleText + "; border-color: transparent; border-bottom-left-radius: 6px; }",
-      ".chat-bubble.user { margin-left: auto; background: " + accent + "; color: white; border-color: " + accent + "; border-bottom-right-radius: 6px; }",
+      ".chat-bubble.user { margin-left: auto; background: color-mix(in srgb, " + accent + " 78%, white 22%); color: white; border-color: color-mix(in srgb, " + accent + " 68%, white 32%); border-bottom-right-radius: 6px; box-shadow: 0 10px 24px color-mix(in srgb, " + accent + " 22%, transparent); backdrop-filter: blur(8px); }",
       ".chat-rich { white-space: normal; }",
       ".chat-rich p { margin: 0; }",
       ".chat-rich p + p, .chat-rich p + ul, .chat-rich p + ol, .chat-rich ul + p, .chat-rich ol + p, .chat-rich ul + ul, .chat-rich ol + ol { margin-top: 10px; }",
@@ -154,7 +155,9 @@
     var resetButton = document.createElement("button");
     resetButton.className = "chat-reset";
     resetButton.type = "button";
-    resetButton.textContent = "Novo atendimento";
+    resetButton.setAttribute("aria-label", "Novo atendimento");
+    resetButton.setAttribute("title", "Novo atendimento");
+    resetButton.innerHTML = createResetIcon();
     headerActions.appendChild(resetButton);
 
     var closeButton = document.createElement("button");
@@ -200,6 +203,10 @@
 
     function createPlaneIcon() {
       return '<span class="chat-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M20.2 4.8 3.9 11.2c-.7.3-.7 1.3.1 1.5l5.9 1.9 1.9 5.9c.2.8 1.2.8 1.5.1l6.4-16.3c.3-.8-.5-1.6-1.5-1.3Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="m9.8 14.2 4.5-4.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+    }
+
+    function createResetIcon() {
+      return '<span class="chat-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 8V4m0 0h4M6 4l3.1 3.1A8 8 0 1 1 4 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
     }
 
     function createCloseIcon() {
