@@ -247,7 +247,7 @@ function sanitizeTechnicalValue<T>(value: T): T {
   return value;
 }
 
-function compactHumanLine(value: string) {
+function organizeHumanLine(value: string) {
   const cleaned = stripDecorativeCharacters(
     value
     .replace(/\s{2,}/g, " ")
@@ -285,7 +285,6 @@ function compactAgentSummary(summary: string) {
   const withoutJsonBlocks = normalized.replace(/\{[\s\S]*\}$/g, "").trim();
   const lines = withoutJsonBlocks.split("\n");
   const compacted: string[] = [];
-  const seen = new Set<string>();
   let currentSection = "";
 
   for (const line of lines) {
@@ -296,7 +295,7 @@ function compactAgentSummary(summary: string) {
       continue;
     }
 
-    const normalizedLine = compactHumanLine(line);
+    const normalizedLine = organizeHumanLine(line);
 
     if (!normalizedLine.startsWith("- ") && /:$/.test(normalizedLine)) {
       const section = normalizedLine
@@ -312,15 +311,6 @@ function compactAgentSummary(summary: string) {
         currentSection = section;
       }
       continue;
-    }
-
-    const dedupeKey = normalizeSummaryKey(normalizedLine);
-    if (dedupeKey && seen.has(dedupeKey)) {
-      continue;
-    }
-
-    if (dedupeKey) {
-      seen.add(dedupeKey);
     }
 
     compacted.push(normalizedLine);
