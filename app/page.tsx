@@ -83,7 +83,7 @@ function HomePageContent() {
       />
 
       {externalWidgetTestMode ? (
-        <ExternalChatEmbed projeto={embeddedProjeto} agente={embeddedAgente} />
+        <ExternalChatEmbed projeto={embeddedProjeto} agente={embeddedAgente} open={chatOpen} />
       ) : null}
 
       <HeroSection onOpenChat={openPreferredChat} />

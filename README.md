@@ -4,9 +4,9 @@ Painel e backend de projetos, agentes e canais de chat da InfraStudio.
 
 ## Chat SDK
 
-O novo padrao de embed do chat e fixo no frontend e dinamico no backend.
+O widget agora opera em modo host-controlled. O script so expoe a API global; a aplicacao hospedeira decide quando montar, atualizar, ocultar e destruir.
 
-### Embed obrigatorio
+### Carregamento do SDK
 
 ```html
 <script
@@ -18,26 +18,36 @@ O novo padrao de embed do chat e fixo no frontend e dinamico no backend.
 
 ### API global
 
-O script expõe `window.InfraChat` automaticamente.
-
 ```html
 <script>
-  InfraChat.setContext({
-    id: "uuid-123",
-    cidade: "sp",
-    cor: "#586"
+  InfraChat.mount({
+    projeto: "abc123",
+    agente: "imoveis",
+    apiBase: "https://infrastudio.vercel.app",
+    strictHostControl: true,
+    context: {
+      route: { path: window.location.pathname },
+      client: { id: "tenant-a" },
+      resource: { id: "imovel-123" }
+    },
+    policy: {
+      allowed: true,
+      allowedRoutes: ["/imoveis/*"]
+    }
   });
 </script>
 ```
 
 ### Regras
 
-- `data-projeto` e `data-agente` sao obrigatorios.
+- `mount(...)` e obrigatorio para criar o chat.
+- `data-projeto` e `data-agente` podem servir como default, mas nao causam auto-inicializacao.
 - O SDK usa JavaScript puro e funciona em HTML, React, Vue e Angular.
-- O chat inicializa sozinho ao carregar o script.
-- `InfraChat.setContext(...)` aceita multiplas chamadas e faz merge raso do contexto.
-- Se `setContext` for chamado cedo, o SDK guarda os dados em fila interna e aplica quando terminar o load.
-- Tema, cor, titulo e transparencia nao ficam fixos no snippet. Eles podem vir do backend ou do contexto enviado pelo cliente.
+- `InfraChat.updateContext(...)` invalida o contexto anterior e aplica o novo.
+- `InfraChat.destroy()` remove root, listeners, timers, observers, controllers e o estado visual em memoria.
+- O SDK nunca se auto-recria depois de `destroy()`.
+- Eventos de debug: `mounted`, `context_updated`, `hidden`, `destroyed`, `blocked_by_route`, `blocked_by_policy`.
+- Tema, cor, titulo e transparencia podem vir do backend ou do contexto enviado pelo cliente.
 
 ### Backend
 

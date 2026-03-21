@@ -351,11 +351,11 @@ function renderSnippetLine(line: string) {
     return <span className="text-fuchsia-300">{line}</span>;
   }
 
-  const parts = line.split(/(data-[\w-]+|src|InfraChat\.setContext)/g);
+  const parts = line.split(/(data-[\w-]+|src|InfraChat\.(?:mount|updateContext|destroy|hide|setContext))/g);
   return (
     <>
       {parts.map((part, index) => {
-        if (part === "src" || part.startsWith("data-") || part === "InfraChat.setContext") {
+        if (part === "src" || part.startsWith("data-") || part.startsWith("InfraChat.")) {
           return (
             <span key={`${part}-${index}`} className="text-cyan-300">
               {part}
@@ -975,6 +975,8 @@ function WidgetModal({
     return null;
   }
 
+  const documentationHref = "/docs/chat-widget-host-control";
+
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
       <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
@@ -984,14 +986,26 @@ function WidgetModal({
             <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar widget" : "Novo widget"}</h2>
             <p className="mt-1 text-sm text-slate-400">Este widget ja nasce vinculado ao projeto atual para evitar ambiguidades na abertura do chat.</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
-            aria-label="Fechar modal"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              href={documentationHref}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-3 text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+              aria-label="Abrir documentacao do widget"
+              title="Abrir documentacao do widget"
+            >
+              <ExternalLink size={18} />
+            </a>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label="Fechar modal"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="max-h-[calc(92vh-88px)] overflow-y-auto p-6">
@@ -1339,19 +1353,39 @@ export default function AdminProjetoDetalhePage() {
     }
 
     return [
-      "<!-- 1) Cole este bloco no HTML/layout para carregar o chat na abertura da pagina -->",
+      "<!-- 1) Carregue o SDK, mas deixe o host controlar quando o chat existe -->",
       "<script",
       `  src=\"${base}/chat.js\"`,
       `  data-projeto=\"${projetoRef}\"`,
       `  data-agente=\"${agenteRef}\"`,
       "></script>",
       "",
-      "<!-- 2) Depois, no JavaScript da pagina ou do framework, envie contexto e personalize se quiser -->",
+      "<!-- 2) Monte apenas na rota/contexto permitido -->",
       "<script>",
-      "  // Exemplo: execute quando a pagina carregar ou quando tiver os dados do cliente",
-      "  InfraChat.setContext({",
+      "  InfraChat.mount({",
+      `    projeto: '${projetoRef}',`,
+      `    agente: '${agenteRef}',`,
+      `    apiBase: '${base}',`,
+      "    strictHostControl: true,",
+      "    context: {",
+      "      route: { path: window.location.pathname },",
       ...contextLines,
+      "    },",
+      "    policy: {",
+      "      allowed: true,",
+      "      allowedRoutes: ['/detalhe-imovel/*'],",
+      "    },",
       "  });",
+      "",
+      "  // Ao trocar imovel, usuario, cliente ou rota, invalide o contexto anterior",
+      "  InfraChat.updateContext({",
+      "    route: { path: window.location.pathname },",
+      "    resource: { id: 'novo-recurso' },",
+      "    client: { id: 'novo-cliente' },",
+      "  });",
+      "",
+      "  // Ao sair da rota autorizada, destrua de forma imediata",
+      "  InfraChat.destroy();",
       "</script>",
     ].join("\n");
   };
