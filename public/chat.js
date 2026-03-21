@@ -790,6 +790,13 @@
       void sendMessage(instance, input.value);
     });
 
+    addListener(instance, input, "keydown", function (event) {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        void sendMessage(instance, input.value);
+      }
+    });
+
     addListener(instance, input, "input", function () {
       autoResizeInput(instance);
     });
@@ -837,6 +844,7 @@
 
     instance.state.messages.push({ id: "user-" + Date.now(), text: trimmed, isAi: false });
     instance.refs.input.value = "";
+    autoResizeInput(instance);
     renderMessages(instance);
     setLoading(instance, true);
 

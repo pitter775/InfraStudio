@@ -598,6 +598,7 @@
     resetButton.addEventListener("click", function () {
       chatId = null;
       messages = [];
+      input.value = "";
       persist();
       renderMessages();
       autoResizeInput();
