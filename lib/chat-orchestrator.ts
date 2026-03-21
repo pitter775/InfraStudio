@@ -112,12 +112,13 @@ function heuristicReply(message: string) {
 
 function buildStructuredReplyInstruction(context?: ConversationContext) {
   const shouldStructure = prefersStructuredReply(context);
+  const allowIcons = context?.ui?.allow_icons !== false;
 
   if (!shouldStructure) {
     return "";
   }
 
-  return [
+  const lines = [
     "Formato da resposta:",
     "- Prefira respostas escaneaveis, nunca em bloco corrido quando houver mais de uma ideia.",
     "- Use quebras de linha entre contexto, diagnostico, proximos passos e CTA.",
@@ -126,7 +127,14 @@ function buildStructuredReplyInstruction(context?: ConversationContext) {
     "- Pode usar icones simples e pontuais como ✓, →, • ou icons discretos para melhorar leitura.",
     "- Pode usar marcadores curtos como '-', '->' e pontos de destaque para melhorar leitura.",
     "- Mantenha o texto elegante e curto, sem excesso de enfeite.",
-  ].join("\n");
+    "- Quando a base vier de resumo, campos extraidos ou contexto parcial, diga isso com clareza em vez de sugerir que leu tudo.",
+  ];
+
+  if (allowIcons) {
+    lines.splice(5, 0, "- Se ajudar a leitura, use no maximo 1 ou 2 icones simples como ✓, -> ou •.");
+  }
+
+  return lines.join("\n");
 }
 
 function isAnalyticalQuery(message: string) {
@@ -921,6 +929,8 @@ function buildSystemPrompt(agent: Awaited<ReturnType<typeof getAgenteAtivo>>) {
     "Foque em automacao, IA, integracoes, sistemas sob medida, atendimento e vendas.",
     "Seja consultivo, direto e convincente sem soar robotico.",
     "Nao invente funcionalidades. Quando faltar contexto, faca uma pergunta curta de qualificacao.",
+    "Nunca diga ou sugira que leu edital, matricula, contrato ou documento inteiro se voce recebeu apenas resumo, campos extraidos ou contexto parcial.",
+    "Quando responder com base parcial, use formulacoes honestas como 'com base nos dados enviados' ou 'pelo resumo atual'.",
     "Mantenha respostas curtas, normalmente entre 3 e 6 linhas.",
     "Quando houver fit comercial, convide para continuar no WhatsApp.",
   ].join("\n");
@@ -1193,21 +1203,23 @@ export async function generateSalesReply(history: ConversationMessage[], context
       .filter(Boolean)
       .join(" ");
 
+    const requestPayload = {
+      model: openai.model,
+      temperature: 0.5,
+      max_output_tokens: 220,
+      instructions: [systemPrompt, structuredReplyInstruction, analyticalReplyInstruction, agentAssetInstruction, focusedApiContext.instructions, summary, lead, qualification]
+        .filter(Boolean)
+        .join("\n\n"),
+      input: buildInput(latestUserTurn ? [...recentMessages.filter((item) => item !== latestUserTurn), latestUserTurn] : recentMessages),
+    };
+
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${openai.apiKey}`,
       },
-      body: JSON.stringify({
-        model: openai.model,
-        temperature: 0.5,
-        max_output_tokens: 220,
-        instructions: [systemPrompt, structuredReplyInstruction, analyticalReplyInstruction, agentAssetInstruction, focusedApiContext.instructions, summary, lead, qualification]
-          .filter(Boolean)
-          .join("\n\n"),
-        input: buildInput(latestUserTurn ? [...recentMessages.filter((item) => item !== latestUserTurn), latestUserTurn] : recentMessages),
-      }),
+      body: JSON.stringify(requestPayload),
     });
 
     const payload = (await response.json()) as OpenAIResponsesPayload;
@@ -1247,6 +1259,13 @@ export async function generateSalesReply(history: ConversationMessage[], context
         model: payload.model ?? openai.model,
         agenteId: agent?.id ?? null,
         agenteNome: agent?.nome ?? null,
+        debugRequest: {
+          hasSummary,
+          allowIcons: context?.ui?.allow_icons !== false,
+          structuredResponse: context?.ui?.structured_response !== false,
+          historyLength: history.length,
+          requestPayload,
+        },
       },
     };
   } catch (error) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { appendMessage, createChat, getChatById, getChatContext, listChatMessages, updateChatContext, updateChatStats } from "@/lib/chats";
 import { enrichLeadContext, generateSalesReply, shouldRefreshSummary, summarizeConversation } from "@/lib/chat-orchestrator";
 import { getAgenteAtivo, getAgenteById, getAgenteByIdentifier } from "@/lib/agentes";
+import { appendChatRequestLog } from "@/lib/chat-logs";
 import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetByProjetoAgente, getChatWidgetBySlug } from "@/lib/chat-widgets";
 import { estimateOpenAICostUsd } from "@/lib/openai-pricing";
 import { getProjetoById, getProjetoByIdentifier } from "@/lib/projetos";
@@ -311,6 +312,33 @@ export async function POST(request: Request) {
       contexto: nextContext,
     });
 
+    await appendChatRequestLog({
+      projetoId: nextContext.projeto?.id ?? null,
+      descricao: `Chat ${chat.id} | ${ai.metadata?.provider ?? "unknown"} | ${ai.metadata?.model ?? "unknown"}`,
+      payload: {
+        chatId: chat.id,
+        title: chat.titulo,
+        provider: ai.metadata?.provider ?? null,
+        model: ai.metadata?.model ?? null,
+        channel: nextContext.channel ?? null,
+        lead: nextContext.lead ?? null,
+        summary: nextContext.memoria?.resumo ?? null,
+        messageCount: nextContext.memoria?.mensagem_count ?? history.length,
+        latestUserMessage: message,
+        tokens: {
+          input: ai.usage.inputTokens,
+          output: ai.usage.outputTokens,
+          total: ai.usage.inputTokens + ai.usage.outputTokens,
+        },
+        estimatedCostUsd,
+        requestDebug:
+          ai.metadata && typeof ai.metadata === "object" && "debugRequest" in ai.metadata
+            ? (ai.metadata.debugRequest as Record<string, unknown>)
+            : null,
+        replyPreview: String(ai.reply ?? "").slice(0, 500),
+      },
+    });
+
     const widgetContext = isPlainObject((nextContext as Record<string, unknown>).widget)
       ? ((nextContext as Record<string, unknown>).widget as Record<string, unknown>)
       : null;
@@ -318,12 +346,27 @@ export async function POST(request: Request) {
       typeof widgetContext?.whatsapp_celular === "string" && widgetContext.whatsapp_celular.trim()
         ? widgetContext.whatsapp_celular.trim()
         : null;
+    const agenteAtual = nextContext.agente?.id ? await getAgenteById(String(nextContext.agente.id)) : null;
+    const configuredWhatsappCta =
+      agenteAtual?.configuracoes &&
+      typeof agenteAtual.configuracoes.cta_whatsapp === "string" &&
+      agenteAtual.configuracoes.cta_whatsapp.trim()
+        ? agenteAtual.configuracoes.cta_whatsapp.trim()
+        : null;
+    const hasWhatsappHandoff =
+      Boolean(agenteAtual?.configuracoes) &&
+      typeof agenteAtual?.configuracoes?.handoff === "object" &&
+      agenteAtual.configuracoes.handoff !== null;
+    const hasWhatsappBias = Boolean(widgetPhone) || Boolean(configuredWhatsappCta) || hasWhatsappHandoff;
     const shouldOfferCommercialCta =
       /whats\s?app/i.test(ai.reply) ||
       /estimativa|orcamento|orçamento|proximo passo|pr[oó]ximo passo|encaixe inicial|fecharmos/i.test(ai.reply);
-    const shouldShowWhatsappButton =
-      Boolean(widgetPhone) &&
-      (Boolean(nextContext.qualificacao?.pronto_para_whatsapp) || shouldOfferCommercialCta);
+    const shouldPreferWhatsappButton =
+      hasWhatsappBias &&
+      (Boolean(nextContext.qualificacao?.pronto_para_whatsapp) ||
+        shouldOfferCommercialCta ||
+        Number(nextContext.memoria?.mensagem_count ?? 0) >= 2);
+    const shouldShowWhatsappButton = Boolean(widgetPhone) && shouldPreferWhatsappButton;
     const whatsappMessage = [
       "Ola! Vim do chat do site",
       nextContext.projeto?.nome ? "do projeto " + String(nextContext.projeto.nome) : "",

@@ -549,6 +549,7 @@ function autoResizeChatTextarea(element: HTMLTextAreaElement | null) {
 export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidgetProps) {
   const chatStorageKey = "infrastudio-site-chat";
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const messagesRef = useRef<HTMLDivElement | null>(null);
   type ChatWidgetCta = {
     url: string;
     label?: string;
@@ -689,6 +690,18 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
   useEffect(() => {
     autoResizeChatTextarea(textareaRef.current);
   }, [draft, loading, open]);
+
+  useEffect(() => {
+    const element = messagesRef.current;
+    if (!element || !open) {
+      return;
+    }
+
+    element.scrollTo({
+      top: element.scrollHeight,
+      behavior: messages.length > 1 ? "smooth" : "auto",
+    });
+  }, [messages, loading, open]);
 
   const sendMessage = async (text: string) => {
     const trimmed = text.trim();
@@ -833,7 +846,10 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
           </div>
         </div>
 
-        <div className="chat-scroll min-h-0 flex-1 overflow-y-auto bg-slate-950/20 p-5">
+        <div
+          ref={messagesRef}
+          className="chat-scroll min-h-0 flex-1 overflow-y-auto bg-slate-950/20 p-5 [scrollbar-width:thin] [scrollbar-color:rgba(59,130,246,0.45)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-blue-400/50"
+        >
           <div className="space-y-3">
             {messages.map((message) => (
               <div
@@ -841,12 +857,12 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
                 className={cn(
                   "max-w-[90%] rounded-2xl border p-3 text-sm leading-relaxed shadow-sm backdrop-blur-sm",
                   message.isAi
-                    ? "rounded-bl-none border-transparent bg-transparent p-0 text-slate-200 shadow-none backdrop-blur-none"
+                    ? "rounded-bl-none border-white/8 bg-slate-900/80 text-slate-200 shadow-lg shadow-slate-950/20"
                     : "ml-auto rounded-br-none border-blue-400/20 bg-blue-500/18 text-blue-50",
                 )}
               >
                 <div
-                  className="[&_ol]:m-0 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol_+_p]:mt-2.5 [&_p]:m-0 [&_p_+_ol]:mt-2.5 [&_p_+_p]:mt-2.5 [&_p_+_ul]:mt-2.5 [&_strong]:font-bold [&_strong]:text-white [&_ul]:m-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ul_+_p]:mt-2.5 [&_ul_+_ul]:mt-2.5 [&_li_+_li]:mt-1.5"
+                  className="[&_ol]:m-0 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol_+_p]:mt-2.5 [&_p]:m-0 [&_p_+_ol]:mt-2.5 [&_p_+_p]:mt-2.5 [&_p_+_ul]:mt-2.5 [&_strong]:font-bold [&_strong]:text-slate-50 [&_ul]:m-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ul_+_p]:mt-2.5 [&_ul_+_ul]:mt-2.5 [&_li_+_li]:mt-1.5"
                   dangerouslySetInnerHTML={{ __html: formatChatRichText(message.text) }}
                 />
                 {message.isAi && Array.isArray(message.assets) && message.assets.length ? (
@@ -935,7 +951,7 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
                   void sendMessage(draft);
                 }
               }}
-              className="chat-scroll flex-1 resize-none rounded-[18px] border border-white/8 bg-white/[0.05] px-4 py-[11px] text-sm leading-[22px] text-white outline-none placeholder:text-slate-500 backdrop-blur-md"
+              className="chat-scroll flex-1 resize-none rounded-[18px] border border-white/8 bg-white/[0.05] px-4 py-[11px] text-sm leading-[22px] text-white outline-none placeholder:text-slate-500 backdrop-blur-md [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
               placeholder={loading ? "Atendente esta digitando..." : "Digite sua mensagem..."}
               readOnly={loading}
             />

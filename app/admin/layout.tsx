@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  ActivitySquare,
   BriefcaseBusiness,
   Coins,
   ChevronLeft,
@@ -25,6 +26,7 @@ const adminLinks = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/projetos", label: "Projetos", icon: BriefcaseBusiness },
   { href: "/admin/ia-tokens", label: "IA Tokens", icon: Coins },
+  { href: "/admin/chat-logs", label: "Logs de Chat", icon: ActivitySquare },
   { href: "/admin/usuarios", label: "Usuários", icon: Users },
 ];
 
