@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Bot, CheckCircle2, ExternalLink, FileImage, MessageSquare, Paperclip, Pencil, Plus, Sparkles, TestTube2, Trash2, X } from "lucide-react";
+import { Bot, CheckCircle2, Copy, ExternalLink, FileImage, MessageSquare, Paperclip, Pencil, Plus, Sparkles, TestTube2, Trash2, X } from "lucide-react";
 
 type Projeto = {
   id: string;
@@ -1200,6 +1200,7 @@ export default function AdminProjetoDetalhePage() {
   const [chatDetail, setChatDetail] = useState<ChatDetailState | null>(null);
   const [pendingAgenteArquivos, setPendingAgenteArquivos] = useState<PendingAgenteArquivo[]>([]);
   const [origin, setOrigin] = useState("");
+  const [copiedWidgetSlug, setCopiedWidgetSlug] = useState<string | null>(null);
 
   const loadProjeto = async () => {
     const response = await fetch(`/api/admin/projetos/${params.id}`, { cache: "no-store" });
@@ -1333,61 +1334,87 @@ export default function AdminProjetoDetalhePage() {
     const base = origin || "https://seu-dominio";
     const projetoRef = data?.projeto.slug || data?.projeto.id || "seu-projeto";
     const agente = getResolvedWidgetAgent(widget);
-    const agenteRef = agente?.slug || agente?.id || "default";
+    const agenteRef = agente?.slug || agente?.id || "agente-do-projeto";
     const requiredParameters = getWidgetRequiredParameters(widget);
     const contextLines = [
-      `    title: '${widget.nome.replace(/'/g, "\\'")}',`,
-      `    theme: '${widget.tema}',`,
-      `    accent: '${widget.corPrimaria}',`,
-      `    transparent: ${widget.fundoTransparente ? "true" : "false"},`,
+      "      tenant: { id: 'cliente-atual' },",
+      "      user: { id: 'usuario-atual', tipo: 'lead' },",
+      "      resource: { id: 'recurso-atual', tipo: 'imovel' },",
+      "      route: { path: window.location.pathname },",
+      "      ui: {",
+      `        title: '${widget.nome.replace(/'/g, "\\'")}',`,
+      `        theme: '${widget.tema}',`,
+      `        accent: '${widget.corPrimaria}',`,
+      `        transparent: ${widget.fundoTransparente ? "true" : "false"},`,
+      "      },",
     ];
 
     if (requiredParameters.length) {
-      contextLines.push("    // Campos obrigatorios das APIs vinculadas ao agente");
+      contextLines.push("      // Campos obrigatorios das APIs vinculadas ao agente");
       for (const parametro of requiredParameters) {
         const placeholder = parametro.tipo === "number" ? "0" : parametro.tipo === "boolean" ? "false" : "'XXX'";
-        contextLines.push(`    ${parametro.nome}: ${placeholder},`);
+        contextLines.push(`      ${parametro.nome}: ${placeholder},`);
       }
     } else {
-      contextLines.push("    id: 'uuid-123',");
+      contextLines.push("      id: 'identificador-do-contexto',");
     }
 
     return [
-      "<!-- 1) Carregue o SDK, mas deixe o host controlar quando o chat existe -->",
+      "<!-- 1) Carregue o SDK uma vez -->",
       "<script",
       `  src=\"${base}/chat.js\"`,
       `  data-projeto=\"${projetoRef}\"`,
       `  data-agente=\"${agenteRef}\"`,
       "></script>",
       "",
-      "<!-- 2) Monte apenas na rota/contexto permitido -->",
+      "<!-- 2) O host decide quando o chat pode existir -->",
       "<script>",
-      "  InfraChat.mount({",
-      `    projeto: '${projetoRef}',`,
-      `    agente: '${agenteRef}',`,
-      `    apiBase: '${base}',`,
-      "    strictHostControl: true,",
-      "    context: {",
-      "      route: { path: window.location.pathname },",
+      `  // Projeto: ${data?.projeto.nome ?? "Projeto atual"}`,
+      `  // Agente sugerido: ${agente?.nome ?? "Agente ativo do projeto"}`,
+      "  const canShowChat = window.location.pathname.startsWith('/rota-autorizada');",
+      "",
+      "  if (!canShowChat) {",
+      "    window.InfraChat.destroy();",
+      "  } else {",
+      "    window.InfraChat.mount({",
+      `      projeto: '${projetoRef}',`,
+      `      agente: '${agenteRef}',`,
+      `      apiBase: '${base}',`,
+      "      strictHostControl: true,",
+      "      context: {",
       ...contextLines,
-      "    },",
-      "    policy: {",
-      "      allowed: true,",
-      "      allowedRoutes: ['/detalhe-imovel/*'],",
-      "    },",
-      "  });",
+      "      },",
+      "      policy: {",
+        "        allowed: true,",
+      `        allowedRoutes: ['/${widget.slug}/*'],`,
+      "      },",
+      "    });",
+      "  }",
       "",
-      "  // Ao trocar imovel, usuario, cliente ou rota, invalide o contexto anterior",
+      "  // 3) Ao trocar cliente, agente, usuario, recurso ou rota, atualize o contexto",
       "  InfraChat.updateContext({",
+      "    tenant: { id: 'novo-cliente' },",
+      "    user: { id: 'novo-usuario' },",
+      "    resource: { id: 'novo-recurso', tipo: 'imovel' },",
       "    route: { path: window.location.pathname },",
-      "    resource: { id: 'novo-recurso' },",
-      "    client: { id: 'novo-cliente' },",
       "  });",
       "",
-      "  // Ao sair da rota autorizada, destrua de forma imediata",
+      "  // 4) Ao sair do contexto autorizado, destrua completamente",
       "  InfraChat.destroy();",
       "</script>",
     ].join("\n");
+  };
+
+  const handleCopyWidgetSnippet = async (widget: ChatWidget) => {
+    try {
+      await navigator.clipboard.writeText(buildWidgetSnippet(widget));
+      setCopiedWidgetSlug(widget.slug);
+      window.setTimeout(() => {
+        setCopiedWidgetSlug((current) => (current === widget.slug ? null : current));
+      }, 1800);
+    } catch {
+      setCopiedWidgetSlug(null);
+    }
   };
 
   const handleAddAgenteFiles = (files: FileList | null) => {
@@ -2152,7 +2179,28 @@ export default function AdminProjetoDetalhePage() {
                           <p className="mt-1 text-sm text-slate-400">Tema: {widget.tema === "light" ? "claro" : "escuro"} | cor: {widget.corPrimaria}</p>
                           <p className="mt-1 text-sm text-slate-400">Fundo: {widget.fundoTransparente ? "transparente" : "solido"}</p>
                           <div className="mt-4 w-full rounded-xl border border-white/10 bg-slate-950/60 p-3">
-                            <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Codigo de injecao</p>
+                            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Codigo de injecao</p>
+                              <div className="flex items-center gap-2">
+                                <a
+                                  href="/docs/chat-widget-host-control"
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                                >
+                                  <ExternalLink size={13} />
+                                  Documentacao
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleCopyWidgetSnippet(widget)}
+                                  className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+                                >
+                                  {copiedWidgetSlug === widget.slug ? <CheckCircle2 size={13} /> : <Copy size={13} />}
+                                  {copiedWidgetSlug === widget.slug ? "Copiado" : "Copiar"}
+                                </button>
+                              </div>
+                            </div>
                             <div className="w-full overflow-x-auto rounded-lg border border-white/10 bg-[#07111f]">
                               <pre className="min-h-[170px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
                                 {buildWidgetSnippet(widget)
