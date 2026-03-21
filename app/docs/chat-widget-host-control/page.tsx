@@ -325,8 +325,8 @@ export default function ChatWidgetHostControlDocsPage() {
         <div className="rounded-[32px] border border-white/10 bg-white/[0.03] p-6 shadow-[0_24px_80px_-34px_rgba(8,15,30,0.92)] backdrop-blur-xl md:p-8">
           <div className="grid gap-10 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
             <aside className="lg:sticky lg:top-6 lg:self-start">
-              <div className="rounded-[28px] border border-white/10 bg-slate-950/60 p-5">
-                <a href="/" className="group block rounded-[22px] border border-white/8 bg-white/[0.04] p-4 transition-colors hover:bg-white/[0.06]">
+              <div className="p-5">
+                <a href="/" className="group block p-4 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="relative h-12 w-12 overflow-hidden">
                       <img src="/logo.png" alt="InfraStudio" className="h-full w-full object-contain" />
