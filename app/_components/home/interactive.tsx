@@ -289,6 +289,13 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
                 >
                   Como funciona
                 </a>
+                <Link
+                  href="/docs/chat-widget-host-control"
+                  onClick={closeMobileMenu}
+                  className="block rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.06]"
+                >
+                  Documentacao
+                </Link>
                 <a
                   href="#"
                   onClick={(event) => {
@@ -373,6 +380,9 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
             <a href="#como-funciona" className="text-sm font-medium text-slate-300 transition-colors hover:text-blue-400">
               Como funciona
             </a>
+            <Link href="/docs/chat-widget-host-control" className="text-sm font-medium text-slate-300 transition-colors hover:text-blue-400">
+              Documentacao
+            </Link>
             <a
               href="#"
               onClick={(event) => {
@@ -857,7 +867,7 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
                 className={cn(
                   "max-w-[90%] rounded-2xl border p-3 text-sm leading-relaxed shadow-sm backdrop-blur-sm",
                   message.isAi
-                    ? "rounded-bl-none border-white/8 bg-slate-900/80 text-slate-200 shadow-lg shadow-slate-950/20"
+                    ? "rounded-bl-none border-transparent bg-transparent text-slate-200 shadow-none backdrop-blur-none"
                     : "ml-auto rounded-br-none border-blue-400/20 bg-blue-500/18 text-blue-50",
                 )}
               >
@@ -900,7 +910,7 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
                     href={message.cta.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-2 inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-500/14 px-3 py-1.5 text-[11px] font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/18"
+                    className="mt-2 inline-flex w-fit items-center gap-1.5 rounded-full border border-blue-400/25 bg-blue-500/14 px-3 py-1.5 text-[11px] font-semibold text-blue-100 transition-colors hover:bg-blue-500/18"
                   >
                     <MessageCircle size={13} />
                     {message.cta.label || "Ir para o WhatsApp"}
@@ -910,7 +920,7 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
             ))}
 
             {loading ? (
-              <div className="inline-flex w-fit max-w-[90%] items-center gap-2 rounded-2xl rounded-bl-none border border-white/5 bg-slate-800/90 p-3 text-sm text-slate-400">
+              <div className="inline-flex w-fit max-w-[90%] items-center gap-2 rounded-2xl rounded-bl-none border border-transparent bg-transparent p-3 text-sm text-blue-300 shadow-none">
                 <span className="flex gap-1" aria-hidden="true">
                   <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:0ms]" />
                   <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:120ms]" />

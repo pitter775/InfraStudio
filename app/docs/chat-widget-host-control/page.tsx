@@ -326,7 +326,19 @@ export default function ChatWidgetHostControlDocsPage() {
           <div className="grid gap-10 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
             <aside className="lg:sticky lg:top-6 lg:self-start">
               <div className="rounded-[28px] border border-white/10 bg-slate-950/60 p-5">
-                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-300">InfraStudio Docs</p>
+                <a href="/" className="group block rounded-[22px] border border-white/8 bg-white/[0.04] p-4 transition-colors hover:bg-white/[0.06]">
+                  <div className="flex items-center gap-3">
+                    <div className="relative h-12 w-12 overflow-hidden">
+                      <img src="/logo.png" alt="InfraStudio" className="h-full w-full object-contain" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-extrabold tracking-tight text-white">InfraStudio</p>
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Smart Systems Lab</p>
+                    </div>
+                  </div>
+                </a>
+
+                <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-300">InfraStudio Docs</p>
                 <h1 className="mt-3 text-2xl font-extrabold text-white">Host-controlled chat widget</h1>
                 <p className="mt-3 text-sm leading-6 text-slate-400">
                   Navegacao rapida para uma documentacao longa, no estilo de docs de produto.
