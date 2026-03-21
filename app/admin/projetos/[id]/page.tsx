@@ -194,6 +194,43 @@ function normalizeAgentText(value: string) {
     .trim();
 }
 
+function normalizeSummaryKey(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function compactHumanLine(value: string) {
+  const cleaned = value
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[-*]\s*/, "- ")
+    .replace(/^(\d+)[.)]\s*/, "$1. ")
+    .trim();
+
+  const normalized = normalizeSummaryKey(cleaned);
+
+  if (
+    normalized.includes("quando o usuario pedir analise") ||
+    normalized.includes("nao apenas liste dados")
+  ) {
+    return "Analise: conclua, destaque os motivos e diga o que falta quando a base nao bastar.";
+  }
+
+  if (normalized.includes("importante") && normalized.includes("nao oferecer") && normalized.includes("whatsapp")) {
+    return "Canal: nao oferecer WhatsApp; atendimento exclusivo no site.";
+  }
+
+  if (normalized.includes("encaminhar para atendimento humano quando")) {
+    return "Handoff humano:";
+  }
+
+  return cleaned;
+}
+
 function compactAgentSummary(summary: string) {
   const normalized = normalizeAgentText(summary);
   if (!normalized) {
@@ -203,6 +240,7 @@ function compactAgentSummary(summary: string) {
   const withoutJsonBlocks = normalized.replace(/\{[\s\S]*\}$/g, "").trim();
   const lines = withoutJsonBlocks.split("\n");
   const compacted: string[] = [];
+  const seen = new Set<string>();
   let currentSection = "";
 
   for (const line of lines) {
@@ -213,10 +251,7 @@ function compactAgentSummary(summary: string) {
       continue;
     }
 
-    const normalizedLine = line
-      .replace(/\s{2,}/g, " ")
-      .replace(/^[-*]\s*/, "- ")
-      .replace(/^(\d+)[.)]\s*/, "$1. ");
+    const normalizedLine = compactHumanLine(line);
 
     if (!normalizedLine.startsWith("- ") && /:$/.test(normalizedLine)) {
       const section = normalizedLine
@@ -232,6 +267,15 @@ function compactAgentSummary(summary: string) {
         currentSection = section;
       }
       continue;
+    }
+
+    const dedupeKey = normalizeSummaryKey(normalizedLine);
+    if (dedupeKey && seen.has(dedupeKey)) {
+      continue;
+    }
+
+    if (dedupeKey) {
+      seen.add(dedupeKey);
     }
 
     compacted.push(normalizedLine);
@@ -345,15 +389,15 @@ function buildAgentConfigFromSummary(summary: string) {
   const objetivo = intro.join(" ").trim() || "Qualificar leads e conduzir o atendimento com contexto do negocio.";
   const config: Record<string, unknown> = {
     objetivo,
-    capacidades: capacidades.length ? capacidades : [],
-    perguntas_qualificacao: perguntasQualificacao.length ? perguntasQualificacao : [],
+    capacidades: capacidades.slice(0, 8),
+    perguntas_qualificacao: perguntasQualificacao.slice(0, 5),
     handoff: {
-      enviar_para_humano_se: handoff.length ? handoff : [],
+      enviar_para_humano_se: handoff.slice(0, 5),
     },
   };
 
   if (regrasPrecificacao.length) {
-    config.regras_precificacao = regrasPrecificacao;
+    config.regras_precificacao = regrasPrecificacao.slice(0, 8);
   }
 
   if (cta.length) {
@@ -361,7 +405,7 @@ function buildAgentConfigFromSummary(summary: string) {
   }
 
   if (observacoes.length) {
-    config.observacoes = observacoes;
+    config.observacoes = observacoes.slice(0, 6);
   }
 
   return config;
