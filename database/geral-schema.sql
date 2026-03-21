@@ -68,6 +68,19 @@ CREATE TABLE public.apis (
   CONSTRAINT apis_pkey PRIMARY KEY (id),
   CONSTRAINT apis_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id)
 );
+CREATE TABLE public.canais_whatsapp (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  projeto_id uuid NOT NULL,
+  agente_id uuid,
+  numero character varying NOT NULL,
+  session_data jsonb,
+  status character varying NOT NULL DEFAULT 'ativo'::character varying CHECK (status::text = ANY (ARRAY['ativo'::character varying, 'inativo'::character varying]::text[])),
+  created_at timestamp without time zone NOT NULL DEFAULT now(),
+  updated_at timestamp without time zone NOT NULL DEFAULT now(),
+  CONSTRAINT canais_whatsapp_pkey PRIMARY KEY (id),
+  CONSTRAINT canais_whatsapp_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id),
+  CONSTRAINT canais_whatsapp_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id)
+);
 CREATE TABLE public.chat_widgets (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   nome character varying NOT NULL,
@@ -99,6 +112,8 @@ CREATE TABLE public.chats (
   created_at timestamp without time zone DEFAULT now(),
   updated_at timestamp without time zone DEFAULT now(),
   agente_id uuid,
+  canal character varying NOT NULL DEFAULT 'web'::character varying,
+  identificador_externo text,
   CONSTRAINT chats_pkey PRIMARY KEY (id),
   CONSTRAINT chats_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id),
   CONSTRAINT chats_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES public.usuarios(id),
@@ -160,6 +175,8 @@ CREATE TABLE public.mensagens (
   custo numeric,
   metadata jsonb,
   created_at timestamp without time zone DEFAULT now(),
+  canal character varying NOT NULL DEFAULT 'web'::character varying,
+  identificador_externo text,
   CONSTRAINT mensagens_pkey PRIMARY KEY (id),
   CONSTRAINT mensagens_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.chats(id)
 );

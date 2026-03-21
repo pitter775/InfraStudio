@@ -76,6 +76,8 @@ type Chat = {
   titulo: string;
   updatedAt: string;
   totalTokens: number;
+  canal: string;
+  identificadorExterno: string | null;
   contexto: Record<string, unknown> | null;
 };
 
@@ -84,6 +86,31 @@ type ChatMessage = {
   role: "user" | "assistant" | "system";
   conteudo: string;
   createdAt: string;
+};
+
+type WhatsAppChannelSession = {
+  connectionStatus?: "offline" | "aguardando_qr" | "connecting" | "online";
+  qrCodeUrl?: string | null;
+  qrCodeDataUrl?: string | null;
+  qrCodeText?: string | null;
+  connectedAt?: string | null;
+  disconnectedAt?: string | null;
+  lastInboundAt?: string | null;
+  lastOutboundAt?: string | null;
+  lastSyncAt?: string | null;
+  worker?: string | null;
+  notes?: string | null;
+};
+
+type WhatsAppChannel = {
+  id: string;
+  projetoId: string | null;
+  agenteId: string | null;
+  numero: string;
+  status: "ativo" | "inativo";
+  sessionData: WhatsAppChannelSession | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 type ChatWidget = {
@@ -105,12 +132,14 @@ type ProjetoDetalhe = {
   agentes: Agente[];
   apis: Api[];
   widgets: ChatWidget[];
+  whatsappChannels: WhatsAppChannel[];
   chats: Chat[];
   stats: {
     totalAgentes: number;
     agenteAtivoId: string | null;
     totalApis: number;
     totalWidgets: number;
+    totalWhatsAppChannels: number;
     totalChats: number;
   };
 };
@@ -122,6 +151,13 @@ type WidgetFormState = ChatWidget & {
 type ChatDetailState = {
   chat: Chat;
   messages: ChatMessage[];
+};
+
+type WhatsAppChannelFormState = {
+  id?: string;
+  numero: string;
+  agenteId: string | null;
+  status: "ativo" | "inativo";
 };
 
 type PendingAgenteArquivo = {
@@ -162,6 +198,40 @@ function formatWhatsAppPhone(value: string) {
   }
 
   return formatted;
+}
+
+function getWhatsAppServiceUrl(pathname: string, channelId: string) {
+  const baseUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL?.trim();
+  if (!baseUrl) {
+    return null;
+  }
+
+  const normalizedBase = baseUrl.replace(/\/$/, "");
+  return `${normalizedBase}${pathname}?channelId=${encodeURIComponent(channelId)}`;
+}
+
+function getChannelStatusTone(status: string) {
+  if (status === "conectado" || status === "online") {
+    return "bg-emerald-500/15 text-emerald-300";
+  }
+
+  if (status === "aguardando_qr") {
+    return "bg-amber-500/15 text-amber-200";
+  }
+
+  return "bg-slate-800 text-slate-400";
+}
+
+function getChannelStatusLabel(status: string | null | undefined) {
+  if (status === "online" || status === "conectado") {
+    return "conectado";
+  }
+
+  if (status === "aguardando_qr") {
+    return "aguardando_qr";
+  }
+
+  return "desconectado";
 }
 
 function summarizeApiFields(campos: ApiCampo[], limit = 6) {
@@ -1061,6 +1131,12 @@ const emptyWidgetForm: WidgetFormState = {
   corPrimaria: "#2563eb",
   fundoTransparente: true,
   ativo: true,
+};
+
+const emptyWhatsAppChannelForm: WhatsAppChannelFormState = {
+  numero: "",
+  agenteId: null,
+  status: "ativo",
 };
 
 function FormLabel({ children }: { children: string }) {
@@ -2271,15 +2347,20 @@ export default function AdminProjetoDetalhePage() {
   const [agenteForm, setAgenteForm] = useState<AgenteFormState>(emptyAgenteForm);
   const [apiForm, setApiForm] = useState<ApiFormState>(emptyApiForm);
   const [widgetForm, setWidgetForm] = useState<WidgetFormState>(emptyWidgetForm);
+  const [whatsAppChannelForm, setWhatsAppChannelForm] = useState<WhatsAppChannelFormState>(emptyWhatsAppChannelForm);
   const [detectedApiCampos, setDetectedApiCampos] = useState<ApiCampo[]>([]);
   const [apiTestParameterValues, setApiTestParameterValues] = useState<Record<string, string>>({});
   const [savingAgente, setSavingAgente] = useState(false);
   const [savingApi, setSavingApi] = useState(false);
   const [savingWidget, setSavingWidget] = useState(false);
+  const [savingWhatsAppChannel, setSavingWhatsAppChannel] = useState(false);
+  const [connectingWhatsAppChannelId, setConnectingWhatsAppChannelId] = useState<string | null>(null);
+  const [disconnectingWhatsAppChannelId, setDisconnectingWhatsAppChannelId] = useState<string | null>(null);
   const [testingApi, setTestingApi] = useState(false);
   const [feedbackAgente, setFeedbackAgente] = useState<string | null>(null);
   const [feedbackApi, setFeedbackApi] = useState<string | null>(null);
   const [feedbackWidget, setFeedbackWidget] = useState<string | null>(null);
+  const [feedbackWhatsApp, setFeedbackWhatsApp] = useState<string | null>(null);
   const [agenteModalOpen, setAgenteModalOpen] = useState(false);
   const [apiModalOpen, setApiModalOpen] = useState(false);
   const [widgetModalOpen, setWidgetModalOpen] = useState(false);
@@ -2290,6 +2371,8 @@ export default function AdminProjetoDetalhePage() {
   const [pendingAgenteArquivos, setPendingAgenteArquivos] = useState<PendingAgenteArquivo[]>([]);
   const [origin, setOrigin] = useState("");
   const [copiedSnippetKey, setCopiedSnippetKey] = useState<string | null>(null);
+  const [serviceStatusByChannel, setServiceStatusByChannel] = useState<Record<string, string>>({});
+  const [serviceQrByChannel, setServiceQrByChannel] = useState<Record<string, string | null>>({});
 
   const loadProjeto = async () => {
     const response = await fetch(`/api/admin/projetos/${params.id}`, { cache: "no-store" });
@@ -2311,6 +2394,25 @@ export default function AdminProjetoDetalhePage() {
     }
     void loadProjeto();
   }, [params.id]);
+
+  useEffect(() => {
+    if (!data?.whatsappChannels.length) {
+      return;
+    }
+
+    const sync = () => {
+      for (const channel of data.whatsappChannels) {
+        void refreshWhatsAppRuntime(channel.id);
+      }
+    };
+
+    sync();
+    const timer = window.setInterval(sync, 5000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [data?.whatsappChannels]);
 
   const resetAgenteForm = () => {
     setAgenteForm({
@@ -2336,6 +2438,11 @@ export default function AdminProjetoDetalhePage() {
     setFeedbackWidget(null);
   };
 
+  const resetWhatsAppChannelForm = () => {
+    setWhatsAppChannelForm(emptyWhatsAppChannelForm);
+    setFeedbackWhatsApp(null);
+  };
+
   const openNewAgenteModal = () => {
     resetAgenteForm();
     setAgenteModalOpen(true);
@@ -2349,6 +2456,47 @@ export default function AdminProjetoDetalhePage() {
   const openNewWidgetModal = () => {
     resetWidgetForm();
     setWidgetModalOpen(true);
+  };
+
+  const refreshWhatsAppRuntime = async (channelId: string) => {
+    const statusUrl = getWhatsAppServiceUrl("/status", channelId);
+    const qrUrl = getWhatsAppServiceUrl("/qr", channelId);
+
+    if (!statusUrl || !qrUrl) {
+      return;
+    }
+
+    try {
+      const statusResponse = await fetch(statusUrl, { cache: "no-store" });
+      const statusPayload = (await statusResponse.json()) as { status?: string };
+      if (statusResponse.ok) {
+        setServiceStatusByChannel((current) => ({
+          ...current,
+          [channelId]: getChannelStatusLabel(statusPayload.status),
+        }));
+      }
+    } catch {
+      setServiceStatusByChannel((current) => ({
+        ...current,
+        [channelId]: "desconectado",
+      }));
+    }
+
+    try {
+      const qrResponse = await fetch(qrUrl, { cache: "no-store" });
+      const qrPayload = (await qrResponse.json()) as { qrCodeDataUrl?: string | null };
+      if (qrResponse.ok) {
+        setServiceQrByChannel((current) => ({
+          ...current,
+          [channelId]: qrPayload.qrCodeDataUrl ?? null,
+        }));
+      }
+    } catch {
+      setServiceQrByChannel((current) => ({
+        ...current,
+        [channelId]: null,
+      }));
+    }
   };
 
   const handleOpenChatHistory = async (chat: Chat) => {
@@ -2936,6 +3084,124 @@ export default function AdminProjetoDetalhePage() {
     setWidgetModalOpen(true);
   };
 
+  const handleEditWhatsAppChannel = (channel: WhatsAppChannel) => {
+    setWhatsAppChannelForm({
+      id: channel.id,
+      numero: formatWhatsAppPhone(channel.numero),
+      agenteId: channel.agenteId,
+      status: channel.status,
+    });
+    setFeedbackWhatsApp(null);
+  };
+
+  const handleSaveWhatsAppChannel = async () => {
+    setSavingWhatsAppChannel(true);
+    setFeedbackWhatsApp(null);
+
+    const response = await fetch("/api/admin/whatsapp-canais", {
+      method: whatsAppChannelForm.id ? "PUT" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id: whatsAppChannelForm.id,
+        projetoId: params.id,
+        agenteId: whatsAppChannelForm.agenteId,
+        numero: sanitizePhoneDigits(whatsAppChannelForm.numero),
+        status: whatsAppChannelForm.status,
+      }),
+    });
+
+    const payload = (await response.json()) as { error?: string };
+    if (!response.ok) {
+      setFeedbackWhatsApp(payload.error ?? "Nao foi possivel salvar o canal WhatsApp.");
+      setSavingWhatsAppChannel(false);
+      return;
+    }
+
+    await loadProjeto();
+    setSavingWhatsAppChannel(false);
+    setFeedbackWhatsApp(whatsAppChannelForm.id ? "Canal WhatsApp atualizado com sucesso." : "Canal WhatsApp criado com sucesso.");
+    resetWhatsAppChannelForm();
+  };
+
+  const handleConnectWhatsAppChannel = async (channel: WhatsAppChannel) => {
+    const serviceUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL?.trim();
+    if (!serviceUrl) {
+      setFeedbackWhatsApp("Defina NEXT_PUBLIC_WHATSAPP_SERVICE_URL para conectar o whatsapp-service.");
+      return;
+    }
+
+    setConnectingWhatsAppChannelId(channel.id);
+    setFeedbackWhatsApp(null);
+
+    try {
+      const connectResponse = await fetch(`${serviceUrl.replace(/\/$/, "")}/connect`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          channelId: channel.id,
+          projetoId: channel.projetoId,
+          agenteId: channel.agenteId,
+          numero: channel.numero,
+        }),
+      });
+
+      const connectPayload = (await connectResponse.json()) as { error?: string };
+      if (!connectResponse.ok) {
+        throw new Error(connectPayload.error ?? "Nao foi possivel iniciar o whatsapp-service.");
+      }
+
+      await fetch(`/api/admin/whatsapp-canais/${channel.id}/connect`, { method: "POST" });
+      await refreshWhatsAppRuntime(channel.id);
+      await loadProjeto();
+      setFeedbackWhatsApp(`Conexao iniciada para ${formatWhatsAppPhone(channel.numero)}.`);
+    } catch (error) {
+      setFeedbackWhatsApp(error instanceof Error ? error.message : "Nao foi possivel conectar o WhatsApp.");
+    } finally {
+      setConnectingWhatsAppChannelId(null);
+    }
+  };
+
+  const handleDisconnectWhatsAppChannel = async (channel: WhatsAppChannel) => {
+    const serviceUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL?.trim();
+
+    setDisconnectingWhatsAppChannelId(channel.id);
+    setFeedbackWhatsApp(null);
+
+    try {
+      if (serviceUrl) {
+        await fetch(`${serviceUrl.replace(/\/$/, "")}/disconnect`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            channelId: channel.id,
+          }),
+        });
+      }
+
+      await fetch(`/api/admin/whatsapp-canais/${channel.id}/disconnect`, { method: "POST" });
+      setServiceQrByChannel((current) => ({
+        ...current,
+        [channel.id]: null,
+      }));
+      setServiceStatusByChannel((current) => ({
+        ...current,
+        [channel.id]: "desconectado",
+      }));
+      await loadProjeto();
+      setFeedbackWhatsApp(`Canal ${formatWhatsAppPhone(channel.numero)} desconectado.`);
+    } catch (error) {
+      setFeedbackWhatsApp(error instanceof Error ? error.message : "Nao foi possivel desconectar o WhatsApp.");
+    } finally {
+      setDisconnectingWhatsAppChannelId(null);
+    }
+  };
+
   const handleDeleteApi = async (api: Api) => {
     const confirmed = window.confirm(`Tem certeza que deseja excluir a API "${api.nome}"?`);
     if (!confirmed) {
@@ -3064,7 +3330,7 @@ export default function AdminProjetoDetalhePage() {
         </div>
         <h1 className="text-4xl font-extrabold text-white">{data.projeto.nome}</h1>
         <p className="mt-3 max-w-3xl text-slate-400">{data.projeto.descricao || "Sem descricao cadastrada."}</p>
-        <div className="mt-6 grid gap-4 md:grid-cols-6">
+        <div className="mt-6 grid gap-4 md:grid-cols-7">
           <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Slug</p>
             <p className="mt-2 text-lg font-bold text-white">{data.projeto.slug ?? "sem-slug"}</p>
@@ -3080,6 +3346,10 @@ export default function AdminProjetoDetalhePage() {
           <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Widgets</p>
             <p className="mt-2 text-lg font-bold text-white">{data.stats.totalWidgets}</p>
+          </div>
+          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">WhatsApp</p>
+            <p className="mt-2 text-lg font-bold text-white">{data.stats.totalWhatsAppChannels}</p>
           </div>
           <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Chats</p>
@@ -3141,11 +3411,12 @@ export default function AdminProjetoDetalhePage() {
         </div>
       </section>
 
-      {(feedbackAgente || feedbackApi || feedbackWidget) && (
+      {(feedbackAgente || feedbackApi || feedbackWidget || feedbackWhatsApp) && (
         <section className="grid gap-3">
           {feedbackAgente ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackAgente}</div> : null}
           {feedbackApi ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackApi}</div> : null}
           {feedbackWidget ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackWidget}</div> : null}
+          {feedbackWhatsApp ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackWhatsApp}</div> : null}
         </section>
       )}
 
@@ -3282,6 +3553,176 @@ export default function AdminProjetoDetalhePage() {
 
       <section className={`${activeTab === "whatsapp" ? "block" : "hidden"}`}>
         <div className="space-y-6">
+          <section className="overflow-hidden rounded-2xl border border-cyan-500/20 bg-cyan-500/10">
+            <div className="border-b border-cyan-500/20 px-6 py-5">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">whatsapp-web.js</p>
+              <h3 className="mt-2 text-xl font-bold text-white">Canal oficial com sessao persistente</h3>
+              <p className="mt-2 max-w-3xl text-sm text-cyan-50/80">
+                O motor real fica no `whatsapp-service`, separado do Next.js. A aba usa `POST /connect`, `GET /status` e `GET /qr` para acompanhar a sessao.
+              </p>
+              {!process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL ? (
+                <p className="mt-3 text-xs text-amber-200/90">Defina `NEXT_PUBLIC_WHATSAPP_SERVICE_URL` para habilitar a conexao e a leitura do QR.</p>
+              ) : null}
+            </div>
+            <div className="grid gap-6 p-6 xl:grid-cols-[360px,minmax(0,1fr)]">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-5">
+                <h4 className="text-base font-bold text-white">{whatsAppChannelForm.id ? "Editar canal" : "Novo canal"}</h4>
+                <p className="mt-1 text-sm text-slate-400">Cadastre o numero e vincule o agente que vai responder nesse canal.</p>
+                <div className="mt-5 space-y-4">
+                  <div>
+                    <FormLabel>Numero</FormLabel>
+                    <input
+                      value={whatsAppChannelForm.numero}
+                      onChange={(event) =>
+                        setWhatsAppChannelForm((prev) => ({
+                          ...prev,
+                          numero: formatWhatsAppPhone(event.target.value),
+                        }))
+                      }
+                      placeholder="+55 11 99999-9999"
+                      className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
+                    />
+                  </div>
+                  <div>
+                    <FormLabel>Agente</FormLabel>
+                    <select
+                      value={whatsAppChannelForm.agenteId ?? ""}
+                      onChange={(event) =>
+                        setWhatsAppChannelForm((prev) => ({
+                          ...prev,
+                          agenteId: event.target.value || null,
+                        }))
+                      }
+                      className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
+                    >
+                      <option value="">Agente ativo do projeto</option>
+                      {data.agentes.map((agente) => (
+                        <option key={agente.id} value={agente.id}>
+                          {agente.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <FormLabel>Status</FormLabel>
+                    <select
+                      value={whatsAppChannelForm.status}
+                      onChange={(event) =>
+                        setWhatsAppChannelForm((prev) => ({
+                          ...prev,
+                          status: event.target.value === "inativo" ? "inativo" : "ativo",
+                        }))
+                      }
+                      className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
+                    >
+                      <option value="ativo">ativo</option>
+                      <option value="inativo">inativo</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveWhatsAppChannel()}
+                    disabled={savingWhatsAppChannel}
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3 font-semibold text-slate-950 disabled:opacity-60"
+                  >
+                    <Plus size={16} />
+                    {savingWhatsAppChannel ? "Salvando..." : whatsAppChannelForm.id ? "Salvar canal" : "Criar canal"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetWhatsAppChannelForm}
+                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200"
+                  >
+                    Limpar
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {data.whatsappChannels.length ? (
+                  data.whatsappChannels.map((channel) => {
+                    const agente = channel.agenteId ? data.agentes.find((item) => item.id === channel.agenteId) ?? null : agenteAtivo;
+                    const runtimeStatus = serviceStatusByChannel[channel.id] ?? getChannelStatusLabel(channel.sessionData?.connectionStatus);
+                    const qrImage = serviceQrByChannel[channel.id] ?? channel.sessionData?.qrCodeDataUrl ?? channel.sessionData?.qrCodeUrl ?? null;
+
+                    return (
+                      <div key={channel.id} className="rounded-2xl border border-white/10 bg-slate-950/35 p-5">
+                        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-3">
+                              <h4 className="text-lg font-bold text-white">{formatWhatsAppPhone(channel.numero)}</h4>
+                              <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${getChannelStatusTone(runtimeStatus)}`}>
+                                {runtimeStatus}
+                              </span>
+                              <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${channel.status === "ativo" ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
+                                {channel.status}
+                              </span>
+                            </div>
+                            <p className="mt-3 text-sm text-slate-300">Agente: {agente?.nome ?? "agente ativo do projeto"}</p>
+                            <p className="mt-1 text-sm text-slate-400">Worker: {channel.sessionData?.worker || "whatsapp-service"}</p>
+                            <p className="mt-1 text-sm text-slate-400">Ultima sincronizacao: {channel.sessionData?.lastSyncAt ? new Date(channel.sessionData.lastSyncAt).toLocaleString("pt-BR") : "nao sincronizada"}</p>
+                            {channel.sessionData?.notes ? <p className="mt-1 text-sm text-amber-100/80">{channel.sessionData.notes}</p> : null}
+
+                            <div className="mt-4 flex flex-wrap gap-3">
+                              <button
+                                type="button"
+                                onClick={() => void handleConnectWhatsAppChannel(channel)}
+                                disabled={connectingWhatsAppChannelId === channel.id}
+                                className="rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 px-4 py-3 text-sm font-semibold text-slate-950 disabled:opacity-60"
+                              >
+                                {connectingWhatsAppChannelId === channel.id ? "Conectando..." : "Conectar WhatsApp"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleDisconnectWhatsAppChannel(channel)}
+                                disabled={disconnectingWhatsAppChannelId === channel.id}
+                                className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100 disabled:opacity-60"
+                              >
+                                {disconnectingWhatsAppChannelId === channel.id ? "Desconectando..." : "Desconectar"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleEditWhatsAppChannel(channel)}
+                                className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200"
+                              >
+                                Editar canal
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void refreshWhatsAppRuntime(channel.id)}
+                                className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200"
+                              >
+                                Atualizar status
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="w-full max-w-[280px] rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">QR Code</p>
+                            {qrImage ? (
+                              <img src={qrImage} alt={`QR do canal ${channel.numero}`} className="mt-4 w-full rounded-xl bg-white p-3" />
+                            ) : (
+                              <div className="mt-4 rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-10 text-center text-sm text-slate-400">
+                                QR indisponivel no momento.
+                              </div>
+                            )}
+                            <p className="mt-3 text-xs text-slate-500">Endpoint consumido: `GET /qr` e `GET /status` do `whatsapp-service`.</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">
+                    Nenhum canal WhatsApp oficial configurado para este projeto ainda.
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
           <section className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>

@@ -3,6 +3,7 @@ import "server-only";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export type ChatMessageRole = "user" | "assistant" | "system";
+export type ChatChannelKind = "web" | "whatsapp" | string;
 
 export type ChatRecord = {
   id: string;
@@ -15,6 +16,8 @@ export type ChatRecord = {
   agenteId: string | null;
   usuarioId: string | null;
   projetoId: string | null;
+  canal: ChatChannelKind;
+  identificadorExterno: string | null;
   contexto: Record<string, unknown> | null;
 };
 
@@ -23,6 +26,8 @@ export type ChatMessageRecord = {
   chatId: string;
   role: ChatMessageRole;
   conteudo: string;
+  canal: ChatChannelKind;
+  identificadorExterno: string | null;
   tokensInput: number | null;
   tokensOutput: number | null;
   custo: number | null;
@@ -41,6 +46,8 @@ type ChatRow = {
   agente_id: string | null;
   usuario_id: string | null;
   projeto_id: string | null;
+  canal: string | null;
+  identificador_externo: string | null;
   contexto: Record<string, unknown> | null;
 };
 
@@ -70,6 +77,8 @@ type MensagemRow = {
   chat_id: string | null;
   role: string;
   conteudo: string;
+  canal: string | null;
+  identificador_externo: string | null;
   tokens_input: number | null;
   tokens_output: number | null;
   custo: number | null;
@@ -89,6 +98,8 @@ function mapChat(row: ChatRow): ChatRecord {
     agenteId: row.agente_id,
     usuarioId: row.usuario_id,
     projetoId: row.projeto_id,
+    canal: (row.canal?.trim() || "web") as ChatChannelKind,
+    identificadorExterno: row.identificador_externo?.trim() || null,
     contexto: row.contexto,
   };
 }
@@ -99,6 +110,8 @@ function mapMensagem(row: MensagemRow): ChatMessageRecord {
     chatId: row.chat_id ?? "",
     role: row.role === "assistant" ? "assistant" : row.role === "system" ? "system" : "user",
     conteudo: row.conteudo,
+    canal: (row.canal?.trim() || "web") as ChatChannelKind,
+    identificadorExterno: row.identificador_externo?.trim() || null,
     tokensInput: row.tokens_input,
     tokensOutput: row.tokens_output,
     custo: row.custo,
@@ -112,6 +125,8 @@ export async function createChat(input: {
   usuarioId?: string | null;
   projetoId?: string | null;
   agenteId?: string | null;
+  canal?: ChatChannelKind;
+  identificadorExterno?: string | null;
   contexto?: Record<string, unknown> | null;
 }) {
   const supabase = getSupabaseAdminClient();
@@ -123,6 +138,8 @@ export async function createChat(input: {
       usuario_id: input.usuarioId ?? null,
       projeto_id: input.projetoId ?? null,
       agente_id: input.agenteId ?? null,
+      canal: input.canal ?? "web",
+      identificador_externo: input.identificadorExterno?.trim() || null,
       contexto: input.contexto ?? null,
       status: "ativo",
       total_tokens: 0,
@@ -130,7 +147,7 @@ export async function createChat(input: {
       created_at: now,
       updated_at: now,
     } as never)
-    .select("id, titulo, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, contexto")
+    .select("id, titulo, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
     .single();
 
   if (error || !data) {
@@ -149,6 +166,8 @@ export async function appendMessage(input: {
   chatId: string;
   role: ChatMessageRole;
   conteudo: string;
+  canal?: ChatChannelKind | null;
+  identificadorExterno?: string | null;
   tokensInput?: number | null;
   tokensOutput?: number | null;
   custo?: number | null;
@@ -162,13 +181,15 @@ export async function appendMessage(input: {
       chat_id: input.chatId,
       role: input.role,
       conteudo: input.conteudo,
+      canal: input.canal ?? "web",
+      identificador_externo: input.identificadorExterno?.trim() || null,
       tokens_input: input.tokensInput ?? null,
       tokens_output: input.tokensOutput ?? null,
       custo: input.custo ?? null,
       metadata: input.metadata ?? null,
       created_at: now,
     } as never)
-    .select("id, chat_id, role, conteudo, tokens_input, tokens_output, custo, metadata, created_at")
+    .select("id, chat_id, role, conteudo, canal, identificador_externo, tokens_input, tokens_output, custo, metadata, created_at")
     .single();
 
   if (error || !data) {
@@ -238,7 +259,7 @@ export async function getChatById(chatId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("chats")
-    .select("id, titulo, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, contexto")
+    .select("id, titulo, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
     .eq("id", chatId)
     .maybeSingle();
 
@@ -250,11 +271,47 @@ export async function getChatById(chatId: string) {
   return mapChat(data as ChatRow);
 }
 
+export async function findActiveChatByChannel(input: {
+  projetoId?: string | null;
+  agenteId?: string | null;
+  canal: ChatChannelKind;
+  identificadorExterno: string;
+}) {
+  const supabase = getSupabaseAdminClient();
+  let query = supabase
+    .from("chats")
+    .select("id, titulo, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
+    .eq("canal", input.canal)
+    .eq("identificador_externo", input.identificadorExterno.trim())
+    .eq("status", "ativo")
+    .order("updated_at", { ascending: false })
+    .limit(1);
+
+  if (input.projetoId) {
+    query = query.eq("projeto_id", input.projetoId);
+  }
+
+  if (input.agenteId) {
+    query = query.eq("agente_id", input.agenteId);
+  }
+
+  const { data, error } = await query.maybeSingle();
+
+  if (error || !data) {
+    if (error) {
+      console.error("[chats] failed to find active chat by channel", error);
+    }
+    return null;
+  }
+
+  return mapChat(data as ChatRow);
+}
+
 export async function listChats(projetoId?: string | null) {
   const supabase = getSupabaseAdminClient();
   let query = supabase
     .from("chats")
-    .select("id, titulo, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, contexto")
+    .select("id, titulo, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
     .order("updated_at", { ascending: false });
 
   if (projetoId) {
@@ -275,7 +332,7 @@ export async function listChatMessages(chatId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("mensagens")
-    .select("id, chat_id, role, conteudo, tokens_input, tokens_output, custo, metadata, created_at")
+    .select("id, chat_id, role, conteudo, canal, identificador_externo, tokens_input, tokens_output, custo, metadata, created_at")
     .eq("chat_id", chatId)
     .order("created_at", { ascending: true });
 

@@ -6,6 +6,7 @@ import { listChatWidgets } from "@/lib/chat-widgets";
 import { listChats } from "@/lib/chats";
 import { listProjetos } from "@/lib/projetos";
 import { getSessionUser } from "@/lib/session";
+import { listWhatsAppChannels } from "@/lib/whatsapp-channels";
 
 type RouteContext = {
   params: Promise<{
@@ -26,12 +27,13 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
   }
 
-  const [projetos, agentes, chats, apis, allWidgets] = await Promise.all([
+  const [projetos, agentes, chats, apis, allWidgets, whatsappChannels] = await Promise.all([
     listProjetos(),
     listAgentes(id),
     listChats(id),
     listApis(id),
     listChatWidgets(),
+    listWhatsAppChannels(id),
   ]);
   const projeto = projetos.find((item) => item.id === id) ?? null;
   const widgets = allWidgets.filter((widget) => widget.projetoId === id);
@@ -46,12 +48,14 @@ export async function GET(_request: Request, context: RouteContext) {
       agentes,
       apis,
       widgets,
+      whatsappChannels,
       chats,
       stats: {
         totalAgentes: agentes.length,
         agenteAtivoId: agentes.find((agente) => agente.ativo)?.id ?? null,
         totalApis: apis.length,
         totalWidgets: widgets.length,
+        totalWhatsAppChannels: whatsappChannels.length,
         totalChats: chats.length,
       },
     },
