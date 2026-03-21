@@ -62,6 +62,14 @@ function sanitizeFileName(name: string) {
     .toLowerCase();
 }
 
+function shortenId(value: string | null | undefined) {
+  const normalized = String(value || "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toLowerCase();
+
+  return normalized.slice(0, 8) || "x";
+}
+
 function inferAssetCategory(mimeType: string) {
   return mimeType.startsWith("image/") ? "image" : "file";
 }
@@ -128,9 +136,11 @@ export async function createAgenteAsset(input: {
   const mimeType = input.file.type || "application/octet-stream";
   const categoria = inferAssetCategory(mimeType);
   const extension = input.file.name.includes(".") ? input.file.name.split(".").pop() ?? "" : "";
-  const baseName = sanitizeFileName(input.file.name.replace(/\.[^.]+$/, "")) || "arquivo";
-  const uniqueName = `${Date.now()}-${randomUUID()}${extension ? `.${sanitizeFileName(extension)}` : ""}`;
-  const storagePath = `${input.projetoId ?? "sem-projeto"}/${input.agenteId}/${baseName}-${uniqueName}`;
+  const compactStamp = Date.now().toString(36);
+  const compactToken = randomUUID().replace(/-/g, "").slice(0, 10);
+  const safeExtension = extension ? sanitizeFileName(extension) : "";
+  const compactFileName = `${compactStamp}-${compactToken}${safeExtension ? `.${safeExtension}` : ""}`;
+  const storagePath = `p-${shortenId(input.projetoId)}/a-${shortenId(input.agenteId)}/${compactFileName}`;
   const fileBuffer = await input.file.arrayBuffer();
 
   const uploadResult = await supabase.storage.from(AGENTE_ASSETS_BUCKET).upload(storagePath, fileBuffer, {

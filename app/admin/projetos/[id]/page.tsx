@@ -761,6 +761,7 @@ function AgenteModal({
   onAddFiles,
   onRemovePendingFile,
   onRemoveUploadedFile,
+  onValidateSummary,
   onSubmit,
 }: {
   open: boolean;
@@ -774,8 +775,17 @@ function AgenteModal({
   onAddFiles: (files: FileList | null) => void;
   onRemovePendingFile: (id: string) => void;
   onRemoveUploadedFile: (id: string) => void;
+  onValidateSummary: () => void;
   onSubmit: () => void;
 }) {
+  const [showRawConfig, setShowRawConfig] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setShowRawConfig(false);
+    }
+  }, [open]);
+
   if (!open) {
     return null;
   }
@@ -801,12 +811,60 @@ function AgenteModal({
 
         <div className="grid max-h-[calc(92vh-88px)] gap-0 overflow-x-hidden overflow-y-auto lg:grid-cols-[1.05fr_0.95fr]">
           <div className="min-w-0 space-y-4 p-6">
-            <input value={form.slug} onChange={(event) => onChange({ slug: event.target.value })} placeholder="Slug do agente" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
-            <input value={form.nome} onChange={(event) => onChange({ nome: event.target.value })} placeholder="Nome do agente" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
-            <input value={form.descricao} onChange={(event) => onChange({ descricao: event.target.value })} placeholder="Descricao curta do agente" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
-            <textarea value={form.promptBase} onChange={(event) => onChange({ promptBase: event.target.value })} placeholder="Prompt base do agente" rows={8} className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none placeholder:text-slate-500" />
-            <textarea value={form.configuracoes} onChange={(event) => onChange({ configuracoes: event.target.value })} rows={12} className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 font-mono text-xs leading-relaxed text-cyan-100 outline-none placeholder:text-slate-500" />
+            <div>
+              <FormLabel>Slug</FormLabel>
+              <input value={form.slug} onChange={(event) => onChange({ slug: event.target.value })} placeholder="agente-comercial-principal" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
+            </div>
+            <div>
+              <FormLabel>Nome do agente</FormLabel>
+              <input value={form.nome} onChange={(event) => onChange({ nome: event.target.value })} placeholder="Agente comercial principal" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
+            </div>
+            <div>
+              <FormLabel>Descricao curta</FormLabel>
+              <input value={form.descricao} onChange={(event) => onChange({ descricao: event.target.value })} placeholder="Resumo curto para identificar esse agente" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
+            </div>
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <FormLabel>Resumo do agente</FormLabel>
+                <button
+                  type="button"
+                  onClick={onValidateSummary}
+                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/20"
+                >
+                  <Sparkles size={14} />
+                  Validar e organizar
+                </button>
+              </div>
+              <textarea
+                value={form.promptBase}
+                onChange={(event) => onChange({ promptBase: event.target.value })}
+                placeholder="Descreva como o agente deve atuar, o que oferecer, como qualificar, regras de preco, handoff e CTA."
+                rows={12}
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none placeholder:text-slate-500"
+              />
+              <p className="mt-2 text-xs text-slate-400">Ao validar, o texto e compactado e o JSON tecnico e gerado a partir das informacoes escritas aqui.</p>
+            </div>
             <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-white">Configuracao tecnica</p>
+                  <p className="mt-1 text-xs text-slate-400">O JSON fica discreto. Abra somente quando quiser revisar ou ajustar manualmente.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowRawConfig((current) => !current)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  {showRawConfig ? "Ocultar JSON" : "Ver JSON"}
+                </button>
+              </div>
+              {showRawConfig ? (
+                <div className="mt-4">
+                  <textarea value={form.configuracoes} onChange={(event) => onChange({ configuracoes: event.target.value })} rows={12} className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 font-mono text-xs leading-relaxed text-cyan-100 outline-none placeholder:text-slate-500" />
+                </div>
+              ) : null}
+            </div>
+            <div className="hidden rounded-xl border border-white/10 bg-slate-950/30 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-white">Arquivos e imagens do agente</p>
@@ -833,9 +891,136 @@ function AgenteModal({
                   {form.arquivos.map((asset) => (
                     <div key={asset.id} className="flex items-start justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3">
                       <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/[0.05] text-cyan-100">
-                          {asset.categoria === "image" ? <FileImage size={18} /> : <Paperclip size={18} />}
+                        <AgenteAssetPreview categoria={asset.categoria} publicUrl={asset.publicUrl} alt={asset.nome} />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-white">{asset.nome}</p>
+                          <p className="text-xs text-slate-400">
+                            {asset.arquivoNome} • {formatFileSize(asset.tamanhoBytes)}
+                          </p>
+                          <a
+                            href={asset.publicUrl}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="mt-1 inline-flex items-center gap-2 text-[11px] leading-relaxed text-cyan-200/80 transition-colors hover:text-cyan-100"
+                            title={asset.publicUrl}
+                          >
+                            Link publico
+                            <ExternalLink size={12} />
+                          </a>
                         </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={asset.publicUrl}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                          aria-label="Abrir arquivo"
+                        >
+                          <ExternalLink size={15} />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => onRemoveUploadedFile(asset.id)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-100 transition-colors hover:bg-rose-500/20"
+                          aria-label="Remover arquivo"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {pendingArquivos.length ? (
+                <div className="mt-4 space-y-2">
+                  {pendingArquivos.map((item) => (
+                    <div key={item.id} className="flex items-start justify-between gap-3 rounded-xl border border-cyan-500/15 bg-cyan-500/10 px-3 py-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <AgenteAssetPreview categoria={item.file.type.startsWith("image/") ? "image" : "file"} file={item.file} alt={item.file.name} />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-white">{item.file.name}</p>
+                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} • aguardando upload</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onRemovePendingFile(item.id)}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                        aria-label="Remover arquivo pendente"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="min-w-0 border-t border-white/10 bg-white/[0.03] p-6 lg:border-l lg:border-t-0">
+            <div className="hidden mb-5 rounded-2xl border border-cyan-500/15 bg-cyan-500/10 p-5">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950/20 text-cyan-100">
+                <Bot size={22} />
+              </div>
+              <p className="text-lg font-bold text-white">{form.nome || "Agente sem nome"}</p>
+              <p className="mt-2 text-sm leading-relaxed text-cyan-50">{form.descricao || "Defina o papel comercial e o comportamento desse agente para o projeto selecionado."}</p>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+              <p className="text-sm font-semibold text-white">APIs disponiveis para este agente</p>
+              <div className="mt-3 space-y-2">
+                {apis.length ? (
+                  apis.map((api) => (
+                    <label key={api.id} className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+                      <input type="checkbox" checked={form.apiIds.includes(api.id)} onChange={(event) => onChange({ apiIds: event.target.checked ? [...form.apiIds, api.id] : form.apiIds.filter((item) => item !== api.id) })} />
+                      <span className="font-semibold text-white">{api.nome}</span>
+                      <span className="text-slate-500">{api.metodo}</span>
+                      <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${api.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-200"}`}>
+                        {api.ativo ? "ativa" : "inativa"}
+                      </span>
+                      {api.parametros.some((parametro) => parametro.obrigatorio) ? (
+                        <span className="text-[11px] text-amber-200/80">
+                          exige: {api.parametros.filter((parametro) => parametro.obrigatorio).map((parametro) => parametro.nome).join(", ")}
+                        </span>
+                      ) : null}
+                    </label>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400">Cadastre uma API neste projeto para vincular ao agente.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/30 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-white">Arquivos e imagens do agente</p>
+                  <p className="mt-1 text-xs text-slate-400">Imagens aparecem com miniatura para ficar mais facil revisar o que ja foi cadastrado.</p>
+                </div>
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100">
+                  <Paperclip size={14} />
+                  Adicionar arquivos
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                    onChange={(event) => {
+                      onAddFiles(event.target.files);
+                      event.currentTarget.value = "";
+                    }}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              {form.arquivos.length ? (
+                <div className="mt-4 space-y-2">
+                  {form.arquivos.map((asset) => (
+                    <div key={asset.id} className="flex items-start justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <AgenteAssetPreview categoria={asset.categoria} publicUrl={asset.publicUrl} alt={asset.nome} />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{asset.nome}</p>
                           <p className="text-xs text-slate-400">
@@ -881,9 +1066,7 @@ function AgenteModal({
                   {pendingArquivos.map((item) => (
                     <div key={item.id} className="flex items-start justify-between gap-3 rounded-xl border border-cyan-500/15 bg-cyan-500/10 px-3 py-3">
                       <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950/20 text-cyan-100">
-                          {item.file.type.startsWith("image/") ? <FileImage size={18} /> : <Paperclip size={18} />}
-                        </div>
+                        <AgenteAssetPreview categoria={item.file.type.startsWith("image/") ? "image" : "file"} file={item.file} alt={item.file.name} />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{item.file.name}</p>
                           <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} • aguardando upload</p>
@@ -901,41 +1084,6 @@ function AgenteModal({
                   ))}
                 </div>
               ) : null}
-            </div>
-          </div>
-
-          <div className="min-w-0 border-t border-white/10 bg-white/[0.03] p-6 lg:border-l lg:border-t-0">
-            <div className="mb-5 rounded-2xl border border-cyan-500/15 bg-cyan-500/10 p-5">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950/20 text-cyan-100">
-                <Bot size={22} />
-              </div>
-              <p className="text-lg font-bold text-white">{form.nome || "Agente sem nome"}</p>
-              <p className="mt-2 text-sm leading-relaxed text-cyan-50">{form.descricao || "Defina o papel comercial e o comportamento desse agente para o projeto selecionado."}</p>
-            </div>
-
-            <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
-              <p className="text-sm font-semibold text-white">APIs disponiveis para este agente</p>
-              <div className="mt-3 space-y-2">
-                {apis.length ? (
-                  apis.map((api) => (
-                    <label key={api.id} className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
-                      <input type="checkbox" checked={form.apiIds.includes(api.id)} onChange={(event) => onChange({ apiIds: event.target.checked ? [...form.apiIds, api.id] : form.apiIds.filter((item) => item !== api.id) })} />
-                      <span className="font-semibold text-white">{api.nome}</span>
-                      <span className="text-slate-500">{api.metodo}</span>
-                      <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${api.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-200"}`}>
-                        {api.ativo ? "ativa" : "inativa"}
-                      </span>
-                      {api.parametros.some((parametro) => parametro.obrigatorio) ? (
-                        <span className="text-[11px] text-amber-200/80">
-                          exige: {api.parametros.filter((parametro) => parametro.obrigatorio).map((parametro) => parametro.nome).join(", ")}
-                        </span>
-                      ) : null}
-                    </label>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-400">Cadastre uma API neste projeto para vincular ao agente.</p>
-                )}
-              </div>
             </div>
 
             {form.apiIds.length ? (
@@ -1057,8 +1205,14 @@ function ApiModal({
         <div className="flex max-h-[calc(92vh-88px)] flex-col">
           <div className="flex-1 overflow-y-auto p-6">
             <div className="space-y-4 pb-6">
-            <input value={form.nome} onChange={(event) => onChange({ nome: event.target.value })} placeholder="Nome da API" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
-            <input value={form.url} onChange={(event) => onChange({ url: event.target.value })} placeholder="https://api.exemplo.com/recurso" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
+            <div>
+              <FormLabel>Nome da API</FormLabel>
+              <input value={form.nome} onChange={(event) => onChange({ nome: event.target.value })} placeholder="Consulta de imoveis" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
+            </div>
+            <div>
+              <FormLabel>URL da API</FormLabel>
+              <input value={form.url} onChange={(event) => onChange({ url: event.target.value })} placeholder="https://api.exemplo.com/recurso" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
+            </div>
             <div className="rounded-xl border border-cyan-500/15 bg-cyan-500/8 px-4 py-3 text-sm text-cyan-50">
               <p className="font-semibold text-white">Como configurar sem erro</p>
               <p className="mt-1 text-cyan-100/80">
@@ -1097,8 +1251,14 @@ function ApiModal({
                 </div>
               </div>
             ) : null}
-            <input value={form.metodo} readOnly className="w-full rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-white outline-none" />
-            <textarea value={form.descricao} onChange={(event) => onChange({ descricao: event.target.value })} placeholder="Descricao da API" rows={5} className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none placeholder:text-slate-500" />
+            <div>
+              <FormLabel>Metodo</FormLabel>
+              <input value={form.metodo} readOnly className="w-full rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-white outline-none" />
+            </div>
+            <div>
+              <FormLabel>Descricao da API</FormLabel>
+              <textarea value={form.descricao} onChange={(event) => onChange({ descricao: event.target.value })} placeholder="Explique o que essa API retorna e quando o agente deve usa-la" rows={5} className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none placeholder:text-slate-500" />
+            </div>
             <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
               <input type="checkbox" checked={form.ativo} onChange={(event) => onChange({ ativo: event.target.checked })} />
               API ativa no projeto
@@ -1230,48 +1390,66 @@ function WidgetModal({
 
         <div className="max-h-[calc(92vh-88px)] overflow-y-auto p-6">
           <div className="space-y-4">
-            <input
-              value={form.nome}
-              onChange={(event) => onChange({ nome: event.target.value })}
-              placeholder="Nome do widget"
-              className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-            />
-            <input
-              value={form.slug}
-              onChange={(event) => onChange({ slug: event.target.value })}
-              placeholder="Slug publico do widget"
-              className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-            />
-            <input
-              value={form.dominio}
-              onChange={(event) => onChange({ dominio: event.target.value })}
-              placeholder="Dominio permitido ou contexto do embed"
-              className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-            />
-            <input
-              value={form.whatsappCelular}
-              onChange={(event) => onChange({ whatsappCelular: formatWhatsAppPhone(event.target.value) })}
-              placeholder="+55 11 99999-9999"
-              inputMode="tel"
-              autoComplete="tel"
-              maxLength={17}
-              className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-            />
-            <div className="grid gap-4 sm:grid-cols-[0.7fr_0.3fr]">
-              <select
-                value={form.tema}
-                onChange={(event) => onChange({ tema: event.target.value === "light" ? "light" : "dark" })}
-                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
-              >
-                <option value="dark">Tema escuro</option>
-                <option value="light">Tema claro</option>
-              </select>
+            <div>
+              <FormLabel>Nome do widget</FormLabel>
               <input
-                type="color"
-                value={form.corPrimaria}
-                onChange={(event) => onChange({ corPrimaria: event.target.value })}
-                className="h-[50px] w-full rounded-xl border border-white/10 bg-slate-950/50 px-2 py-2"
+                value={form.nome}
+                onChange={(event) => onChange({ nome: event.target.value })}
+                placeholder="Chat principal do site"
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
               />
+            </div>
+            <div>
+              <FormLabel>Slug publico</FormLabel>
+              <input
+                value={form.slug}
+                onChange={(event) => onChange({ slug: event.target.value })}
+                placeholder="chat-site"
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+              />
+            </div>
+            <div>
+              <FormLabel>Dominio ou contexto</FormLabel>
+              <input
+                value={form.dominio}
+                onChange={(event) => onChange({ dominio: event.target.value })}
+                placeholder="Dominio permitido ou contexto do embed"
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+              />
+            </div>
+            <div>
+              <FormLabel>WhatsApp</FormLabel>
+              <input
+                value={form.whatsappCelular}
+                onChange={(event) => onChange({ whatsappCelular: formatWhatsAppPhone(event.target.value) })}
+                placeholder="+55 11 99999-9999"
+                inputMode="tel"
+                autoComplete="tel"
+                maxLength={17}
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-[0.7fr_0.3fr]">
+              <div>
+                <FormLabel>Tema</FormLabel>
+                <select
+                  value={form.tema}
+                  onChange={(event) => onChange({ tema: event.target.value === "light" ? "light" : "dark" })}
+                  className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
+                >
+                  <option value="dark">Tema escuro</option>
+                  <option value="light">Tema claro</option>
+                </select>
+              </div>
+              <div>
+                <FormLabel>Cor principal</FormLabel>
+                <input
+                  type="color"
+                  value={form.corPrimaria}
+                  onChange={(event) => onChange({ corPrimaria: event.target.value })}
+                  className="h-[50px] w-full rounded-xl border border-white/10 bg-slate-950/50 px-2 py-2"
+                />
+              </div>
             </div>
             <div className="rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm text-slate-300">
               Projeto selecionado
@@ -1666,25 +1844,43 @@ export default function AdminProjetoDetalhePage() {
     }
   };
 
+  const prepareAgenteForm = (form: AgenteFormState) => {
+    const compactPromptBase = compactAgentSummary(form.promptBase);
+    const generatedConfig = buildAgentConfigFromSummary(compactPromptBase);
+
+    return {
+      ...form,
+      descricao: form.descricao.trim() || inferShortDescription(compactPromptBase),
+      promptBase: compactPromptBase,
+      configuracoes: JSON.stringify(generatedConfig, null, 2),
+    };
+  };
+
+  const handleValidateAgenteSummary = () => {
+    if (!agenteForm.promptBase.trim()) {
+      setFeedbackAgente("Preencha o resumo do agente antes de validar.");
+      return;
+    }
+
+    const preparedForm = prepareAgenteForm(agenteForm);
+    setAgenteForm(preparedForm);
+    setFeedbackAgente("Resumo validado e configuracao tecnica atualizada.");
+  };
+
   const handleAgenteSubmit = async () => {
     setSavingAgente(true);
     setFeedbackAgente(null);
 
-    try {
-      JSON.parse(agenteForm.configuracoes);
-    } catch {
-      setFeedbackAgente("O JSON de configuracoes esta invalido.");
-      setSavingAgente(false);
-      return;
-    }
+    const preparedForm = prepareAgenteForm(agenteForm);
+    setAgenteForm(preparedForm);
 
-    const method = agenteForm.id ? "PUT" : "POST";
+    const method = preparedForm.id ? "PUT" : "POST";
     const response = await fetch("/api/admin/agentes", {
       method,
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(agenteForm),
+      body: JSON.stringify(preparedForm),
     });
 
     const payload = (await response.json()) as { error?: string };
@@ -1708,7 +1904,7 @@ export default function AdminProjetoDetalhePage() {
     }
 
     await loadProjeto();
-    const message = agenteForm.id ? "Agente atualizado com sucesso." : "Agente criado com sucesso.";
+    const message = preparedForm.id ? "Agente atualizado com sucesso." : "Agente criado com sucesso.";
     resetAgenteForm();
     setSavingAgente(false);
     setAgenteModalOpen(false);
@@ -2476,6 +2672,7 @@ export default function AdminProjetoDetalhePage() {
         onAddFiles={handleAddAgenteFiles}
         onRemovePendingFile={handleRemovePendingAgenteFile}
         onRemoveUploadedFile={handleRemoveUploadedAgenteFile}
+        onValidateSummary={handleValidateAgenteSummary}
         onSubmit={() => void handleAgenteSubmit()}
       />
 

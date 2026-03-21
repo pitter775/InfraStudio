@@ -4,7 +4,7 @@ Painel e backend de projetos, agentes e canais de chat da InfraStudio.
 
 ## Chat SDK
 
-O widget agora opera em modo host-controlled. O script so expoe a API global; a aplicacao hospedeira decide quando montar, atualizar, ocultar e destruir.
+O widget agora opera em modo host-controlled. O script expoe a API global para a aplicacao hospedeira decidir quando montar, atualizar, ocultar e destruir, mas o visual rico do chat continua sendo responsabilidade do proprio SDK.
 
 ### Carregamento do SDK
 
@@ -48,6 +48,7 @@ O widget agora opera em modo host-controlled. O script so expoe a API global; a 
 - O SDK nunca se auto-recria depois de `destroy()`.
 - Eventos de debug: `mounted`, `context_updated`, `hidden`, `destroyed`, `blocked_by_route`, `blocked_by_policy`.
 - Tema, cor, titulo e transparencia podem vir do backend ou do contexto enviado pelo cliente.
+- O modo host-controlled nao implica UI minimalista: o `chat.js` mantem launcher, painel, cabecalho, digitacao e renderizacao rica de mensagens/arquivos.
 
 ### Backend
 
