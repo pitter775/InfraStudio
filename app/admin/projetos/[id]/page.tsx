@@ -1341,8 +1341,8 @@ function AgenteModal({
 }) {
   const [showRawConfig, setShowRawConfig] = useState(false);
   const [promptExpanded, setPromptExpanded] = useState(false);
-  const [editorHtml, setEditorHtml] = useState("");
   const promptRef = useRef<HTMLDivElement | null>(null);
+  const lastPromptSyncRef = useRef("");
 
   useEffect(() => {
     if (open) {
@@ -1357,19 +1357,22 @@ function AgenteModal({
     }
 
     const nextHtml = plainTextToEditorHtml(form.promptBase);
-    const currentStructured = richTextToStructuredText(editorHtml);
-    if (normalizeAgentText(currentStructured) !== normalizeAgentText(form.promptBase)) {
-      setEditorHtml(nextHtml);
+    const normalizedPrompt = normalizeAgentText(form.promptBase);
+
+    if (lastPromptSyncRef.current !== normalizedPrompt && promptRef.current) {
+      promptRef.current.innerHTML = nextHtml;
+      lastPromptSyncRef.current = normalizedPrompt;
     }
-  }, [editorHtml, form.promptBase, open]);
+  }, [form.promptBase, open]);
 
   if (!open) {
     return null;
   }
 
   const updatePromptBase = (nextHtml: string) => {
-    setEditorHtml(nextHtml);
-    onChange({ promptBase: richTextToStructuredText(nextHtml) });
+    const nextPrompt = richTextToStructuredText(nextHtml);
+    lastPromptSyncRef.current = normalizeAgentText(nextPrompt);
+    onChange({ promptBase: nextPrompt });
   };
 
   const applyPromptFormat = (mode: "bold" | "title" | "bullet" | "numbered") => {
@@ -1505,7 +1508,6 @@ function AgenteModal({
                 suppressContentEditableWarning
                 onInput={(event) => updatePromptBase(event.currentTarget.innerHTML)}
                 className={`w-full overflow-y-auto rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none transition-all duration-300 [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-base [&_h3]:font-bold [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-2 [&_strong]:font-extrabold [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 ${promptExpanded ? "min-h-[560px]" : "min-h-[290px]"}`}
-                dangerouslySetInnerHTML={{ __html: editorHtml || "<p>Descreva como o agente deve atuar, o que oferecer, como qualificar, regras de preco, handoff e CTA.</p>" }}
               />
               <p className="mt-2 text-xs text-slate-400">Ao validar, o texto e reorganizado para leitura humana e o JSON tecnico e regenerado automaticamente sem virar um resumao podado.</p>
             </div>
