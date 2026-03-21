@@ -284,39 +284,151 @@ function compactAgentSummary(summary: string) {
 
   const withoutJsonBlocks = normalized.replace(/\{[\s\S]*\}$/g, "").trim();
   const lines = withoutJsonBlocks.split("\n");
-  const compacted: string[] = [];
-  let currentSection = "";
+  const sectionOrder = [
+    "Contexto",
+    "Objetivo",
+    "Capacidades",
+    "Qualificacao",
+    "Regras",
+    "Precificacao",
+    "WhatsApp",
+    "Handoff humano",
+    "API",
+    "Observacoes",
+  ] as const;
+  const buckets = new Map<string, string[]>();
+  sectionOrder.forEach((section) => buckets.set(section, []));
+  let currentSection: string | null = null;
+
+  const ensureSection = (section: string) => {
+    if (!buckets.has(section)) {
+      buckets.set(section, []);
+    }
+    return buckets.get(section)!;
+  };
+
+  const classifyLine = (value: string) => {
+    const normalizedValue = normalizeSummaryKey(value);
+
+    if (
+      normalizedValue.includes("objetivo") ||
+      normalizedValue.includes("meta") ||
+      normalizedValue.includes("missao")
+    ) {
+      return "Objetivo";
+    }
+
+    if (
+      normalizedValue.includes("capacidade") ||
+      normalizedValue.includes("o que ele faz") ||
+      normalizedValue.includes("servico") ||
+      normalizedValue.includes("oferta") ||
+      normalizedValue.includes("solucao")
+    ) {
+      return "Capacidades";
+    }
+
+    if (
+      normalizedValue.includes("qualific") ||
+      normalizedValue.includes("pergunta") ||
+      normalizedValue.includes("descobrir")
+    ) {
+      return "Qualificacao";
+    }
+
+    if (
+      normalizedValue.includes("regra") ||
+      normalizedValue.includes("tom") ||
+      normalizedValue.includes("responda") ||
+      normalizedValue.includes("evite") ||
+      normalizedValue.includes("nunca")
+    ) {
+      return "Regras";
+    }
+
+    if (
+      normalizedValue.includes("preco") ||
+      normalizedValue.includes("valor") ||
+      normalizedValue.includes("orcamento") ||
+      normalizedValue.includes("tabela")
+    ) {
+      return "Precificacao";
+    }
+
+    if (normalizedValue.includes("whatsapp") || normalizedValue.includes("zap")) {
+      return "WhatsApp";
+    }
+
+    if (
+      normalizedValue.includes("handoff") ||
+      normalizedValue.includes("humano") ||
+      normalizedValue.includes("encaminh") ||
+      normalizedValue.includes("escalar")
+    ) {
+      return "Handoff humano";
+    }
+
+    if (normalizedValue.includes("api") || normalizedValue.includes("integrac")) {
+      return "API";
+    }
+
+    if (
+      normalizedValue.includes("voce e") ||
+      normalizedValue.includes("este agente") ||
+      normalizedValue.includes("contexto") ||
+      normalizedValue.includes("projeto")
+    ) {
+      return "Contexto";
+    }
+
+    return currentSection ?? "Observacoes";
+  };
 
   for (const line of lines) {
     if (!line) {
-      if (compacted[compacted.length - 1] !== "") {
-        compacted.push("");
-      }
       continue;
     }
 
     const normalizedLine = organizeHumanLine(line);
 
     if (!normalizedLine.startsWith("- ") && /:$/.test(normalizedLine)) {
-      const section = normalizedLine
+      currentSection = normalizedLine
         .replace(/:$/, "")
         .replace(/\s+/g, " ")
         .trim();
-
-      if (section && section !== currentSection) {
-        if (compacted[compacted.length - 1] && compacted[compacted.length - 1] !== "") {
-          compacted.push("");
-        }
-        compacted.push(`${section}:`);
-        currentSection = section;
-      }
       continue;
     }
 
-    compacted.push(normalizedLine);
+    const section = classifyLine(normalizedLine);
+    const bucket = ensureSection(section);
+    bucket.push(normalizedLine.replace(/^[-*]\s*/, "").trim());
   }
 
-  return compacted.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  const organized: string[] = [];
+
+  for (const section of sectionOrder) {
+    const items = buckets.get(section) ?? [];
+    if (!items.length) {
+      continue;
+    }
+
+    if (organized.length) {
+      organized.push("");
+    }
+
+    organized.push(`${section}:`);
+
+    for (const item of items) {
+      const normalizedItem = item.replace(/^[-*]\s*/, "").trim();
+      organized.push(
+        /:$/.test(normalizedItem) && normalizedItem.length <= 40
+          ? normalizedItem
+          : `- ${normalizedItem}`,
+      );
+    }
+  }
+
+  return organized.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function inferShortDescription(summary: string) {
@@ -332,8 +444,40 @@ function inferShortDescription(summary: string) {
   return `${firstParagraph.slice(0, 157).trimEnd()}...`;
 }
 
-function buildAgentConfigFromSummary(summary: string) {
+function parseAgentSummarySections(summary: string) {
   const normalized = compactAgentSummary(summary);
+  const lines = normalized ? normalized.split("\n") : [];
+  const sections: Record<string, string[]> = {};
+  let currentSection = "geral";
+
+  for (const line of lines) {
+    if (!line) {
+      continue;
+    }
+
+    if (!line.startsWith("- ") && /:$/.test(line)) {
+      currentSection = line.replace(/:$/, "").trim();
+      if (!sections[currentSection]) {
+        sections[currentSection] = [];
+      }
+      continue;
+    }
+
+    if (!sections[currentSection]) {
+      sections[currentSection] = [];
+    }
+
+    sections[currentSection].push(line.replace(/^[-*]\s*/, "").trim());
+  }
+
+  return {
+    normalized,
+    sections,
+  };
+}
+
+function buildAgentConfigFromSummary(summary: string) {
+  const { normalized, sections } = parseAgentSummarySections(summary);
   const lines = normalized ? normalized.split("\n") : [];
   const intro: string[] = [];
   const capacidades: string[] = [];
@@ -423,6 +567,24 @@ function buildAgentConfigFromSummary(summary: string) {
 
   const objetivo = intro.join(" ").trim() || "Qualificar leads e conduzir o atendimento com contexto do negocio.";
   const descricaoCurta = inferShortDescription(normalized || summary) || objetivo;
+  const sectionAliases: Record<string, string> = {
+    Contexto: "contexto",
+    Objetivo: "objetivo",
+    Capacidades: "capacidades",
+    Qualificacao: "qualificacao",
+    Regras: "regras",
+    Precificacao: "precificacao",
+    WhatsApp: "whatsapp",
+    "Handoff humano": "handoff_humano",
+    API: "api",
+    Observacoes: "observacoes",
+    geral: "geral",
+  };
+  const sourceSections = Object.fromEntries(
+    Object.entries(sections)
+      .map(([key, value]) => [sectionAliases[key] ?? normalizeSummaryKey(key).replace(/\s+/g, "_"), value])
+      .filter(([, value]) => Array.isArray(value) && value.length > 0),
+  );
   const runtime = {
     version: 1,
     overview: {
@@ -452,6 +614,8 @@ function buildAgentConfigFromSummary(summary: string) {
   };
   const config: Record<string, unknown> = {
     objetivo,
+    resumo_organizado: normalized,
+    secoes_fonte: sourceSections,
     capacidades: capacidades.slice(0, 8),
     perguntas_qualificacao: perguntasQualificacao.slice(0, 5),
     handoff: {
@@ -2282,24 +2446,13 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const prepareAgenteForm = (form: AgenteFormState) => {
-    const compactPromptBase = compactAgentSummary(form.promptBase);
-    const generatedConfig = buildAgentConfigFromSummary(compactPromptBase);
-    const condensedPromptBase = [
-      inferShortDescription(compactPromptBase),
-      ...compactPromptBase
-        .split("\n")
-        .filter((line) => line && line !== inferShortDescription(compactPromptBase))
-        .slice(0, 18),
-    ]
-      .filter(Boolean)
-      .join("\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
+    const organizedPromptBase = normalizeAgentText(form.promptBase);
+    const generatedConfig = buildAgentConfigFromSummary(organizedPromptBase);
 
     return {
       ...form,
-      descricao: form.descricao.trim() || inferShortDescription(condensedPromptBase),
-      promptBase: condensedPromptBase,
+      descricao: form.descricao.trim() || inferShortDescription(organizedPromptBase),
+      promptBase: organizedPromptBase,
       configuracoes: JSON.stringify(generatedConfig, null, 2),
     };
   };
