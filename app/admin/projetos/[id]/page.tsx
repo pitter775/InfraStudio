@@ -344,7 +344,7 @@ function renderSnippetLine(line: string) {
   }
 
   if (trimmed.startsWith("<!--") || trimmed.startsWith("//")) {
-    return <span className="text-amber-300">{line}</span>;
+    return <span className="text-slate-400">{line}</span>;
   }
 
   if (trimmed.startsWith("<script") || trimmed.startsWith("></script>") || trimmed.startsWith("</script>")) {
@@ -363,9 +363,17 @@ function renderSnippetLine(line: string) {
           );
         }
 
-        if (part.includes("=") || part.includes('"')) {
+        if (part.includes("=") || part.includes('"') || part.includes("'")) {
           return (
-            <span key={`${part}-${index}`} className="text-emerald-200">
+            <span key={`${part}-${index}`} className="text-emerald-300">
+              {part}
+            </span>
+          );
+        }
+
+        if (part.includes(":")) {
+          return (
+            <span key={`${part}-${index}`} className="text-violet-200">
               {part}
             </span>
           );
@@ -1355,12 +1363,14 @@ export default function AdminProjetoDetalhePage() {
     }
 
     return [
+      "// Carregue o SDK do widget",
       "<script",
       `  src=\"${base}/chat.js\"`,
       `  data-projeto=\"${projetoRef}\"`,
       `  data-agente=\"${agenteRef}\"`,
       "></script>",
       "",
+      "// Monte o chat com o contexto inicial da pagina",
       "<script>",
       "  window.InfraChat.mount({",
       `    projeto: '${projetoRef}',`,
