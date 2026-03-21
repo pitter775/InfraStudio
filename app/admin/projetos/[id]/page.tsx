@@ -2371,6 +2371,7 @@ export default function AdminProjetoDetalhePage() {
   const [pendingAgenteArquivos, setPendingAgenteArquivos] = useState<PendingAgenteArquivo[]>([]);
   const [origin, setOrigin] = useState("");
   const [copiedSnippetKey, setCopiedSnippetKey] = useState<string | null>(null);
+  const [expandedSnippetKeys, setExpandedSnippetKeys] = useState<Record<string, boolean>>({});
   const [serviceStatusByChannel, setServiceStatusByChannel] = useState<Record<string, string>>({});
   const [serviceQrByChannel, setServiceQrByChannel] = useState<Record<string, string | null>>({});
 
@@ -2668,6 +2669,13 @@ export default function AdminProjetoDetalhePage() {
     } catch {
       setCopiedSnippetKey(null);
     }
+  };
+
+  const toggleSnippetExpanded = (key: string) => {
+    setExpandedSnippetKeys((current) => ({
+      ...current,
+      [key]: !current[key],
+    }));
   };
 
   const handleAddAgenteFiles = (files: FileList | null) => {
@@ -3320,6 +3328,7 @@ export default function AdminProjetoDetalhePage() {
   }
 
   const agenteAtivo = data.agentes.find((agente) => agente.ativo) ?? null;
+  const primaryWhatsAppChannel = data.whatsappChannels[0] ?? null;
 
   return (
     <main className="space-y-6">
@@ -3564,162 +3573,257 @@ export default function AdminProjetoDetalhePage() {
                 <p className="mt-3 text-xs text-amber-200/90">Defina `NEXT_PUBLIC_WHATSAPP_SERVICE_URL` para habilitar a conexao e a leitura do QR.</p>
               ) : null}
             </div>
-            <div className="grid gap-6 p-6 xl:grid-cols-[360px,minmax(0,1fr)]">
-              <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-5">
-                <h4 className="text-base font-bold text-white">{whatsAppChannelForm.id ? "Editar canal" : "Novo canal"}</h4>
-                <p className="mt-1 text-sm text-slate-400">Cadastre o numero e vincule o agente que vai responder nesse canal.</p>
-                <div className="mt-5 space-y-4">
-                  <div>
-                    <FormLabel>Numero</FormLabel>
-                    <input
-                      value={whatsAppChannelForm.numero}
-                      onChange={(event) =>
-                        setWhatsAppChannelForm((prev) => ({
-                          ...prev,
-                          numero: formatWhatsAppPhone(event.target.value),
-                        }))
-                      }
-                      placeholder="+55 11 99999-9999"
-                      className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
-                    />
-                  </div>
-                  <div>
-                    <FormLabel>Agente</FormLabel>
-                    <select
-                      value={whatsAppChannelForm.agenteId ?? ""}
-                      onChange={(event) =>
-                        setWhatsAppChannelForm((prev) => ({
-                          ...prev,
-                          agenteId: event.target.value || null,
-                        }))
-                      }
-                      className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
-                    >
-                      <option value="">Agente ativo do projeto</option>
-                      {data.agentes.map((agente) => (
-                        <option key={agente.id} value={agente.id}>
-                          {agente.nome}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <FormLabel>Status</FormLabel>
-                    <select
-                      value={whatsAppChannelForm.status}
-                      onChange={(event) =>
-                        setWhatsAppChannelForm((prev) => ({
-                          ...prev,
-                          status: event.target.value === "inativo" ? "inativo" : "ativo",
-                        }))
-                      }
-                      className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
-                    >
-                      <option value="ativo">ativo</option>
-                      <option value="inativo">inativo</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void handleSaveWhatsAppChannel()}
-                    disabled={savingWhatsAppChannel}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3 font-semibold text-slate-950 disabled:opacity-60"
-                  >
-                    <Plus size={16} />
-                    {savingWhatsAppChannel ? "Salvando..." : whatsAppChannelForm.id ? "Salvar canal" : "Criar canal"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={resetWhatsAppChannelForm}
-                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200"
-                  >
-                    Limpar
-                  </button>
-                </div>
-              </div>
+            <div className="space-y-6 p-6">
+              {primaryWhatsAppChannel ? (() => {
+                const channel = primaryWhatsAppChannel;
+                const agente = channel.agenteId ? data.agentes.find((item) => item.id === channel.agenteId) ?? null : agenteAtivo;
+                const runtimeStatus = serviceStatusByChannel[channel.id] ?? getChannelStatusLabel(channel.sessionData?.connectionStatus);
+                const qrImage = serviceQrByChannel[channel.id] ?? channel.sessionData?.qrCodeDataUrl ?? channel.sessionData?.qrCodeUrl ?? null;
+                const isConnected = runtimeStatus === "conectado" || runtimeStatus === "online";
+                const isWaitingQr = runtimeStatus === "aguardando_qr" && Boolean(qrImage);
 
-              <div className="space-y-4">
-                {data.whatsappChannels.length ? (
-                  data.whatsappChannels.map((channel) => {
-                    const agente = channel.agenteId ? data.agentes.find((item) => item.id === channel.agenteId) ?? null : agenteAtivo;
-                    const runtimeStatus = serviceStatusByChannel[channel.id] ?? getChannelStatusLabel(channel.sessionData?.connectionStatus);
-                    const qrImage = serviceQrByChannel[channel.id] ?? channel.sessionData?.qrCodeDataUrl ?? channel.sessionData?.qrCodeUrl ?? null;
-
-                    return (
-                      <div key={channel.id} className="rounded-2xl border border-white/10 bg-slate-950/35 p-5">
-                        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-3">
-                              <h4 className="text-lg font-bold text-white">{formatWhatsAppPhone(channel.numero)}</h4>
-                              <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${getChannelStatusTone(runtimeStatus)}`}>
-                                {runtimeStatus}
-                              </span>
-                              <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${channel.status === "ativo" ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
-                                {channel.status}
-                              </span>
-                            </div>
-                            <p className="mt-3 text-sm text-slate-300">Agente: {agente?.nome ?? "agente ativo do projeto"}</p>
-                            <p className="mt-1 text-sm text-slate-400">Worker: {channel.sessionData?.worker || "whatsapp-service"}</p>
-                            <p className="mt-1 text-sm text-slate-400">Ultima sincronizacao: {channel.sessionData?.lastSyncAt ? new Date(channel.sessionData.lastSyncAt).toLocaleString("pt-BR") : "nao sincronizada"}</p>
-                            {channel.sessionData?.notes ? <p className="mt-1 text-sm text-amber-100/80">{channel.sessionData.notes}</p> : null}
-
-                            <div className="mt-4 flex flex-wrap gap-3">
-                              <button
-                                type="button"
-                                onClick={() => void handleConnectWhatsAppChannel(channel)}
-                                disabled={connectingWhatsAppChannelId === channel.id}
-                                className="rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 px-4 py-3 text-sm font-semibold text-slate-950 disabled:opacity-60"
-                              >
-                                {connectingWhatsAppChannelId === channel.id ? "Conectando..." : "Conectar WhatsApp"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void handleDisconnectWhatsAppChannel(channel)}
-                                disabled={disconnectingWhatsAppChannelId === channel.id}
-                                className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100 disabled:opacity-60"
-                              >
-                                {disconnectingWhatsAppChannelId === channel.id ? "Desconectando..." : "Desconectar"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleEditWhatsAppChannel(channel)}
-                                className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200"
-                              >
-                                Editar canal
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void refreshWhatsAppRuntime(channel.id)}
-                                className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200"
-                              >
-                                Atualizar status
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="w-full max-w-[280px] rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">QR Code</p>
-                            {qrImage ? (
-                              <img src={qrImage} alt={`QR do canal ${channel.numero}`} className="mt-4 w-full rounded-xl bg-white p-3" />
-                            ) : (
-                              <div className="mt-4 rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-10 text-center text-sm text-slate-400">
-                                QR indisponivel no momento.
-                              </div>
-                            )}
-                            <p className="mt-3 text-xs text-slate-500">Endpoint consumido: `GET /qr` e `GET /status` do `whatsapp-service`.</p>
-                          </div>
+                return (
+                  <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr),380px]">
+                    <div className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),rgba(8,47,73,0.14)_35%,rgba(2,6,23,0.9)_75%)] p-6">
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Canal principal</p>
+                          <h4 className="mt-3 text-3xl font-black text-white">{formatWhatsAppPhone(channel.numero)}</h4>
+                          <p className="mt-2 text-sm text-slate-300">Agente: {agente?.nome ?? "agente ativo do projeto"}</p>
+                        </div>
+                        <div className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] ${getChannelStatusTone(runtimeStatus)}`}>
+                          {isConnected ? "conectado" : runtimeStatus}
                         </div>
                       </div>
-                    );
-                  })
-                ) : (
-                  <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">
-                    Nenhum canal WhatsApp oficial configurado para este projeto ainda.
+
+                      <div className="mt-6 grid gap-4 md:grid-cols-3">
+                        <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Estado</p>
+                          <p className="mt-3 text-lg font-bold text-white">{isConnected ? "WhatsApp conectado" : isWaitingQr ? "Escaneie o QR" : "Aguardando conexao"}</p>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Ultima sincronizacao</p>
+                          <p className="mt-3 text-sm font-semibold text-white">
+                            {channel.sessionData?.lastSyncAt ? new Date(channel.sessionData.lastSyncAt).toLocaleString("pt-BR") : "nao sincronizada"}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Worker</p>
+                          <p className="mt-3 text-sm font-semibold text-white">{channel.sessionData?.worker || "whatsapp-service"}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={() => void handleConnectWhatsAppChannel(channel)}
+                          disabled={connectingWhatsAppChannelId === channel.id}
+                          className="rounded-2xl bg-gradient-to-r from-emerald-500 to-green-400 px-5 py-3 text-sm font-bold text-slate-950 disabled:opacity-60"
+                        >
+                          {connectingWhatsAppChannelId === channel.id ? "Conectando..." : isConnected ? "Reconectar WhatsApp" : "Conectar e gerar QR"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDisconnectWhatsAppChannel(channel)}
+                          disabled={disconnectingWhatsAppChannelId === channel.id}
+                          className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-5 py-3 text-sm font-bold text-rose-100 disabled:opacity-60"
+                        >
+                          {disconnectingWhatsAppChannelId === channel.id ? "Desconectando..." : "Desconectar"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleEditWhatsAppChannel(channel)}
+                          className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-slate-200"
+                        >
+                          Editar numero
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void refreshWhatsAppRuntime(channel.id)}
+                          className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-slate-200"
+                        >
+                          Atualizar
+                        </button>
+                      </div>
+
+                      {channel.sessionData?.notes ? (
+                        <div className="mt-5 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                          {channel.sessionData.notes}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded-[28px] border border-white/10 bg-slate-950/55 p-5">
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{isConnected ? "Status da conexao" : "QR Code para escanear"}</p>
+                      {isConnected ? (
+                        <div className="mt-4 rounded-[24px] border border-emerald-500/20 bg-emerald-500/10 px-5 py-8 text-center">
+                          <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300">
+                            <CheckCircle2 size={42} />
+                          </div>
+                          <h5 className="mt-5 text-2xl font-black text-white">WhatsApp conectado</h5>
+                          <p className="mt-2 text-sm text-emerald-50/80">Nao e necessario escanear novamente enquanto a sessao permanecer ativa.</p>
+                        </div>
+                      ) : qrImage ? (
+                        <div className="mt-4 rounded-[24px] border border-cyan-500/20 bg-cyan-500/[0.07] p-4">
+                          <img src={qrImage} alt={`QR do canal ${channel.numero}`} className="mx-auto w-full max-w-[300px] rounded-2xl bg-white p-4 shadow-2xl shadow-cyan-950/40" />
+                          <p className="mt-4 text-center text-sm font-semibold text-white">Abra o WhatsApp no celular e escaneie este QR.</p>
+                          <p className="mt-1 text-center text-xs text-slate-400">Se o codigo expirar, clique em “Conectar e gerar QR”.</p>
+                        </div>
+                      ) : (
+                        <div className="mt-4 rounded-[24px] border border-dashed border-white/10 bg-slate-950/40 px-5 py-12 text-center">
+                          <p className="text-lg font-bold text-white">QR ainda nao disponivel</p>
+                          <p className="mt-2 text-sm text-slate-400">Clique em “Conectar e gerar QR” para iniciar a sessao deste numero.</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
+                );
+              })() : (
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr),360px]">
+                  <div className="rounded-[28px] border border-dashed border-cyan-500/20 bg-slate-950/30 p-8">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Primeiro passo</p>
+                    <h4 className="mt-3 text-3xl font-black text-white">Crie o numero que vai atender no WhatsApp</h4>
+                    <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+                      Assim que o canal for criado, esta area passa a mostrar o QR bem grande para escanear ou o estado “WhatsApp conectado”.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-5">
+                    <h4 className="text-base font-bold text-white">Novo canal</h4>
+                    <p className="mt-1 text-sm text-slate-400">Cadastre o numero e vincule o agente que vai responder nesse canal.</p>
+                    <div className="mt-5 space-y-4">
+                      <div>
+                        <FormLabel>Numero</FormLabel>
+                        <input
+                          value={whatsAppChannelForm.numero}
+                          onChange={(event) =>
+                            setWhatsAppChannelForm((prev) => ({
+                              ...prev,
+                              numero: formatWhatsAppPhone(event.target.value),
+                            }))
+                          }
+                          placeholder="+55 11 99999-9999"
+                          className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
+                        />
+                      </div>
+                      <div>
+                        <FormLabel>Agente</FormLabel>
+                        <select
+                          value={whatsAppChannelForm.agenteId ?? ""}
+                          onChange={(event) =>
+                            setWhatsAppChannelForm((prev) => ({
+                              ...prev,
+                              agenteId: event.target.value || null,
+                            }))
+                          }
+                          className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
+                        >
+                          <option value="">Agente ativo do projeto</option>
+                          {data.agentes.map((agente) => (
+                            <option key={agente.id} value={agente.id}>
+                              {agente.nome}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => void handleSaveWhatsAppChannel()}
+                        disabled={savingWhatsAppChannel}
+                        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3 font-semibold text-slate-950 disabled:opacity-60"
+                      >
+                        <Plus size={16} />
+                        {savingWhatsAppChannel ? "Salvando..." : "Criar canal"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {primaryWhatsAppChannel ? (
+                <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Configuracao do canal</p>
+                      <h4 className="mt-2 text-lg font-bold text-white">{whatsAppChannelForm.id ? "Editar canal atual" : "Atualizar cadastro"}</h4>
+                    </div>
+                    {data.whatsappChannels.length > 1 ? (
+                      <p className="text-xs text-amber-100/80">Existem {data.whatsappChannels.length} canais cadastrados. A interface esta priorizando o primeiro.</p>
+                    ) : null}
+                  </div>
+                  <div className="mt-5 grid gap-4 md:grid-cols-3">
+                    <div>
+                      <FormLabel>Numero</FormLabel>
+                      <input
+                        value={whatsAppChannelForm.numero}
+                        onChange={(event) =>
+                          setWhatsAppChannelForm((prev) => ({
+                            ...prev,
+                            numero: formatWhatsAppPhone(event.target.value),
+                          }))
+                        }
+                        placeholder="+55 11 99999-9999"
+                        className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
+                      />
+                    </div>
+                    <div>
+                      <FormLabel>Agente</FormLabel>
+                      <select
+                        value={whatsAppChannelForm.agenteId ?? ""}
+                        onChange={(event) =>
+                          setWhatsAppChannelForm((prev) => ({
+                            ...prev,
+                            agenteId: event.target.value || null,
+                          }))
+                        }
+                        className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
+                      >
+                        <option value="">Agente ativo do projeto</option>
+                        {data.agentes.map((agente) => (
+                          <option key={agente.id} value={agente.id}>
+                            {agente.nome}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <FormLabel>Status</FormLabel>
+                      <select
+                        value={whatsAppChannelForm.status}
+                        onChange={(event) =>
+                          setWhatsAppChannelForm((prev) => ({
+                            ...prev,
+                            status: event.target.value === "inativo" ? "inativo" : "ativo",
+                          }))
+                        }
+                        className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-400/50"
+                      >
+                        <option value="ativo">ativo</option>
+                        <option value="inativo">inativo</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveWhatsAppChannel()}
+                      disabled={savingWhatsAppChannel}
+                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3 font-semibold text-slate-950 disabled:opacity-60"
+                    >
+                      <Plus size={16} />
+                      {savingWhatsAppChannel ? "Salvando..." : whatsAppChannelForm.id ? "Salvar alteracoes" : "Salvar canal"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={resetWhatsAppChannelForm}
+                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200"
+                    >
+                      Limpar
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </section>
 
@@ -3751,6 +3855,8 @@ export default function AdminProjetoDetalhePage() {
                   const hasWhatsapp = Boolean(sanitizePhoneDigits(widget.whatsappCelular));
                   const whatsappSnippetKey = `whatsapp:${widget.slug}`;
                   const widgetSnippetKey = `widget:${widget.slug}`;
+                  const widgetSnippetExpanded = expandedSnippetKeys[widgetSnippetKey] === true;
+                  const whatsappSnippetExpanded = expandedSnippetKeys[whatsappSnippetKey] === true;
 
                   return (
                     <div key={`whatsapp-${widget.id ?? widget.slug}`} className="rounded-xl border border-white/10 bg-slate-950/30 p-5">
@@ -3789,6 +3895,14 @@ export default function AdminProjetoDetalhePage() {
                                   </a>
                                   <button
                                     type="button"
+                                    onClick={() => toggleSnippetExpanded(widgetSnippetKey)}
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                                  >
+                                    {widgetSnippetExpanded ? <Minimize2 size={13} /> : <Expand size={13} />}
+                                    {widgetSnippetExpanded ? "Recolher" : "Expandir"}
+                                  </button>
+                                  <button
+                                    type="button"
                                     onClick={() => void handleCopySnippet(widgetSnippetKey, buildWidgetSnippet(widget))}
                                     className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
                                   >
@@ -3797,15 +3911,21 @@ export default function AdminProjetoDetalhePage() {
                                   </button>
                                 </div>
                               </div>
-                              <div className="w-full overflow-x-auto rounded-lg border border-white/10 bg-[#07111f]">
-                                <pre className="min-h-[170px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
-                                  {buildWidgetSnippet(widget)
-                                    .split("\n")
-                                    .map((line, index) => (
-                                      <div key={`${widget.slug}-widget-line-${index}`}>{renderSnippetLine(line)}</div>
-                                    ))}
-                                </pre>
-                              </div>
+                              {widgetSnippetExpanded ? (
+                                <div className="w-full overflow-x-auto rounded-lg border border-white/10 bg-[#07111f]">
+                                  <pre className="min-h-[170px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
+                                    {buildWidgetSnippet(widget)
+                                      .split("\n")
+                                      .map((line, index) => (
+                                        <div key={`${widget.slug}-widget-line-${index}`}>{renderSnippetLine(line)}</div>
+                                      ))}
+                                  </pre>
+                                </div>
+                              ) : (
+                                <div className="rounded-lg border border-dashed border-white/10 bg-slate-950/40 px-4 py-4 text-xs text-slate-400">
+                                  Codigo do widget oculto para manter a tela compacta. Clique em "Expandir" para visualizar.
+                                </div>
+                              )}
                             </div>
 
                             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -3814,6 +3934,14 @@ export default function AdminProjetoDetalhePage() {
                                 <p className="mt-1 text-xs text-slate-400">Cole antes do fechamento de `&lt;/body&gt;` no site do cliente.</p>
                               </div>
                               <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleSnippetExpanded(whatsappSnippetKey)}
+                                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                                >
+                                  {whatsappSnippetExpanded ? <Minimize2 size={13} /> : <Expand size={13} />}
+                                  {whatsappSnippetExpanded ? "Recolher" : "Expandir"}
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => void handleCopySnippet(whatsappSnippetKey, buildWhatsappSnippet(widget))}
@@ -3831,15 +3959,21 @@ export default function AdminProjetoDetalhePage() {
                                 </button>
                               </div>
                             </div>
-                            <div className="w-full overflow-x-auto rounded-lg border border-white/10 bg-[#07111f]">
-                              <pre className="min-h-[170px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
-                                {buildWhatsappSnippet(widget)
-                                  .split("\n")
-                                  .map((line, index) => (
-                                    <div key={`${widget.slug}-whatsapp-line-${index}`}>{renderSnippetLine(line)}</div>
-                                  ))}
-                              </pre>
-                            </div>
+                            {whatsappSnippetExpanded ? (
+                              <div className="w-full overflow-x-auto rounded-lg border border-white/10 bg-[#07111f]">
+                                <pre className="min-h-[170px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
+                                  {buildWhatsappSnippet(widget)
+                                    .split("\n")
+                                    .map((line, index) => (
+                                      <div key={`${widget.slug}-whatsapp-line-${index}`}>{renderSnippetLine(line)}</div>
+                                    ))}
+                                </pre>
+                              </div>
+                            ) : (
+                              <div className="rounded-lg border border-dashed border-white/10 bg-slate-950/40 px-4 py-4 text-xs text-slate-400">
+                                Codigo JS oculto para manter a tela compacta. Clique em "Expandir" para visualizar.
+                              </div>
+                            )}
                             {!hasWhatsapp ? (
                               <p className="mt-3 text-xs text-amber-200/80">Preencha um numero de WhatsApp para gerar o link final com o telefone correto.</p>
                             ) : null}
