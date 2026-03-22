@@ -5,7 +5,7 @@ import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetByProjetoAgente, getChatWidgetBy
 import { appendMessage, createChat, findActiveChatByChannel, getChatById, getChatContext, listChatMessages, type ChatChannelKind, updateChatContext, updateChatStats } from "@/lib/chats";
 import { estimateOpenAICostUsd } from "@/lib/openai-pricing";
 import { getProjetoById, getProjetoByIdentifier } from "@/lib/projetos";
-import { getPreferredWhatsAppChannel, updateWhatsAppChannelSession } from "@/lib/whatsapp-channels";
+import { getPreferredWhatsAppChannel, getWhatsAppChannelById, updateWhatsAppChannelSession } from "@/lib/whatsapp-channels";
 
 export type ChatRequestBody = {
   chatId?: string;
@@ -153,15 +153,45 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
   }
 
   const channelKind = normalizeChannelKind(body);
+  let effectiveBody = body;
+
+  if (channelKind === "whatsapp" && body.whatsappChannelId) {
+    const officialChannel = await getWhatsAppChannelById(body.whatsappChannelId);
+
+    if (!officialChannel || !officialChannel.projetoId) {
+      throw new Error("Canal WhatsApp nao encontrado.");
+    }
+
+    if (officialChannel.status !== "ativo") {
+      throw new Error("Canal WhatsApp inativo.");
+    }
+
+    effectiveBody = {
+      ...body,
+      projeto: officialChannel.projetoId,
+      agente: officialChannel.agenteId ?? undefined,
+      context: mergeContext(
+        isPlainObject(body.context) ? body.context : {},
+        {
+          whatsapp: {
+            ...(isPlainObject(body.context?.whatsapp) ? body.context.whatsapp : {}),
+            channelId: officialChannel.id,
+            numeroCanal: officialChannel.numero,
+          },
+        },
+      ),
+    };
+  }
+
   const normalizedExternalIdentifier =
     channelKind === "whatsapp"
-      ? sanitizePhone(body.identificadorExterno ?? body.identificador)
-      : body.identificadorExterno?.trim() || body.identificador?.trim() || null;
-  let chat = body.chatId ? await getChatById(body.chatId) : null;
+      ? sanitizePhone(effectiveBody.identificadorExterno ?? effectiveBody.identificador)
+      : effectiveBody.identificadorExterno?.trim() || effectiveBody.identificador?.trim() || null;
+  let chat = effectiveBody.chatId ? await getChatById(effectiveBody.chatId) : null;
 
   if (!chat) {
     const resolved = await resolveChatChannel({
-      ...body,
+      ...effectiveBody,
       canal: channelKind,
       identificadorExterno: normalizedExternalIdentifier,
     });
@@ -180,8 +210,8 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     }
 
     if (!chat) {
-      const extraContext = isPlainObject(body.context) ? body.context : null;
-      const source = body.source?.trim() || (channelKind === "whatsapp" ? "whatsapp_bridge" : "site_widget");
+      const extraContext = isPlainObject(effectiveBody.context) ? effectiveBody.context : null;
+      const source = effectiveBody.source?.trim() || (channelKind === "whatsapp" ? "whatsapp_bridge" : "site_widget");
       const baseContext = {
         source,
         canal: channelKind,
@@ -195,12 +225,12 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
           : null,
         projeto: {
           id: resolved.projeto?.id ?? null,
-          slug: resolved.projeto?.slug ?? body.projeto?.trim() ?? null,
+          slug: resolved.projeto?.slug ?? effectiveBody.projeto?.trim() ?? null,
           nome: resolved.projeto?.nome ?? null,
         },
         agente: {
           id: resolved.agente?.id ?? null,
-          slug: resolved.agente?.slug ?? body.agente?.trim() ?? null,
+          slug: resolved.agente?.slug ?? effectiveBody.agente?.trim() ?? null,
           nome: resolved.agente?.nome ?? null,
         },
         sdk: {
@@ -235,7 +265,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     canal: channelKind,
     identificadorExterno: normalizedExternalIdentifier,
     metadata: {
-      source: body.source?.trim() || (channelKind === "whatsapp" ? "whatsapp_bridge" : "site_widget"),
+      source: effectiveBody.source?.trim() || (channelKind === "whatsapp" ? "whatsapp_bridge" : "site_widget"),
     },
   });
 
@@ -245,7 +275,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
 
   const history = await listChatMessages(chat.id);
   const currentContext = getChatContext(chat) as Record<string, unknown>;
-  const extraContext = isPlainObject(body.context) ? body.context : null;
+  const extraContext = isPlainObject(effectiveBody.context) ? effectiveBody.context : null;
   const mergedCurrentContext = mergeContext(currentContext, extraContext);
   const enrichedContext = enrichLeadContext(
     mergedCurrentContext,

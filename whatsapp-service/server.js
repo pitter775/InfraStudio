@@ -15,6 +15,10 @@ fs.mkdirSync(AUTH_DIR, { recursive: true });
 
 const sessions = new Map();
 
+function hasOwn(obj, key) {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
 function getAuthSessionDir(channelId) {
   return path.join(AUTH_DIR, `session-${channelId}`);
 }
@@ -124,6 +128,7 @@ async function forwardMessageToBackend(state, msg) {
       projeto: state.projetoId,
       agente: state.agenteId || undefined,
       canal: "whatsapp",
+      whatsappChannelId: state.channelId,
       identificadorExterno: msg.from,
       identificador: msg.from,
       context: {
@@ -262,9 +267,9 @@ async function startSession(config) {
 
   const existing = sessions.get(config.channelId);
   if (existing && existing.client) {
-    existing.projetoId = config.projetoId || existing.projetoId || null;
-    existing.agenteId = config.agenteId || existing.agenteId || null;
-    existing.numero = config.numero || existing.numero || null;
+    existing.projetoId = hasOwn(config, "projetoId") ? config.projetoId || null : existing.projetoId || null;
+    existing.agenteId = hasOwn(config, "agenteId") ? config.agenteId || null : existing.agenteId || null;
+    existing.numero = hasOwn(config, "numero") ? config.numero || null : existing.numero || null;
     upsertStoredChannel({
       channelId: config.channelId,
       projetoId: existing.projetoId,
@@ -289,9 +294,9 @@ async function startSession(config) {
     client: null,
   };
 
-  state.projetoId = config.projetoId || state.projetoId || null;
-  state.agenteId = config.agenteId || state.agenteId || null;
-  state.numero = config.numero || state.numero || null;
+  state.projetoId = hasOwn(config, "projetoId") ? config.projetoId || null : state.projetoId || null;
+  state.agenteId = hasOwn(config, "agenteId") ? config.agenteId || null : state.agenteId || null;
+  state.numero = hasOwn(config, "numero") ? config.numero || null : state.numero || null;
   sessions.set(config.channelId, state);
 
   upsertStoredChannel({
