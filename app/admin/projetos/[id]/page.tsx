@@ -127,10 +127,27 @@ type ChatWidget = {
   ativo: boolean;
 };
 
+type Connector = {
+  id?: string;
+  nome: string;
+  tipo: "mercado_livre";
+  projetoId: string | null;
+  agenteId: string | null;
+  endpointBase: string;
+  configuracoes: {
+    seller_id?: string;
+    nickname?: string;
+  } | null;
+  ativo: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 type ProjetoDetalhe = {
   projeto: Projeto;
   agentes: Agente[];
   apis: Api[];
+  conectores: Connector[];
   widgets: ChatWidget[];
   whatsappChannels: WhatsAppChannel[];
   chats: Chat[];
@@ -138,6 +155,7 @@ type ProjetoDetalhe = {
     totalAgentes: number;
     agenteAtivoId: string | null;
     totalApis: number;
+    totalConectores: number;
     totalWidgets: number;
     totalWhatsAppChannels: number;
     totalChats: number;
@@ -146,6 +164,18 @@ type ProjetoDetalhe = {
 
 type WidgetFormState = ChatWidget & {
   id?: string;
+};
+
+type ConnectorFormState = {
+  id?: string;
+  nome: string;
+  tipo: "mercado_livre";
+  projetoId: string;
+  agenteId: string | null;
+  endpointBase: string;
+  sellerId: string;
+  nickname: string;
+  ativo: boolean;
 };
 
 type ChatDetailState = {
@@ -253,6 +283,50 @@ function formatFileSize(value: number) {
   }
 
   return `${value} B`;
+}
+
+function formatDateTimeLabel(value: string | null | undefined) {
+  if (!value) {
+    return "nao registrado";
+  }
+
+  return new Date(value).toLocaleString("pt-BR");
+}
+
+function getChatLeadName(chat: Chat) {
+  const lead = chat.contexto?.lead as { nome?: string | null } | undefined;
+  return lead?.nome?.trim() || "Nao identificado";
+}
+
+function getChatObjective(chat: Chat) {
+  const qualification = chat.contexto?.qualificacao as { objetivo?: string | null } | undefined;
+  return qualification?.objetivo?.trim() || "Objetivo nao identificado";
+}
+
+function getChatSummary(chat: Chat) {
+  const memory = chat.contexto?.memoria as { resumo?: string | null } | undefined;
+  return memory?.resumo?.trim() || null;
+}
+
+function getChatPriorityScore(chat: Chat) {
+  const lead = chat.contexto?.lead as { identificado?: boolean } | undefined;
+  const qualification = chat.contexto?.qualificacao as { pronto_para_whatsapp?: boolean } | undefined;
+  let score = 0;
+
+  if (chat.canal === "whatsapp") score += 4;
+  if (lead?.identificado) score += 3;
+  if (qualification?.pronto_para_whatsapp) score += 2;
+  if (chat.totalTokens > 0) score += 1;
+
+  return score;
+}
+
+function getChatChannelLabel(chat: Chat) {
+  return chat.canal === "whatsapp" ? "WhatsApp" : "Site";
+}
+
+function getChatChannelTone(chat: Chat) {
+  return chat.canal === "whatsapp" ? "bg-emerald-500/10 text-emerald-200" : "bg-cyan-500/10 text-cyan-100";
 }
 
 function normalizeAgentText(value: string) {
@@ -1086,7 +1160,7 @@ type ApiCampoTreeDraftNode = {
   children: Map<string, ApiCampoTreeDraftNode>;
 };
 
-type ProjectTab = "agentes" | "apis" | "whatsapp" | "chats";
+type ProjectTab = "agentes" | "apis" | "conectores" | "whatsapp" | "chats";
 
 const defaultConfiguracoes = {
   objetivo: "Qualificar leads e operar o atendimento do projeto com contexto de negocio.",
@@ -1130,6 +1204,17 @@ const emptyWidgetForm: WidgetFormState = {
   tema: "dark",
   corPrimaria: "#2563eb",
   fundoTransparente: true,
+  ativo: true,
+};
+
+const emptyConnectorForm: ConnectorFormState = {
+  nome: "",
+  tipo: "mercado_livre",
+  projetoId: "",
+  agenteId: null,
+  endpointBase: "https://api.mercadolibre.com",
+  sellerId: "",
+  nickname: "",
   ativo: true,
 };
 
@@ -2270,6 +2355,131 @@ function WidgetModal({
   );
 }
 
+function ConnectorModal({
+  open,
+  form,
+  agentes,
+  saving,
+  feedback,
+  onClose,
+  onChange,
+  onSubmit,
+}: {
+  open: boolean;
+  form: ConnectorFormState;
+  agentes: Agente[];
+  saving: boolean;
+  feedback: string | null;
+  onClose: () => void;
+  onChange: (next: Partial<ConnectorFormState>) => void;
+  onSubmit: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Conector</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar conector" : "Novo conector"}</h2>
+            <p className="mt-1 text-sm text-slate-400">Use este cadastro para o agente buscar produtos no Mercado Livre sem expor a resposta bruta da API.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Fechar modal"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="max-h-[calc(92vh-88px)] overflow-y-auto p-6">
+          <div className="space-y-4">
+            <div>
+              <FormLabel>Nome</FormLabel>
+              <input
+                value={form.nome}
+                onChange={(event) => onChange({ nome: event.target.value })}
+                placeholder="Loja Mercado Livre"
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+              />
+            </div>
+            <div>
+              <FormLabel>Tipo</FormLabel>
+              <select
+                value={form.tipo}
+                onChange={(event) => onChange({ tipo: event.target.value === "mercado_livre" ? "mercado_livre" : "mercado_livre" })}
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
+              >
+                <option value="mercado_livre">mercado_livre</option>
+              </select>
+            </div>
+            <div>
+              <FormLabel>Agente</FormLabel>
+              <select
+                value={form.agenteId ?? ""}
+                onChange={(event) => onChange({ agenteId: event.target.value || null })}
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
+              >
+                <option value="">Selecione um agente</option>
+                {agentes.map((agente) => (
+                  <option key={agente.id} value={agente.id}>
+                    {agente.nome}
+                    {agente.ativo ? " (ativo)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <FormLabel>Seller ID</FormLabel>
+              <input
+                value={form.sellerId}
+                onChange={(event) => onChange({ sellerId: event.target.value })}
+                placeholder="123456789"
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+              />
+            </div>
+            <div>
+              <FormLabel>Nickname opcional</FormLabel>
+              <input
+                value={form.nickname}
+                onChange={(event) => onChange({ nickname: event.target.value })}
+                placeholder="minha_loja"
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+              />
+            </div>
+            <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
+              <input type="checkbox" checked={form.ativo} onChange={(event) => onChange({ ativo: event.target.checked })} />
+              Conector ativo
+            </label>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onSubmit}
+                disabled={saving}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
+              >
+                {form.id ? <Pencil size={16} /> : <Plus size={16} />}
+                {saving ? "Salvando..." : form.id ? "Atualizar conector" : "Criar conector"}
+              </button>
+              <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
+                Cancelar
+              </button>
+            </div>
+
+            {feedback ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</div> : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function WhatsAppChannelModal({
   open,
   form,
@@ -2453,12 +2663,14 @@ export default function AdminProjetoDetalhePage() {
   const [data, setData] = useState<ProjetoDetalhe | null>(null);
   const [agenteForm, setAgenteForm] = useState<AgenteFormState>(emptyAgenteForm);
   const [apiForm, setApiForm] = useState<ApiFormState>(emptyApiForm);
+  const [connectorForm, setConnectorForm] = useState<ConnectorFormState>(emptyConnectorForm);
   const [widgetForm, setWidgetForm] = useState<WidgetFormState>(emptyWidgetForm);
   const [whatsAppChannelForm, setWhatsAppChannelForm] = useState<WhatsAppChannelFormState>(emptyWhatsAppChannelForm);
   const [detectedApiCampos, setDetectedApiCampos] = useState<ApiCampo[]>([]);
   const [apiTestParameterValues, setApiTestParameterValues] = useState<Record<string, string>>({});
   const [savingAgente, setSavingAgente] = useState(false);
   const [savingApi, setSavingApi] = useState(false);
+  const [savingConnector, setSavingConnector] = useState(false);
   const [savingWidget, setSavingWidget] = useState(false);
   const [savingWhatsAppChannel, setSavingWhatsAppChannel] = useState(false);
   const [connectingWhatsAppChannelId, setConnectingWhatsAppChannelId] = useState<string | null>(null);
@@ -2466,16 +2678,21 @@ export default function AdminProjetoDetalhePage() {
   const [testingApi, setTestingApi] = useState(false);
   const [feedbackAgente, setFeedbackAgente] = useState<string | null>(null);
   const [feedbackApi, setFeedbackApi] = useState<string | null>(null);
+  const [feedbackConnector, setFeedbackConnector] = useState<string | null>(null);
   const [feedbackWidget, setFeedbackWidget] = useState<string | null>(null);
   const [feedbackWhatsApp, setFeedbackWhatsApp] = useState<string | null>(null);
   const [agenteModalOpen, setAgenteModalOpen] = useState(false);
   const [apiModalOpen, setApiModalOpen] = useState(false);
+  const [connectorModalOpen, setConnectorModalOpen] = useState(false);
   const [widgetModalOpen, setWidgetModalOpen] = useState(false);
   const [whatsAppChannelModalOpen, setWhatsAppChannelModalOpen] = useState(false);
   const [chatHistoryOpen, setChatHistoryOpen] = useState(false);
   const [chatHistoryLoading, setChatHistoryLoading] = useState(false);
   const [chatHistoryError, setChatHistoryError] = useState<string | null>(null);
   const [chatDetail, setChatDetail] = useState<ChatDetailState | null>(null);
+  const [chatChannelFilter, setChatChannelFilter] = useState<"todos" | "web" | "whatsapp">("todos");
+  const [chatSortMode, setChatSortMode] = useState<"prioridade" | "recentes" | "tokens">("prioridade");
+  const [chatPage, setChatPage] = useState(1);
   const [pendingAgenteArquivos, setPendingAgenteArquivos] = useState<PendingAgenteArquivo[]>([]);
   const [origin, setOrigin] = useState("");
   const [copiedSnippetKey, setCopiedSnippetKey] = useState<string | null>(null);
@@ -2539,6 +2756,14 @@ export default function AdminProjetoDetalhePage() {
     setFeedbackApi(null);
   };
 
+  const resetConnectorForm = () => {
+    setConnectorForm({
+      ...emptyConnectorForm,
+      projetoId: params.id,
+    });
+    setFeedbackConnector(null);
+  };
+
   const resetWidgetForm = () => {
     setWidgetForm({
       ...emptyWidgetForm,
@@ -2565,6 +2790,11 @@ export default function AdminProjetoDetalhePage() {
   const openNewApiModal = () => {
     resetApiForm();
     setApiModalOpen(true);
+  };
+
+  const openNewConnectorModal = () => {
+    resetConnectorForm();
+    setConnectorModalOpen(true);
   };
 
   const openNewWidgetModal = () => {
@@ -3048,6 +3278,45 @@ export default function AdminProjetoDetalhePage() {
     setFeedbackWidget(message);
   };
 
+  const handleConnectorSubmit = async () => {
+    setSavingConnector(true);
+    setFeedbackConnector(null);
+
+    const response = await fetch("/api/admin/conectores", {
+      method: connectorForm.id ? "PUT" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id: connectorForm.id,
+        nome: connectorForm.nome,
+        tipo: connectorForm.tipo,
+        projetoId: params.id,
+        agenteId: connectorForm.agenteId,
+        endpointBase: connectorForm.endpointBase,
+        configuracoes: {
+          seller_id: connectorForm.sellerId.trim(),
+          nickname: connectorForm.nickname.trim() || undefined,
+        },
+        ativo: connectorForm.ativo,
+      }),
+    });
+
+    const payload = (await response.json()) as { error?: string };
+    if (!response.ok) {
+      setFeedbackConnector(payload.error ?? "Nao foi possivel salvar o conector.");
+      setSavingConnector(false);
+      return;
+    }
+
+    await loadProjeto();
+    const message = connectorForm.id ? "Conector atualizado com sucesso." : "Conector criado com sucesso.";
+    resetConnectorForm();
+    setSavingConnector(false);
+    setConnectorModalOpen(false);
+    setFeedbackConnector(message);
+  };
+
   const persistApiBeforeTest = async () => {
     const endpoint = apiForm.id ? `/api/apis/${apiForm.id}` : `/api/projetos/${params.id}/apis`;
     const method = apiForm.id ? "PUT" : "POST";
@@ -3203,6 +3472,22 @@ export default function AdminProjetoDetalhePage() {
     });
     setFeedbackWidget(null);
     setWidgetModalOpen(true);
+  };
+
+  const handleEditConnector = (connector: Connector) => {
+    setConnectorForm({
+      id: connector.id,
+      nome: connector.nome,
+      tipo: connector.tipo === "mercado_livre" ? "mercado_livre" : "mercado_livre",
+      projetoId: connector.projetoId ?? params.id,
+      agenteId: connector.agenteId,
+      endpointBase: connector.endpointBase || "https://api.mercadolibre.com",
+      sellerId: connector.configuracoes?.seller_id ?? "",
+      nickname: connector.configuracoes?.nickname ?? "",
+      ativo: connector.ativo,
+    });
+    setFeedbackConnector(null);
+    setConnectorModalOpen(true);
   };
 
   const handleEditWhatsAppChannel = (channel: WhatsAppChannel) => {
@@ -3444,6 +3729,39 @@ export default function AdminProjetoDetalhePage() {
 
   const agenteAtivo = data.agentes.find((agente) => agente.ativo) ?? null;
   const primaryWhatsAppChannel = data.whatsappChannels[0] ?? null;
+  const recentWhatsAppChats = data.chats
+    .filter((chat) => chat.canal === "whatsapp")
+    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
+    .slice(0, 3);
+  const identifiedChatsCount = data.chats.filter((chat) => {
+    const lead = chat.contexto?.lead as { identificado?: boolean } | undefined;
+    return Boolean(lead?.identificado);
+  }).length;
+  const whatsappChatsCount = data.chats.filter((chat) => chat.canal === "whatsapp").length;
+  const channelReadyChatsCount = data.chats.filter((chat) => {
+    const qualification = chat.contexto?.qualificacao as { pronto_para_whatsapp?: boolean } | undefined;
+    return Boolean(qualification?.pronto_para_whatsapp);
+  }).length;
+  const totalChatTokens = data.chats.reduce((sum, chat) => sum + (chat.totalTokens || 0), 0);
+  const filteredChats = data.chats.filter((chat) => chatChannelFilter === "todos" ? true : chat.canal === chatChannelFilter);
+  const sortedChats = [...filteredChats].sort((left, right) => {
+    if (chatSortMode === "tokens") {
+      return right.totalTokens - left.totalTokens || new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+    }
+
+    if (chatSortMode === "recentes") {
+      return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+    }
+
+    return (
+      getChatPriorityScore(right) - getChatPriorityScore(left) ||
+      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+    );
+  });
+  const chatsPerPage = 8;
+  const chatTotalPages = Math.max(1, Math.ceil(sortedChats.length / chatsPerPage));
+  const currentChatPage = Math.min(chatPage, chatTotalPages);
+  const paginatedChats = sortedChats.slice((currentChatPage - 1) * chatsPerPage, currentChatPage * chatsPerPage);
 
   return (
     <main className="space-y-6">
@@ -3454,7 +3772,7 @@ export default function AdminProjetoDetalhePage() {
         </div>
         <h1 className="text-4xl font-extrabold text-white">{data.projeto.nome}</h1>
         <p className="mt-3 max-w-3xl text-slate-400">{data.projeto.descricao || "Sem descricao cadastrada."}</p>
-        <div className="mt-6 grid gap-4 md:grid-cols-7">
+        <div className="mt-6 grid gap-4 md:grid-cols-8">
           <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Slug</p>
             <p className="mt-2 text-lg font-bold text-white">{data.projeto.slug ?? "sem-slug"}</p>
@@ -3466,6 +3784,10 @@ export default function AdminProjetoDetalhePage() {
           <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">APIs</p>
             <p className="mt-2 text-lg font-bold text-white">{data.stats.totalApis}</p>
+          </div>
+          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Conectores</p>
+            <p className="mt-2 text-lg font-bold text-white">{data.stats.totalConectores}</p>
           </div>
           <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Widgets</p>
@@ -3511,6 +3833,17 @@ export default function AdminProjetoDetalhePage() {
             </button>
             <button
               type="button"
+              onClick={() => setActiveTab("conectores")}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                activeTab === "conectores"
+                  ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
+                  : "border border-white/10 bg-white/5 text-white"
+              }`}
+            >
+              Conectores
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveTab("chats")}
               className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
                 activeTab === "chats"
@@ -3535,10 +3868,11 @@ export default function AdminProjetoDetalhePage() {
         </div>
       </section>
 
-      {(feedbackAgente || feedbackApi || feedbackWidget || feedbackWhatsApp) && (
+      {(feedbackAgente || feedbackApi || feedbackConnector || feedbackWidget || feedbackWhatsApp) && (
         <section className="grid gap-3">
           {feedbackAgente ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackAgente}</div> : null}
           {feedbackApi ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackApi}</div> : null}
+          {feedbackConnector ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackConnector}</div> : null}
           {feedbackWidget ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackWidget}</div> : null}
           {feedbackWhatsApp ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackWhatsApp}</div> : null}
         </section>
@@ -3673,6 +4007,50 @@ export default function AdminProjetoDetalhePage() {
           </div>
         </section>
 
+        <section className={`${activeTab === "conectores" ? "block" : "hidden"} overflow-hidden rounded-2xl border border-white/10 bg-white/5`}>
+          <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-white">Conectores do projeto</h3>
+              <p className="mt-1 text-sm text-slate-400">Cadastre fontes de produto por agente. O primeiro tipo disponivel e o `mercado_livre`.</p>
+            </div>
+            <button type="button" onClick={openNewConnectorModal} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
+              <Plus size={16} />
+              Novo conector
+            </button>
+          </div>
+          <div className="space-y-3 p-4">
+            {data.conectores.length ? (
+              data.conectores.map((connector) => {
+                const agente = connector.agenteId ? data.agentes.find((item) => item.id === connector.agenteId) ?? null : null;
+                return (
+                  <div key={connector.id} className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h4 className="text-base font-bold text-white">{connector.nome}</h4>
+                          <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200">{connector.tipo}</span>
+                          <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${connector.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
+                            {connector.ativo ? "ativo" : "inativo"}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-400">Agente: {agente?.nome ?? "nao vinculado"}</p>
+                        <p className="mt-1 text-sm text-slate-400">Seller ID: {connector.configuracoes?.seller_id ?? "nao informado"}</p>
+                        {connector.configuracoes?.nickname ? <p className="mt-1 text-sm text-slate-400">Nickname: {connector.configuracoes.nickname}</p> : null}
+                        <p className="mt-1 truncate text-xs text-cyan-200/80">{connector.endpointBase}</p>
+                      </div>
+                      <button type="button" onClick={() => handleEditConnector(connector)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200">
+                        Editar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhum conector cadastrado para este projeto ainda.</div>
+            )}
+          </div>
+        </section>
+
       </div>
 
       <section className={`${activeTab === "whatsapp" ? "block" : "hidden"}`}>
@@ -3688,7 +4066,7 @@ export default function AdminProjetoDetalhePage() {
                 <p className="mt-3 text-xs text-amber-200/90">Defina `NEXT_PUBLIC_WHATSAPP_SERVICE_URL` para habilitar a conexao e a leitura do QR.</p>
               ) : null}
             </div>
-            <div className="space-y-6 p-6">
+            <div className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1.35fr),minmax(340px,0.92fr)] xl:items-start">
               {primaryWhatsAppChannel ? (() => {
                 const channel = primaryWhatsAppChannel;
                 const agente = channel.agenteId ? data.agentes.find((item) => item.id === channel.agenteId) ?? null : agenteAtivo;
@@ -3698,7 +4076,7 @@ export default function AdminProjetoDetalhePage() {
                 const isWaitingQr = runtimeStatus === "aguardando_qr" && Boolean(qrImage);
 
                 return (
-                  <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr),380px]">
+                  <div className="grid gap-6 xl:col-start-1">
                     <div className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),rgba(8,47,73,0.14)_35%,rgba(2,6,23,0.9)_75%)] p-6">
                       <div className="flex flex-wrap items-start justify-between gap-4">
                         <div>
@@ -3794,7 +4172,7 @@ export default function AdminProjetoDetalhePage() {
                   </div>
                 );
               })() : (
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr),420px]">
+                <div className="grid gap-4 xl:col-span-2 xl:grid-cols-[minmax(0,1.15fr),420px]">
                   <div className="grid gap-4">
                     <div className="rounded-[28px] border border-dashed border-cyan-500/20 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),rgba(8,47,73,0.08)_35%,rgba(2,6,23,0.78)_75%)] p-7">
                       <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Primeiro passo</p>
@@ -3850,7 +4228,7 @@ export default function AdminProjetoDetalhePage() {
               )}
 
               {primaryWhatsAppChannel ? (
-                <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-5">
+                <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-5 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:sticky xl:top-6">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Configuracao do canal</p>
@@ -3878,6 +4256,48 @@ export default function AdminProjetoDetalhePage() {
                       <p className="mt-2 text-base font-bold text-white">{primaryWhatsAppChannel.status}</p>
                     </div>
                   </div>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div className="rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Atividade do canal</p>
+                      <div className="mt-3 space-y-3 text-sm text-slate-300">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Ultima mensagem recebida</p>
+                          <p className="mt-1 font-semibold text-white">{formatDateTimeLabel(primaryWhatsAppChannel.sessionData?.lastInboundAt)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Ultima resposta enviada</p>
+                          <p className="mt-1 font-semibold text-white">{formatDateTimeLabel(primaryWhatsAppChannel.sessionData?.lastOutboundAt)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Numero bruto</p>
+                          <p className="mt-1 font-mono text-sm text-cyan-100">{primaryWhatsAppChannel.numero}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Ultimas conversas</p>
+                      {recentWhatsAppChats.length ? (
+                        <div className="mt-3 space-y-3">
+                          {recentWhatsAppChats.map((chat) => (
+                            <button
+                              key={chat.id}
+                              type="button"
+                              onClick={() => void handleOpenChatHistory(chat)}
+                              className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-3 text-left transition-colors hover:border-cyan-400/20 hover:bg-slate-900/80"
+                            >
+                              <p className="truncate text-sm font-semibold text-white">{chat.titulo || chat.identificadorExterno || "Conversa WhatsApp"}</p>
+                              <p className="mt-1 text-xs text-slate-400">{chat.identificadorExterno || "sem identificador"}</p>
+                              <p className="mt-1 text-[11px] text-slate-500">{new Date(chat.updatedAt).toLocaleString("pt-BR")}</p>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mt-3 rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-6 text-sm text-slate-400">
+                          As conversas do WhatsApp vao aparecer aqui conforme o canal receber mensagens.
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <div className="mt-5 flex flex-wrap gap-3">
                     <button
                       type="button"
@@ -3902,15 +4322,19 @@ export default function AdminProjetoDetalhePage() {
           </section>
 
           <section className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),auto] lg:items-center">
-              <div>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">Modo free com JS</p>
                 <h3 className="mt-2 text-xl font-bold text-white">Canal rapido de WhatsApp sem API oficial</h3>
                 <p className="mt-2 max-w-3xl text-sm text-emerald-50/80">
                   Esta aba entrega um botao flutuante em JavaScript puro para qualquer site. E o caminho mais leve para abrir conversa no WhatsApp sem depender de integracao paga.
                 </p>
               </div>
-              <button type="button" onClick={openNewWidgetModal} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 px-4 py-3 font-semibold text-slate-950">
+              <button
+                type="button"
+                onClick={openNewWidgetModal}
+                className="inline-flex w-full items-center justify-center gap-2 self-start rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 px-4 py-3 font-semibold text-slate-950 lg:w-auto lg:shrink-0"
+              >
                 <Plus size={16} />
                 Novo canal WhatsApp
               </button>
@@ -4073,30 +4497,174 @@ export default function AdminProjetoDetalhePage() {
             <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h3 className="text-xl font-bold text-white">Conversas do projeto</h3>
-                <p className="mt-1 text-sm text-slate-400">Historico recente dos chats para auditoria, contexto e acompanhamento comercial.</p>
+                <p className="mt-1 text-sm text-slate-400">Historico recente dos chats do site e dos sistemas para auditoria, contexto e acompanhamento comercial.</p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {data.widgets[0] ? (
+                  <button
+                    type="button"
+                    onClick={() => handleEditWidget(data.widgets[0])}
+                    className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                  >
+                    <Pencil size={16} />
+                    Editar widget do site
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={openNewWidgetModal}
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
+                >
+                  <Plus size={16} />
+                  Criar widget do site
+                </button>
               </div>
             </div>
             <div className="space-y-4 p-6">
+              <div className="grid gap-4 xl:grid-cols-4">
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-200">Potencial comercial</p>
+                  <p className="mt-2 text-2xl font-black text-white">{channelReadyChatsCount}</p>
+                  <p className="mt-2 text-xs text-emerald-50/80">Conversas que ja alcançaram sinal de continuidade comercial.</p>
+                </div>
+                <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-100">Leads identificados</p>
+                  <p className="mt-2 text-2xl font-black text-white">{identifiedChatsCount}</p>
+                  <p className="mt-2 text-xs text-cyan-50/80">Conversas com nome e contato reconhecidos no contexto.</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-slate-950/40 px-4 py-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">WhatsApp</p>
+                  <p className="mt-2 text-2xl font-black text-white">{whatsappChatsCount}</p>
+                  <p className="mt-2 text-xs text-slate-400">Quantidade de conversas que chegaram pelo canal WhatsApp.</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-slate-950/40 px-4 py-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Tokens totais</p>
+                  <p className="mt-2 text-2xl font-black text-white">{totalChatTokens}</p>
+                  <p className="mt-2 text-xs text-slate-400">Uso acumulado para medir profundidade de atendimento.</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-slate-950/30 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { key: "todos", label: "Todos" },
+                    { key: "web", label: "Site" },
+                    { key: "whatsapp", label: "WhatsApp" },
+                  ].map((filter) => (
+                    <button
+                      key={filter.key}
+                      type="button"
+                      onClick={() => {
+                        setChatChannelFilter(filter.key as typeof chatChannelFilter);
+                        setChatPage(1);
+                      }}
+                      className={`rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] transition-colors ${
+                        chatChannelFilter === filter.key ? "bg-cyan-500/15 text-cyan-100" : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { key: "prioridade", label: "Prioridade" },
+                    { key: "recentes", label: "Mais recentes" },
+                    { key: "tokens", label: "Mais profundos" },
+                  ].map((sort) => (
+                    <button
+                      key={sort.key}
+                      type="button"
+                      onClick={() => {
+                        setChatSortMode(sort.key as typeof chatSortMode);
+                        setChatPage(1);
+                      }}
+                      className={`rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] transition-colors ${
+                        chatSortMode === sort.key ? "bg-emerald-500/15 text-emerald-200" : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      {sort.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {data.chats.length ? (
-                data.chats.slice(0, 12).map((chat) => (
+                paginatedChats.map((chat) => (
                   <button
                     key={chat.id}
                     type="button"
                     onClick={() => void handleOpenChatHistory(chat)}
                     className="block w-full rounded-xl border border-white/10 bg-slate-950/30 p-4 text-left transition-colors hover:border-cyan-500/30 hover:bg-slate-950/50"
                   >
-                    <div className="flex items-center gap-2 text-cyan-200">
-                      <MessageSquare size={14} />
-                      <p className="font-semibold text-white">{chat.titulo}</p>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 text-cyan-200">
+                          <MessageSquare size={14} />
+                          <p className="truncate font-semibold text-white">{chat.titulo}</p>
+                          <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(chat)}`}>
+                            {getChatChannelLabel(chat)}
+                          </span>
+                          {getChatPriorityScore(chat) >= 5 ? (
+                            <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-200">
+                              potencial
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 text-xs text-slate-500">{new Date(chat.updatedAt).toLocaleString("pt-BR")}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Score comercial</p>
+                        <p className="mt-1 text-lg font-black text-white">{getChatPriorityScore(chat)}</p>
+                      </div>
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">{new Date(chat.updatedAt).toLocaleString("pt-BR")}</p>
-                    <p className="mt-2 text-xs text-slate-400">Lead: {String((chat.contexto?.lead as { nome?: string } | undefined)?.nome ?? "Nao identificado")}</p>
-                    <p className="mt-1 text-xs text-cyan-200/80">Tokens: {chat.totalTokens}</p>
+                    <div className="mt-3 grid gap-3 md:grid-cols-3">
+                      <div className="rounded-lg border border-white/10 bg-slate-950/40 px-3 py-3">
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Lead</p>
+                        <p className="mt-1 text-sm font-semibold text-white">{getChatLeadName(chat)}</p>
+                      </div>
+                      <div className="rounded-lg border border-white/10 bg-slate-950/40 px-3 py-3">
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Objetivo</p>
+                        <p className="mt-1 text-sm font-semibold text-white">{getChatObjective(chat)}</p>
+                      </div>
+                      <div className="rounded-lg border border-white/10 bg-slate-950/40 px-3 py-3">
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Tokens</p>
+                        <p className="mt-1 text-sm font-semibold text-cyan-100">{chat.totalTokens}</p>
+                      </div>
+                    </div>
+                    <p className="mt-3 line-clamp-2 text-sm text-slate-400">
+                      {getChatSummary(chat) ?? "Sem resumo consolidado ainda. Abra a conversa para ver a progressao completa."}
+                    </p>
                   </button>
                 ))
               ) : (
                 <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhum chat registrado para este projeto ainda.</div>
               )}
+              {sortedChats.length > chatsPerPage ? (
+                <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-slate-400">
+                    Pagina {currentChatPage} de {chatTotalPages} • {sortedChats.length} conversas filtradas
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setChatPage((current) => Math.max(1, current - 1))}
+                      disabled={currentChatPage <= 1}
+                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 disabled:opacity-40"
+                    >
+                      Anterior
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChatPage((current) => Math.min(chatTotalPages, current + 1))}
+                      disabled={currentChatPage >= chatTotalPages}
+                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 disabled:opacity-40"
+                    >
+                      Proxima
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </section>
         </div>
@@ -4165,6 +4733,25 @@ export default function AdminProjetoDetalhePage() {
           }))
         }
         onSubmit={() => void handleWidgetSubmit()}
+      />
+      <ConnectorModal
+        open={connectorModalOpen}
+        form={connectorForm}
+        agentes={data.agentes}
+        saving={savingConnector}
+        feedback={feedbackConnector}
+        onClose={() => {
+          setConnectorModalOpen(false);
+          resetConnectorForm();
+        }}
+        onChange={(next) =>
+          setConnectorForm((prev) => ({
+            ...prev,
+            ...next,
+            projetoId: params.id,
+          }))
+        }
+        onSubmit={() => void handleConnectorSubmit()}
       />
       <WhatsAppChannelModal
         open={whatsAppChannelModalOpen}

@@ -5,6 +5,7 @@ import { getAgenteAtivo, getAgenteById } from "@/lib/agentes";
 import { normalizeAgentRuntimeConfig, selectAgentRuntimeLines } from "@/lib/agent-runtime";
 import { buildAgenteApiRuntimeContext, type ApiRuntimeContext } from "@/lib/apis";
 import { getChatChannelPolicy } from "@/lib/chat-channel-policy";
+import { buscarProdutosMercadoLivrePorAgente, type ProdutoPadronizado } from "@/lib/mercado-livre";
 import { getProjetoOpenAIConfig } from "@/lib/segredos";
 import type { ChatMessageRole } from "@/lib/chats";
 
@@ -1129,6 +1130,122 @@ function buildLegacyAgentPrompt(agent: Awaited<ReturnType<typeof getAgenteAtivo>
     .join("\n");
 }
 
+function shouldSearchProducts(message: string) {
+  const normalized = normalizeText(message);
+
+  const productSignals = [
+    "tem ",
+    "tem algum",
+    "tem alguma",
+    "voce tem",
+    "tem ai",
+    "produto",
+    "produtos",
+    "item",
+    "itens",
+    "catalogo",
+    "catálogo",
+    "loja",
+    "mercado livre",
+    "ml",
+    "venda",
+    "vende",
+    "disponivel",
+    "disponível",
+    "procuro",
+    "quero comprar",
+    "estou procurando",
+  ];
+
+  return productSignals.some((signal) => normalized.includes(signal));
+}
+
+function extractProductSearchTerm(message: string) {
+  const cleaned = message
+    .trim()
+    .replace(/[?!.]+$/g, "")
+    .replace(/^(oi|ola|olá|opa)\s*[!,.-]?\s*/i, "")
+    .replace(/^(voces?|você|vc)\s+/i, "")
+    .replace(/^(tem|tem ai|tem aí|vende|procuro|quero|estou procurando)\s+/i, "")
+    .replace(/^(algum|alguma|alguns|algumas)\s+/i, "")
+    .replace(/^(produto|produtos|item|itens)\s+(de\s+)?/i, "")
+    .replace(/^(no|na|da|do)\s+/i, "")
+    .trim();
+
+  return cleaned || message.trim();
+}
+
+function buildMercadoLivreNoResultsReply(termo: string, context?: ConversationContext) {
+  const termoLimpo = termo.trim() || "esse produto";
+
+  if (isWhatsAppChannel(context)) {
+    return [
+      `Nao encontrei resultados para "${termoLimpo}" na loja agora.`,
+      "Se quiser, eu posso tentar com outro nome, cor, tamanho ou modelo parecido.",
+    ].join("\n\n");
+  }
+
+  return [
+    `Nao encontrei resultados para **"${termoLimpo}"** na loja neste momento.`,
+    "",
+    "Se quiser, eu posso tentar outra busca com um nome parecido, cor, tamanho ou modelo alternativo.",
+  ].join("\n");
+}
+
+function buildMercadoLivreReply(produtos: ProdutoPadronizado[], context?: ConversationContext) {
+  if (!produtos.length) {
+    return null;
+  }
+
+  if (produtos.length === 1) {
+    const produto = produtos[0];
+
+    if (isWhatsAppChannel(context)) {
+      return [
+        "Encontrei este produto na loja:",
+        `${produto.nome}\nR$ ${produto.preco.toLocaleString("pt-BR")}\n${produto.link}`,
+        "",
+        "Se quiser, eu posso buscar mais opcoes parecidas.",
+      ].join("\n\n");
+    }
+
+    return [
+      "**Encontrei este produto na loja:**",
+      `- **${produto.nome}**\n  R$ ${produto.preco.toLocaleString("pt-BR")}\n  ${produto.link}`,
+      "",
+      "Se quiser, eu posso buscar outras opcoes parecidas.",
+    ].join("\n");
+  }
+
+  if (isWhatsAppChannel(context)) {
+    return [
+      "Encontrei algumas opcoes parecidas na loja:",
+      ...produtos.map((produto, index) => `${index + 1}. ${produto.nome}\nR$ ${produto.preco.toLocaleString("pt-BR")}\n${produto.link}`),
+      "",
+      "Se quiser, eu posso te mostrar mais opcoes ou buscar outro modelo.",
+    ].join("\n\n");
+  }
+
+  return [
+    "**Encontrei estas opcoes parecidas na loja:**",
+    ...produtos.map((produto) => `- **${produto.nome}**\n  R$ ${produto.preco.toLocaleString("pt-BR")}\n  ${produto.link}`),
+    "",
+    "Se quiser, eu posso buscar mais variacoes desse produto.",
+  ].join("\n");
+}
+
+function buildMercadoLivrePromptContext(produtos: ProdutoPadronizado[]) {
+  if (!produtos.length) {
+    return "";
+  }
+
+  return [
+    "Produtos encontrados no conector Mercado Livre do agente:",
+    ...produtos.map((produto) => `- nome: ${produto.nome} | preco: ${produto.preco} | link: ${produto.link}`),
+    "Se o cliente estiver buscando produto, responda com base nesses itens e convide para refinar a busca se necessario.",
+  ].join("\n");
+}
+
 function buildInput(messages: ConversationMessage[]) {
   return messages.map((message) => ({
     role: message.role === "assistant" ? "assistant" : message.role === "system" ? "system" : "user",
@@ -1281,12 +1398,16 @@ function maybeAskForLeadIdentification(context: ConversationContext, history: Co
 
 export async function generateSalesReply(history: ConversationMessage[], context?: ConversationContext) {
   const latestUserMessage = [...history].reverse().find((item) => item.role === "user")?.content ?? "";
+  const productSearchRequested = shouldSearchProducts(latestUserMessage);
+  const productSearchTerm = productSearchRequested ? extractProductSearchTerm(latestUserMessage) : "";
   const channelPolicy = getChatChannelPolicy(context);
   const projectId = context?.projeto?.id ?? null;
   const agentId = context?.agente?.id ?? null;
   const agent = agentId ? await getAgenteById(agentId) : projectId ? await getAgenteAtivo(projectId) : null;
   const runtimeAssets = buildRuntimeReplyAssets(agent?.arquivos ?? []);
   const apiContexts = agent?.id ? await buildAgenteApiRuntimeContext(agent.id, (context ?? {}) as Record<string, unknown>) : [];
+  const mercadoLivreProducts =
+    agent?.id && productSearchRequested ? await buscarProdutosMercadoLivrePorAgente(agent.id, productSearchTerm) : [];
   const openai = await getProjetoOpenAIConfig(projectId);
   const systemPrompt = buildSystemPrompt(agent, context);
   const channelReplyInstruction = buildChannelReplyInstruction(context);
@@ -1296,9 +1417,13 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const analyticalReplyInstruction = buildAnalyticalReplyInstruction(latestUserMessage);
   const agentAssetInstruction = buildAgentAssetInstruction(runtimeAssets, latestUserMessage);
   const focusedApiContext = buildFocusedApiContext(latestUserMessage, apiContexts);
+  const mercadoLivrePromptContext = buildMercadoLivrePromptContext(mercadoLivreProducts);
   const catalogPricingReply = channelPolicy.allowCatalogPricing ? buildCatalogPricingReply(history, context) : null;
   const canUseDirectReply = shouldUseDirectFieldReply(latestUserMessage) && !isAnalyticalQuery(latestUserMessage);
   const directApiReply = canUseDirectReply ? buildDirectApiReply(latestUserMessage, apiContexts) : null;
+  const directMercadoLivreReply = buildMercadoLivreReply(mercadoLivreProducts, context);
+  const mercadoLivreNoResultsReply =
+    productSearchRequested && agent?.id && mercadoLivreProducts.length === 0 ? buildMercadoLivreNoResultsReply(productSearchTerm, context) : null;
 
   if (catalogPricingReply && apiContexts.length === 0) {
     return {
@@ -1346,6 +1471,34 @@ export async function generateSalesReply(history: ConversationMessage[], context
     };
   }
 
+  if (directMercadoLivreReply) {
+    return {
+      reply: formatHeuristicReply(directMercadoLivreReply, context),
+      assets: [],
+      usage: { inputTokens: 0, outputTokens: 0 },
+      metadata: {
+        provider: "heuristic",
+        model: "mercado_livre_connector",
+        agenteId: agent?.id ?? null,
+        agenteNome: agent?.nome ?? null,
+      },
+    };
+  }
+
+  if (mercadoLivreNoResultsReply) {
+    return {
+      reply: formatHeuristicReply(mercadoLivreNoResultsReply, context),
+      assets: [],
+      usage: { inputTokens: 0, outputTokens: 0 },
+      metadata: {
+        provider: "heuristic",
+        model: "mercado_livre_no_results",
+        agenteId: agent?.id ?? null,
+        agenteNome: agent?.nome ?? null,
+      },
+    };
+  }
+
   if (!openai.apiKey) {
     const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
     return {
@@ -1376,7 +1529,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
       model: openai.model,
       temperature: 0.5,
       max_output_tokens: 220,
-      instructions: [systemPrompt, channelReplyInstruction, runtimePrompt, legacyAgentPrompt, structuredReplyInstruction, analyticalReplyInstruction, agentAssetInstruction, focusedApiContext.instructions, summary, lead, qualification]
+      instructions: [systemPrompt, channelReplyInstruction, runtimePrompt, legacyAgentPrompt, structuredReplyInstruction, analyticalReplyInstruction, agentAssetInstruction, focusedApiContext.instructions, mercadoLivrePromptContext, summary, lead, qualification]
         .filter(Boolean)
         .join("\n\n"),
       input: buildInput(latestUserTurn ? [...recentMessages.filter((item) => item !== latestUserTurn), latestUserTurn] : recentMessages),
