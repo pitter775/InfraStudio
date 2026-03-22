@@ -1,3 +1,5 @@
+create extension if not exists "uuid-ossp";
+
 create table if not exists public.canais_whatsapp (
   id uuid primary key default uuid_generate_v4(),
   projeto_id uuid not null references public.projetos(id) on delete cascade,

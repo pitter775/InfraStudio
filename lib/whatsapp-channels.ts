@@ -30,6 +30,13 @@ export type WhatsAppChannelRecord = {
   updatedAt: string;
 };
 
+export class WhatsAppChannelError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WhatsAppChannelError";
+  }
+}
+
 type WhatsAppChannelRow = {
   id: string;
   projeto_id: string | null;
@@ -136,7 +143,7 @@ export async function createWhatsAppChannel(input: {
 
   if (error || !data) {
     console.error("[whatsapp-channels] failed to create channel", error);
-    return null;
+    throw new WhatsAppChannelError(error?.message || "Falha ao criar canal WhatsApp no banco de dados.");
   }
 
   return mapWhatsAppChannel(data as WhatsAppChannelRow);
@@ -169,7 +176,7 @@ export async function updateWhatsAppChannel(input: {
 
   if (error || !data) {
     console.error("[whatsapp-channels] failed to update channel", error);
-    return null;
+    throw new WhatsAppChannelError(error?.message || "Falha ao atualizar canal WhatsApp no banco de dados.");
   }
 
   return mapWhatsAppChannel(data as WhatsAppChannelRow);

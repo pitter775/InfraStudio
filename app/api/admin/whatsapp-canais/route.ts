@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { canAccessAdmin, canManageProject, resolveCurrentProjectId } from "@/lib/access";
 import { getAgenteById } from "@/lib/agentes";
 import { getSessionUser } from "@/lib/session";
-import { createWhatsAppChannel, listWhatsAppChannels, updateWhatsAppChannel } from "@/lib/whatsapp-channels";
+import { createWhatsAppChannel, listWhatsAppChannels, updateWhatsAppChannel, WhatsAppChannelError } from "@/lib/whatsapp-channels";
 
 type WhatsAppChannelBody = {
   id?: string;
@@ -68,18 +68,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: agentError }, { status: 400 });
   }
 
-  const channel = await createWhatsAppChannel({
-    projetoId: access.projetoId!,
-    agenteId: body.agenteId ?? null,
-    numero: body.numero,
-    status: body.status ?? "ativo",
-  });
+  try {
+    const channel = await createWhatsAppChannel({
+      projetoId: access.projetoId!,
+      agenteId: body.agenteId ?? null,
+      numero: body.numero,
+      status: body.status ?? "ativo",
+    });
 
-  if (!channel) {
-    return NextResponse.json({ error: "Nao foi possivel criar o canal WhatsApp." }, { status: 500 });
+    return NextResponse.json({ channel }, { status: 201 });
+  } catch (error) {
+    const message = error instanceof WhatsAppChannelError ? error.message : "Nao foi possivel criar o canal WhatsApp.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  return NextResponse.json({ channel }, { status: 201 });
 }
 
 export async function PUT(request: Request) {
@@ -103,17 +104,18 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: agentError }, { status: 400 });
   }
 
-  const channel = await updateWhatsAppChannel({
-    id: body.id,
-    projetoId: access.projetoId!,
-    agenteId: body.agenteId ?? null,
-    numero: body.numero,
-    status: body.status ?? "ativo",
-  });
+  try {
+    const channel = await updateWhatsAppChannel({
+      id: body.id,
+      projetoId: access.projetoId!,
+      agenteId: body.agenteId ?? null,
+      numero: body.numero,
+      status: body.status ?? "ativo",
+    });
 
-  if (!channel) {
-    return NextResponse.json({ error: "Nao foi possivel atualizar o canal WhatsApp." }, { status: 500 });
+    return NextResponse.json({ channel }, { status: 200 });
+  } catch (error) {
+    const message = error instanceof WhatsAppChannelError ? error.message : "Nao foi possivel atualizar o canal WhatsApp.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  return NextResponse.json({ channel }, { status: 200 });
 }
