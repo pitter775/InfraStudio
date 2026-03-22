@@ -104,16 +104,16 @@ async function fetchMercadoLivreProducts(input: {
 async function searchConnectorProducts(connector: ConnectorRecord, termo: string) {
   const config = getMercadoLivreConnectorConfig(connector);
   const endpointBase = connector.endpointBase || "https://api.mercadolibre.com";
-  const sellerId = config?.seller_id?.trim();
+  const sellerId = config?.seller_id?.replace(/\D/g, "").trim();
 
   const primary = await fetchMercadoLivreProducts({
     endpointBase,
     termo,
-    sellerId,
+    sellerId: sellerId || undefined,
     limit: 3,
   });
 
-  if (primary.length || sellerId) {
+  if (primary.length) {
     return primary;
   }
 

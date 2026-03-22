@@ -43,7 +43,7 @@ export function getChatChannelPolicy(context?: ChatChannelContext): ChatChannelP
       kind: "whatsapp",
       preferStructuredReplies: false,
       allowCatalogPricing: false,
-      allowLeadGate: true,
+      allowLeadGate: false,
     };
   }
 

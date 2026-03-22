@@ -1660,7 +1660,22 @@ export function enrichLeadContext(
 
   const phone = extractPhone(latestUserMessage);
   const name = extractName(latestUserMessage);
+  const whatsappContext =
+    currentContext && typeof currentContext.whatsapp === "object" && currentContext.whatsapp !== null
+      ? (currentContext.whatsapp as { remetente?: string | null })
+      : null;
+  const channelContext =
+    currentContext && typeof currentContext.channel === "object" && currentContext.channel !== null
+      ? (currentContext.channel as { kind?: string | null; external_id?: string | null })
+      : null;
+  const whatsappPhone =
+    (typeof whatsappContext?.remetente === "string" ? whatsappContext.remetente : null) ||
+    (typeof channelContext?.external_id === "string" ? channelContext.external_id : null);
+  const normalizedWhatsappPhone = whatsappPhone ? whatsappPhone.replace(/\D/g, "") : null;
+  const isWhatsAppConversation = (channelContext?.kind ?? "").trim().toLowerCase() === "whatsapp";
   const nextCount = history.filter((item) => item.role !== "system").length;
+  const resolvedPhone = phone ?? context.lead?.telefone ?? normalizedWhatsappPhone ?? null;
+  const resolvedName = name ?? context.lead?.nome ?? null;
 
   const nextContext = {
     origem: context.origem ?? "site",
@@ -1674,10 +1689,10 @@ export function enrichLeadContext(
       nome: (currentContext as { agente?: { nome?: string | null } } | null)?.agente?.nome ?? null,
     },
     lead: {
-      nome: name ?? context.lead?.nome ?? null,
-      telefone: phone ?? context.lead?.telefone ?? null,
+      nome: resolvedName,
+      telefone: resolvedPhone,
       email: context.lead?.email ?? null,
-      identificado: Boolean((phone ?? context.lead?.telefone) && (name ?? context.lead?.nome)),
+      identificado: isWhatsAppConversation ? Boolean(resolvedPhone) : Boolean(resolvedPhone && resolvedName),
     },
     memoria: {
       resumo: context.memoria?.resumo ?? null,
