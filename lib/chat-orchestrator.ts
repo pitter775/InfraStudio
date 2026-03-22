@@ -1439,24 +1439,6 @@ export async function generateSalesReply(history: ConversationMessage[], context
     };
   }
 
-  const identificationPrompt = channelPolicy.allowLeadGate
-    ? maybeAskForLeadIdentification(context ?? {}, history, latestUserMessage)
-    : null;
-
-  if (identificationPrompt && apiContexts.length === 0) {
-      return {
-      reply: formatHeuristicReply(identificationPrompt, context),
-      assets: [],
-      usage: { inputTokens: 0, outputTokens: 0 },
-      metadata: {
-        provider: "heuristic",
-        model: "lead_identification_gate",
-        agenteId: agent?.id ?? null,
-        agenteNome: agent?.nome ?? null,
-      },
-    };
-  }
-
   if (directApiReply) {
       return {
       reply: directApiReply,
@@ -1493,6 +1475,24 @@ export async function generateSalesReply(history: ConversationMessage[], context
       metadata: {
         provider: "heuristic",
         model: "mercado_livre_no_results",
+        agenteId: agent?.id ?? null,
+        agenteNome: agent?.nome ?? null,
+      },
+    };
+  }
+
+  const identificationPrompt = channelPolicy.allowLeadGate
+    ? maybeAskForLeadIdentification(context ?? {}, history, latestUserMessage)
+    : null;
+
+  if (identificationPrompt && apiContexts.length === 0) {
+      return {
+      reply: formatHeuristicReply(identificationPrompt, context),
+      assets: [],
+      usage: { inputTokens: 0, outputTokens: 0 },
+      metadata: {
+        provider: "heuristic",
+        model: "lead_identification_gate",
         agenteId: agent?.id ?? null,
         agenteNome: agent?.nome ?? null,
       },
