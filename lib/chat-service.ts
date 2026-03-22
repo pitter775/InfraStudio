@@ -269,9 +269,16 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
           kind: channelKind,
           external_id: normalizedExternalIdentifier,
         },
-    ui: isPlainObject(enrichedContextRecord.ui)
-      ? { ...(isPlainObject(mergedCurrentContext.ui) ? mergedCurrentContext.ui : {}), ...enrichedContextRecord.ui }
-      : mergedCurrentContext.ui,
+    ui: {
+      ...(isPlainObject(mergedCurrentContext.ui) ? mergedCurrentContext.ui : {}),
+      ...(isPlainObject(enrichedContextRecord.ui) ? enrichedContextRecord.ui : {}),
+      ...(channelKind === "whatsapp"
+        ? {
+            structured_response: false,
+            allow_icons: true,
+          }
+        : {}),
+    },
     sdk: isPlainObject(enrichedContextRecord.sdk)
       ? { ...(isPlainObject(mergedCurrentContext.sdk) ? mergedCurrentContext.sdk : {}), ...enrichedContextRecord.sdk }
       : mergedCurrentContext.sdk,

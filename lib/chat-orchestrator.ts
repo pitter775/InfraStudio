@@ -61,7 +61,11 @@ type ConversationContext = {
   };
 };
 
-function heuristicReply(message: string) {
+function heuristicReply(message: string, context?: ConversationContext) {
+  if (isWhatsAppChannel(context)) {
+    return buildWhatsAppHeuristicReply(message, context);
+  }
+
   const normalized = message.toLowerCase();
 
   if (normalized.includes("whatsapp") || normalized.includes("atendimento")) {
@@ -111,6 +115,72 @@ function heuristicReply(message: string) {
   ].join("\n");
 }
 
+function isWhatsAppChannel(context?: ConversationContext) {
+  return (context?.channel?.kind ?? "").trim().toLowerCase() === "whatsapp";
+}
+
+function isShortFollowUp(message: string) {
+  const compact = normalizeText(message).replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  if (!compact) {
+    return false;
+  }
+
+  const words = compact.split(" ").filter(Boolean);
+  return compact.length <= 24 && words.length <= 4;
+}
+
+function buildWhatsAppHeuristicReply(message: string, context?: ConversationContext) {
+  const normalized = normalizeText(message);
+  const objective = normalizeText(context?.qualificacao?.objetivo ?? "");
+
+  if (/\bagenda\b|agendamento|calendario/.test(normalized)) {
+    return [
+      "Consigo te ajudar com agenda sim.",
+      "Voce quer automatizar agendamento, confirmacao ou lembrete?",
+    ].join("\n\n");
+  }
+
+  if (/\bsite\b|\bchat\b/.test(normalized)) {
+    return [
+      "Da para colocar um agente no seu site e conectar com o comercial.",
+      "Voce quer captar leads, tirar duvidas ou agendar atendimento?",
+    ].join("\n\n");
+  }
+
+  if (/\bwhatsapp\b|\batendimento\b/.test(normalized)) {
+    return [
+      "Da para automatizar o atendimento no WhatsApp sem perder o toque humano.",
+      "Hoje voce quer focar em captacao, qualificacao ou suporte?",
+    ].join("\n\n");
+  }
+
+  if (/\bcrm\b|\berp\b|integrac/.test(normalized)) {
+    return [
+      "Consigo integrar isso com CRM e outras ferramentas.",
+      "Qual sistema voce usa hoje?",
+    ].join("\n\n");
+  }
+
+  if (/\bvendas?\b|comercial|lead/.test(normalized)) {
+    return [
+      "Boa. Da para organizar melhor entrada, qualificacao e repasse dos leads.",
+      "Seu gargalo hoje esta em captar, responder ou fechar?",
+    ].join("\n\n");
+  }
+
+  if (isShortFollowUp(message) && objective.includes("agenda")) {
+    return [
+      "Fechado. Em agenda, o melhor fluxo depende do seu caso.",
+      "Voce quer marcar horario, confirmar consultas ou mandar lembretes?",
+    ].join("\n\n");
+  }
+
+  return [
+    "Consigo te orientar por aqui.",
+    "Me diz em uma frase o que voce quer automatizar hoje.",
+  ].join("\n\n");
+}
+
 function buildStructuredReplyInstruction(context?: ConversationContext) {
   const shouldStructure = prefersStructuredReply(context);
   const allowIcons = context?.ui?.allow_icons !== false;
@@ -136,6 +206,23 @@ function buildStructuredReplyInstruction(context?: ConversationContext) {
   }
 
   return lines.join("\n");
+}
+
+function buildChannelReplyInstruction(context?: ConversationContext) {
+  if (!isWhatsAppChannel(context)) {
+    return "";
+  }
+
+  return [
+    "Canal atual: WhatsApp.",
+    "Responda de forma mais humana e natural, como conversa comercial real no WhatsApp.",
+    "Prefira respostas curtas, normalmente entre 2 e 4 linhas.",
+    "Faca uma pergunta por vez.",
+    "Nao repita a resposta anterior com outras palavras.",
+    "Quando o cliente mandar algo curto como 'agenda', 'site', 'sim' ou 'quero', trate isso como continuacao do contexto.",
+    "Pode usar no maximo 1 icone simples quando ajudar a leitura, sem exagero.",
+    "Evite blocos longos, listas extensas e tom robotico.",
+  ].join("\n");
 }
 
 function isAnalyticalQuery(message: string) {
@@ -276,7 +363,7 @@ function prefersStructuredReply(context?: ConversationContext) {
 
 function formatHeuristicReply(reply: string, context?: ConversationContext) {
   if (!prefersStructuredReply(context)) {
-    return reply;
+    return isWhatsAppChannel(context) ? reply.replace(/\n{3,}/g, "\n\n").trim() : reply;
   }
 
   return reply
@@ -923,7 +1010,7 @@ function buildApiFallbackReply(message: string, apiContexts: ApiRuntimeContext[]
   return null;
 }
 
-function buildSystemPrompt(agent: Awaited<ReturnType<typeof getAgenteAtivo>>) {
+function buildSystemPrompt(agent: Awaited<ReturnType<typeof getAgenteAtivo>>, context?: ConversationContext) {
   const defaultPrompt = [
     "Voce e o agente comercial inicial da InfraStudio.",
     "Seu papel e entender a necessidade do cliente, mostrar capacidade tecnica com objetividade e conduzir para o WhatsApp quando houver intencao comercial.",
@@ -932,7 +1019,7 @@ function buildSystemPrompt(agent: Awaited<ReturnType<typeof getAgenteAtivo>>) {
     "Nao invente funcionalidades. Quando faltar contexto, faca uma pergunta curta de qualificacao.",
     "Nunca diga ou sugira que leu edital, matricula, contrato ou documento inteiro se voce recebeu apenas resumo, campos extraidos ou contexto parcial.",
     "Quando responder com base parcial, use formulacoes honestas como 'com base nos dados enviados' ou 'pelo resumo atual'.",
-    "Mantenha respostas curtas, normalmente entre 3 e 6 linhas.",
+    isWhatsAppChannel(context) ? "No WhatsApp, mantenha respostas curtas, normalmente entre 2 e 4 linhas." : "Mantenha respostas curtas, normalmente entre 3 e 6 linhas.",
     "Quando houver fit comercial, convide para continuar no WhatsApp.",
   ].join("\n");
 
@@ -1201,7 +1288,8 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const runtimeAssets = buildRuntimeReplyAssets(agent?.arquivos ?? []);
   const apiContexts = agent?.id ? await buildAgenteApiRuntimeContext(agent.id, (context ?? {}) as Record<string, unknown>) : [];
   const openai = await getProjetoOpenAIConfig(projectId);
-  const systemPrompt = buildSystemPrompt(agent);
+  const systemPrompt = buildSystemPrompt(agent, context);
+  const channelReplyInstruction = buildChannelReplyInstruction(context);
   const runtimePrompt = buildRuntimePrompt(agent, latestUserMessage, context, apiContexts);
   const legacyAgentPrompt = runtimePrompt ? "" : buildLegacyAgentPrompt(agent);
   const structuredReplyInstruction = buildStructuredReplyInstruction(context);
@@ -1261,7 +1349,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   if (!openai.apiKey) {
     const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
     return {
-      reply: formatHeuristicReply(apiFallbackReply ?? heuristicReply(latestUserMessage), context),
+      reply: formatHeuristicReply(apiFallbackReply ?? heuristicReply(latestUserMessage, context), context),
       assets: selectRelevantAssetsHeuristically(latestUserMessage, runtimeAssets),
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: { provider: "heuristic", model: "fallback", agenteId: agent?.id ?? null, agenteNome: agent?.nome ?? null },
@@ -1288,7 +1376,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
       model: openai.model,
       temperature: 0.5,
       max_output_tokens: 220,
-      instructions: [systemPrompt, runtimePrompt, legacyAgentPrompt, structuredReplyInstruction, analyticalReplyInstruction, agentAssetInstruction, focusedApiContext.instructions, summary, lead, qualification]
+      instructions: [systemPrompt, channelReplyInstruction, runtimePrompt, legacyAgentPrompt, structuredReplyInstruction, analyticalReplyInstruction, agentAssetInstruction, focusedApiContext.instructions, summary, lead, qualification]
         .filter(Boolean)
         .join("\n\n"),
       input: buildInput(latestUserTurn ? [...recentMessages.filter((item) => item !== latestUserTurn), latestUserTurn] : recentMessages),
@@ -1310,7 +1398,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
       console.error("[chat] openai response failed", payload.error?.message ?? payload);
       const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
       return {
-        reply: formatHeuristicReply(apiFallbackReply ?? heuristicReply(latestUserMessage), context),
+        reply: formatHeuristicReply(apiFallbackReply ?? heuristicReply(latestUserMessage, context), context),
         assets: selectRelevantAssetsHeuristically(latestUserMessage, runtimeAssets),
         usage: { inputTokens: 0, outputTokens: 0 },
         metadata: {
@@ -1354,7 +1442,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     console.error("[chat] failed to call openai", error);
     const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
     return {
-      reply: formatHeuristicReply(apiFallbackReply ?? heuristicReply(latestUserMessage), context),
+      reply: formatHeuristicReply(apiFallbackReply ?? heuristicReply(latestUserMessage, context), context),
       assets: selectRelevantAssetsHeuristically(latestUserMessage, runtimeAssets),
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
@@ -1462,6 +1550,8 @@ export function enrichLeadContext(
   if (!nextContext.qualificacao.objetivo) {
     if (normalized.includes("whatsapp")) nextContext.qualificacao.objetivo = "automatizar atendimento no WhatsApp";
     else if (normalized.includes("crm")) nextContext.qualificacao.objetivo = "integrar CRM";
+    else if (normalized.includes("agenda") || normalized.includes("agendamento")) nextContext.qualificacao.objetivo = "automatizar agenda";
+    else if (normalized.includes("venda") || normalized.includes("comercial") || normalized.includes("lead")) nextContext.qualificacao.objetivo = "melhorar operacao comercial";
     else if (normalized.includes("site") || normalized.includes("chat")) nextContext.qualificacao.objetivo = "implantar agente no site";
   }
 

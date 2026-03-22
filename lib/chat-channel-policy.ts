@@ -11,7 +11,7 @@ export type ChatChannelContext = {
 };
 
 export type ChatChannelPolicy = {
-  kind: "home" | "external_widget" | "unknown";
+  kind: "home" | "external_widget" | "whatsapp" | "unknown";
   preferStructuredReplies: boolean;
   allowCatalogPricing: boolean;
   allowLeadGate: boolean;
@@ -33,6 +33,15 @@ export function getChatChannelPolicy(context?: ChatChannelContext): ChatChannelP
     return {
       kind: "external_widget",
       preferStructuredReplies: context?.ui?.structured_response !== false,
+      allowCatalogPricing: false,
+      allowLeadGate: true,
+    };
+  }
+
+  if (kind === "whatsapp") {
+    return {
+      kind: "whatsapp",
+      preferStructuredReplies: false,
       allowCatalogPricing: false,
       allowLeadGate: true,
     };

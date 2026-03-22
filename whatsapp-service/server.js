@@ -225,6 +225,7 @@ async function initializeClient(state) {
       if (msg.fromMe) return;
       if (msg.from.includes("@g.us")) return;
       if (msg.hasMedia) return;
+      if (!String(msg.body || "").trim()) return;
 
       await syncBackendSession(state, {
         connectionStatus: "online",
@@ -464,13 +465,11 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-bootstrapStoredSessions()
-  .then(() => {
-    server.listen(PORT, () => {
-      console.log(`[whatsapp-service] listening on http://localhost:${PORT}`);
-    });
-  })
-  .catch((error) => {
+server.listen(PORT, () => {
+  console.log(`[whatsapp-service] listening on http://localhost:${PORT}`);
+
+  // Keep the HTTP API available while stored sessions reconnect in the background.
+  bootstrapStoredSessions().catch((error) => {
     console.error("[whatsapp-service] failed to bootstrap", error);
-    process.exit(1);
   });
+});
