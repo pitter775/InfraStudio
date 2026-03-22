@@ -24,6 +24,15 @@ function parseConfiguracoes(value: unknown) {
   return JSON.parse(trimmed) as Record<string, unknown>;
 }
 
+function resolveRequestedProjectId(user: Awaited<ReturnType<typeof getSessionUser>>, projetoId: string | null | undefined) {
+  if (user?.isMaster) {
+    return projetoId ?? null;
+  }
+
+  const requestedProjectId = projetoId?.trim() || null;
+  return requestedProjectId ?? resolveCurrentProjectId(user);
+}
+
 export async function GET() {
   const user = await getSessionUser();
 
@@ -59,7 +68,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Nome do agente é obrigatório." }, { status: 400 });
     }
 
-    const projetoId = user?.isMaster ? body.projetoId ?? null : resolveCurrentProjectId(user);
+    const projetoId = resolveRequestedProjectId(user, body.projetoId);
     if (!projetoId || !canManageProject(user, projetoId)) {
       return NextResponse.json({ error: "Projeto inválido para criar agente." }, { status: 403 });
     }
@@ -110,7 +119,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Id e nome do agente são obrigatórios." }, { status: 400 });
     }
 
-    const projetoId = user?.isMaster ? body.projetoId ?? null : resolveCurrentProjectId(user);
+    const projetoId = resolveRequestedProjectId(user, body.projetoId);
     if (!projetoId || !canManageProject(user, projetoId)) {
       return NextResponse.json({ error: "Projeto inválido para atualizar agente." }, { status: 403 });
     }

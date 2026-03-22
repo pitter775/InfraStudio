@@ -12,6 +12,15 @@ type WhatsAppChannelBody = {
   status?: "ativo" | "inativo";
 };
 
+function resolveRequestedProjectId(user: Awaited<ReturnType<typeof getSessionUser>>, projetoId: string | null | undefined) {
+  if (user?.isMaster) {
+    return projetoId ?? null;
+  }
+
+  const requestedProjectId = projetoId?.trim() || null;
+  return requestedProjectId ?? resolveCurrentProjectId(user);
+}
+
 async function validateProjectAccess(projetoId: string | null | undefined) {
   const user = await getSessionUser();
 
@@ -19,7 +28,7 @@ async function validateProjectAccess(projetoId: string | null | undefined) {
     return { user, error: NextResponse.json({ error: "Acesso negado." }, { status: 403 }) };
   }
 
-  const resolvedProjectId = user?.isMaster ? projetoId ?? null : resolveCurrentProjectId(user);
+  const resolvedProjectId = resolveRequestedProjectId(user, projetoId);
   if (!resolvedProjectId || !canManageProject(user, resolvedProjectId)) {
     return { user, error: NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 }) };
   }

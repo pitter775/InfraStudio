@@ -15,6 +15,10 @@ fs.mkdirSync(AUTH_DIR, { recursive: true });
 
 const sessions = new Map();
 
+function getAuthSessionDir(channelId) {
+  return path.join(AUTH_DIR, `session-${channelId}`);
+}
+
 function loadStoredChannels() {
   try {
     if (!fs.existsSync(CHANNELS_FILE)) {
@@ -325,6 +329,14 @@ async function stopSession(channelId) {
 
   if (state.client) {
     try {
+      if (typeof state.client.logout === "function") {
+        await state.client.logout();
+      }
+    } catch (error) {
+      console.error("[whatsapp-service] failed to logout client", error);
+    }
+
+    try {
       await state.client.destroy();
     } catch (error) {
       console.error("[whatsapp-service] failed to destroy client", error);
@@ -341,6 +353,14 @@ async function stopSession(channelId) {
     qrCodeDataUrl: null,
     qrCodeText: null,
   });
+
+  try {
+    fs.rmSync(getAuthSessionDir(channelId), { recursive: true, force: true });
+  } catch (error) {
+    console.error("[whatsapp-service] failed to purge auth session", error);
+  }
+
+  sessions.delete(channelId);
 
   return getSessionSnapshot(state);
 }
