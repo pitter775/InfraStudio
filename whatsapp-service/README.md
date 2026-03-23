@@ -13,6 +13,7 @@ Servico Node.js separado para operar o canal WhatsApp com `whatsapp-web.js`.
 
 - `POST /connect`
 - `POST /disconnect`
+- `POST /purge`
 - `GET /status?channelId=...`
 - `GET /qr?channelId=...`
 

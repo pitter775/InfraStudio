@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { canAccessAdmin } from "@/lib/access";
 import { getAgenteById, listAgentes } from "@/lib/agentes";
 import { listApis } from "@/lib/apis";
-import { createChatWidget, listChatWidgets, updateChatWidget } from "@/lib/chat-widgets";
+import { createChatWidget, deleteChatWidget, getChatWidgetById, listChatWidgets, updateChatWidget } from "@/lib/chat-widgets";
 import { listProjetos } from "@/lib/projetos";
 import { getSessionUser } from "@/lib/session";
 
@@ -135,4 +135,37 @@ export async function PUT(request: Request) {
   }
 
   return NextResponse.json({ widget }, { status: 200 });
+}
+
+export async function DELETE(request: Request) {
+  const user = await getSessionUser();
+
+  if (!user?.isMaster || !canAccessAdmin(user)) {
+    return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+  }
+
+  const body = (await request.json()) as {
+    id?: string;
+    projetoId?: string | null;
+  };
+
+  if (!body.id) {
+    return NextResponse.json({ error: "Id do widget e obrigatorio." }, { status: 400 });
+  }
+
+  const widget = await getChatWidgetById(body.id);
+  if (!widget) {
+    return NextResponse.json({ error: "Widget nao encontrado." }, { status: 404 });
+  }
+
+  if (!body.projetoId || widget.projetoId !== body.projetoId) {
+    return NextResponse.json({ error: "Projeto invalido para excluir widget." }, { status: 403 });
+  }
+
+  const deleted = await deleteChatWidget(body.id);
+  if (!deleted) {
+    return NextResponse.json({ error: "Nao foi possivel excluir o widget." }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true }, { status: 200 });
 }

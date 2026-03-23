@@ -1,11 +1,12 @@
 import "server-only";
 
 import type { AgenteAssetRecord } from "@/lib/agente-assets";
-import { getAgenteAtivo, getAgenteById } from "@/lib/agentes";
+import { getAgenteById, type AgenteRecord } from "@/lib/agentes";
 import { normalizeAgentRuntimeConfig, selectAgentRuntimeLines } from "@/lib/agent-runtime";
 import { buildAgenteApiRuntimeContext, type ApiRuntimeContext } from "@/lib/apis";
 import { getChatChannelPolicy } from "@/lib/chat-channel-policy";
 import { buscarProdutosMercadoLivrePorAgente, type ProdutoPadronizado } from "@/lib/mercado-livre";
+import { appendRuntimeErrorLog } from "@/lib/runtime-error-log";
 import { getProjetoOpenAIConfig } from "@/lib/segredos";
 import type { ChatMessageRole } from "@/lib/chats";
 
@@ -44,6 +45,7 @@ type ConversationContext = {
   agente?: {
     id?: string | null;
     nome?: string | null;
+    locked?: boolean;
   };
   lead?: {
     nome?: string | null;
@@ -59,6 +61,9 @@ type ConversationContext = {
     dor_principal?: string | null;
     objetivo?: string | null;
     pronto_para_whatsapp?: boolean;
+  };
+  catalogo?: {
+    ultimaBusca?: string | null;
   };
 };
 
@@ -1011,7 +1016,7 @@ function buildApiFallbackReply(message: string, apiContexts: ApiRuntimeContext[]
   return null;
 }
 
-function buildSystemPrompt(agent: Awaited<ReturnType<typeof getAgenteAtivo>>, context?: ConversationContext) {
+function buildSystemPrompt(agent: AgenteRecord | null, context?: ConversationContext) {
   const defaultPrompt = [
     "Voce e o agente comercial inicial da InfraStudio.",
     "Seu papel e entender a necessidade do cliente, mostrar capacidade tecnica com objetividade e conduzir para o WhatsApp quando houver intencao comercial.",
@@ -1072,7 +1077,7 @@ function detectPromptRoute(latestUserMessage: string, context: ConversationConte
 }
 
 function buildRuntimePrompt(
-  agent: Awaited<ReturnType<typeof getAgenteAtivo>>,
+  agent: AgenteRecord | null,
   latestUserMessage: string,
   context: ConversationContext | undefined,
   apiContexts: ApiRuntimeContext[],
@@ -1102,7 +1107,7 @@ function buildRuntimePrompt(
     .join("\n");
 }
 
-function buildLegacyAgentPrompt(agent: Awaited<ReturnType<typeof getAgenteAtivo>>) {
+function buildLegacyAgentPrompt(agent: AgenteRecord | null) {
   if (!agent) {
     return "";
   }
@@ -1160,12 +1165,43 @@ function shouldSearchProducts(message: string) {
   return productSignals.some((signal) => normalized.includes(signal));
 }
 
+function shouldContinueProductSearch(history: ConversationMessage[], latestUserMessage: string, context?: ConversationContext) {
+  const normalized = normalizeText(latestUserMessage).trim();
+  if (!normalized) {
+    return false;
+  }
+
+  if (shouldSearchProducts(latestUserMessage)) {
+    return true;
+  }
+
+  const compact = normalized.replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  const words = compact ? compact.split(" ").filter(Boolean) : [];
+  if (compact.length > 40 || words.length > 6) {
+    return false;
+  }
+
+  const previousMessages = history.slice(-4, -1).map((item) => normalizeText(item.content));
+  const previousHadCatalogIntent = previousMessages.some((item) =>
+    item.includes("na loja") ||
+    item.includes("produto") ||
+    item.includes("opcoes parecidas") ||
+    item.includes("buscar mais opcoes") ||
+    item.includes("outro nome") ||
+    item.includes("modelo parecido") ||
+    item.includes("nao encontrei resultados")
+  );
+
+  return previousHadCatalogIntent || Boolean(context?.catalogo?.ultimaBusca);
+}
+
 function extractProductSearchTerm(message: string) {
   const cleaned = message
     .trim()
     .replace(/[?!.]+$/g, "")
     .replace(/^(oi|ola|olá|opa)\s*[!,.-]?\s*/i, "")
     .replace(/^(voces?|você|vc)\s+/i, "")
+    .replace(/^e\s+/i, "")
     .replace(/^(tem|tem ai|tem aí|vende|procuro|quero|estou procurando)\s+/i, "")
     .replace(/^(algum|alguma|alguns|algumas)\s+/i, "")
     .replace(/^(produto|produtos|item|itens)\s+(de\s+)?/i, "")
@@ -1398,16 +1434,58 @@ function maybeAskForLeadIdentification(context: ConversationContext, history: Co
 
 export async function generateSalesReply(history: ConversationMessage[], context?: ConversationContext) {
   const latestUserMessage = [...history].reverse().find((item) => item.role === "user")?.content ?? "";
-  const productSearchRequested = shouldSearchProducts(latestUserMessage);
+  const productSearchRequested = shouldContinueProductSearch(history, latestUserMessage, context);
   const productSearchTerm = productSearchRequested ? extractProductSearchTerm(latestUserMessage) : "";
   const channelPolicy = getChatChannelPolicy(context);
   const projectId = context?.projeto?.id ?? null;
   const agentId = context?.agente?.id ?? null;
-  const agent = agentId ? await getAgenteById(agentId) : projectId ? await getAgenteAtivo(projectId) : null;
+  const lockedToAgent = context?.agente?.locked === true;
+  const resolvedAgent = agentId ? await getAgenteById(agentId) : null;
+  const agent =
+    resolvedAgent && resolvedAgent.ativo && (!projectId || resolvedAgent.projetoId === projectId) ? resolvedAgent : null;
+
+  const traceBase = {
+    projetoId: projectId,
+    agenteId: agent?.id ?? agentId ?? null,
+    payload: {
+      lockedToAgent,
+      resolvedAgentId: resolvedAgent?.id ?? null,
+      resolvedAgentProjetoId: resolvedAgent?.projetoId ?? null,
+      resolvedAgentAtivo: resolvedAgent?.ativo ?? null,
+      channelKind: context?.channel?.kind ?? null,
+      latestUserMessage: latestUserMessage.slice(0, 280),
+    },
+  };
+
+  if (!agent) {
+    await appendRuntimeErrorLog({
+      source: "chat_orchestrator.guardrail",
+      message: lockedToAgent ? "Agente travado invalido ou inativo no orquestrador." : "Orquestrador sem agente valido. Fallback automatico bloqueado.",
+      ...traceBase,
+    });
+    return {
+      reply: "",
+      assets: [],
+      usage: { inputTokens: 0, outputTokens: 0 },
+      metadata: {
+        provider: "guardrail",
+        model: "inactive_or_invalid_agent",
+        agenteId: null,
+        agenteNome: null,
+      },
+    };
+  }
   const runtimeAssets = buildRuntimeReplyAssets(agent?.arquivos ?? []);
   const apiContexts = agent?.id ? await buildAgenteApiRuntimeContext(agent.id, (context ?? {}) as Record<string, unknown>) : [];
   const mercadoLivreProducts =
     agent?.id && productSearchRequested ? await buscarProdutosMercadoLivrePorAgente(agent.id, productSearchTerm) : [];
+  const resourceTrace = {
+    apiNames: apiContexts.map((item) => item.nome),
+    apiErrors: apiContexts.filter((item) => item.erro).map((item) => ({ nome: item.nome, erro: item.erro })),
+    mercadoLivreRequested: productSearchRequested,
+    mercadoLivreTerm: productSearchTerm || null,
+    mercadoLivreCount: mercadoLivreProducts.length,
+  };
   const openai = await getProjetoOpenAIConfig(projectId);
   const systemPrompt = buildSystemPrompt(agent, context);
   const channelReplyInstruction = buildChannelReplyInstruction(context);
@@ -1418,42 +1496,17 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const agentAssetInstruction = buildAgentAssetInstruction(runtimeAssets, latestUserMessage);
   const focusedApiContext = buildFocusedApiContext(latestUserMessage, apiContexts);
   const mercadoLivrePromptContext = buildMercadoLivrePromptContext(mercadoLivreProducts);
-  const catalogPricingReply = channelPolicy.allowCatalogPricing ? buildCatalogPricingReply(history, context) : null;
-  const canUseDirectReply = shouldUseDirectFieldReply(latestUserMessage) && !isAnalyticalQuery(latestUserMessage);
-  const directApiReply = canUseDirectReply ? buildDirectApiReply(latestUserMessage, apiContexts) : null;
   const directMercadoLivreReply = buildMercadoLivreReply(mercadoLivreProducts, context);
   const mercadoLivreNoResultsReply =
     productSearchRequested && agent?.id && mercadoLivreProducts.length === 0 ? buildMercadoLivreNoResultsReply(productSearchTerm, context) : null;
 
-  if (catalogPricingReply && apiContexts.length === 0) {
-    return {
-      reply: catalogPricingReply,
-      assets: selectRelevantAssetsHeuristically(latestUserMessage, runtimeAssets),
-      usage: { inputTokens: 0, outputTokens: 0 },
-      metadata: {
-        provider: "heuristic",
-        model: "catalog_pricing",
-        agenteId: agent?.id ?? null,
-        agenteNome: agent?.nome ?? null,
-      },
-    };
-  }
-
-  if (directApiReply) {
-      return {
-      reply: directApiReply,
-      assets: selectRelevantAssetsHeuristically(latestUserMessage, runtimeAssets),
-      usage: { inputTokens: 0, outputTokens: 0 },
-      metadata: {
-        provider: "heuristic",
-        model: "direct_api_field",
-        agenteId: agent?.id ?? null,
-        agenteNome: agent?.nome ?? null,
-      },
-    };
-  }
-
   if (directMercadoLivreReply) {
+    await appendRuntimeErrorLog({
+      source: "chat_orchestrator.trace",
+      message: "Resposta heuristica por conector Mercado Livre acionada.",
+      ...traceBase,
+      payload: { ...traceBase.payload, ...resourceTrace, mode: "mercado_livre_connector" },
+    });
     return {
       reply: formatHeuristicReply(directMercadoLivreReply, context),
       assets: [],
@@ -1468,6 +1521,12 @@ export async function generateSalesReply(history: ConversationMessage[], context
   }
 
   if (mercadoLivreNoResultsReply) {
+    await appendRuntimeErrorLog({
+      source: "chat_orchestrator.trace",
+      message: "Busca em conector Mercado Livre sem resultados.",
+      ...traceBase,
+      payload: { ...traceBase.payload, ...resourceTrace, mode: "mercado_livre_no_results" },
+    });
     return {
       reply: formatHeuristicReply(mercadoLivreNoResultsReply, context),
       assets: [],
@@ -1481,31 +1540,18 @@ export async function generateSalesReply(history: ConversationMessage[], context
     };
   }
 
-  const identificationPrompt = channelPolicy.allowLeadGate
-    ? maybeAskForLeadIdentification(context ?? {}, history, latestUserMessage)
-    : null;
-
-  if (identificationPrompt && apiContexts.length === 0) {
-      return {
-      reply: formatHeuristicReply(identificationPrompt, context),
+  if (!openai.apiKey) {
+    await appendRuntimeErrorLog({
+      source: "chat_orchestrator.guardrail",
+      message: "OpenAI indisponivel. Resposta bloqueada por fail-closed.",
+      ...traceBase,
+      payload: { ...traceBase.payload, ...resourceTrace, mode: "fail_closed_no_openai_key" },
+    });
+    return {
+      reply: "",
       assets: [],
       usage: { inputTokens: 0, outputTokens: 0 },
-      metadata: {
-        provider: "heuristic",
-        model: "lead_identification_gate",
-        agenteId: agent?.id ?? null,
-        agenteNome: agent?.nome ?? null,
-      },
-    };
-  }
-
-  if (!openai.apiKey) {
-    const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
-    return {
-      reply: formatHeuristicReply(apiFallbackReply ?? heuristicReply(latestUserMessage, context), context),
-      assets: selectRelevantAssetsHeuristically(latestUserMessage, runtimeAssets),
-      usage: { inputTokens: 0, outputTokens: 0 },
-      metadata: { provider: "heuristic", model: "fallback", agenteId: agent?.id ?? null, agenteNome: agent?.nome ?? null },
+      metadata: { provider: "guardrail", model: "fail_closed_no_openai_key", agenteId: agent?.id ?? null, agenteNome: agent?.nome ?? null },
     };
   }
 
@@ -1549,14 +1595,24 @@ export async function generateSalesReply(history: ConversationMessage[], context
 
     if (!response.ok || !outputText) {
       console.error("[chat] openai response failed", payload.error?.message ?? payload);
-      const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
+      await appendRuntimeErrorLog({
+        source: "chat_orchestrator.guardrail",
+        message: "OpenAI retornou erro. Resposta bloqueada por fail-closed.",
+        ...traceBase,
+        payload: {
+          ...traceBase.payload,
+          ...resourceTrace,
+          mode: "fail_closed_after_openai_error",
+          openaiError: payload.error?.message ?? null,
+        },
+      });
       return {
-        reply: formatHeuristicReply(apiFallbackReply ?? heuristicReply(latestUserMessage, context), context),
-        assets: selectRelevantAssetsHeuristically(latestUserMessage, runtimeAssets),
+        reply: "",
+        assets: [],
         usage: { inputTokens: 0, outputTokens: 0 },
         metadata: {
-          provider: "heuristic",
-          model: "fallback_after_openai_error",
+          provider: "guardrail",
+          model: "fail_closed_after_openai_error",
           agenteId: agent?.id ?? null,
           agenteNome: agent?.nome ?? null,
         },
@@ -1564,14 +1620,9 @@ export async function generateSalesReply(history: ConversationMessage[], context
     }
 
     const resolvedReply = extractTaggedAssets(outputText, runtimeAssets);
-    const fallbackAssets =
-      resolvedReply.assets.length === 0 && userExplicitlyRequestedAsset(latestUserMessage)
-        ? selectRelevantAssetsHeuristically(latestUserMessage, runtimeAssets)
-        : resolvedReply.assets;
-
     return {
       reply: resolvedReply.reply,
-      assets: fallbackAssets,
+      assets: resolvedReply.assets,
       usage: {
         inputTokens: payload.usage?.input_tokens ?? 0,
         outputTokens: payload.usage?.output_tokens ?? 0,
@@ -1593,14 +1644,24 @@ export async function generateSalesReply(history: ConversationMessage[], context
     };
   } catch (error) {
     console.error("[chat] failed to call openai", error);
-    const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts);
+    await appendRuntimeErrorLog({
+      source: "chat_orchestrator.guardrail",
+      message: "Excecao ao chamar OpenAI. Resposta bloqueada por fail-closed.",
+      ...traceBase,
+      payload: {
+        ...traceBase.payload,
+        ...resourceTrace,
+        mode: "fail_closed_after_exception",
+        error: error instanceof Error ? error.message : "unknown",
+      },
+    });
     return {
-      reply: formatHeuristicReply(apiFallbackReply ?? heuristicReply(latestUserMessage, context), context),
-      assets: selectRelevantAssetsHeuristically(latestUserMessage, runtimeAssets),
+      reply: "",
+      assets: [],
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
-        provider: "heuristic",
-        model: "fallback_after_exception",
+        provider: "guardrail",
+        model: "fail_closed_after_exception",
         agenteId: agent?.id ?? null,
         agenteNome: agent?.nome ?? null,
       },
@@ -1648,6 +1709,7 @@ export function enrichLeadContext(
 ) {
   const context = (currentContext ?? {}) as {
     origem?: string;
+    agente?: { id?: string | null; nome?: string | null; locked?: boolean };
     lead?: { nome?: string | null; telefone?: string | null; email?: string | null; identificado?: boolean };
     memoria?: { resumo?: string | null; mensagem_count?: number; ultimo_resumo_at?: string | null };
     qualificacao?: {
@@ -1656,6 +1718,7 @@ export function enrichLeadContext(
       objetivo?: string | null;
       pronto_para_whatsapp?: boolean;
     };
+    catalogo?: { ultimaBusca?: string | null };
   };
 
   const phone = extractPhone(latestUserMessage);
@@ -1685,8 +1748,9 @@ export function enrichLeadContext(
       nome: (currentContext as { projeto?: { nome?: string | null } } | null)?.projeto?.nome ?? null,
     },
     agente: {
-      id: (currentContext as { agente?: { id?: string | null } } | null)?.agente?.id ?? null,
-      nome: (currentContext as { agente?: { nome?: string | null } } | null)?.agente?.nome ?? null,
+      id: context.agente?.id ?? null,
+      nome: context.agente?.nome ?? null,
+      locked: context.agente?.locked ?? false,
     },
     lead: {
       nome: resolvedName,
@@ -1704,6 +1768,9 @@ export function enrichLeadContext(
       dor_principal: context.qualificacao?.dor_principal ?? null,
       objetivo: context.qualificacao?.objetivo ?? null,
       pronto_para_whatsapp: context.qualificacao?.pronto_para_whatsapp ?? false,
+    },
+    catalogo: {
+      ultimaBusca: context.catalogo?.ultimaBusca ?? null,
     },
   };
 

@@ -1,10 +1,11 @@
-import { getAgenteAtivo, getAgenteById, getAgenteByIdentifier } from "@/lib/agentes";
+import { getAgenteById, getAgenteByIdentifier, type AgenteRecord } from "@/lib/agentes";
 import { appendChatRequestLog } from "@/lib/chat-logs";
 import { enrichLeadContext, generateSalesReply, shouldRefreshSummary, summarizeConversation } from "@/lib/chat-orchestrator";
 import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetByProjetoAgente, getChatWidgetBySlug } from "@/lib/chat-widgets";
 import { appendMessage, createChat, findActiveChatByChannel, getChatById, getChatContext, listChatMessages, type ChatChannelKind, updateChatContext, updateChatStats } from "@/lib/chats";
 import { estimateOpenAICostUsd } from "@/lib/openai-pricing";
 import { getProjetoById, getProjetoByIdentifier } from "@/lib/projetos";
+import { appendRuntimeErrorLog } from "@/lib/runtime-error-log";
 import { getPreferredWhatsAppChannel, getWhatsAppChannelById, updateWhatsAppChannelSession } from "@/lib/whatsapp-channels";
 
 export type ChatRequestBody = {
@@ -20,6 +21,14 @@ export type ChatRequestBody = {
   identificador?: string | null;
   source?: string | null;
   whatsappChannelId?: string | null;
+};
+
+type ResolvedChatChannel = {
+  projeto: Awaited<ReturnType<typeof getProjetoById>> | Awaited<ReturnType<typeof getProjetoByIdentifier>>;
+  agente: AgenteRecord | null;
+  widget: Awaited<ReturnType<typeof getChatWidgetBySlug>> | Awaited<ReturnType<typeof getChatWidgetByProjetoAgente>>;
+  channel: Record<string, unknown>;
+  lockedToAgent: boolean;
 };
 
 function sanitizePhone(phone: string | null | undefined) {
@@ -47,6 +56,15 @@ function mergeContext(base: Record<string, unknown>, extra?: Record<string, unkn
   return {
     ...base,
     ...extra,
+  };
+}
+
+function buildSilentChatResult(chatId?: string | null) {
+  return {
+    chatId: chatId ?? "",
+    reply: "",
+    assets: [],
+    whatsapp: null,
   };
 }
 
@@ -82,7 +100,7 @@ function buildContinuationMessage(input: {
     .trim();
 }
 
-async function resolveChatChannel(body: ChatRequestBody) {
+async function resolveChatChannel(body: ChatRequestBody): Promise<ResolvedChatChannel> {
   const projetoIdentifier = body.projeto?.trim() || null;
   const agenteIdentifier = body.agente?.trim() || null;
   const channelKind = normalizeChannelKind(body);
@@ -90,9 +108,10 @@ async function resolveChatChannel(body: ChatRequestBody) {
   if (projetoIdentifier) {
     const projeto = await getProjetoByIdentifier(projetoIdentifier);
     let agente = agenteIdentifier ? await getAgenteByIdentifier(agenteIdentifier, projeto?.id ?? null) : null;
+    const explicitAgentRequested = Boolean(agenteIdentifier);
 
-    if (!agente && projeto) {
-      agente = await getAgenteAtivo(projeto.id);
+    if (agente && (!agente.ativo || agente.projetoId !== projeto?.id)) {
+      agente = null;
     }
 
     const widget = projeto ? await getChatWidgetByProjetoAgente({ projetoId: projeto.id, agenteId: agente?.id ?? null }) : null;
@@ -101,6 +120,7 @@ async function resolveChatChannel(body: ChatRequestBody) {
       projeto,
       agente,
       widget,
+      lockedToAgent: true,
       channel: {
         kind: channelKind,
         projeto: projetoIdentifier,
@@ -118,6 +138,7 @@ async function resolveChatChannel(body: ChatRequestBody) {
       projeto: null,
       agente: null,
       widget: null,
+      lockedToAgent: true,
       channel: {
         kind: channelKind,
         widgetSlug,
@@ -127,17 +148,14 @@ async function resolveChatChannel(body: ChatRequestBody) {
   }
 
   const projeto = await getProjetoById(widget.projetoId);
-  const agente =
-    widget?.agenteId && projeto
-      ? await getAgenteById(widget.agenteId)
-      : projeto
-        ? await getAgenteAtivo(projeto.id)
-        : null;
+  const widgetAgent = widget?.agenteId && projeto ? await getAgenteById(widget.agenteId) : null;
+  const agente = widgetAgent && widgetAgent.ativo && widgetAgent.projetoId === projeto?.id ? widgetAgent : null;
 
   return {
     projeto,
     agente,
     widget,
+    lockedToAgent: true,
     channel: {
       kind: channelKind,
       widgetSlug,
@@ -154,22 +172,60 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
 
   const channelKind = normalizeChannelKind(body);
   let effectiveBody = body;
+  let lockedWhatsAppAgent: AgenteRecord | null = null;
 
   if (channelKind === "whatsapp" && body.whatsappChannelId) {
     const officialChannel = await getWhatsAppChannelById(body.whatsappChannelId);
 
     if (!officialChannel || !officialChannel.projetoId) {
-      throw new Error("Canal WhatsApp nao encontrado.");
+      await appendRuntimeErrorLog({
+        source: "chat_service.whatsapp_guardrail",
+        message: "Canal WhatsApp nao encontrado ou sem projeto.",
+        payload: { whatsappChannelId: body.whatsappChannelId },
+      });
+      return buildSilentChatResult(body.chatId);
     }
 
     if (officialChannel.status !== "ativo") {
-      throw new Error("Canal WhatsApp inativo.");
+      await appendRuntimeErrorLog({
+        source: "chat_service.whatsapp_guardrail",
+        message: "Canal WhatsApp inativo bloqueado.",
+        projetoId: officialChannel.projetoId,
+        agenteId: officialChannel.agenteId,
+        payload: { whatsappChannelId: officialChannel.id, status: officialChannel.status },
+      });
+      return buildSilentChatResult(body.chatId);
     }
+
+    if (!officialChannel.agenteId) {
+      await appendRuntimeErrorLog({
+        source: "chat_service.whatsapp_guardrail",
+        message: "Canal WhatsApp sem agente vinculado.",
+        projetoId: officialChannel.projetoId,
+        payload: { whatsappChannelId: officialChannel.id },
+      });
+      return buildSilentChatResult(body.chatId);
+    }
+
+    const officialAgent = await getAgenteById(officialChannel.agenteId);
+
+    if (!officialAgent || !officialAgent.ativo || officialAgent.projetoId !== officialChannel.projetoId) {
+      await appendRuntimeErrorLog({
+        source: "chat_service.whatsapp_guardrail",
+        message: "Agente do canal WhatsApp invalido, inativo ou fora do projeto.",
+        projetoId: officialChannel.projetoId,
+        agenteId: officialChannel.agenteId,
+        payload: { whatsappChannelId: officialChannel.id, agenteProjetoId: officialAgent?.projetoId ?? null, agenteAtivo: officialAgent?.ativo ?? null },
+      });
+      return buildSilentChatResult(body.chatId);
+    }
+
+    lockedWhatsAppAgent = officialAgent;
 
     effectiveBody = {
       ...body,
       projeto: officialChannel.projetoId,
-      agente: officialChannel.agenteId ?? undefined,
+      agente: officialAgent.id,
       context: mergeContext(
         isPlainObject(body.context) ? body.context : {},
         {
@@ -200,12 +256,28 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
       throw new Error("Projeto ou widget do chat nao encontrado. Revise o embed configurado para este site.");
     }
 
+    if (resolved.lockedToAgent && !resolved.agente) {
+      await appendRuntimeErrorLog({
+        source: "chat_service.channel_resolution",
+        message: "Canal travado a agente invalido ou inativo.",
+        projetoId: resolved.projeto.id,
+        payload: {
+          projeto: effectiveBody.projeto ?? null,
+          agente: effectiveBody.agente ?? null,
+          widgetSlug: effectiveBody.widgetSlug ?? null,
+          channelKind,
+        },
+      });
+      return buildSilentChatResult(effectiveBody.chatId);
+    }
+
     if (normalizedExternalIdentifier) {
       chat = await findActiveChatByChannel({
         projetoId: resolved.projeto.id,
         agenteId: resolved.agente?.id ?? null,
         canal: channelKind,
         identificadorExterno: normalizedExternalIdentifier,
+        channelScopeId: channelKind === "whatsapp" ? body.whatsappChannelId ?? null : null,
       });
     }
 
@@ -232,6 +304,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
           id: resolved.agente?.id ?? null,
           slug: resolved.agente?.slug ?? effectiveBody.agente?.trim() ?? null,
           nome: resolved.agente?.nome ?? null,
+          locked: resolved.lockedToAgent,
         },
         sdk: {
           version: "1",
@@ -258,6 +331,32 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     throw new Error("Nao foi possivel iniciar a conversa no banco. Verifique permissoes nas tabelas `chats` e `mensagens`.");
   }
 
+  const chatContext = getChatContext(chat) as Record<string, unknown>;
+  const lockedAgentFromContext =
+    isPlainObject(chatContext.agente) && chatContext.agente.locked === true ? true : false;
+
+  if (channelKind === "whatsapp" || lockedAgentFromContext) {
+    const currentAgentId = chat.agenteId ?? effectiveBody.agente ?? null;
+    const currentAgent = lockedWhatsAppAgent ?? (currentAgentId ? await getAgenteById(currentAgentId) : null);
+
+    if (!currentAgent || !currentAgent.ativo || currentAgent.projetoId !== chat.projetoId) {
+      await appendRuntimeErrorLog({
+        source: "chat_service.chat_guardrail",
+        message: "Chat bloqueado por agente invalido, inativo ou fora do projeto.",
+        projetoId: chat.projetoId,
+        agenteId: currentAgentId,
+        payload: {
+          chatId: chat.id,
+          channelKind,
+          lockedAgentFromContext,
+          agentProjetoId: currentAgent?.projetoId ?? null,
+          agentAtivo: currentAgent?.ativo ?? null,
+        },
+      });
+      return buildSilentChatResult(chat.id);
+    }
+  }
+
   const userMessage = await appendMessage({
     chatId: chat.id,
     role: "user",
@@ -274,7 +373,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
   }
 
   const history = await listChatMessages(chat.id);
-  const currentContext = getChatContext(chat) as Record<string, unknown>;
+  const currentContext = chatContext;
   const extraContext = isPlainObject(effectiveBody.context) ? effectiveBody.context : null;
   const mergedCurrentContext = mergeContext(currentContext, extraContext);
   const enrichedContext = enrichLeadContext(
@@ -315,6 +414,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     widget: isPlainObject(enrichedContextRecord.widget)
       ? { ...(isPlainObject(mergedCurrentContext.widget) ? mergedCurrentContext.widget : {}), ...enrichedContextRecord.widget }
       : mergedCurrentContext.widget,
+    catalogo: isPlainObject(mergedCurrentContext.catalogo) ? { ...mergedCurrentContext.catalogo } : {},
   };
 
   if (!nextContext.lead?.telefone && history.length >= 2 && history.length < 6) {
@@ -335,7 +435,18 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
   nextContext.agente = {
     id: typeof ai.metadata?.agenteId === "string" ? ai.metadata.agenteId : null,
     nome: typeof ai.metadata?.agenteNome === "string" ? ai.metadata.agenteNome : null,
+    locked: channelKind === "whatsapp" || lockedAgentFromContext,
   };
+
+  const latestNormalizedMessage = message.toLowerCase();
+  const catalogSignals = ["tem ", "produto", "produtos", "catalogo", "catálogo", "loja", "vende", "procuro", "estou procurando"];
+  const catalogSearchRequested = catalogSignals.some((signal) => latestNormalizedMessage.includes(signal)) || /^\s*e\s+\S+/i.test(message);
+  if (catalogSearchRequested) {
+    nextContext.catalogo = {
+      ...(isPlainObject(nextContext.catalogo) ? nextContext.catalogo : {}),
+      ultimaBusca: message.trim(),
+    };
+  }
 
   const estimatedCostUsd =
     ai.metadata?.provider === "openai"

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin, canManageProject, resolveCurrentProjectId } from "@/lib/access";
-import { createAgente, listAgentes, updateAgente } from "@/lib/agentes";
+import { createAgente, deleteAgente, getAgenteById, listAgentes, updateAgente } from "@/lib/agentes";
 import { getSessionUser } from "@/lib/session";
 
 function parseConfiguracoes(value: unknown) {
@@ -145,4 +145,38 @@ export async function PUT(request: Request) {
     console.error("[api/admin/agentes] failed to update agent", error);
     return NextResponse.json({ error: "Configurações inválidas. Use JSON válido." }, { status: 400 });
   }
+}
+
+export async function DELETE(request: Request) {
+  const user = await getSessionUser();
+
+  if (!canAccessAdmin(user)) {
+    return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+  }
+
+  const body = (await request.json()) as {
+    id?: string;
+    projetoId?: string;
+  };
+
+  if (!body.id) {
+    return NextResponse.json({ error: "Id do agente e obrigatorio." }, { status: 400 });
+  }
+
+  const agente = await getAgenteById(body.id);
+  if (!agente) {
+    return NextResponse.json({ error: "Agente nao encontrado." }, { status: 404 });
+  }
+
+  const projetoId = resolveRequestedProjectId(user, body.projetoId ?? agente.projetoId ?? undefined);
+  if (!projetoId || !canManageProject(user, projetoId) || agente.projetoId !== projetoId) {
+    return NextResponse.json({ error: "Projeto invalido para excluir agente." }, { status: 403 });
+  }
+
+  const deleted = await deleteAgente(body.id);
+  if (!deleted) {
+    return NextResponse.json({ error: "Nao foi possivel excluir o agente." }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true }, { status: 200 });
 }

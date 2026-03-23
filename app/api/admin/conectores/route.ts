@@ -3,6 +3,8 @@ import { canAccessAdmin, canManageProject } from "@/lib/access";
 import { getAgenteById } from "@/lib/agentes";
 import {
   createConector,
+  deleteConector,
+  getConectorById,
   listConectores,
   MERCADO_LIVRE_CONNECTOR_TYPE,
   updateConector,
@@ -24,10 +26,12 @@ type ConnectorBody = {
 function normalizeMercadoLivreConfig(configuracoes: MercadoLivreConnectorConfig | null | undefined) {
   const sellerId = typeof configuracoes?.seller_id === "string" ? configuracoes.seller_id.trim() : "";
   const nickname = typeof configuracoes?.nickname === "string" ? configuracoes.nickname.trim() : "";
+  const accessToken = typeof configuracoes?.access_token === "string" ? configuracoes.access_token.trim() : "";
 
   return {
     seller_id: sellerId,
     nickname: nickname || undefined,
+    access_token: accessToken || undefined,
   };
 }
 
@@ -153,4 +157,37 @@ export async function PUT(request: Request) {
   }
 
   return NextResponse.json({ conector }, { status: 200 });
+}
+
+export async function DELETE(request: Request) {
+  const user = await getSessionUser();
+
+  if (!canAccessAdmin(user)) {
+    return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+  }
+
+  const body = (await request.json()) as {
+    id?: string;
+    projetoId?: string;
+  };
+
+  if (!body.id) {
+    return NextResponse.json({ error: "Id do conector e obrigatorio." }, { status: 400 });
+  }
+
+  const conector = await getConectorById(body.id);
+  if (!conector) {
+    return NextResponse.json({ error: "Conector nao encontrado." }, { status: 404 });
+  }
+
+  if (!conector.projetoId || !body.projetoId || conector.projetoId !== body.projetoId || !canManageProject(user, body.projetoId)) {
+    return NextResponse.json({ error: "Projeto invalido para excluir conector." }, { status: 403 });
+  }
+
+  const deleted = await deleteConector(body.id);
+  if (!deleted) {
+    return NextResponse.json({ error: "Nao foi possivel excluir o conector." }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true }, { status: 200 });
 }

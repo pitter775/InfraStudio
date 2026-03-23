@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { purgeWhatsAppServiceSessions } from "@/lib/whatsapp-service";
 
 export type WhatsAppChannelStatus = "ativo" | "inativo";
 
@@ -200,4 +201,21 @@ export async function updateWhatsAppChannelSession(id: string, nextSessionData: 
       lastSyncAt: new Date().toISOString(),
     },
   });
+}
+
+export async function deleteWhatsAppChannel(id: string) {
+  const purge = await purgeWhatsAppServiceSessions({ channelId: id });
+  if (!purge.ok) {
+    throw new WhatsAppChannelError(purge.error || "Falha ao limpar a persistencia do whatsapp-service.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase.from("canais_whatsapp").delete().eq("id", id);
+
+  if (error) {
+    console.error("[whatsapp-channels] failed to delete channel", error);
+    throw new WhatsAppChannelError(error?.message || "Falha ao excluir canal WhatsApp no banco de dados.");
+  }
+
+  return true;
 }

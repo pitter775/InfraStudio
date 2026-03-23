@@ -3,6 +3,7 @@ import "server-only";
 import { listAgenteAssetsByAgenteIds, type AgenteAssetRecord } from "@/lib/agente-assets";
 import { listApiIdsByAgentes, syncAgenteApis } from "@/lib/apis";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { purgeWhatsAppServiceSessions } from "@/lib/whatsapp-service";
 
 export type AgenteRecord = {
   id: string;
@@ -286,4 +287,89 @@ export async function updateAgente(input: {
 
   const [withApis] = await attachRelations([agente]);
   return withApis ?? null;
+}
+
+export async function deleteAgente(id: string) {
+  const supabase = getSupabaseAdminClient();
+  const agente = await getAgenteById(id);
+  if (!agente) {
+    return false;
+  }
+
+  const purge = await purgeWhatsAppServiceSessions({ agenteId: id });
+  if (!purge.ok) {
+    console.error("[agentes] failed to purge whatsapp-service sessions", purge.error);
+    return false;
+  }
+
+  const assetsByAgente = await listAgenteAssetsByAgenteIds([id]);
+  const assets = assetsByAgente.get(id) ?? [];
+  const storagePaths = assets.map((asset) => asset.storagePath).filter(Boolean);
+
+  if (storagePaths.length) {
+    const storageResult = await supabase.storage.from("agente-assets").remove(storagePaths);
+    if (storageResult.error) {
+      console.error("[agentes] failed to delete agent asset files", storageResult.error);
+      return false;
+    }
+  }
+
+  const { error: assetError } = await supabase.from("agente_arquivos").delete().eq("agente_id", id);
+  if (assetError) {
+    console.error("[agentes] failed to delete agent assets", assetError);
+    return false;
+  }
+
+  const { data: chatsData, error: chatsReadError } = await supabase.from("chats").select("id").eq("agente_id", id);
+  if (chatsReadError) {
+    console.error("[agentes] failed to list agent chats", chatsReadError);
+    return false;
+  }
+
+  const chatIds = ((chatsData ?? []) as Array<{ id: string | null }>).map((item) => item.id).filter(Boolean) as string[];
+  if (chatIds.length) {
+    const { error: messageError } = await supabase.from("mensagens").delete().in("chat_id", chatIds);
+    if (messageError) {
+      console.error("[agentes] failed to delete agent chat messages", messageError);
+      return false;
+    }
+  }
+
+  const { error: chatsError } = await supabase.from("chats").delete().eq("agente_id", id);
+  if (chatsError) {
+    console.error("[agentes] failed to delete agent chats", chatsError);
+    return false;
+  }
+
+  const { error: widgetError } = await supabase.from("chat_widgets").delete().eq("agente_id", id);
+  if (widgetError) {
+    console.error("[agentes] failed to delete agent widgets", widgetError);
+    return false;
+  }
+
+  const { error: channelError } = await supabase.from("canais_whatsapp").delete().eq("agente_id", id);
+  if (channelError) {
+    console.error("[agentes] failed to delete agent whatsapp channels", channelError);
+    return false;
+  }
+
+  const { error: connectorError } = await supabase.from("conectores").delete().eq("agente_id", id);
+  if (connectorError) {
+    console.error("[agentes] failed to delete agent connectors", connectorError);
+    return false;
+  }
+
+  const { error: apiLinkError } = await supabase.from("agente_api").delete().eq("agente_id", id);
+  if (apiLinkError) {
+    console.error("[agentes] failed to delete agent api links", apiLinkError);
+    return false;
+  }
+
+  const { error } = await supabase.from("agentes").delete().eq("id", id);
+  if (error) {
+    console.error("[agentes] failed to delete agent", error);
+    return false;
+  }
+
+  return true;
 }

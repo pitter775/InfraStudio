@@ -1,6 +1,8 @@
 import "server-only";
 
+import { AGENTE_ASSETS_BUCKET } from "@/lib/agente-assets";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { purgeWhatsAppServiceSessions } from "@/lib/whatsapp-service";
 
 export type ProjetoRecord = {
   id: string;
@@ -178,4 +180,116 @@ export async function updateProjeto(input: {
   }
 
   return mapProjeto(data as ProjetoRow);
+}
+
+export async function deleteProjeto(id: string) {
+  const supabase = getSupabaseAdminClient();
+
+  const purge = await purgeWhatsAppServiceSessions({ projetoId: id });
+  if (!purge.ok) {
+    console.error("[projetos] failed to purge whatsapp-service sessions", purge.error);
+    return false;
+  }
+
+  const { data: assetsData, error: assetsReadError } = await supabase
+    .from("agente_arquivos")
+    .select("storage_path")
+    .eq("projeto_id", id);
+
+  if (assetsReadError) {
+    console.error("[projetos] failed to list project assets", assetsReadError);
+    return false;
+  }
+
+  const storagePaths = ((assetsData ?? []) as Array<{ storage_path: string | null }>)
+    .map((item) => item.storage_path?.trim() || "")
+    .filter(Boolean);
+
+  if (storagePaths.length) {
+    const storageResult = await supabase.storage.from(AGENTE_ASSETS_BUCKET).remove(storagePaths);
+    if (storageResult.error) {
+      console.error("[projetos] failed to delete project asset files", storageResult.error);
+      return false;
+    }
+  }
+
+  const { data: chatsData, error: chatsReadError } = await supabase.from("chats").select("id").eq("projeto_id", id);
+  if (chatsReadError) {
+    console.error("[projetos] failed to list project chats", chatsReadError);
+    return false;
+  }
+
+  const chatIds = ((chatsData ?? []) as Array<{ id: string | null }>).map((item) => item.id).filter(Boolean) as string[];
+  if (chatIds.length) {
+    const { error: messageError } = await supabase.from("mensagens").delete().in("chat_id", chatIds);
+    if (messageError) {
+      console.error("[projetos] failed to delete project chat messages", messageError);
+      return false;
+    }
+  }
+
+  const { data: apisData, error: apisReadError } = await supabase.from("apis").select("id").eq("projeto_id", id);
+  if (apisReadError) {
+    console.error("[projetos] failed to list project apis", apisReadError);
+    return false;
+  }
+
+  const apiIds = ((apisData ?? []) as Array<{ id: string | null }>).map((item) => item.id).filter(Boolean) as string[];
+  if (apiIds.length) {
+    const { error: agentApiError } = await supabase.from("agente_api").delete().in("api_id", apiIds);
+    if (agentApiError) {
+      console.error("[projetos] failed to delete project api links", agentApiError);
+      return false;
+    }
+
+    const { error: apiFieldError } = await supabase.from("api_campos").delete().in("api_id", apiIds);
+    if (apiFieldError) {
+      console.error("[projetos] failed to delete project api fields", apiFieldError);
+      return false;
+    }
+  }
+
+  const { data: agentsData, error: agentsReadError } = await supabase.from("agentes").select("id").eq("projeto_id", id);
+  if (agentsReadError) {
+    console.error("[projetos] failed to list project agents", agentsReadError);
+    return false;
+  }
+
+  const agentIds = ((agentsData ?? []) as Array<{ id: string | null }>).map((item) => item.id).filter(Boolean) as string[];
+  if (agentIds.length) {
+    const { error: agentApiByAgentError } = await supabase.from("agente_api").delete().in("agente_id", agentIds);
+    if (agentApiByAgentError) {
+      console.error("[projetos] failed to delete project agent api links", agentApiByAgentError);
+      return false;
+    }
+  }
+
+  const deletions = [
+    { label: "project logs", execute: () => supabase.from("logs").delete().eq("projeto_id", id) },
+    { label: "project secrets", execute: () => supabase.from("segredos").delete().eq("projeto_id", id) },
+    { label: "project memberships", execute: () => supabase.from("usuarios_projetos").delete().eq("projeto_id", id) },
+    { label: "project widgets", execute: () => supabase.from("chat_widgets").delete().eq("projeto_id", id) },
+    { label: "project whatsapp channels", execute: () => supabase.from("canais_whatsapp").delete().eq("projeto_id", id) },
+    { label: "project connectors", execute: () => supabase.from("conectores").delete().eq("projeto_id", id) },
+    { label: "project asset rows", execute: () => supabase.from("agente_arquivos").delete().eq("projeto_id", id) },
+    { label: "project chats", execute: () => supabase.from("chats").delete().eq("projeto_id", id) },
+    { label: "project apis", execute: () => supabase.from("apis").delete().eq("projeto_id", id) },
+    { label: "project agents", execute: () => supabase.from("agentes").delete().eq("projeto_id", id) },
+  ];
+
+  for (const item of deletions) {
+    const { error } = await item.execute();
+    if (error) {
+      console.error(`[projetos] failed to delete ${item.label}`, error);
+      return false;
+    }
+  }
+
+  const { error } = await supabase.from("projetos").delete().eq("id", id);
+  if (error) {
+    console.error("[projetos] failed to delete projeto", error);
+    return false;
+  }
+
+  return true;
 }

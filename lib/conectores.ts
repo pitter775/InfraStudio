@@ -8,6 +8,10 @@ export const MERCADO_LIVRE_ENDPOINT_BASE = "https://api.mercadolibre.com";
 export type MercadoLivreConnectorConfig = {
   seller_id?: string;
   nickname?: string;
+  access_token?: string;
+  refresh_token?: string;
+  token_expires_at?: string;
+  user_id?: string;
 };
 
 export type ConnectorRecord = {
@@ -64,14 +68,34 @@ function normalizeMercadoLivreConfig(configuracoes?: Record<string, unknown> | n
     typeof configuracoes.nickname === "string" && configuracoes.nickname.trim()
       ? configuracoes.nickname.trim()
       : undefined;
+  const accessToken =
+    typeof configuracoes.access_token === "string" && configuracoes.access_token.trim()
+      ? configuracoes.access_token.trim()
+      : undefined;
+  const refreshToken =
+    typeof configuracoes.refresh_token === "string" && configuracoes.refresh_token.trim()
+      ? configuracoes.refresh_token.trim()
+      : undefined;
+  const tokenExpiresAt =
+    typeof configuracoes.token_expires_at === "string" && configuracoes.token_expires_at.trim()
+      ? configuracoes.token_expires_at.trim()
+      : undefined;
+  const userId =
+    typeof configuracoes.user_id === "string" && configuracoes.user_id.trim()
+      ? configuracoes.user_id.trim()
+      : undefined;
 
-  if (!sellerId && !nickname) {
+  if (!sellerId && !nickname && !accessToken && !refreshToken && !tokenExpiresAt && !userId) {
     return null;
   }
 
   return {
     seller_id: sellerId,
     nickname,
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    token_expires_at: tokenExpiresAt,
+    user_id: userId,
   };
 }
 
@@ -102,6 +126,24 @@ export async function listConectores(projetoId?: string | null) {
   }
 
   return data.map((row) => mapConnector(row as ConnectorRow));
+}
+
+export async function getConectorById(id: string) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("conectores")
+    .select("id, projeto_id, agente_id, nome, tipo, endpoint_base, configuracoes, ativo, created_at, updated_at")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !data) {
+    if (error) {
+      console.error("[conectores] failed to load connector by id", error);
+    }
+    return null;
+  }
+
+  return mapConnector(data as ConnectorRow);
 }
 
 export async function listConectoresByAgente(agenteId: string, tipo?: string) {
@@ -195,4 +237,16 @@ export async function updateConector(input: {
   }
 
   return mapConnector(data as ConnectorRow);
+}
+
+export async function deleteConector(id: string) {
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase.from("conectores").delete().eq("id", id);
+
+  if (error) {
+    console.error("[conectores] failed to delete connector", error);
+    return false;
+  }
+
+  return true;
 }

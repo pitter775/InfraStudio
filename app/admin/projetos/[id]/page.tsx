@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Bold, Bot, CheckCircle2, Copy, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, MessageSquare, Minimize2, Paperclip, Pencil, Plus, Sparkles, TestTube2, Trash2, X } from "lucide-react";
 import { getAgentRuntimeBlockEntries, normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
@@ -137,6 +137,7 @@ type Connector = {
   configuracoes: {
     seller_id?: string;
     nickname?: string;
+    access_token?: string;
   } | null;
   ativo: boolean;
   createdAt?: string;
@@ -162,6 +163,112 @@ type ProjetoDetalhe = {
   };
 };
 
+type AgentConnectionSummary = {
+  linkedApis: number;
+  activeApis: number;
+  widgets: number;
+  activeWidgets: number;
+  whatsappChannels: number;
+  onlineWhatsAppChannels: number;
+  connectors: number;
+  activeConnectors: number;
+  chats: number;
+  fallbackWidgets: number;
+};
+
+type AgentConnectionsPayload = {
+  apis: Array<{
+    id: string;
+    nome: string;
+    ativo: boolean;
+    parametrosObrigatorios: string[];
+  }>;
+  widgets: Array<{
+    id?: string;
+    nome: string;
+    slug: string;
+    ativo: boolean;
+    dominio: string;
+  }>;
+  fallbackWidgets: Array<{
+    id?: string;
+    nome: string;
+    slug: string;
+    ativo: boolean;
+  }>;
+  whatsappChannels: Array<{
+    id: string;
+    numero: string;
+    status: "ativo" | "inativo";
+    connectionStatus: string;
+    worker: string | null;
+    lastSyncAt: string | null;
+  }>;
+  connectors: Array<{
+    id?: string;
+    nome: string;
+    tipo: string;
+    ativo: boolean;
+    endpointBase: string;
+    sellerId: string | null;
+    nickname: string | null;
+  }>;
+  chatsRecentes: Array<{
+    id: string;
+    titulo: string;
+    canal: string;
+    updatedAt: string;
+  }>;
+};
+
+type AgentDiagnosticsOverview = {
+  summary: AgentConnectionSummary;
+  warnings: string[];
+  connections: AgentConnectionsPayload;
+};
+
+type AgentDiagnosticRun = {
+  ok: boolean;
+  checks: {
+    agent: { ok: boolean; detail: string };
+    chat: { ok: boolean; detail: string };
+    whatsapp: { ok: boolean; detail: string };
+    connectors: { ok: boolean; detail: string };
+    apis: Array<{
+      id: string;
+      nome: string;
+      ok: boolean;
+      status: string;
+      detail: string;
+    }>;
+  };
+};
+
+type AgentStoreSearchProduct = {
+  nome: string;
+  preco: number;
+  imagem: string;
+  link: string;
+  publicadoEm: string | null;
+};
+
+type AgentStoreSearchResult = {
+  termo: string;
+  produtos: AgentStoreSearchProduct[];
+  error: string | null;
+};
+
+type AgentStoreLatestResult = {
+  connector: {
+    id: string;
+    nome: string;
+    sellerId: string;
+    nickname: string | null;
+  } | null;
+  produtos: AgentStoreSearchProduct[];
+  error: string | null;
+};
+
 type WidgetFormState = ChatWidget & {
   id?: string;
 };
@@ -175,6 +282,7 @@ type ConnectorFormState = {
   endpointBase: string;
   sellerId: string;
   nickname: string;
+  accessToken: string;
   ativo: boolean;
 };
 
@@ -1215,6 +1323,7 @@ const emptyConnectorForm: ConnectorFormState = {
   endpointBase: "https://api.mercadolibre.com",
   sellerId: "",
   nickname: "",
+  accessToken: "",
   ativo: true,
 };
 
@@ -2363,8 +2472,10 @@ function ConnectorModal({
   agentes,
   saving,
   feedback,
+  copiedTutorial,
   onClose,
   onChange,
+  onCopyTutorial,
   onSubmit,
 }: {
   open: boolean;
@@ -2372,8 +2483,10 @@ function ConnectorModal({
   agentes: Agente[];
   saving: boolean;
   feedback: string | null;
+  copiedTutorial: boolean;
   onClose: () => void;
   onChange: (next: Partial<ConnectorFormState>) => void;
+  onCopyTutorial: () => void;
   onSubmit: () => void;
 }) {
   if (!open) {
@@ -2389,14 +2502,25 @@ function ConnectorModal({
             <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar conector" : "Novo conector"}</h2>
             <p className="mt-1 text-sm text-slate-400">Use este cadastro para o agente buscar produtos no Mercado Livre sem expor a resposta bruta da API.</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
-            aria-label="Fechar modal"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            {form.id ? (
+              <a
+                href={`/api/admin/conectores/${form.id}/mercado-livre/connect`}
+                className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/15 hover:text-white"
+              >
+                <ExternalLink size={14} />
+                Conectar Mercado Livre
+              </a>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label="Fechar modal"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="max-h-[calc(92vh-88px)] overflow-y-auto p-6">
@@ -2454,6 +2578,53 @@ function ConnectorModal({
                 className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
               />
             </div>
+            <div>
+              <FormLabel>Access token do Mercado Livre</FormLabel>
+              <input
+                type="password"
+                value={form.accessToken}
+                onChange={(event) => onChange({ accessToken: event.target.value })}
+                placeholder="APP_USR-..."
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+              />
+              <p className="mt-2 text-xs text-slate-400">Opcional para busca publica. Necessario para listar os ultimos produtos da loja quando a API exigir autenticacao.</p>
+            </div>
+            {!form.id ? (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
+                Salve o conector primeiro para habilitar o botao <span className="font-semibold">Conectar Mercado Livre</span> e concluir o OAuth automatico.
+              </div>
+            ) : null}
+            <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-white">Tutorial para o cliente da loja</p>
+                  <p className="mt-1 text-xs text-cyan-100/80">Use esse texto para pedir o APP ID e o CLIENT SECRET da conta do Mercado Livre.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onCopyTutorial}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+                >
+                  {copiedTutorial ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                  {copiedTutorial ? "Copiado" : "Copiar tutorial"}
+                </button>
+              </div>
+              <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4 text-xs leading-6 text-slate-200">
+                <p>Abre esse link:</p>
+                <p className="font-semibold text-white">https://developers.mercadolivre.com.br/apps</p>
+                <p className="mt-3">Clica em “Criar aplicação”</p>
+                <p className="mt-3">Preenche assim:</p>
+                <p>Nome: InfraStudio</p>
+                <p>Tipo: Web</p>
+                <p>URL de retorno:</p>
+                <p className="font-semibold text-white">https://infrastudio.vercel.app/api/admin/conectores/mercado-livre/callback</p>
+                <p className="mt-3">Depois de criar, vao aparecer 2 codigos na tela:</p>
+                <p>APP ID</p>
+                <p>CLIENT SECRET</p>
+                <p className="mt-3">Envie esses dois dados para configurar a integracao da loja.</p>
+                <p className="mt-3">Se aparecer botao de “autorizar” ou “permitir”, pode seguir normalmente.</p>
+              </div>
+            </div>
             <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
               <input type="checkbox" checked={form.ativo} onChange={(event) => onChange({ ativo: event.target.checked })} />
               Conector ativo
@@ -2475,6 +2646,200 @@ function ConnectorModal({
             </div>
 
             {feedback ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</div> : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentStoreSearchModal({
+  open,
+  agente,
+  termo,
+  latestLoading,
+  latestResult,
+  searchLoading,
+  searchResult,
+  onClose,
+  onTermoChange,
+  onLoadLatest,
+  onRunSearch,
+}: {
+  open: boolean;
+  agente: Agente | null;
+  termo: string;
+  latestLoading: boolean;
+  latestResult: AgentStoreLatestResult | null;
+  searchLoading: boolean;
+  searchResult: AgentStoreSearchResult | null;
+  onClose: () => void;
+  onTermoChange: (value: string) => void;
+  onLoadLatest: () => void;
+  onRunSearch: () => void;
+}) {
+  if (!open || !agente) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
+      <div className="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-200">Teste da loja</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{agente.nome}</h2>
+            <p className="mt-1 text-sm text-slate-400">Este teste usa a mesma busca de produtos que o WhatsApp usa no atendimento.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Fechar modal"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="max-h-[calc(92vh-88px)] overflow-y-auto p-6">
+          <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/10 p-4">
+            <p className="text-sm font-semibold text-white">Diagnostico da loja</p>
+            <p className="mt-1 text-xs text-emerald-100/80">O teste principal lista os ultimos produtos da loja. A busca por termo fica opcional logo abaixo.</p>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">Ultimos produtos da loja</p>
+                <p className="mt-1 text-xs text-slate-400">Usa o seller configurado no conector para listar os produtos mais recentes.</p>
+              </div>
+              <button
+                type="button"
+                onClick={onLoadLatest}
+                disabled={latestLoading}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100 disabled:opacity-60"
+              >
+                <TestTube2 size={15} />
+                {latestLoading ? "Carregando..." : "Listar ultimos"}
+              </button>
+            </div>
+
+            {latestResult ? (
+              <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${latestResult.error ? "bg-rose-500/15 text-rose-100" : "bg-emerald-500/15 text-emerald-100"}`}>
+                    {latestResult.error ? "Listagem com erro" : "Listagem validada"}
+                  </span>
+                  <p className="text-xs text-slate-300">
+                    {latestResult.connector
+                      ? `${latestResult.connector.nickname || latestResult.connector.nome} | seller ${latestResult.connector.sellerId}`
+                      : "Sem conector valido"}
+                  </p>
+                </div>
+
+                {latestResult.error ? <p className="mt-3 text-sm text-rose-100">{latestResult.error}</p> : null}
+
+                {latestResult.produtos.length ? (
+                  <div className="mt-4 space-y-3">
+                    {latestResult.produtos.map((produto) => (
+                      <div key={produto.link} className="rounded-xl border border-white/10 bg-slate-950/45 p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-white">{produto.nome}</p>
+                            <p className="mt-1 text-xs text-slate-300">
+                              R$ {produto.preco.toLocaleString("pt-BR")}
+                              {produto.publicadoEm ? ` | ${new Date(produto.publicadoEm).toLocaleString("pt-BR")}` : ""}
+                            </p>
+                          </div>
+                          <a
+                            href={produto.link}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+                          >
+                            <ExternalLink size={13} />
+                            Abrir
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+            <div>
+              <p className="text-sm font-semibold text-white">Busca opcional</p>
+              <p className="mt-1 text-xs text-slate-400">Quando quiser, rode a mesma busca por termo usada pelo WhatsApp.</p>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <input
+              value={termo}
+              onChange={(event) => onTermoChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  onRunSearch();
+                }
+              }}
+              placeholder="Ex.: sopeira porcelana real"
+              className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+            />
+            <button
+              type="button"
+              onClick={onRunSearch}
+              disabled={searchLoading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100 disabled:opacity-60"
+            >
+              <TestTube2 size={15} />
+              {searchLoading ? "Testando..." : "Testar busca"}
+            </button>
+          </div>
+
+          {searchResult ? (
+            <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${searchResult.error ? "bg-rose-500/15 text-rose-100" : "bg-emerald-500/15 text-emerald-100"}`}>
+                  {searchResult.error ? "Busca sem retorno" : "Busca validada"}
+                </span>
+                <p className="text-xs text-slate-300">
+                  Termo testado: <span className="font-semibold text-white">{searchResult.termo}</span>
+                </p>
+              </div>
+
+              {searchResult.error ? <p className="mt-3 text-sm text-rose-100">{searchResult.error}</p> : null}
+
+              {searchResult.produtos.length ? (
+                <div className="mt-4 space-y-3">
+                  {searchResult.produtos.map((produto) => (
+                    <div key={produto.link} className="rounded-xl border border-white/10 bg-slate-950/45 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-white">{produto.nome}</p>
+                          <p className="mt-1 text-xs text-slate-300">
+                            R$ {produto.preco.toLocaleString("pt-BR")}
+                            {produto.publicadoEm ? ` | ${new Date(produto.publicadoEm).toLocaleString("pt-BR")}` : ""}
+                          </p>
+                        </div>
+                        <a
+                          href={produto.link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+                        >
+                          <ExternalLink size={13} />
+                          Abrir
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           </div>
         </div>
       </div>
@@ -2662,6 +3027,8 @@ function ChatHistoryModal({
 
 export default function AdminProjetoDetalhePage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [data, setData] = useState<ProjetoDetalhe | null>(null);
   const [agenteForm, setAgenteForm] = useState<AgenteFormState>(emptyAgenteForm);
   const [apiForm, setApiForm] = useState<ApiFormState>(emptyApiForm);
@@ -2677,6 +3044,11 @@ export default function AdminProjetoDetalhePage() {
   const [savingWhatsAppChannel, setSavingWhatsAppChannel] = useState(false);
   const [connectingWhatsAppChannelId, setConnectingWhatsAppChannelId] = useState<string | null>(null);
   const [disconnectingWhatsAppChannelId, setDisconnectingWhatsAppChannelId] = useState<string | null>(null);
+  const [deletingAgenteId, setDeletingAgenteId] = useState<string | null>(null);
+  const [deletingConnectorId, setDeletingConnectorId] = useState<string | null>(null);
+  const [deletingWidgetId, setDeletingWidgetId] = useState<string | null>(null);
+  const [deletingWhatsAppChannelId, setDeletingWhatsAppChannelId] = useState<string | null>(null);
+  const [deletingProject, setDeletingProject] = useState(false);
   const [testingApi, setTestingApi] = useState(false);
   const [feedbackAgente, setFeedbackAgente] = useState<string | null>(null);
   const [feedbackApi, setFeedbackApi] = useState<string | null>(null);
@@ -2701,6 +3073,16 @@ export default function AdminProjetoDetalhePage() {
   const [expandedSnippetKeys, setExpandedSnippetKeys] = useState<Record<string, boolean>>({});
   const [serviceStatusByChannel, setServiceStatusByChannel] = useState<Record<string, string>>({});
   const [serviceQrByChannel, setServiceQrByChannel] = useState<Record<string, string | null>>({});
+  const [agentDiagnosticsById, setAgentDiagnosticsById] = useState<Record<string, AgentDiagnosticsOverview>>({});
+  const [runningAgentDiagnosticId, setRunningAgentDiagnosticId] = useState<string | null>(null);
+  const [latestAgentDiagnosticById, setLatestAgentDiagnosticById] = useState<Record<string, AgentDiagnosticRun>>({});
+  const [agentStoreSearchModalOpen, setAgentStoreSearchModalOpen] = useState(false);
+  const [agentStoreSearchTarget, setAgentStoreSearchTarget] = useState<Agente | null>(null);
+  const [agentStoreSearchTerm, setAgentStoreSearchTerm] = useState("");
+  const [agentStoreLatestLoading, setAgentStoreLatestLoading] = useState(false);
+  const [agentStoreSearchLoading, setAgentStoreSearchLoading] = useState(false);
+  const [agentStoreLatestResult, setAgentStoreLatestResult] = useState<AgentStoreLatestResult | null>(null);
+  const [agentStoreSearchResult, setAgentStoreSearchResult] = useState<AgentStoreSearchResult | null>(null);
 
   const loadProjeto = async () => {
     const response = await fetch(`/api/admin/projetos/${params.id}`, { cache: "no-store" });
@@ -2714,6 +3096,26 @@ export default function AdminProjetoDetalhePage() {
       ...prev,
       projetoId: payload.projeto.id,
     }));
+
+    const diagnosticsEntries = await Promise.all(
+      payload.agentes.map(async (agente) => {
+        try {
+          const diagnosticResponse = await fetch(`/api/admin/agentes/${agente.id}/diagnostico`, { cache: "no-store" });
+          if (!diagnosticResponse.ok) {
+            return null;
+          }
+
+          const diagnosticPayload = (await diagnosticResponse.json()) as AgentDiagnosticsOverview;
+          return [agente.id, diagnosticPayload] as const;
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    setAgentDiagnosticsById(
+      Object.fromEntries(diagnosticsEntries.filter((entry): entry is readonly [string, AgentDiagnosticsOverview] => Boolean(entry))),
+    );
   };
 
   useEffect(() => {
@@ -2722,6 +3124,22 @@ export default function AdminProjetoDetalhePage() {
     }
     void loadProjeto();
   }, [params.id]);
+
+  useEffect(() => {
+    const oauthStatus = searchParams.get("mercado_livre_oauth");
+    const oauthError = searchParams.get("mercado_livre_oauth_error");
+
+    if (oauthStatus === "success") {
+      setFeedbackConnector("Conexao com o Mercado Livre concluida. O conector recebeu os tokens da loja.");
+      router.replace(`/admin/projetos/${params.id}`);
+      return;
+    }
+
+    if (oauthError) {
+      setFeedbackConnector(oauthError);
+      router.replace(`/admin/projetos/${params.id}`);
+    }
+  }, [params.id, router, searchParams]);
 
   useEffect(() => {
     if (!data?.whatsappChannels.length) {
@@ -3103,6 +3521,137 @@ export default function AdminProjetoDetalhePage() {
     setFeedbackAgente("Resumo validado e configuracao tecnica atualizada.");
   };
 
+  const handleRunAgentDiagnostic = async (agente: Agente) => {
+    setRunningAgentDiagnosticId(agente.id);
+    setFeedbackAgente(null);
+
+    try {
+      const response = await fetch(`/api/admin/agentes/${agente.id}/diagnostico`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const payload = (await response.json()) as AgentDiagnosticRun & { error?: string };
+
+      if (!response.ok) {
+        setFeedbackAgente(payload.error ?? "Nao foi possivel validar o agente.");
+        return;
+      }
+
+      setLatestAgentDiagnosticById((current) => ({
+        ...current,
+        [agente.id]: payload,
+      }));
+
+      await loadProjeto();
+      setFeedbackAgente(
+        payload.ok
+          ? `Validacao concluida para "${agente.nome}". Chat, APIs, conectores e WhatsApp foram verificados.`
+          : `Validacao concluida para "${agente.nome}" com alertas. Veja os blocos de status do agente.`,
+      );
+    } catch (error) {
+      setFeedbackAgente(error instanceof Error ? error.message : "Nao foi possivel validar o agente.");
+    } finally {
+      setRunningAgentDiagnosticId(null);
+    }
+  };
+
+  const handleOpenAgentStoreSearchModal = (agente: Agente) => {
+    setFeedbackAgente(null);
+    setAgentStoreSearchTarget(agente);
+    setAgentStoreSearchTerm("");
+    setAgentStoreLatestResult(null);
+    setAgentStoreSearchResult(null);
+    setAgentStoreLatestLoading(false);
+    setAgentStoreSearchLoading(false);
+    setAgentStoreSearchModalOpen(true);
+  };
+
+  const handleLoadAgentLatestProducts = async () => {
+    const agente = agentStoreSearchTarget;
+
+    if (!agente) {
+      return;
+    }
+
+    setAgentStoreLatestLoading(true);
+    setAgentStoreLatestResult(null);
+    setFeedbackAgente(null);
+
+    try {
+      const response = await fetch(`/api/admin/agentes/${encodeURIComponent(agente.id)}/loja-teste`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const payload = (await response.json()) as AgentStoreLatestResult & { error?: string };
+      setAgentStoreLatestResult({
+        connector: payload.connector ?? null,
+        produtos: Array.isArray(payload.produtos) ? payload.produtos : [],
+        error: payload.error ?? null,
+      });
+    } catch (error) {
+      setAgentStoreLatestResult({
+        connector: null,
+        produtos: [],
+        error: error instanceof Error ? error.message : "Nao foi possivel listar os ultimos produtos da loja.",
+      });
+    } finally {
+      setAgentStoreLatestLoading(false);
+    }
+  };
+
+  const handleRunAgentStoreSearch = async () => {
+    const agente = agentStoreSearchTarget;
+    const termo = agentStoreSearchTerm.trim();
+
+    if (!agente) {
+      return;
+    }
+
+    if (!termo) {
+      setAgentStoreSearchResult({
+        termo: "",
+        produtos: [],
+        error: "Digite um termo para testar a busca da loja.",
+      });
+      return;
+    }
+
+    setAgentStoreSearchLoading(true);
+    setAgentStoreSearchResult(null);
+    setFeedbackAgente(null);
+
+    try {
+      const response = await fetch(`/api/produtos?termo=${encodeURIComponent(termo)}&agente_id=${encodeURIComponent(agente.id)}`, {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error(`A busca da loja retornou ${response.status}.`);
+      }
+
+      const payload = (await response.json()) as AgentStoreSearchProduct[];
+      setAgentStoreSearchResult({
+        termo,
+        produtos: payload,
+        error: payload.length ? null : `Nao encontrei resultados para "${termo}" na loja agora.`,
+      });
+    } catch (error) {
+      setAgentStoreSearchResult({
+        termo,
+        produtos: [],
+        error: error instanceof Error ? error.message : "Nao foi possivel testar a busca da loja.",
+      });
+    } finally {
+      setAgentStoreSearchLoading(false);
+    }
+  };
+
   const handleAgenteSubmit = async () => {
     setSavingAgente(true);
     setFeedbackAgente(null);
@@ -3299,12 +3848,13 @@ export default function AdminProjetoDetalhePage() {
         configuracoes: {
           seller_id: connectorForm.sellerId.trim(),
           nickname: connectorForm.nickname.trim() || undefined,
+          access_token: connectorForm.accessToken.trim() || undefined,
         },
         ativo: connectorForm.ativo,
       }),
     });
 
-    const payload = (await response.json()) as { error?: string };
+    const payload = (await response.json()) as { error?: string; conector?: Connector };
     if (!response.ok) {
       setFeedbackConnector(payload.error ?? "Nao foi possivel salvar o conector.");
       setSavingConnector(false);
@@ -3312,6 +3862,25 @@ export default function AdminProjetoDetalhePage() {
     }
 
     await loadProjeto();
+
+    if (!connectorForm.id && payload.conector) {
+      setConnectorForm({
+        id: payload.conector.id,
+        nome: payload.conector.nome,
+        tipo: payload.conector.tipo === "mercado_livre" ? "mercado_livre" : "mercado_livre",
+        projetoId: payload.conector.projetoId ?? params.id,
+        agenteId: payload.conector.agenteId,
+        endpointBase: payload.conector.endpointBase || "https://api.mercadolibre.com",
+        sellerId: payload.conector.configuracoes?.seller_id ?? "",
+        nickname: payload.conector.configuracoes?.nickname ?? "",
+        accessToken: payload.conector.configuracoes?.access_token ?? "",
+        ativo: payload.conector.ativo,
+      });
+      setSavingConnector(false);
+      setFeedbackConnector("Conector criado com sucesso. Agora clique em Conectar Mercado Livre para autorizar a loja.");
+      return;
+    }
+
     const message = connectorForm.id ? "Conector atualizado com sucesso." : "Conector criado com sucesso.";
     resetConnectorForm();
     setSavingConnector(false);
@@ -3486,6 +4055,7 @@ export default function AdminProjetoDetalhePage() {
       endpointBase: connector.endpointBase || "https://api.mercadolibre.com",
       sellerId: connector.configuracoes?.seller_id ?? "",
       nickname: connector.configuracoes?.nickname ?? "",
+      accessToken: connector.configuracoes?.access_token ?? "",
       ativo: connector.ativo,
     });
     setFeedbackConnector(null);
@@ -3633,6 +4203,208 @@ export default function AdminProjetoDetalhePage() {
     setFeedbackApi(`API "${api.nome}" excluida com sucesso.`);
   };
 
+  const handleDeleteAgente = async (agente: Agente) => {
+    const confirmed = window.confirm(
+      `Remover completamente o agente "${agente.nome}"?\n\nIsso tambem apaga arquivos, widgets, canais WhatsApp, conectores e chats vinculados a ele.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingAgenteId(agente.id);
+    setFeedbackAgente(null);
+
+    try {
+      const response = await fetch("/api/admin/agentes", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: agente.id,
+          projetoId: params.id,
+        }),
+      });
+
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setFeedbackAgente(payload.error ?? "Nao foi possivel excluir o agente.");
+        return;
+      }
+
+      await loadProjeto();
+      if (agenteForm.id === agente.id) {
+        resetAgenteForm();
+      }
+      setFeedbackAgente(`Agente "${agente.nome}" removido completamente.`);
+    } finally {
+      setDeletingAgenteId(null);
+    }
+  };
+
+  const handleDeleteConnector = async (connector: Connector) => {
+    const confirmed = window.confirm(`Remover completamente o conector "${connector.nome}"?`);
+    if (!confirmed || !connector.id) {
+      return;
+    }
+
+    setDeletingConnectorId(connector.id);
+    setFeedbackConnector(null);
+
+    try {
+      const response = await fetch("/api/admin/conectores", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: connector.id,
+          projetoId: params.id,
+        }),
+      });
+
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setFeedbackConnector(payload.error ?? "Nao foi possivel excluir o conector.");
+        return;
+      }
+
+      await loadProjeto();
+      if (connectorForm.id === connector.id) {
+        resetConnectorForm();
+      }
+      setFeedbackConnector(`Conector "${connector.nome}" removido completamente.`);
+    } finally {
+      setDeletingConnectorId(null);
+    }
+  };
+
+  const handleDeleteWidget = async (widget: ChatWidget) => {
+    const confirmed = window.confirm(`Remover completamente o widget "${widget.nome}"?`);
+    if (!confirmed || !widget.id) {
+      return;
+    }
+
+    setDeletingWidgetId(widget.id);
+    setFeedbackWidget(null);
+
+    try {
+      const response = await fetch("/api/admin/chat-widgets", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: widget.id,
+          projetoId: params.id,
+        }),
+      });
+
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setFeedbackWidget(payload.error ?? "Nao foi possivel excluir o widget.");
+        return;
+      }
+
+      await loadProjeto();
+      if (widgetForm.id === widget.id) {
+        resetWidgetForm();
+      }
+      setFeedbackWidget(`Widget "${widget.nome}" removido completamente.`);
+    } finally {
+      setDeletingWidgetId(null);
+    }
+  };
+
+  const handleDeleteWhatsAppChannel = async (channel: WhatsAppChannel) => {
+    const confirmed = window.confirm(
+      `Remover completamente o canal ${formatWhatsAppPhone(channel.numero)}?\n\nIsso apaga o cadastro do WhatsApp deste projeto.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingWhatsAppChannelId(channel.id);
+    setFeedbackWhatsApp(null);
+
+    try {
+      const serviceUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL?.trim();
+      if (serviceUrl) {
+        await fetch(`${serviceUrl.replace(/\/$/, "")}/disconnect`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            channelId: channel.id,
+          }),
+        });
+      }
+
+      const response = await fetch("/api/admin/whatsapp-canais", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: channel.id,
+          projetoId: params.id,
+        }),
+      });
+
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setFeedbackWhatsApp(payload.error ?? "Nao foi possivel excluir o canal WhatsApp.");
+        return;
+      }
+
+      setServiceQrByChannel((current) => ({
+        ...current,
+        [channel.id]: null,
+      }));
+      setServiceStatusByChannel((current) => ({
+        ...current,
+        [channel.id]: "desconectado",
+      }));
+      await loadProjeto();
+      if (whatsAppChannelForm.id === channel.id) {
+        resetWhatsAppChannelForm();
+      }
+      setFeedbackWhatsApp(`Canal ${formatWhatsAppPhone(channel.numero)} removido completamente.`);
+    } finally {
+      setDeletingWhatsAppChannelId(null);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    const projectName = data?.projeto.nome ?? "este projeto";
+    const confirmed = window.confirm(
+      `Remover completamente o projeto "${projectName}"?\n\nIsso apaga agentes, APIs, conectores, widgets, WhatsApp, chats, logs e vinculos do projeto.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingProject(true);
+    setFeedbackWhatsApp(null);
+
+    try {
+      const response = await fetch(`/api/admin/projetos/${params.id}`, {
+        method: "DELETE",
+      });
+
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setFeedbackWhatsApp(payload.error ?? "Nao foi possivel excluir o projeto.");
+        return;
+      }
+
+      router.push("/admin/projetos");
+    } finally {
+      setDeletingProject(false);
+    }
+  };
+
   const toggleApiCampo = (campo: ApiCampo) => {
     setApiForm((prev) => {
       const exists = prev.campos.some((item) => item.nome === campo.nome);
@@ -3774,38 +4546,63 @@ export default function AdminProjetoDetalhePage() {
         </div>
         <h1 className="text-4xl font-extrabold text-white">{data.projeto.nome}</h1>
         <p className="mt-3 max-w-3xl text-slate-400">{data.projeto.descricao || "Sem descricao cadastrada."}</p>
-        <div className="mt-6 grid gap-4 md:grid-cols-8">
-          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Slug</p>
-            <p className="mt-2 text-lg font-bold text-white">{data.projeto.slug ?? "sem-slug"}</p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => void handleDeleteProject()}
+            disabled={deletingProject}
+            className="inline-flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100 disabled:opacity-60"
+          >
+            <Trash2 size={16} />
+            {deletingProject ? "Removendo projeto..." : "Remover projeto completamente"}
+          </button>
+        </div>
+        <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1.2fr),minmax(0,0.9fr)]">
+          <div className="rounded-2xl border border-white/8 bg-slate-950/30 p-5">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),minmax(260px,0.72fr)]">
+              <div className="min-w-0 rounded-xl border border-white/8 bg-white/[0.03] p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Slug do projeto</p>
+                <p className="mt-2 truncate text-lg font-bold text-white" title={data.projeto.slug ?? "sem-slug"}>
+                  {data.projeto.slug ?? "sem-slug"}
+                </p>
+              </div>
+              <div className="min-w-0 rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Agente ativo</p>
+                <p className="mt-2 text-xl font-extrabold leading-tight text-white">
+                  {agenteAtivo?.nome ?? "Nenhum ativo"}
+                </p>
+                <p className="mt-2 text-sm text-cyan-50/75">
+                  {agenteAtivo ? "Esse agente responde pelo projeto quando o canal estiver valido." : "Sem agente ativo para atender este projeto."}
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
+
+          <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-3">
+          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4 xl:col-span-1">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Agentes</p>
             <p className="mt-2 text-lg font-bold text-white">{data.stats.totalAgentes}</p>
           </div>
-          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
+          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4 xl:col-span-1">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">APIs</p>
             <p className="mt-2 text-lg font-bold text-white">{data.stats.totalApis}</p>
           </div>
-          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
+          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4 xl:col-span-2">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Conectores</p>
             <p className="mt-2 text-lg font-bold text-white">{data.stats.totalConectores}</p>
           </div>
-          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
+          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4 xl:col-span-1">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Widgets</p>
             <p className="mt-2 text-lg font-bold text-white">{data.stats.totalWidgets}</p>
           </div>
-          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
+          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4 xl:col-span-2">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">WhatsApp</p>
             <p className="mt-2 text-lg font-bold text-white">{data.stats.totalWhatsAppChannels}</p>
           </div>
-          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
+          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4 xl:col-span-1">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Chats</p>
             <p className="mt-2 text-lg font-bold text-white">{data.stats.totalChats}</p>
           </div>
-          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Agente ativo</p>
-            <p className="mt-2 text-lg font-bold text-white">{agenteAtivo?.nome ?? "Nenhum ativo"}</p>
           </div>
         </div>
         <div className="mt-10">
@@ -3898,6 +4695,8 @@ export default function AdminProjetoDetalhePage() {
                 const linkedApis = getAgentLinkedApis(agente);
                 const inactiveApis = getAgentInactiveApis(agente);
                 const requiredParameters = getAgentRequiredParameters(agente);
+                const diagnostic = agentDiagnosticsById[agente.id];
+                const latestDiagnostic = latestAgentDiagnosticById[agente.id];
 
                 return (
                   <div key={agente.id} className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
@@ -3923,10 +4722,187 @@ export default function AdminProjetoDetalhePage() {
                         {requiredParameters.length ? (
                           <p className="mt-1 text-xs text-cyan-100/80">O chat precisa enviar no contexto: {requiredParameters.map((parametro) => parametro.nome).join(", ")}</p>
                         ) : null}
+
+                        {diagnostic ? (
+                          <div className="mt-4 grid gap-3 md:grid-cols-5">
+                            <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-3">
+                              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">APIs</p>
+                              <p className="mt-2 text-sm font-bold text-white">{diagnostic.summary.activeApis}/{diagnostic.summary.linkedApis}</p>
+                            </div>
+                            <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-3">
+                              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Widgets</p>
+                              <p className="mt-2 text-sm font-bold text-white">{diagnostic.summary.activeWidgets}/{diagnostic.summary.widgets}</p>
+                            </div>
+                            <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-3">
+                              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">WhatsApp</p>
+                              <p className="mt-2 text-sm font-bold text-white">{diagnostic.summary.onlineWhatsAppChannels}/{diagnostic.summary.whatsappChannels}</p>
+                            </div>
+                            <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-3">
+                              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Conectores</p>
+                              <p className="mt-2 text-sm font-bold text-white">{diagnostic.summary.activeConnectors}/{diagnostic.summary.connectors}</p>
+                            </div>
+                            <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-3">
+                              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Chats</p>
+                              <p className="mt-2 text-sm font-bold text-white">{diagnostic.summary.chats}</p>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {diagnostic ? (
+                          <div className="mt-3 space-y-2">
+                            <p className="text-xs font-semibold text-slate-300">
+                              Conectado em:{" "}
+                              {[
+                                diagnostic.connections.widgets.length ? `${diagnostic.connections.widgets.length} widget(s) diretos` : null,
+                                diagnostic.connections.whatsappChannels.length ? `${diagnostic.connections.whatsappChannels.length} canal(is) WhatsApp` : null,
+                                diagnostic.connections.connectors.length ? `${diagnostic.connections.connectors.length} conector(es)` : null,
+                                diagnostic.connections.apis.length ? `${diagnostic.connections.apis.length} API(s)` : null,
+                              ]
+                                .filter(Boolean)
+                                .join(" | ") || "sem vinculos diretos"}
+                            </p>
+                            {diagnostic.summary.fallbackWidgets ? (
+                              <p className="text-xs text-amber-200/80">
+                                Widgets genericos do projeto: {diagnostic.summary.fallbackWidgets}. Eles podem atender sem ficar presos a este agente.
+                              </p>
+                            ) : null}
+                            {diagnostic.connections.whatsappChannels.length ? (
+                              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-3">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-200">WhatsApp ativo no agente</p>
+                                <div className="mt-2 space-y-1">
+                                  {diagnostic.connections.whatsappChannels.map((channel) => (
+                                    <p key={channel.id} className="text-sm font-semibold text-white">
+                                      {formatWhatsAppPhone(channel.numero)}{" "}
+                                      <span className={`text-xs font-medium ${channel.connectionStatus === "online" ? "text-emerald-200" : "text-amber-200"}`}>
+                                        {channel.status} | {channel.connectionStatus}
+                                      </span>
+                                    </p>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                            {diagnostic.connections.connectors.length ? (
+                              <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-3">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">Loja conectada ao agente</p>
+                                <div className="mt-2 space-y-1">
+                                  {diagnostic.connections.connectors.map((connector) => (
+                                    <p key={connector.id ?? connector.nome} className="text-sm font-semibold text-white">
+                                      {connector.nickname || connector.nome}
+                                      <span className="ml-2 text-xs font-medium text-cyan-100/80">
+                                        {connector.tipo}
+                                        {connector.sellerId ? ` | seller ${connector.sellerId}` : ""}
+                                      </span>
+                                    </p>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                            {diagnostic.warnings.map((warning) => (
+                              <p key={warning} className="text-xs text-amber-200/80">{warning}</p>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        {latestDiagnostic ? (
+                          <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 p-3">
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${latestDiagnostic.ok ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-200"}`}>
+                                {latestDiagnostic.ok ? "validado" : "com alertas"}
+                              </span>
+                              <p className="text-xs text-slate-300">Teste de loja, APIs, WhatsApp e chat do agente</p>
+                            </div>
+                            <div className="mt-3 grid gap-2 md:grid-cols-2">
+                              <p className="text-xs text-slate-300">Chat: <span className={latestDiagnostic.checks.chat.ok ? "text-emerald-300" : "text-amber-200"}>{latestDiagnostic.checks.chat.detail}</span></p>
+                              <p className="text-xs text-slate-300">WhatsApp: <span className={latestDiagnostic.checks.whatsapp.ok ? "text-emerald-300" : "text-amber-200"}>{latestDiagnostic.checks.whatsapp.detail}</span></p>
+                              <p className="text-xs text-slate-300">Conectores: <span className={latestDiagnostic.checks.connectors.ok ? "text-emerald-300" : "text-amber-200"}>{latestDiagnostic.checks.connectors.detail}</span></p>
+                              <p className="text-xs text-slate-300">Agente: <span className={latestDiagnostic.checks.agent.ok ? "text-emerald-300" : "text-amber-200"}>{latestDiagnostic.checks.agent.detail}</span></p>
+                            </div>
+                            {diagnostic?.connections.connectors.length ? (
+                              <div className="mt-3 space-y-1">
+                                {diagnostic.connections.connectors.map((connector) => (
+                                  <p key={connector.id ?? connector.nome} className="text-xs text-slate-300">
+                                    Conector {connector.nome}:{" "}
+                                    <span className={connector.ativo ? "text-emerald-300" : "text-slate-400"}>
+                                      {connector.tipo}
+                                      {connector.nickname ? ` | ${connector.nickname}` : ""}
+                                      {connector.sellerId ? ` | seller ${connector.sellerId}` : ""}
+                                    </span>
+                                  </p>
+                                ))}
+                              </div>
+                            ) : null}
+                            {diagnostic?.connections.whatsappChannels.length ? (
+                              <div className="mt-3 space-y-1">
+                                {diagnostic.connections.whatsappChannels.map((channel) => (
+                                  <p key={channel.id} className="text-xs text-slate-300">
+                                    Canal WhatsApp {formatWhatsAppPhone(channel.numero)}:{" "}
+                                    <span className={channel.connectionStatus === "online" ? "text-emerald-300" : "text-amber-200"}>
+                                      {channel.status} | {channel.connectionStatus}
+                                    </span>
+                                  </p>
+                                ))}
+                              </div>
+                            ) : null}
+                            {diagnostic?.connections.widgets.length ? (
+                              <div className="mt-3 space-y-1">
+                                {diagnostic.connections.widgets.map((widget) => (
+                                  <p key={widget.id ?? widget.slug} className="text-xs text-slate-300">
+                                    Widget {widget.nome}:{" "}
+                                    <span className={widget.ativo ? "text-emerald-300" : "text-slate-400"}>
+                                      slug {widget.slug}
+                                      {widget.dominio ? ` | ${widget.dominio}` : ""}
+                                    </span>
+                                  </p>
+                                ))}
+                              </div>
+                            ) : null}
+                            {latestDiagnostic.checks.apis.length ? (
+                              <div className="mt-3 space-y-1">
+                                {latestDiagnostic.checks.apis.map((apiCheck) => (
+                                  <p key={apiCheck.id} className="text-xs text-slate-300">
+                                    API {apiCheck.nome}:{" "}
+                                    <span className={apiCheck.ok ? "text-emerald-300" : apiCheck.status === "pendente_contexto" ? "text-cyan-200" : "text-amber-200"}>
+                                      {apiCheck.detail}
+                                    </span>
+                                  </p>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+
                       </div>
-                      <button type="button" onClick={() => handleEditAgente(agente)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200">
-                        Editar
-                      </button>
+                      <div className="flex flex-col gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void handleRunAgentDiagnostic(agente)}
+                          disabled={runningAgentDiagnosticId === agente.id}
+                          className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-100 disabled:opacity-60"
+                        >
+                          <TestTube2 size={14} />
+                          {runningAgentDiagnosticId === agente.id ? "Validando..." : "Validar tudo"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAgentStoreSearchModal(agente)}
+                          className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100 disabled:opacity-60"
+                        >
+                          <TestTube2 size={14} />
+                          Testar busca da loja
+                        </button>
+                        <button type="button" onClick={() => handleEditAgente(agente)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200">
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteAgente(agente)}
+                          disabled={deletingAgenteId === agente.id}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-100 disabled:opacity-60"
+                        >
+                          <Trash2 size={14} />
+                          {deletingAgenteId === agente.id ? "Removendo..." : "Remover completamente"}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -4038,11 +5014,32 @@ export default function AdminProjetoDetalhePage() {
                         <p className="mt-2 text-sm text-slate-400">Agente: {agente?.nome ?? "nao vinculado"}</p>
                         <p className="mt-1 text-sm text-slate-400">Seller ID: {connector.configuracoes?.seller_id ?? "nao informado"}</p>
                         {connector.configuracoes?.nickname ? <p className="mt-1 text-sm text-slate-400">Nickname: {connector.configuracoes.nickname}</p> : null}
+                        <p className="mt-1 text-sm text-slate-400">
+                          OAuth: {connector.configuracoes?.refresh_token ? "conectado" : connector.configuracoes?.access_token ? "token manual" : "nao conectado"}
+                        </p>
                         <p className="mt-1 truncate text-xs text-cyan-200/80">{connector.endpointBase}</p>
                       </div>
-                      <button type="button" onClick={() => handleEditConnector(connector)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200">
-                        Editar
-                      </button>
+                      <div className="flex flex-col gap-2">
+                        <a
+                          href={`/api/admin/conectores/${connector.id}/mercado-livre/connect`}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100"
+                        >
+                          <ExternalLink size={14} />
+                          Conectar ML
+                        </a>
+                        <button type="button" onClick={() => handleEditConnector(connector)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200">
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteConnector(connector)}
+                          disabled={deletingConnectorId === connector.id}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-100 disabled:opacity-60"
+                        >
+                          <Trash2 size={14} />
+                          {deletingConnectorId === connector.id ? "Removendo..." : "Remover completamente"}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -4131,6 +5128,14 @@ export default function AdminProjetoDetalhePage() {
                           className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-slate-200"
                         >
                           Editar numero
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteWhatsAppChannel(channel)}
+                          disabled={deletingWhatsAppChannelId === channel.id}
+                          className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-5 py-3 text-sm font-bold text-rose-100 disabled:opacity-60"
+                        >
+                          {deletingWhatsAppChannelId === channel.id ? "Removendo..." : "Remover completamente"}
                         </button>
                         <button
                           type="button"
@@ -4311,6 +5316,15 @@ export default function AdminProjetoDetalhePage() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => void handleDeleteWhatsAppChannel(primaryWhatsAppChannel)}
+                      disabled={deletingWhatsAppChannelId === primaryWhatsAppChannel.id}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 font-semibold text-rose-100 transition-colors hover:bg-rose-500/15 hover:text-white disabled:opacity-60"
+                    >
+                      <Trash2 size={16} />
+                      {deletingWhatsAppChannelId === primaryWhatsAppChannel.id ? "Removendo..." : "Remover canal"}
+                    </button>
+                    <button
+                      type="button"
                       onClick={openNewWhatsAppChannelModal}
                       className="inline-flex items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
                     >
@@ -4456,6 +5470,15 @@ export default function AdminProjetoDetalhePage() {
                                   className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
                                 >
                                   Editar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDeleteWidget(widget)}
+                                  disabled={deletingWidgetId === widget.id}
+                                  className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/20 bg-rose-500/10 px-3 py-1.5 text-[11px] font-semibold text-rose-100 transition-colors hover:bg-rose-500/15 hover:text-white disabled:opacity-60"
+                                >
+                                  <Trash2 size={13} />
+                                  {deletingWidgetId === widget.id ? "Removendo..." : "Remover"}
                                 </button>
                               </div>
                             </div>
@@ -4694,6 +5717,27 @@ export default function AdminProjetoDetalhePage() {
         onValidateSummary={handleValidateAgenteSummary}
         onSubmit={() => void handleAgenteSubmit()}
       />
+      <AgentStoreSearchModal
+        open={agentStoreSearchModalOpen}
+        agente={agentStoreSearchTarget}
+        termo={agentStoreSearchTerm}
+        latestLoading={agentStoreLatestLoading}
+        latestResult={agentStoreLatestResult}
+        searchLoading={agentStoreSearchLoading}
+        searchResult={agentStoreSearchResult}
+        onClose={() => {
+          setAgentStoreSearchModalOpen(false);
+          setAgentStoreSearchTarget(null);
+          setAgentStoreSearchTerm("");
+          setAgentStoreLatestResult(null);
+          setAgentStoreSearchResult(null);
+          setAgentStoreLatestLoading(false);
+          setAgentStoreSearchLoading(false);
+        }}
+        onTermoChange={setAgentStoreSearchTerm}
+        onLoadLatest={() => void handleLoadAgentLatestProducts()}
+        onRunSearch={() => void handleRunAgentStoreSearch()}
+      />
 
       <ApiModal
         open={apiModalOpen}
@@ -4742,6 +5786,7 @@ export default function AdminProjetoDetalhePage() {
         agentes={data.agentes}
         saving={savingConnector}
         feedback={feedbackConnector}
+        copiedTutorial={copiedSnippetKey === "mercado-livre-oauth-tutorial"}
         onClose={() => {
           setConnectorModalOpen(false);
           resetConnectorForm();
@@ -4752,6 +5797,31 @@ export default function AdminProjetoDetalhePage() {
             ...next,
             projetoId: params.id,
           }))
+        }
+        onCopyTutorial={() =>
+          void handleCopySnippet(
+            "mercado-livre-oauth-tutorial",
+            [
+              "Abre esse link:",
+              "https://developers.mercadolivre.com.br/apps",
+              "",
+              "Clica em \"Criar aplicação\"",
+              "",
+              "Preenche assim:",
+              "Nome: InfraStudio",
+              "Tipo: Web",
+              "URL de retorno:",
+              "https://infrastudio.vercel.app/api/admin/conectores/mercado-livre/callback",
+              "",
+              "Depois de criar, vao aparecer 2 codigos na tela:",
+              "APP ID",
+              "CLIENT SECRET",
+              "",
+              "Envie esses dois dados para configurar a integracao da loja.",
+              "",
+              "Se aparecer botao de \"autorizar\" ou \"permitir\", pode seguir normalmente.",
+            ].join("\n"),
+          )
         }
         onSubmit={() => void handleConnectorSubmit()}
       />

@@ -276,6 +276,7 @@ export async function findActiveChatByChannel(input: {
   agenteId?: string | null;
   canal: ChatChannelKind;
   identificadorExterno: string;
+  channelScopeId?: string | null;
 }) {
   const supabase = getSupabaseAdminClient();
   let query = supabase
@@ -285,7 +286,7 @@ export async function findActiveChatByChannel(input: {
     .eq("identificador_externo", input.identificadorExterno.trim())
     .eq("status", "ativo")
     .order("updated_at", { ascending: false })
-    .limit(1);
+    .limit(input.channelScopeId ? 20 : 1);
 
   if (input.projetoId) {
     query = query.eq("projeto_id", input.projetoId);
@@ -295,16 +296,35 @@ export async function findActiveChatByChannel(input: {
     query = query.eq("agente_id", input.agenteId);
   }
 
-  const { data, error } = await query.maybeSingle();
+  if (!input.channelScopeId) {
+    const { data, error } = await query.maybeSingle();
+
+    if (error || !data) {
+      if (error) {
+        console.error("[chats] failed to find active chat by channel", error);
+      }
+      return null;
+    }
+
+    return mapChat(data as ChatRow);
+  }
+
+  const { data, error } = await query;
 
   if (error || !data) {
     if (error) {
-      console.error("[chats] failed to find active chat by channel", error);
+      console.error("[chats] failed to find active chat candidates by channel", error);
     }
     return null;
   }
 
-  return mapChat(data as ChatRow);
+  const match = data.find((row) => {
+    const mapped = mapChat(row as ChatRow);
+    const whatsapp = (mapped.contexto?.whatsapp ?? null) as Record<string, unknown> | null;
+    return typeof whatsapp?.channelId === "string" && whatsapp.channelId === input.channelScopeId;
+  });
+
+  return match ? mapChat(match as ChatRow) : null;
 }
 
 export async function listChats(projetoId?: string | null) {

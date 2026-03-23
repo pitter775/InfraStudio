@@ -50,9 +50,23 @@ function upsertStoredChannel(config) {
   saveStoredChannels(store);
 }
 
+function removeStoredChannel(channelId) {
+  const store = loadStoredChannels();
+  if (!store[channelId]) {
+    return;
+  }
+
+  delete store[channelId];
+  saveStoredChannels(store);
+}
+
 function getStoredChannel(channelId) {
   const store = loadStoredChannels();
   return store[channelId] || null;
+}
+
+function listStoredChannels() {
+  return Object.values(loadStoredChannels()).filter(Boolean);
 }
 
 function json(res, statusCode, payload) {
@@ -314,19 +328,30 @@ async function startSession(config) {
   return getSessionSnapshot(state);
 }
 
-async function stopSession(channelId) {
+async function stopSession(channelId, options = {}) {
+  const shouldPurge = options.purge === true;
   const state = sessions.get(channelId);
   const stored = getStoredChannel(channelId);
 
   if (stored) {
-    upsertStoredChannel({
-      ...stored,
-      active: false,
-    });
+    if (shouldPurge) {
+      removeStoredChannel(channelId);
+    } else {
+      upsertStoredChannel({
+        ...stored,
+        active: false,
+      });
+    }
   }
 
   if (!state) {
-    return { channelId, status: "desconectado" };
+    try {
+      fs.rmSync(getAuthSessionDir(channelId), { recursive: true, force: true });
+    } catch (error) {
+      console.error("[whatsapp-service] failed to purge auth session", error);
+    }
+
+    return { channelId, status: "desconectado", purged: shouldPurge };
   }
 
   state.manualDisconnect = true;
@@ -367,7 +392,62 @@ async function stopSession(channelId) {
 
   sessions.delete(channelId);
 
-  return getSessionSnapshot(state);
+  return {
+    ...getSessionSnapshot(state),
+    purged: shouldPurge,
+  };
+}
+
+async function purgeSessions(filters = {}) {
+  const requestedIds = Array.isArray(filters.channelIds)
+    ? filters.channelIds.filter(Boolean)
+    : [];
+  const byChannelId = filters.channelId ? [filters.channelId] : [];
+  const explicitIds = [...new Set([...requestedIds, ...byChannelId])];
+  const stored = listStoredChannels();
+  const matchedStoredIds = stored
+    .filter((item) => {
+      if (explicitIds.length && explicitIds.includes(item.channelId)) {
+        return true;
+      }
+
+      if (filters.projetoId && item.projetoId === filters.projetoId) {
+        return true;
+      }
+
+      if (filters.agenteId && item.agenteId === filters.agenteId) {
+        return true;
+      }
+
+      return false;
+    })
+    .map((item) => item.channelId)
+    .filter(Boolean);
+  const matchedSessionIds = [...sessions.values()]
+    .filter((item) => {
+      if (explicitIds.length && explicitIds.includes(item.channelId)) {
+        return true;
+      }
+
+      if (filters.projetoId && item.projetoId === filters.projetoId) {
+        return true;
+      }
+
+      if (filters.agenteId && item.agenteId === filters.agenteId) {
+        return true;
+      }
+
+      return false;
+    })
+    .map((item) => item.channelId)
+    .filter(Boolean);
+
+  const targetIds = [...new Set([...explicitIds, ...matchedStoredIds, ...matchedSessionIds])];
+  for (const channelId of targetIds) {
+    await stopSession(channelId, { purge: true });
+  }
+
+  return targetIds;
 }
 
 async function bootstrapStoredSessions() {
@@ -475,6 +555,18 @@ const server = http.createServer(async (req, res) => {
 
       const snapshot = await stopSession(body.channelId);
       json(res, 200, snapshot);
+      return;
+    }
+
+    if (req.method === "POST" && requestUrl.pathname === "/purge") {
+      const body = await readRequestBody(req);
+      const purged = await purgeSessions({
+        channelId: body.channelId || null,
+        channelIds: Array.isArray(body.channelIds) ? body.channelIds : [],
+        projetoId: body.projetoId || null,
+        agenteId: body.agenteId || null,
+      });
+      json(res, 200, { ok: true, purged });
       return;
     }
 

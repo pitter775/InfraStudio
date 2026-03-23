@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { getAgenteAtivo, getAgenteByIdentifier } from "@/lib/agentes";
+import { getAgenteByIdentifier } from "@/lib/agentes";
 import { getChatWidgetByProjetoAgente } from "@/lib/chat-widgets";
 import { getProjetoByIdentifier } from "@/lib/projetos";
+import { appendRuntimeErrorLog } from "@/lib/runtime-error-log";
 
 function buildCorsHeaders(origin: string | null) {
   return {
@@ -37,9 +38,28 @@ export async function GET(request: Request) {
     }
 
     let agente = agenteIdentifier ? await getAgenteByIdentifier(agenteIdentifier, projeto.id) : null;
+    const explicitAgentRequested = Boolean(agenteIdentifier);
+
+    if (agente && (!agente.ativo || agente.projetoId !== projeto.id)) {
+      agente = null;
+    }
 
     if (!agente) {
-      agente = await getAgenteAtivo(projeto.id);
+      await appendRuntimeErrorLog({
+        source: "api_chat_config",
+        message: explicitAgentRequested
+          ? "Agente explicito invalido, inativo ou fora do projeto."
+          : "Chat config sem agente valido. Fallback automatico bloqueado.",
+        projetoId: projeto.id,
+        payload: {
+          projetoIdentifier,
+          agenteIdentifier,
+        },
+      });
+      return NextResponse.json(
+        { error: explicitAgentRequested ? "Agente nao encontrado, inativo ou fora do projeto." : "Nenhum agente valido informado para este chat." },
+        { status: 404, headers: corsHeaders },
+      );
     }
     const widget = await getChatWidgetByProjetoAgente({ projetoId: projeto.id, agenteId: agente?.id ?? null });
 

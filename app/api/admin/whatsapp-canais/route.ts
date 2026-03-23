@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { canAccessAdmin, canManageProject, resolveCurrentProjectId } from "@/lib/access";
 import { getAgenteById } from "@/lib/agentes";
 import { getSessionUser } from "@/lib/session";
-import { createWhatsAppChannel, listWhatsAppChannels, updateWhatsAppChannel, WhatsAppChannelError } from "@/lib/whatsapp-channels";
+import { createWhatsAppChannel, deleteWhatsAppChannel, getWhatsAppChannelById, listWhatsAppChannels, updateWhatsAppChannel, WhatsAppChannelError } from "@/lib/whatsapp-channels";
 
 type WhatsAppChannelBody = {
   id?: string;
@@ -125,6 +125,39 @@ export async function PUT(request: Request) {
     return NextResponse.json({ channel }, { status: 200 });
   } catch (error) {
     const message = error instanceof WhatsAppChannelError ? error.message : "Nao foi possivel atualizar o canal WhatsApp.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const body = (await request.json()) as {
+    id?: string;
+    projetoId?: string | null;
+  };
+
+  if (!body.id) {
+    return NextResponse.json({ error: "Id do canal obrigatorio." }, { status: 400 });
+  }
+
+  const channel = await getWhatsAppChannelById(body.id);
+  if (!channel) {
+    return NextResponse.json({ error: "Canal WhatsApp nao encontrado." }, { status: 404 });
+  }
+
+  const access = await validateProjectAccess(body.projetoId ?? channel.projetoId);
+  if (access.error) {
+    return access.error;
+  }
+
+  if (channel.projetoId !== access.projetoId) {
+    return NextResponse.json({ error: "Projeto invalido para excluir canal WhatsApp." }, { status: 403 });
+  }
+
+  try {
+    await deleteWhatsAppChannel(body.id);
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (error) {
+    const message = error instanceof WhatsAppChannelError ? error.message : "Nao foi possivel excluir o canal WhatsApp.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

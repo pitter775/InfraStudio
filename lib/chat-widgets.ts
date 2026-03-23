@@ -69,6 +69,24 @@ export async function listChatWidgets() {
   return data.map((row) => mapChatWidget(row as ChatWidgetRow));
 }
 
+export async function getChatWidgetById(id: string) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("chat_widgets")
+    .select("id, nome, slug, projeto_id, agente_id, dominio, whatsapp_celular, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !data) {
+    if (error) {
+      console.error("[chat-widgets] failed to load widget by id", error);
+    }
+    return null;
+  }
+
+  return mapChatWidget(data as ChatWidgetRow);
+}
+
 export async function getChatWidgetBySlug(slug: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
@@ -214,4 +232,16 @@ export async function updateChatWidget(input: {
   }
 
   return mapChatWidget(data as ChatWidgetRow);
+}
+
+export async function deleteChatWidget(id: string) {
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase.from("chat_widgets").delete().eq("id", id);
+
+  if (error) {
+    console.error("[chat-widgets] failed to delete widget", error);
+    return false;
+  }
+
+  return true;
 }
