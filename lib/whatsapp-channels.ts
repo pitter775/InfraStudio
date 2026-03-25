@@ -106,17 +106,13 @@ export async function getWhatsAppChannelById(id: string) {
 }
 
 export async function getPreferredWhatsAppChannel(input: { projetoId: string; agenteId?: string | null }) {
-  const channels = await listWhatsAppChannels(input.projetoId);
-  const activeChannels = channels.filter((channel) => channel.status === "ativo");
-
-  if (input.agenteId) {
-    const byAgent = activeChannels.find((channel) => channel.agenteId === input.agenteId);
-    if (byAgent) {
-      return byAgent;
-    }
+  if (!input.agenteId) {
+    return null;
   }
 
-  return activeChannels[0] ?? null;
+  const channels = await listWhatsAppChannels(input.projetoId);
+  const activeChannels = channels.filter((channel) => channel.status === "ativo");
+  return activeChannels.find((channel) => channel.agenteId === input.agenteId) ?? null;
 }
 
 export async function createWhatsAppChannel(input: {

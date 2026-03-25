@@ -13,7 +13,7 @@ CREATE TABLE public.agente_api (
 CREATE TABLE public.agente_arquivos (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   agente_id uuid NOT NULL,
-  projeto_id uuid,
+  projeto_id uuid CHECK (projeto_id IS NOT NULL),
   nome character varying NOT NULL,
   descricao text,
   arquivo_nome character varying NOT NULL,
@@ -26,7 +26,11 @@ CREATE TABLE public.agente_arquivos (
   updated_at timestamp without time zone NOT NULL DEFAULT now(),
   CONSTRAINT agente_arquivos_pkey PRIMARY KEY (id),
   CONSTRAINT agente_arquivos_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id),
-  CONSTRAINT agente_arquivos_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id)
+  CONSTRAINT agente_arquivos_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id),
+  CONSTRAINT agente_arquivos_projeto_agente_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id),
+  CONSTRAINT agente_arquivos_projeto_agente_fkey FOREIGN KEY (projeto_id) REFERENCES public.agentes(id),
+  CONSTRAINT agente_arquivos_projeto_agente_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(projeto_id),
+  CONSTRAINT agente_arquivos_projeto_agente_fkey FOREIGN KEY (projeto_id) REFERENCES public.agentes(projeto_id)
 );
 CREATE TABLE public.agentes (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -79,7 +83,11 @@ CREATE TABLE public.canais_whatsapp (
   updated_at timestamp without time zone NOT NULL DEFAULT now(),
   CONSTRAINT canais_whatsapp_pkey PRIMARY KEY (id),
   CONSTRAINT canais_whatsapp_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id),
-  CONSTRAINT canais_whatsapp_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id)
+  CONSTRAINT canais_whatsapp_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id),
+  CONSTRAINT canais_whatsapp_projeto_agente_fkey FOREIGN KEY (projeto_id) REFERENCES public.agentes(id),
+  CONSTRAINT canais_whatsapp_projeto_agente_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id),
+  CONSTRAINT canais_whatsapp_projeto_agente_fkey FOREIGN KEY (projeto_id) REFERENCES public.agentes(projeto_id),
+  CONSTRAINT canais_whatsapp_projeto_agente_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(projeto_id)
 );
 CREATE TABLE public.chat_widgets (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -97,7 +105,11 @@ CREATE TABLE public.chat_widgets (
   whatsapp_celular text,
   CONSTRAINT chat_widgets_pkey PRIMARY KEY (id),
   CONSTRAINT chat_widgets_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id),
-  CONSTRAINT chat_widgets_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id)
+  CONSTRAINT chat_widgets_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id),
+  CONSTRAINT chat_widgets_projeto_agente_fkey FOREIGN KEY (projeto_id) REFERENCES public.agentes(id),
+  CONSTRAINT chat_widgets_projeto_agente_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id),
+  CONSTRAINT chat_widgets_projeto_agente_fkey FOREIGN KEY (projeto_id) REFERENCES public.agentes(projeto_id),
+  CONSTRAINT chat_widgets_projeto_agente_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(projeto_id)
 );
 CREATE TABLE public.chats (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -118,7 +130,11 @@ CREATE TABLE public.chats (
   CONSTRAINT chats_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id),
   CONSTRAINT chats_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES public.usuarios(id),
   CONSTRAINT chats_modelo_id_fkey FOREIGN KEY (modelo_id) REFERENCES public.modelos(id),
-  CONSTRAINT chats_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id)
+  CONSTRAINT chats_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id),
+  CONSTRAINT chats_projeto_agente_fkey FOREIGN KEY (projeto_id) REFERENCES public.agentes(id),
+  CONSTRAINT chats_projeto_agente_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id),
+  CONSTRAINT chats_projeto_agente_fkey FOREIGN KEY (projeto_id) REFERENCES public.agentes(projeto_id),
+  CONSTRAINT chats_projeto_agente_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(projeto_id)
 );
 CREATE TABLE public.conectores (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -136,7 +152,11 @@ CREATE TABLE public.conectores (
   updated_at timestamp without time zone DEFAULT now(),
   CONSTRAINT conectores_pkey PRIMARY KEY (id),
   CONSTRAINT conectores_projeto_id_fkey FOREIGN KEY (projeto_id) REFERENCES public.projetos(id),
-  CONSTRAINT conectores_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id)
+  CONSTRAINT conectores_agente_id_fkey FOREIGN KEY (agente_id) REFERENCES public.agentes(id),
+  CONSTRAINT conectores_projeto_agente_fkey_v2 FOREIGN KEY (projeto_id) REFERENCES public.agentes(id),
+  CONSTRAINT conectores_projeto_agente_fkey_v2 FOREIGN KEY (agente_id) REFERENCES public.agentes(id),
+  CONSTRAINT conectores_projeto_agente_fkey_v2 FOREIGN KEY (projeto_id) REFERENCES public.agentes(projeto_id),
+  CONSTRAINT conectores_projeto_agente_fkey_v2 FOREIGN KEY (agente_id) REFERENCES public.agentes(projeto_id)
 );
 CREATE TABLE public.consumos (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),

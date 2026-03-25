@@ -151,6 +151,29 @@
     return { allowed: true, reason: null, route: route };
   }
 
+  function readScopeIdentifier(context, paths) {
+    for (var index = 0; index < paths.length; index += 1) {
+      var value = getValueByPath(context, paths[index]);
+      if (typeof value === "string" && value.trim()) {
+        return value.trim();
+      }
+    }
+
+    return null;
+  }
+
+  function buildConversationScope(config, context) {
+    return JSON.stringify({
+      projeto: config.projeto || null,
+      agente: config.agente || null,
+      apiBase: config.apiBase || null,
+      sessionKey: readScopeIdentifier(context, ["sessionKey", "session.key", "channel.sessionKey"]),
+      tenant: readScopeIdentifier(context, ["tenant.id", "tenant.slug", "tenantId"]),
+      user: readScopeIdentifier(context, ["user.id", "user.email", "usuario.id"]),
+      resource: readScopeIdentifier(context, ["resource.id", "resource.slug", "resourceId"]),
+    });
+  }
+
   function formatRichText(value) {
     return String(value || "")
       .trim()
@@ -261,6 +284,7 @@
         chatId: null,
         messages: [],
         context: clone(config.context || {}),
+        scope: buildConversationScope(config, config.context || {}),
         open: Boolean(config.open),
         hidden: Boolean(config.hidden),
         loading: false,
@@ -1006,11 +1030,24 @@
     if (runtime.instance) {
       var sameAgent = runtime.instance.config.projeto === config.projeto && runtime.instance.config.agente === config.agente;
       if (sameAgent) {
+        var nextScope = buildConversationScope(config, config.context || {});
+        var shouldResetSession = runtime.instance.state.scope !== nextScope;
         runtime.instance.config = mergeDeep(runtime.instance.config, config);
         runtime.instance.state.context = mergeDeep(runtime.instance.state.context, config.context || {});
+        runtime.instance.state.scope = nextScope;
         runtime.instance.state.hidden = Boolean(config.hidden);
         if (typeof config.open === "boolean") {
           runtime.instance.state.open = Boolean(config.open);
+        }
+        if (shouldResetSession) {
+          runtime.instance.state.chatId = null;
+          runtime.instance.state.messages = [];
+          runtime.instance.state.loading = false;
+          renderMessages(runtime.instance);
+          emitLifecycle("scope_reset", {
+            projeto: config.projeto,
+            agente: config.agente,
+          });
         }
         if (isRecord(config.ui)) {
           runtime.instance.state.ui = mergeDeep(runtime.instance.state.ui, config.ui);
@@ -1072,6 +1109,18 @@
 
     instance.config = nextConfig;
     instance.state.context = mergedContext;
+    var nextScope = buildConversationScope(nextConfig, mergedContext);
+    if (instance.state.scope !== nextScope) {
+      instance.state.scope = nextScope;
+      instance.state.chatId = null;
+      instance.state.messages = [];
+      instance.state.loading = false;
+      renderMessages(instance);
+      emitLifecycle("scope_reset", {
+        projeto: nextConfig.projeto,
+        agente: nextConfig.agente,
+      });
+    }
 
     if (typeof nextContext.hidden === "boolean") {
       instance.state.hidden = nextContext.hidden;

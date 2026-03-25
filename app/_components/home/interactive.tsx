@@ -558,6 +558,7 @@ function autoResizeChatTextarea(element: HTMLTextAreaElement | null) {
 
 export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidgetProps) {
   const chatStorageKey = "infrastudio-site-chat";
+  const chatStorageSignature = `v2:${HOME_CHAT_WIDGET_SLUG}`;
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesRef = useRef<HTMLDivElement | null>(null);
   type ChatWidgetCta = {
@@ -632,9 +633,14 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
 
     try {
       const payload = JSON.parse(stored) as {
+        signature?: string;
         chatId: string | null;
         messages: ChatWidgetMessage[];
       };
+      if (payload.signature !== chatStorageSignature) {
+        window.localStorage.removeItem(chatStorageKey);
+        return;
+      }
       setChatId(payload.chatId);
       if (payload.messages?.length) {
         setMessages(payload.messages);
@@ -652,11 +658,12 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
     window.localStorage.setItem(
       chatStorageKey,
       JSON.stringify({
+        signature: chatStorageSignature,
         chatId,
         messages,
       }),
     );
-  }, [chatId, messages]);
+  }, [chatId, chatStorageSignature, messages]);
 
   useEffect(() => {
     if (typeof window === "undefined") {

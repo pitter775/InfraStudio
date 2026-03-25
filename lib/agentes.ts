@@ -180,7 +180,16 @@ export async function getAgenteByIdentifier(identifier: string, projetoId?: stri
     return bySlug;
   }
 
-  return await getAgenteById(value);
+  const byId = await getAgenteById(value);
+  if (!byId) {
+    return null;
+  }
+
+  if (projetoId && byId.projetoId !== projetoId) {
+    return null;
+  }
+
+  return byId;
 }
 
 async function disableOtherAgents(exceptId: string, projetoId: string | null) {
