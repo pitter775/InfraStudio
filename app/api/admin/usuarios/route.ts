@@ -30,6 +30,8 @@ export async function POST(request: Request) {
     email?: string;
     senha?: string;
     ativo?: boolean;
+    papel?: "admin" | "viewer";
+    projetoId?: string | null;
   };
 
   if (!body.nome || !body.email) {
@@ -41,6 +43,8 @@ export async function POST(request: Request) {
     email: body.email,
     senha: body.senha,
     ativo: body.ativo,
+    papel: body.papel,
+    projetoId: body.projetoId ?? resolveCurrentProjectId(user),
   });
 
   if (!created) {
@@ -67,6 +71,8 @@ export async function PUT(request: Request) {
     email?: string;
     senha?: string;
     ativo?: boolean;
+    papel?: "admin" | "viewer";
+    projetoId?: string | null;
   };
 
   if (!body.id || !body.nome || !body.email) {
@@ -79,6 +85,8 @@ export async function PUT(request: Request) {
     email: body.email,
     senha: body.senha,
     ativo: body.ativo,
+    papel: body.papel,
+    projetoId: body.projetoId ?? resolveCurrentProjectId(user),
   });
 
   if (!updated) {

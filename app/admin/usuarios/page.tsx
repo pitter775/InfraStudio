@@ -13,6 +13,8 @@ type UsuarioFormState = {
   email: string;
   senha: string;
   ativo: boolean;
+  papel: "admin" | "viewer";
+  projetoId?: string | null;
 };
 
 const emptyForm: UsuarioFormState = {
@@ -20,6 +22,8 @@ const emptyForm: UsuarioFormState = {
   email: "",
   senha: "",
   ativo: true,
+  papel: "viewer",
+  projetoId: null,
 };
 
 export default function AdminUsuariosPage() {
@@ -79,6 +83,8 @@ export default function AdminUsuariosPage() {
       email: user.email,
       senha: "",
       ativo: user.status === "ativo",
+      papel: user.role === "admin" ? "admin" : "viewer",
+      projetoId: user.memberships?.[0]?.projetoId ?? currentUser?.currentProjectId ?? null,
     });
     setFeedback(null);
   };
@@ -195,6 +201,18 @@ export default function AdminUsuariosPage() {
                     className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
                   />
 
+                  <label className="space-y-2">
+                    <span className="text-sm font-semibold text-slate-300">Perfil</span>
+                    <select
+                      value={form.papel}
+                      onChange={(event) => setForm((prev) => ({ ...prev, papel: event.target.value as "admin" | "viewer" }))}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
+                    >
+                      <option value="viewer">Usuario comum</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </label>
+
                   <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
                     <input
                       type="checkbox"
@@ -274,7 +292,11 @@ export default function AdminUsuariosPage() {
                       <tr key={user.id} className="border-t border-white/5 text-sm text-slate-300">
                         <td className="px-6 py-4 font-semibold text-white">{user.name}</td>
                         <td className="px-6 py-4">{user.email}</td>
-                        <td className="px-6 py-4">{user.isMaster ? "master" : user.role}</td>
+                        <td className="px-6 py-4">
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${user.isMaster ? "bg-amber-500/15 text-amber-300" : user.role === "admin" ? "bg-cyan-500/15 text-cyan-200" : "bg-slate-800 text-slate-300"}`}>
+                            {user.isMaster ? "master" : user.role === "admin" ? "admin" : "comum"}
+                          </span>
+                        </td>
                         <td className="px-6 py-4">
                           <button
                             type="button"

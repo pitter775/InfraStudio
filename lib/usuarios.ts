@@ -161,6 +161,8 @@ type SaveUsuarioInput = {
   email: string;
   senha?: string;
   ativo?: boolean;
+  papel?: AppUser["role"];
+  projetoId?: string | null;
   provider?: string | null;
   providerId?: string | null;
 };
@@ -174,6 +176,61 @@ function sanitizeUsuarioPayload(input: SaveUsuarioInput) {
     provider_id: input.providerId ?? null,
     updated_at: new Date().toISOString(),
   };
+}
+
+async function syncUsuarioProjetoPapel(input: {
+  usuarioId: string;
+  projetoId?: string | null;
+  papel?: AppUser["role"];
+}) {
+  if (!input.projetoId) {
+    return;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const papel = input.papel === "admin" ? "admin" : "viewer";
+  const { data: existing, error: readError } = await supabase
+    .from("usuarios_projetos")
+    .select("usuario_id")
+    .eq("usuario_id", input.usuarioId)
+    .eq("projeto_id", input.projetoId)
+    .maybeSingle();
+
+  if (readError) {
+    console.error("[usuarios] failed to read usuario_projeto", readError);
+    return;
+  }
+
+  if (existing) {
+    const { error } = await supabase
+      .from("usuarios_projetos")
+      .update({
+        papel,
+        updated_at: new Date().toISOString(),
+      } as never)
+      .eq("usuario_id", input.usuarioId)
+      .eq("projeto_id", input.projetoId);
+
+    if (error) {
+      console.error("[usuarios] failed to update usuario_projeto papel", error);
+    }
+
+    return;
+  }
+
+  const { error } = await supabase
+    .from("usuarios_projetos")
+    .insert({
+      usuario_id: input.usuarioId,
+      projeto_id: input.projetoId,
+      papel,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as never);
+
+  if (error) {
+    console.error("[usuarios] failed to create usuario_projeto papel", error);
+  }
 }
 
 export async function createUsuario(input: SaveUsuarioInput) {
@@ -196,7 +253,14 @@ export async function createUsuario(input: SaveUsuarioInput) {
     return null;
   }
 
-  return mapUsuarioToAppUser(data as Omit<UsuarioRow, "senha">);
+  const usuario = data as Omit<UsuarioRow, "senha">;
+  await syncUsuarioProjetoPapel({
+    usuarioId: usuario.id,
+    projetoId: input.projetoId,
+    papel: input.papel,
+  });
+
+  return (await getUsuarioById(usuario.id)) ?? mapUsuarioToAppUser(usuario);
 }
 
 export async function updateUsuario(input: SaveUsuarioInput) {
@@ -223,7 +287,14 @@ export async function updateUsuario(input: SaveUsuarioInput) {
     return null;
   }
 
-  return mapUsuarioToAppUser(data as Omit<UsuarioRow, "senha">);
+  const usuario = data as Omit<UsuarioRow, "senha">;
+  await syncUsuarioProjetoPapel({
+    usuarioId: usuario.id,
+    projetoId: input.projetoId,
+    papel: input.papel,
+  });
+
+  return (await getUsuarioById(usuario.id)) ?? mapUsuarioToAppUser(usuario);
 }
 
 export async function setUsuarioAtivo(usuarioId: string, ativo: boolean) {
