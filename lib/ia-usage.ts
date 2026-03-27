@@ -106,14 +106,24 @@ export type TokenUsageUserProjectGroup = {
   custoTotal: number;
 };
 
+export type TokenUsageProjectAgent = {
+  id: string;
+  projetoId: string;
+  nome: string;
+  ativo: boolean;
+};
+
 export type TokenUsageOverview = {
   isAdmin: boolean;
   tokensInput: number;
   tokensOutput: number;
   custoTotal: number;
+  totalUsuarios: number;
+  totalProjetos: number;
   porUsuario: TokenUsageGroup[];
   porProjeto: TokenUsageGroup[];
   porUsuarioProjeto: TokenUsageUserProjectGroup[];
+  agentesPorProjeto: TokenUsageProjectAgent[];
 };
 
 type IaUsageRange = {
@@ -214,9 +224,12 @@ export async function getTokenUsageOverview(user: AppUser): Promise<TokenUsageOv
       tokensInput: 0,
       tokensOutput: 0,
       custoTotal: 0,
+      totalUsuarios: 0,
+      totalProjetos: 0,
       porUsuario: [],
       porProjeto: [],
       porUsuarioProjeto: [],
+      agentesPorProjeto: [],
     };
   }
 
@@ -232,6 +245,9 @@ export async function getTokenUsageOverview(user: AppUser): Promise<TokenUsageOv
       ? supabase.from("projetos").select("id, nome").in("id", projetoIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
+  const agentesResponse = projetoIds.length
+    ? await supabase.from("agentes").select("id, projeto_id, nome, ativo").in("projeto_id", projetoIds)
+    : { data: [], error: null };
 
   const usuariosMap = new Map(
     ((usuariosResponse.data ?? []) as Array<{ id: string; nome: string | null; email: string | null }>).map((item) => [
@@ -301,15 +317,27 @@ export async function getTokenUsageOverview(user: AppUser): Promise<TokenUsageOv
   const porProjeto = Array.from(porProjetoMap.values()).sort((left, right) => right.custoTotal - left.custoTotal || right.tokensInput + right.tokensOutput - (left.tokensInput + left.tokensOutput));
   const porUsuarioProjeto = Array.from(porUsuarioProjetoMap.values()).sort((left, right) => right.custoTotal - left.custoTotal || right.tokensInput + right.tokensOutput - (left.tokensInput + left.tokensOutput));
   const totals = sumTokenUsage(porUsuario);
+  const agentesPorProjeto = ((agentesResponse.data ?? []) as Array<{ id: string; projeto_id: string | null; nome: string | null; ativo: boolean | null }>)
+    .filter((item) => item.projeto_id)
+    .map((item) => ({
+      id: item.id,
+      projetoId: item.projeto_id!,
+      nome: item.nome?.trim() || "Agente",
+      ativo: item.ativo !== false,
+    }))
+    .sort((left, right) => left.nome.localeCompare(right.nome, "pt-BR"));
 
   return {
     isAdmin: admin,
     tokensInput: totals.tokensInput,
     tokensOutput: totals.tokensOutput,
     custoTotal: totals.custoTotal,
+    totalUsuarios: porUsuario.length,
+    totalProjetos: porProjeto.length,
     porUsuario,
     porProjeto,
     porUsuarioProjeto,
+    agentesPorProjeto,
   };
 }
 

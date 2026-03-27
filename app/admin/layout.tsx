@@ -4,16 +4,19 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  ActivitySquare,
   BriefcaseBusiness,
   Coins,
   ChevronLeft,
   ChevronRight,
+  LayoutDashboard,
   LoaderCircle,
   LogOut,
   Menu,
   Globe,
   Settings,
   UserRound,
+  Users,
   X,
 } from "lucide-react";
 import { getCurrentProjectUser, signOutProjectAuth } from "@/lib/auth";
@@ -22,9 +25,12 @@ import { canAccessAdmin } from "@/lib/access";
 import { cn } from "@/lib/utils";
 
 const adminLinks = [
+  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/projetos", label: "Projetos", icon: BriefcaseBusiness },
   { href: "/admin/me", label: "Meu Perfil", icon: Settings },
   { href: "/admin/usage", label: "Uso de Tokens", icon: Coins },
+  { href: "/admin/chat-logs", label: "Logs de Chat", icon: ActivitySquare },
+  { href: "/admin/usuarios", label: "Usuarios", icon: Users },
 ];
 
 function isAdminLinkActive(pathname: string, href: string) {
