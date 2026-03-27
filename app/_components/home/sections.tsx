@@ -16,6 +16,17 @@ import {
 import { PremiumHomeChatDemo } from "@/app/_components/home/chat-demo-premium";
 import { cn } from "@/lib/utils";
 
+const FOOTER_LINK_TARGETS: Record<string, string> = {
+  "Automações": "/#servicos",
+  Sistemas: "/#servicos",
+  IA: "/#demonstracao",
+  "API integrations": "/#servicos",
+  "Sobre nós": "/#demonstracao",
+  Privacidade: "/#contato",
+  Contato: "/#contato",
+  Carreiras: "/#contato",
+};
+
 function ServiceCard({
   icon: Icon,
   title,
@@ -326,7 +337,11 @@ export function FooterSection() {
               <span className="text-sm font-bold uppercase tracking-widest text-white">Soluções</span>
               <nav className="flex flex-col gap-3">
                 {FOOTER_SOLUTION_LINKS.map((link) => (
-                  <a key={link} href="#" className="text-sm text-slate-500 transition-colors hover:text-blue-400">
+                  <a
+                    key={link}
+                    href={FOOTER_LINK_TARGETS[link] ?? "/"}
+                    className="text-sm text-slate-500 transition-colors hover:text-blue-400"
+                  >
                     {link}
                   </a>
                 ))}
@@ -336,7 +351,11 @@ export function FooterSection() {
               <span className="text-sm font-bold uppercase tracking-widest text-white">Empresa</span>
               <nav className="flex flex-col gap-3">
                 {FOOTER_COMPANY_LINKS.map((link) => (
-                  <a key={link} href="#" className="text-sm text-slate-500 transition-colors hover:text-blue-400">
+                  <a
+                    key={link}
+                    href={FOOTER_LINK_TARGETS[link] ?? "/"}
+                    className="text-sm text-slate-500 transition-colors hover:text-blue-400"
+                  >
                     {link}
                   </a>
                 ))}
