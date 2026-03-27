@@ -5,8 +5,8 @@
 Abra um terminal PowerShell e rode:
 
 ```powershell
-PS C:\Users\pitte> cd C:\Projetos\infrastudio\InfraStudio
-PS C:\Projetos\infrastudio\InfraStudio> npm run dev
+PS C:\Users\pitte> cd C:\Projetos\infrastudio
+PS C:\Projetos\infrastudio> npm run dev
 ```
 
 Depois abra no navegador:
@@ -20,8 +20,8 @@ http://localhost:3000
 Abra outro terminal PowerShell separado e rode:
 
 ```powershell
-PS C:\Users\pitte> cd C:\Projetos\infrastudio\InfraStudio\whatsapp-service
-PS C:\Projetos\infrastudio\InfraStudio\whatsapp-service> npm run dev
+PS C:\Users\pitte> cd C:\Projetos\infrastudio\whatsapp-service
+PS C:\Projetos\infrastudio\whatsapp-service> npm run dev
 ```
 
 O servico do WhatsApp fica em:
@@ -38,7 +38,7 @@ PS C:\Users\pitte> Invoke-WebRequest -UseBasicParsing http://localhost:3010/heal
 
 ## Variavel de ambiente importante
 
-No arquivo [`.env.local`](C:\Projetos\infrastudio\InfraStudio\.env.local), garantir esta linha:
+No arquivo [`.env.local`](C:\Projetos\infrastudio\.env.local), garantir esta linha:
 
 ```env
 NEXT_PUBLIC_WHATSAPP_SERVICE_URL=http://localhost:3010
@@ -56,19 +56,19 @@ NEXT_PUBLIC_WHATSAPP_SERVICE_URL=http://localhost:3010
 Ver o PID:
 
 ```powershell
-PS C:\Projetos\infrastudio\InfraStudio> netstat -ano | Select-String ":3000"
+PS C:\Projetos\infrastudio> netstat -ano | Select-String ":3000"
 ```
 
 Matar o processo:
 
 ```powershell
-PS C:\Projetos\infrastudio\InfraStudio> taskkill /PID 3012 /F
+PS C:\Projetos\infrastudio> taskkill /PID 3012 /F
 ```
 
 Depois subir de novo:
 
 ```powershell
-PS C:\Projetos\infrastudio\InfraStudio> npm run dev
+PS C:\Projetos\infrastudio> npm run dev
 ```
 
 ## Se a porta 3010 ja estiver em uso
@@ -76,19 +76,19 @@ PS C:\Projetos\infrastudio\InfraStudio> npm run dev
 Ver o PID:
 
 ```powershell
-PS C:\Projetos\infrastudio\InfraStudio> netstat -ano | Select-String ":3010"
+PS C:\Projetos\infrastudio> netstat -ano | Select-String ":3010"
 ```
 
 Matar o processo:
 
 ```powershell
-PS C:\Projetos\infrastudio\InfraStudio> taskkill /PID 4824 /F
+PS C:\Projetos\infrastudio> taskkill /PID 4824 /F
 ```
 
 Depois subir de novo:
 
 ```powershell
-PS C:\Projetos\infrastudio\InfraStudio\whatsapp-service> npm run dev
+PS C:\Projetos\infrastudio\whatsapp-service> npm run dev
 ```
 
 ## Criterios do servidor para o WhatsApp
@@ -128,3 +128,4 @@ O Railway atende bem esse caso porque normalmente oferece:
 ### Resumo pratico
 
 Para esse projeto, o Railway atende porque o `whatsapp-service` precisa ser um processo Node dedicado e persistente, e nao apenas uma API stateless.
+

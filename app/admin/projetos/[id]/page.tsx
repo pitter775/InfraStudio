@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Bold, Bot, CheckCircle2, Copy, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, MessageSquare, Minimize2, Paperclip, Pencil, Plus, Sparkles, TestTube2, Trash2, X } from "lucide-react";
+import { Activity, Bold, Bot, Boxes, Cable, CheckCircle2, Copy, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, Sparkles, TestTube2, Trash2, Waypoints, X } from "lucide-react";
 import { getAgentRuntimeBlockEntries, normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
 
 type Projeto = {
@@ -3121,6 +3121,37 @@ export default function AdminProjetoDetalhePage() {
     );
   };
 
+  const withComputedProjectStats = (current: ProjetoDetalhe): ProjetoDetalhe => ({
+    ...current,
+    stats: {
+      ...current.stats,
+      totalAgentes: current.agentes.length,
+      agenteAtivoId: current.agentes.find((agente) => agente.ativo)?.id ?? null,
+      totalApis: current.apis.length,
+      totalConectores: current.conectores.length,
+      totalWidgets: current.widgets.length,
+      totalWhatsAppChannels: current.whatsappChannels.length,
+      totalChats: current.chats.length,
+    },
+  });
+
+  const updateProjetoData = (updater: (current: ProjetoDetalhe) => ProjetoDetalhe) => {
+    setData((current) => (current ? withComputedProjectStats(updater(current)) : current));
+  };
+
+  const upsertById = <T extends { id?: string }>(items: T[], item: T) => {
+    const index = items.findIndex((entry) => entry.id === item.id);
+    if (index === -1) {
+      return [item, ...items];
+    }
+
+    return items.map((entry, currentIndex) => (currentIndex === index ? item : entry));
+  };
+
+  const removeById = <T extends { id?: string }>(items: T[], id: string) => items.filter((entry) => entry.id !== id);
+  const premiumTransitionClass = "transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]";
+  const premiumInteractiveClass = `${premiumTransitionClass} hover:-translate-y-[1px]`;
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       setOrigin(window.location.origin);
@@ -3691,7 +3722,12 @@ export default function AdminProjetoDetalhePage() {
       return;
     }
 
-    await loadProjeto();
+    if (savedAgente) {
+      updateProjetoData((current) => ({
+        ...current,
+        agentes: upsertById(current.agentes, savedAgente),
+      }));
+    }
     const message = preparedForm.id ? "Agente atualizado com sucesso." : "Agente criado com sucesso.";
     resetAgenteForm();
     setSavingAgente(false);
@@ -3744,7 +3780,12 @@ export default function AdminProjetoDetalhePage() {
 
       const savedApi = payload.api ? await maybeRefreshApiFieldsAfterSave(payload.api) : null;
 
-      await loadProjeto();
+      if (savedApi) {
+        updateProjetoData((current) => ({
+          ...current,
+          apis: upsertById(current.apis, savedApi),
+        }));
+      }
       const message = savedApi && hasRequiredTestValues(savedApi.parametros, apiTestParameterValues)
         ? "API atualizada com sucesso e campos reais sincronizados automaticamente."
         : apiForm.id
@@ -3816,7 +3857,7 @@ export default function AdminProjetoDetalhePage() {
       }),
     });
 
-    const payload = (await response.json()) as { error?: string };
+    const payload = (await response.json()) as { error?: string; widget?: ChatWidget };
 
     if (!response.ok) {
       setFeedbackWidget(payload.error ?? "Nao foi possivel salvar o widget.");
@@ -3824,7 +3865,12 @@ export default function AdminProjetoDetalhePage() {
       return;
     }
 
-    await loadProjeto();
+    if (payload.widget) {
+      updateProjetoData((current) => ({
+        ...current,
+        widgets: upsertById(current.widgets, payload.widget!),
+      }));
+    }
     const message = widgetForm.id ? "Widget atualizado com sucesso." : "Widget criado com sucesso.";
     resetWidgetForm();
     setSavingWidget(false);
@@ -3864,7 +3910,12 @@ export default function AdminProjetoDetalhePage() {
       return;
     }
 
-    await loadProjeto();
+    if (payload.conector) {
+      updateProjetoData((current) => ({
+        ...current,
+        conectores: upsertById(current.conectores, payload.conector!),
+      }));
+    }
 
     if (!connectorForm.id && payload.conector) {
       setConnectorForm({
@@ -3989,7 +4040,10 @@ export default function AdminProjetoDetalhePage() {
         })),
       });
       setApiTestParameterValues((prev) => syncTestParameterValues(testedApi.url, prev));
-      await loadProjeto();
+      updateProjetoData((current) => ({
+        ...current,
+        apis: upsertById(current.apis, testedApi),
+      }));
       setFeedbackApi("API testada e campos detectados com sucesso.");
     } catch (error) {
       setFeedbackApi(error instanceof Error ? error.message : "Nao foi possivel testar a API.");
@@ -4094,14 +4148,19 @@ export default function AdminProjetoDetalhePage() {
       }),
     });
 
-    const payload = (await response.json()) as { error?: string };
+    const payload = (await response.json()) as { error?: string; channel?: WhatsAppChannel };
     if (!response.ok) {
       setFeedbackWhatsApp(payload.error ?? "Nao foi possivel salvar o canal WhatsApp.");
       setSavingWhatsAppChannel(false);
       return;
     }
 
-    await loadProjeto();
+    if (payload.channel) {
+      updateProjetoData((current) => ({
+        ...current,
+        whatsappChannels: upsertById(current.whatsappChannels, payload.channel!),
+      }));
+    }
     setSavingWhatsAppChannel(false);
     setFeedbackWhatsApp(whatsAppChannelForm.id ? "Canal WhatsApp atualizado com sucesso." : "Canal WhatsApp criado com sucesso.");
     setWhatsAppChannelModalOpen(false);
@@ -4138,8 +4197,21 @@ export default function AdminProjetoDetalhePage() {
       }
 
       await fetch(`/api/admin/whatsapp-canais/${channel.id}/connect`, { method: "POST" });
+      updateProjetoData((current) => ({
+        ...current,
+        whatsappChannels: current.whatsappChannels.map((entry) =>
+          entry.id === channel.id
+            ? {
+                ...entry,
+                sessionData: {
+                  ...entry.sessionData,
+                  connectionStatus: "connecting",
+                },
+              }
+            : entry,
+        ),
+      }));
       await refreshWhatsAppRuntime(channel.id);
-      await loadProjeto();
       setFeedbackWhatsApp(`Conexao iniciada para ${formatWhatsAppPhone(channel.numero)}.`);
     } catch (error) {
       setFeedbackWhatsApp(error instanceof Error ? error.message : "Nao foi possivel conectar o WhatsApp.");
@@ -4176,7 +4248,22 @@ export default function AdminProjetoDetalhePage() {
         ...current,
         [channel.id]: "desconectado",
       }));
-      await loadProjeto();
+      updateProjetoData((current) => ({
+        ...current,
+        whatsappChannels: current.whatsappChannels.map((entry) =>
+          entry.id === channel.id
+            ? {
+                ...entry,
+                sessionData: {
+                  ...entry.sessionData,
+                  connectionStatus: "offline",
+                  qrCodeDataUrl: null,
+                  qrCodeUrl: null,
+                },
+              }
+            : entry,
+        ),
+      }));
       setFeedbackWhatsApp(`Canal ${formatWhatsAppPhone(channel.numero)} desconectado.`);
     } catch (error) {
       setFeedbackWhatsApp(error instanceof Error ? error.message : "Nao foi possivel desconectar o WhatsApp.");
@@ -4199,7 +4286,14 @@ export default function AdminProjetoDetalhePage() {
       return;
     }
 
-    await loadProjeto();
+    updateProjetoData((current) => ({
+      ...current,
+      apis: removeById(current.apis, api.id),
+      agentes: current.agentes.map((agente) => ({
+        ...agente,
+        apiIds: agente.apiIds.filter((apiId) => apiId !== api.id),
+      })),
+    }));
     if (apiForm.id === api.id) {
       resetApiForm();
     }
@@ -4272,7 +4366,10 @@ export default function AdminProjetoDetalhePage() {
         return;
       }
 
-      await loadProjeto();
+      updateProjetoData((current) => ({
+        ...current,
+        conectores: removeById(current.conectores, connector.id!),
+      }));
       if (connectorForm.id === connector.id) {
         resetConnectorForm();
       }
@@ -4309,7 +4406,10 @@ export default function AdminProjetoDetalhePage() {
         return;
       }
 
-      await loadProjeto();
+      updateProjetoData((current) => ({
+        ...current,
+        widgets: removeById(current.widgets, widget.id!),
+      }));
       if (widgetForm.id === widget.id) {
         resetWidgetForm();
       }
@@ -4369,7 +4469,10 @@ export default function AdminProjetoDetalhePage() {
         ...current,
         [channel.id]: "desconectado",
       }));
-      await loadProjeto();
+      updateProjetoData((current) => ({
+        ...current,
+        whatsappChannels: removeById(current.whatsappChannels, channel.id),
+      }));
       if (whatsAppChannelForm.id === channel.id) {
         resetWhatsAppChannelForm();
       }
@@ -4539,133 +4642,109 @@ export default function AdminProjetoDetalhePage() {
   const chatTotalPages = Math.max(1, Math.ceil(sortedChats.length / chatsPerPage));
   const currentChatPage = Math.min(chatPage, chatTotalPages);
   const paginatedChats = sortedChats.slice((currentChatPage - 1) * chatsPerPage, currentChatPage * chatsPerPage);
+  const overviewStats = [
+    { key: "agentes", label: "Agentes", value: data.stats.totalAgentes, icon: Bot, tone: "text-cyan-100", accent: "from-cyan-500/20 via-cyan-500/8 to-transparent" },
+    { key: "apis", label: "APIs", value: data.stats.totalApis, icon: Activity, tone: "text-sky-100", accent: "from-sky-500/20 via-sky-500/8 to-transparent" },
+    { key: "conectores", label: "Conectores", value: data.stats.totalConectores, icon: Cable, tone: "text-violet-100", accent: "from-violet-500/20 via-violet-500/8 to-transparent" },
+    { key: "widgets", label: "Widgets", value: data.stats.totalWidgets, icon: PanelsTopLeft, tone: "text-amber-100", accent: "from-amber-500/20 via-amber-500/8 to-transparent" },
+    { key: "whatsapp", label: "WhatsApp", value: data.stats.totalWhatsAppChannels, icon: Waypoints, tone: "text-emerald-100", accent: "from-emerald-500/20 via-emerald-500/8 to-transparent" },
+    { key: "chats", label: "Chats", value: data.stats.totalChats, icon: MessageSquareText, tone: "text-rose-100", accent: "from-rose-500/20 via-rose-500/8 to-transparent" },
+  ] as const;
+  const projectTabs = [
+    { key: "agentes" as const, label: "Agentes", icon: Bot },
+    { key: "apis" as const, label: "APIs", icon: Activity },
+    { key: "conectores" as const, label: "Conectores", icon: Cable },
+    { key: "chats" as const, label: "Chats", icon: MessageSquareText },
+    { key: "whatsapp" as const, label: "WhatsApp", icon: Waypoints },
+  ];
 
   return (
     <main className="space-y-6">
-      <section className="px-1 py-2">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-amber-200">
-          <Sparkles size={14} />
-          Projeto
-        </div>
-        <h1 className="text-4xl font-extrabold text-white">{data.projeto.nome}</h1>
-        <p className="mt-3 max-w-3xl text-slate-400">{data.projeto.descricao || "Sem descricao cadastrada."}</p>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={() => void handleDeleteProject()}
-            disabled={deletingProject}
-            className="inline-flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100 disabled:opacity-60"
-          >
-            <Trash2 size={16} />
-            {deletingProject ? "Removendo projeto..." : "Remover projeto completamente"}
-          </button>
-        </div>
-        <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1.2fr),minmax(0,0.9fr)]">
-          <div className="rounded-2xl border border-white/8 bg-slate-950/30 p-5">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),minmax(260px,0.72fr)]">
-              <div className="min-w-0 rounded-xl border border-white/8 bg-white/[0.03] p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Slug do projeto</p>
-                <p className="mt-2 truncate text-lg font-bold text-white" title={data.projeto.slug ?? "sem-slug"}>
-                  {data.projeto.slug ?? "sem-slug"}
-                </p>
-              </div>
-              <div className="min-w-0 rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Agente ativo</p>
-                <p className="mt-2 text-xl font-extrabold leading-tight text-white">
-                  {agenteAtivo?.nome ?? "Nenhum ativo"}
-                </p>
-                <p className="mt-2 text-sm text-cyan-50/75">
-                  {agenteAtivo ? "Esse agente responde pelo projeto quando o canal estiver valido." : "Sem agente ativo para atender este projeto."}
-                </p>
-              </div>
-            </div>
-          </div>
+      <section className="px-1 py-1">
+        <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(250,204,21,0.12),_transparent_28%),linear-gradient(135deg,rgba(15,23,42,0.94),rgba(2,8,23,0.82))] p-4 shadow-[0_24px_80px_rgba(2,8,23,0.45)] sm:p-5">
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:18px_18px] opacity-25" />
+          <div className="pointer-events-none absolute -left-16 top-12 h-36 w-36 rounded-full bg-cyan-500/10 blur-3xl" />
+          <div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-amber-400/10 blur-3xl" />
 
-          <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-3">
-          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4 xl:col-span-1">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Agentes</p>
-            <p className="mt-2 text-lg font-bold text-white">{data.stats.totalAgentes}</p>
-          </div>
-          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4 xl:col-span-1">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">APIs</p>
-            <p className="mt-2 text-lg font-bold text-white">{data.stats.totalApis}</p>
-          </div>
-          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4 xl:col-span-2">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Conectores</p>
-            <p className="mt-2 text-lg font-bold text-white">{data.stats.totalConectores}</p>
-          </div>
-          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4 xl:col-span-1">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Widgets</p>
-            <p className="mt-2 text-lg font-bold text-white">{data.stats.totalWidgets}</p>
-          </div>
-          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4 xl:col-span-2">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">WhatsApp</p>
-            <p className="mt-2 text-lg font-bold text-white">{data.stats.totalWhatsAppChannels}</p>
-          </div>
-          <div className="rounded-xl border border-white/8 bg-slate-950/30 p-4 xl:col-span-1">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Chats</p>
-            <p className="mt-2 text-lg font-bold text-white">{data.stats.totalChats}</p>
-          </div>
-          </div>
-        </div>
-        <div className="mt-10">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Navegacao do projeto</p>
-          <div className="mt-3 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => setActiveTab("agentes")}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                activeTab === "agentes"
-                  ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
-                  : "border border-white/10 bg-white/5 text-white"
-              }`}
-            >
-              Agentes
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("apis")}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                activeTab === "apis"
-                  ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
-                  : "border border-white/10 bg-white/5 text-white"
-              }`}
-            >
-              APIs
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("conectores")}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                activeTab === "conectores"
-                  ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
-                  : "border border-white/10 bg-white/5 text-white"
-              }`}
-            >
-              Conectores
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("chats")}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                activeTab === "chats"
-                  ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
-                  : "border border-white/10 bg-white/5 text-white"
-              }`}
-            >
-              Chats
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("whatsapp")}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                activeTab === "whatsapp"
-                  ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
-                  : "border border-white/10 bg-white/5 text-white"
-              }`}
-            >
-              WhatsApp
-            </button>
+          <div className="relative space-y-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0 space-y-3">
+                <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-amber-100/90">
+                  <Sparkles size={13} />
+                  Projeto
+                </div>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h1 className="text-3xl font-black tracking-tight text-white sm:text-[2.15rem]">{data.projeto.nome}</h1>
+                    <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/15 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/90">
+                      <CheckCircle2 size={12} />
+                      {data.projeto.status ?? "ativo"}
+                    </span>
+                  </div>
+                  <p className="max-w-2xl text-sm leading-relaxed text-slate-300 sm:text-[15px]">
+                    {data.projeto.descricao || "Sem descricao cadastrada."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2.5">
+                  <div className="inline-flex min-w-[180px] items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-3 backdrop-blur-sm">
+                    <div className="mt-0.5 rounded-xl border border-white/10 bg-white/5 p-2 text-cyan-100">
+                      <Boxes size={15} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">Slug do projeto</p>
+                      <p className="mt-1 truncate text-sm font-semibold text-white" title={data.projeto.slug ?? "sem-slug"}>{data.projeto.slug ?? "sem-slug"}</p>
+                    </div>
+                  </div>
+                  <div className="inline-flex min-w-[240px] items-start gap-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-3.5 py-3 backdrop-blur-sm">
+                    <div className="mt-0.5 rounded-xl border border-cyan-300/20 bg-cyan-400/10 p-2 text-cyan-100">
+                      <Bot size={15} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-100/75">Agente ativo</p>
+                      <p className="mt-1 truncate text-sm font-semibold text-white">{agenteAtivo?.nome ?? "Nenhum ativo"}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-cyan-50/75">
+                        {agenteAtivo ? "Responsavel principal pelos canais conectados deste projeto." : "Defina um agente para centralizar o atendimento."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void handleDeleteProject()}
+                disabled={deletingProject}
+                className="inline-flex items-center justify-center gap-2 self-start rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-50 shadow-[0_10px_30px_rgba(244,63,94,0.12)] transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:opacity-60"
+              >
+                <Trash2 size={16} />
+                {deletingProject ? "Removendo projeto..." : "Remover projeto"}
+              </button>
+            </div>
+
+            <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-6">
+              {overviewStats.map((item) => {
+                const Icon = item.icon;
+
+                return (
+                  <div
+                    key={item.key}
+                    className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/45 px-3.5 py-3 backdrop-blur-sm"
+                  >
+                    <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${item.accent}`} />
+                    <div className="relative flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
+                        <p className="mt-1 text-2xl font-black leading-none text-white">{item.value}</p>
+                      </div>
+                      <div className={`rounded-2xl border border-white/10 bg-white/5 p-2.5 ${item.tone}`}>
+                        <Icon size={16} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
           </div>
         </div>
       </section>
@@ -4680,14 +4759,37 @@ export default function AdminProjetoDetalhePage() {
         </section>
       )}
 
-      <div className="space-y-6">
-        <section className={`${activeTab === "agentes" ? "block" : "hidden"} overflow-hidden rounded-2xl border border-white/10 bg-white/5`}>
+      <div className="space-y-4">
+        <section className="mt-8 flex flex-wrap items-center justify-center gap-2">
+          {projectTabs.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.key;
+
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-3.5 py-2 text-sm font-semibold ${premiumInteractiveClass} ${
+                  active
+                    ? "border-cyan-400/30 bg-cyan-400/14 text-cyan-50 shadow-[0_10px_25px_rgba(34,211,238,0.12)]"
+                    : "border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.07]"
+                }`}
+              >
+                <Icon size={15} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </section>
+
+        <section className={`${activeTab === "agentes" ? "block" : "hidden"} ${premiumTransitionClass} overflow-hidden rounded-2xl border border-white/10 bg-white/5`}>
           <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="text-xl font-bold text-white">Agentes do projeto</h3>
+              <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Bot size={18} className="text-cyan-200" />Agentes do projeto</h3>
               <p className="mt-1 text-sm text-slate-400">O agente ativo atende este projeto e pode consumir as APIs marcadas.</p>
             </div>
-            <button type="button" onClick={openNewAgenteModal} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
+            <button type="button" onClick={openNewAgenteModal} className={`inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white ${premiumInteractiveClass}`}>
               <Plus size={16} />
               Novo agente
             </button>
@@ -4702,7 +4804,7 @@ export default function AdminProjetoDetalhePage() {
                 const latestDiagnostic = latestAgentDiagnosticById[agente.id];
 
                 return (
-                  <div key={agente.id} className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+                  <div key={agente.id} className={`rounded-xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3">
@@ -4893,7 +4995,8 @@ export default function AdminProjetoDetalhePage() {
                           <TestTube2 size={14} />
                           Testar busca da loja
                         </button>
-                        <button type="button" onClick={() => handleEditAgente(agente)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200">
+                        <button type="button" onClick={() => handleEditAgente(agente)} className={`inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 ${premiumInteractiveClass}`}>
+                          <Pencil size={14} />
                           Editar
                         </button>
                         <button
@@ -4916,13 +5019,13 @@ export default function AdminProjetoDetalhePage() {
           </div>
         </section>
 
-        <section className={`${activeTab === "apis" ? "block" : "hidden"} overflow-hidden rounded-2xl border border-white/10 bg-white/5`}>
+        <section className={`${activeTab === "apis" ? "block" : "hidden"} ${premiumTransitionClass} overflow-hidden rounded-2xl border border-white/10 bg-white/5`}>
           <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="text-xl font-bold text-white">APIs do projeto</h3>
+              <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Activity size={18} className="text-sky-200" />APIs do projeto</h3>
               <p className="mt-1 text-sm text-slate-400">Gerencie as APIs externas, teste o retorno e controle os campos ativos.</p>
             </div>
-            <button type="button" onClick={openNewApiModal} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
+            <button type="button" onClick={openNewApiModal} className={`inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white ${premiumInteractiveClass}`}>
               <Plus size={16} />
               Nova API
             </button>
@@ -4930,7 +5033,7 @@ export default function AdminProjetoDetalhePage() {
           <div className="space-y-3 p-4">
             {data.apis.length ? (
               data.apis.map((api) => (
-                <div key={api.id} className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+                <div key={api.id} className={`rounded-xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-3">
@@ -4971,7 +5074,8 @@ export default function AdminProjetoDetalhePage() {
                       ) : null}
                     </div>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => handleEditApi(api)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200">
+                      <button type="button" onClick={() => handleEditApi(api)} className={`inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 ${premiumInteractiveClass}`}>
+                        <Pencil size={14} />
                         Editar
                       </button>
                       <button type="button" onClick={() => void handleDeleteApi(api)} className="inline-flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-100">
@@ -4988,13 +5092,13 @@ export default function AdminProjetoDetalhePage() {
           </div>
         </section>
 
-        <section className={`${activeTab === "conectores" ? "block" : "hidden"} overflow-hidden rounded-2xl border border-white/10 bg-white/5`}>
+        <section className={`${activeTab === "conectores" ? "block" : "hidden"} ${premiumTransitionClass} overflow-hidden rounded-2xl border border-white/10 bg-white/5`}>
           <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="text-xl font-bold text-white">Conectores do projeto</h3>
+              <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Cable size={18} className="text-violet-200" />Conectores do projeto</h3>
               <p className="mt-1 text-sm text-slate-400">Cadastre fontes de produto por agente. O primeiro tipo disponivel e o `mercado_livre`.</p>
             </div>
-            <button type="button" onClick={openNewConnectorModal} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
+            <button type="button" onClick={openNewConnectorModal} className={`inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white ${premiumInteractiveClass}`}>
               <Plus size={16} />
               Novo conector
             </button>
@@ -5004,7 +5108,7 @@ export default function AdminProjetoDetalhePage() {
               data.conectores.map((connector) => {
                 const agente = connector.agenteId ? data.agentes.find((item) => item.id === connector.agenteId) ?? null : null;
                 return (
-                  <div key={connector.id} className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+                  <div key={connector.id} className={`rounded-xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-3">
@@ -5030,7 +5134,8 @@ export default function AdminProjetoDetalhePage() {
                           <ExternalLink size={14} />
                           Conectar ML
                         </a>
-                        <button type="button" onClick={() => handleEditConnector(connector)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200">
+                        <button type="button" onClick={() => handleEditConnector(connector)} className={`inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 ${premiumInteractiveClass}`}>
+                          <Pencil size={14} />
                           Editar
                         </button>
                         <button
@@ -5055,12 +5160,12 @@ export default function AdminProjetoDetalhePage() {
 
       </div>
 
-      <section className={`${activeTab === "whatsapp" ? "block" : "hidden"}`}>
+      <section className={`${activeTab === "whatsapp" ? "block" : "hidden"} ${premiumTransitionClass}`}>
         <div className="space-y-6">
           <section className="overflow-hidden rounded-2xl border border-cyan-500/20 bg-cyan-500/10">
             <div className="border-b border-cyan-500/20 px-6 py-5">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">whatsapp-web.js</p>
-              <h3 className="mt-2 text-xl font-bold text-white">Canal oficial com sessao persistente</h3>
+              <h3 className="mt-2 inline-flex items-center gap-2 text-xl font-bold text-white"><Waypoints size={18} className="text-cyan-100" />Canal oficial com sessao persistente</h3>
               <p className="mt-2 max-w-3xl text-sm text-cyan-50/80">
                 O motor real fica no `whatsapp-service`, separado do Next.js. A aba usa `POST /connect`, `GET /status` e `GET /qr` para acompanhar a sessao.
               </p>
@@ -5128,8 +5233,9 @@ export default function AdminProjetoDetalhePage() {
                         <button
                           type="button"
                           onClick={() => handleEditWhatsAppChannel(channel)}
-                          className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-slate-200"
+                          className={`inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-slate-200 ${premiumInteractiveClass}`}
                         >
+                          <Pencil size={15} />
                           Editar numero
                         </button>
                         <button
@@ -5143,8 +5249,9 @@ export default function AdminProjetoDetalhePage() {
                         <button
                           type="button"
                           onClick={() => void refreshWhatsAppRuntime(channel.id)}
-                          className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-slate-200"
+                          className={`inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-slate-200 ${premiumInteractiveClass}`}
                         >
+                          <Activity size={15} />
                           Atualizar
                         </button>
                       </div>
@@ -5519,12 +5626,12 @@ export default function AdminProjetoDetalhePage() {
         </div>
       </section>
 
-      <section className={`${activeTab === "chats" ? "block" : "hidden"}`}>
+      <section className={`${activeTab === "chats" ? "block" : "hidden"} ${premiumTransitionClass}`}>
         <div className="grid gap-6">
           <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
             <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h3 className="text-xl font-bold text-white">Conversas do projeto</h3>
+                <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><MessageSquareText size={18} className="text-rose-200" />Conversas do projeto</h3>
                 <p className="mt-1 text-sm text-slate-400">Historico recente dos chats do site e dos sistemas para auditoria, contexto e acompanhamento comercial.</p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -5532,7 +5639,7 @@ export default function AdminProjetoDetalhePage() {
                   <button
                     type="button"
                     onClick={() => handleEditWidget(data.widgets[0])}
-                    className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                    className={`inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-slate-200 ${premiumInteractiveClass} hover:bg-white/10 hover:text-white`}
                   >
                     <Pencil size={16} />
                     Editar widget do site
@@ -5541,7 +5648,7 @@ export default function AdminProjetoDetalhePage() {
                 <button
                   type="button"
                   onClick={openNewWidgetModal}
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
+                  className={`inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white ${premiumInteractiveClass}`}
                 >
                   <Plus size={16} />
                   Criar widget do site
