@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canAccessAdmin, canManageProject } from "@/lib/access";
+import { canAccessAdmin, canAccessProject, canManageProject } from "@/lib/access";
 import { listAgentes } from "@/lib/agentes";
 import { listApis } from "@/lib/apis";
 import { listChatWidgets } from "@/lib/chat-widgets";
@@ -24,7 +24,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const { id } = await context.params;
 
-  if (!user?.isMaster && !canManageProject(user, id)) {
+  if (!canAccessProject(user, id)) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
   }
 

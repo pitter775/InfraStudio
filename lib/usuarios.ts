@@ -123,6 +123,22 @@ export async function listUsuarios() {
   return data.map((row) => mapUsuarioToAppUser(row as Omit<UsuarioRow, "senha">));
 }
 
+export async function getUsuarioById(usuarioId: string) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("usuarios")
+    .select("id, nome, email, provider, provider_id, ativo, usuarios_projetos(papel, projeto_id, projetos(nome, slug))")
+    .eq("id", usuarioId)
+    .maybeSingle();
+
+  if (error || !data) {
+    console.error("[usuarios] failed to get usuario by id", error);
+    return null;
+  }
+
+  return mapUsuarioToAppUser(data as Omit<UsuarioRow, "senha">);
+}
+
 export async function listUsuariosByProjeto(projetoId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase

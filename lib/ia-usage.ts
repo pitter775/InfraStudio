@@ -2,6 +2,8 @@ import "server-only";
 
 import { estimateOpenAICostUsd, getDefaultOpenAIModel } from "@/lib/openai-pricing";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import type { AppUser } from "@/lib/app-user";
+import { isAdminUser } from "@/lib/access";
 
 type ChatUsageRow = {
   id: string;
@@ -78,6 +80,42 @@ export type IaUsageSummary = {
   recentActivity: RecentUsageItem[];
 };
 
+type ConsumoRow = {
+  usuario_id: string | null;
+  projeto_id: string | null;
+  tokens_input: number | null;
+  tokens_output: number | null;
+  custo_total: number | null;
+};
+
+export type TokenUsageGroup = {
+  id: string;
+  nome: string;
+  tokensInput: number;
+  tokensOutput: number;
+  custoTotal: number;
+};
+
+export type TokenUsageUserProjectGroup = {
+  usuarioId: string;
+  usuarioNome: string;
+  projetoId: string;
+  projetoNome: string;
+  tokensInput: number;
+  tokensOutput: number;
+  custoTotal: number;
+};
+
+export type TokenUsageOverview = {
+  isAdmin: boolean;
+  tokensInput: number;
+  tokensOutput: number;
+  custoTotal: number;
+  porUsuario: TokenUsageGroup[];
+  porProjeto: TokenUsageGroup[];
+  porUsuarioProjeto: TokenUsageUserProjectGroup[];
+};
+
 type IaUsageRange = {
   startDate?: string | null;
   endDate?: string | null;
@@ -142,6 +180,137 @@ function resolveMessageCost(message: MessageUsageRow) {
   }
 
   return estimateOpenAICostUsd(message.tokens_input ?? 0, message.tokens_output ?? 0, getDefaultOpenAIModel());
+}
+
+function sumTokenUsage(items: Array<{ tokensInput: number; tokensOutput: number; custoTotal: number }>) {
+  return items.reduce(
+    (acc, item) => {
+      acc.tokensInput += item.tokensInput;
+      acc.tokensOutput += item.tokensOutput;
+      acc.custoTotal += item.custoTotal;
+      return acc;
+    },
+    { tokensInput: 0, tokensOutput: 0, custoTotal: 0 },
+  );
+}
+
+export async function getTokenUsageOverview(user: AppUser): Promise<TokenUsageOverview> {
+  const supabase = getSupabaseAdminClient();
+  const admin = isAdminUser(user);
+  let query = supabase
+    .from("consumos")
+    .select("usuario_id, projeto_id, tokens_input, tokens_output, custo_total");
+
+  if (!admin) {
+    query = query.eq("usuario_id", user.id);
+  }
+
+  const { data, error } = await query;
+
+  if (error || !data) {
+    console.error("[ia-usage] failed to list consumos", error);
+    return {
+      isAdmin: admin,
+      tokensInput: 0,
+      tokensOutput: 0,
+      custoTotal: 0,
+      porUsuario: [],
+      porProjeto: [],
+      porUsuarioProjeto: [],
+    };
+  }
+
+  const consumos = data as ConsumoRow[];
+  const usuarioIds = Array.from(new Set(consumos.map((item) => item.usuario_id).filter(Boolean) as string[]));
+  const projetoIds = Array.from(new Set(consumos.map((item) => item.projeto_id).filter(Boolean) as string[]));
+
+  const [usuariosResponse, projetosResponse] = await Promise.all([
+    usuarioIds.length
+      ? supabase.from("usuarios").select("id, nome, email").in("id", usuarioIds)
+      : Promise.resolve({ data: [], error: null }),
+    projetoIds.length
+      ? supabase.from("projetos").select("id, nome").in("id", projetoIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const usuariosMap = new Map(
+    ((usuariosResponse.data ?? []) as Array<{ id: string; nome: string | null; email: string | null }>).map((item) => [
+      item.id,
+      item.nome?.trim() || item.email?.trim() || "Usuário",
+    ]),
+  );
+  const projetosMap = new Map(
+    ((projetosResponse.data ?? []) as Array<{ id: string; nome: string | null }>).map((item) => [
+      item.id,
+      item.nome?.trim() || "Projeto",
+    ]),
+  );
+
+  const porUsuarioMap = new Map<string, TokenUsageGroup>();
+  const porProjetoMap = new Map<string, TokenUsageGroup>();
+  const porUsuarioProjetoMap = new Map<string, TokenUsageUserProjectGroup>();
+
+  for (const item of consumos) {
+    const usuarioId = item.usuario_id ?? "sem-usuario";
+    const projetoId = item.projeto_id ?? "sem-projeto";
+    const tokensInput = item.tokens_input ?? 0;
+    const tokensOutput = item.tokens_output ?? 0;
+    const custoTotal = item.custo_total ?? 0;
+
+    const porUsuario = porUsuarioMap.get(usuarioId) ?? {
+      id: usuarioId,
+      nome: usuariosMap.get(usuarioId) ?? "Usuário",
+      tokensInput: 0,
+      tokensOutput: 0,
+      custoTotal: 0,
+    };
+    porUsuario.tokensInput += tokensInput;
+    porUsuario.tokensOutput += tokensOutput;
+    porUsuario.custoTotal += custoTotal;
+    porUsuarioMap.set(usuarioId, porUsuario);
+
+    const porProjeto = porProjetoMap.get(projetoId) ?? {
+      id: projetoId,
+      nome: projetosMap.get(projetoId) ?? "Projeto",
+      tokensInput: 0,
+      tokensOutput: 0,
+      custoTotal: 0,
+    };
+    porProjeto.tokensInput += tokensInput;
+    porProjeto.tokensOutput += tokensOutput;
+    porProjeto.custoTotal += custoTotal;
+    porProjetoMap.set(projetoId, porProjeto);
+
+    const composedKey = `${usuarioId}:${projetoId}`;
+    const porUsuarioProjeto = porUsuarioProjetoMap.get(composedKey) ?? {
+      usuarioId,
+      usuarioNome: usuariosMap.get(usuarioId) ?? "Usuário",
+      projetoId,
+      projetoNome: projetosMap.get(projetoId) ?? "Projeto",
+      tokensInput: 0,
+      tokensOutput: 0,
+      custoTotal: 0,
+    };
+    porUsuarioProjeto.tokensInput += tokensInput;
+    porUsuarioProjeto.tokensOutput += tokensOutput;
+    porUsuarioProjeto.custoTotal += custoTotal;
+    porUsuarioProjetoMap.set(composedKey, porUsuarioProjeto);
+  }
+
+  const porUsuario = Array.from(porUsuarioMap.values()).sort((left, right) => right.custoTotal - left.custoTotal || right.tokensInput + right.tokensOutput - (left.tokensInput + left.tokensOutput));
+  const porProjeto = Array.from(porProjetoMap.values()).sort((left, right) => right.custoTotal - left.custoTotal || right.tokensInput + right.tokensOutput - (left.tokensInput + left.tokensOutput));
+  const porUsuarioProjeto = Array.from(porUsuarioProjetoMap.values()).sort((left, right) => right.custoTotal - left.custoTotal || right.tokensInput + right.tokensOutput - (left.tokensInput + left.tokensOutput));
+  const totals = sumTokenUsage(porUsuario);
+
+  return {
+    isAdmin: admin,
+    tokensInput: totals.tokensInput,
+    tokensOutput: totals.tokensOutput,
+    custoTotal: totals.custoTotal,
+    porUsuario,
+    porProjeto,
+    porUsuarioProjeto,
+  };
 }
 
 export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsageRange): Promise<IaUsageSummary> {

@@ -4,17 +4,16 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  ActivitySquare,
   BriefcaseBusiness,
   Coins,
   ChevronLeft,
   ChevronRight,
-  LayoutDashboard,
+  LoaderCircle,
   LogOut,
   Menu,
   Globe,
+  Settings,
   UserRound,
-  Users,
   X,
 } from "lucide-react";
 import { getCurrentProjectUser, signOutProjectAuth } from "@/lib/auth";
@@ -23,20 +22,24 @@ import { canAccessAdmin } from "@/lib/access";
 import { cn } from "@/lib/utils";
 
 const adminLinks = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/projetos", label: "Projetos", icon: BriefcaseBusiness },
-  { href: "/admin/ia-tokens", label: "IA Tokens", icon: Coins },
-  { href: "/admin/chat-logs", label: "Logs de Chat", icon: ActivitySquare },
-  { href: "/admin/usuarios", label: "Usuários", icon: Users },
+  { href: "/admin/me", label: "Meu Perfil", icon: Settings },
+  { href: "/admin/usage", label: "Uso de Tokens", icon: Coins },
 ];
+
+function isAdminLinkActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 type SidebarProps = {
   currentUser: AppUser | null;
   collapsed: boolean;
   mobileOpen: boolean;
   pathname: string;
+  loadingHref: string | null;
   onCollapseToggle: () => void;
   onCloseMobile: () => void;
+  onLinkStart: (href: string) => void;
   onLogout: () => Promise<void> | void;
 };
 
@@ -45,13 +48,13 @@ function Sidebar({
   collapsed,
   mobileOpen,
   pathname,
+  loadingHref,
   onCollapseToggle,
   onCloseMobile,
+  onLinkStart,
   onLogout,
 }: SidebarProps) {
-  const visibleLinks = currentUser?.isMaster
-    ? adminLinks
-    : adminLinks.filter((item) => item.href !== "/admin/usuarios" && item.href !== "/admin/projetos");
+  const visibleLinks = adminLinks;
 
   return (
     <>
@@ -105,13 +108,19 @@ function Sidebar({
         <nav className="mt-8 flex-1 space-y-2 px-2">
           {visibleLinks.map((item) => {
             const Icon = item.icon;
-            const active = pathname === item.href;
+            const active = isAdminLinkActive(pathname, item.href);
+            const isLoading = loadingHref === item.href;
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={onCloseMobile}
+                onClick={() => {
+                  if (!isAdminLinkActive(pathname, item.href)) {
+                    onLinkStart(item.href);
+                  }
+                  onCloseMobile();
+                }}
                 className={cn(
                   "group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition-all duration-200",
                   active
@@ -121,7 +130,7 @@ function Sidebar({
                 )}
                 title={collapsed ? item.label : undefined}
               >
-                <Icon size={18} className="shrink-0" />
+                {isLoading ? <LoaderCircle size={18} className="shrink-0 animate-spin" /> : <Icon size={18} className="shrink-0" />}
                 {!collapsed ? <span>{item.label}</span> : null}
               </Link>
             );
@@ -198,6 +207,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
+  const [loadingHref, setLoadingHref] = useState<string | null>(null);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -216,6 +226,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
 
   useEffect(() => {
     setMobileOpen(false);
+    setLoadingHref(null);
   }, [pathname]);
 
   const handleLogout = async () => {
@@ -242,8 +253,10 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
         collapsed={collapsed}
         mobileOpen={mobileOpen}
         pathname={pathname}
+        loadingHref={loadingHref}
         onCollapseToggle={() => setCollapsed((value) => !value)}
         onCloseMobile={() => setMobileOpen(false)}
+        onLinkStart={setLoadingHref}
         onLogout={handleLogout}
       />
 

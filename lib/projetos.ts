@@ -53,6 +53,31 @@ export async function listProjetos() {
   return data.map((row) => mapProjeto(row as ProjetoRow));
 }
 
+export async function listProjetosByUsuario(usuarioId: string) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("usuarios_projetos")
+    .select("projetos(id, nome, slug, tipo, descricao, status, configuracoes)")
+    .eq("usuario_id", usuarioId);
+
+  if (error || !data) {
+    console.error("[projetos] failed to list projetos by usuario", error);
+    return [];
+  }
+
+  const projetos = data
+    .map((row) => {
+      const projeto = Array.isArray((row as { projetos?: ProjetoRow | ProjetoRow[] | null }).projetos)
+        ? (row as { projetos?: ProjetoRow[] | null }).projetos?.[0] ?? null
+        : ((row as { projetos?: ProjetoRow | null }).projetos ?? null);
+
+      return projeto ? mapProjeto(projeto) : null;
+    })
+    .filter((item): item is ProjetoRecord => Boolean(item));
+
+  return projetos.sort((left, right) => left.nome.localeCompare(right.nome, "pt-BR"));
+}
+
 export async function getProjetoBySlug(slug: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
@@ -136,6 +161,41 @@ export async function createProjeto(input: {
   }
 
   return mapProjeto(data as ProjetoRow);
+}
+
+export async function createProjetoForUsuario(input: {
+  usuarioId: string;
+  nome: string;
+  slug?: string | null;
+  tipo?: string | null;
+  descricao?: string | null;
+  status?: string | null;
+  siteChatAtivo?: boolean;
+}) {
+  const supabase = getSupabaseAdminClient();
+  const projeto = await createProjeto(input);
+
+  if (!projeto) {
+    return null;
+  }
+
+  const { error } = await supabase
+    .from("usuarios_projetos")
+    .insert({
+      usuario_id: input.usuarioId,
+      projeto_id: projeto.id,
+      papel: "admin",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as never);
+
+  if (error) {
+    console.error("[projetos] failed to create usuario_projeto link", error);
+    await supabase.from("projetos").delete().eq("id", projeto.id);
+    return null;
+  }
+
+  return projeto;
 }
 
 export async function updateProjeto(input: {

@@ -50,6 +50,18 @@ export function canAccessAdmin(user: AppUser | null) {
   return Boolean(user?.isMaster || user?.memberships?.length);
 }
 
+export function isAdminUser(user: AppUser | null) {
+  if (!user) {
+    return false;
+  }
+
+  if (user.isMaster) {
+    return true;
+  }
+
+  return Boolean(user.memberships?.some((membership) => membership.papel === "admin"));
+}
+
 export function getUserProjectIds(user: AppUser | null) {
   if (!user) {
     return [];
@@ -77,6 +89,18 @@ export function canManageProject(user: AppUser | null, projetoId: string | null 
         membership.projetoId === projetoId && (membership.papel === "admin" || membership.papel === "manager"),
     ),
   );
+}
+
+export function canAccessProject(user: AppUser | null, projetoId: string | null | undefined) {
+  if (!user || !projetoId) {
+    return false;
+  }
+
+  if (user.isMaster) {
+    return true;
+  }
+
+  return Boolean(user.memberships?.some((membership) => membership.projetoId === projetoId));
 }
 
 export function resolveCurrentProjectId(user: AppUser | null) {

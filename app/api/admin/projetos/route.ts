@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { canAccessAdmin, resolveCurrentProjectId } from "@/lib/access";
-import { createProjeto, listProjetos, updateProjeto } from "@/lib/projetos";
+import { canAccessAdmin, canManageProject } from "@/lib/access";
+import { createProjetoForUsuario, listProjetos, listProjetosByUsuario, updateProjeto } from "@/lib/projetos";
 import { getSessionUser } from "@/lib/session";
 
 export async function GET() {
@@ -10,24 +10,15 @@ export async function GET() {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
-  const projetos = await listProjetos();
-
-  if (user?.isMaster) {
-    return NextResponse.json({ projetos }, { status: 200 });
-  }
-
-  const currentProjectId = resolveCurrentProjectId(user);
-  return NextResponse.json(
-    { projetos: projetos.filter((projeto) => projeto.id === currentProjectId) },
-    { status: 200 },
-  );
+  const projetos = user?.isMaster ? await listProjetos() : await listProjetosByUsuario(user!.id);
+  return NextResponse.json({ projetos }, { status: 200 });
 }
 
 export async function POST(request: Request) {
   const user = await getSessionUser();
 
-  if (!user?.isMaster) {
-    return NextResponse.json({ error: "Apenas o master pode criar projetos." }, { status: 403 });
+  if (!user || !canAccessAdmin(user)) {
+    return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
   const body = (await request.json()) as {
@@ -39,18 +30,20 @@ export async function POST(request: Request) {
   };
 
   if (!body.nome?.trim()) {
-    return NextResponse.json({ error: "Nome do projeto é obrigatório." }, { status: 400 });
+    return NextResponse.json({ error: "Nome do projeto e obrigatorio." }, { status: 400 });
   }
 
-  const projeto = await createProjeto({
+  const projeto = await createProjetoForUsuario({
+    usuarioId: user.id,
     nome: body.nome,
     slug: body.slug,
     tipo: body.tipo,
     descricao: body.descricao,
     status: body.status,
   });
+
   if (!projeto) {
-    return NextResponse.json({ error: "Não foi possível criar o projeto." }, { status: 500 });
+    return NextResponse.json({ error: "Nao foi possivel criar o projeto." }, { status: 500 });
   }
 
   return NextResponse.json({ projeto }, { status: 201 });
@@ -59,8 +52,8 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const user = await getSessionUser();
 
-  if (!user?.isMaster) {
-    return NextResponse.json({ error: "Apenas o master pode editar projetos." }, { status: 403 });
+  if (!user || !canAccessAdmin(user)) {
+    return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
   const body = (await request.json()) as {
@@ -73,7 +66,11 @@ export async function PUT(request: Request) {
   };
 
   if (!body.id || !body.nome?.trim()) {
-    return NextResponse.json({ error: "Id e nome do projeto são obrigatórios." }, { status: 400 });
+    return NextResponse.json({ error: "Id e nome do projeto sao obrigatorios." }, { status: 400 });
+  }
+
+  if (!canManageProject(user, body.id)) {
+    return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
   }
 
   const projeto = await updateProjeto({
@@ -86,7 +83,7 @@ export async function PUT(request: Request) {
   });
 
   if (!projeto) {
-    return NextResponse.json({ error: "Não foi possível atualizar o projeto." }, { status: 500 });
+    return NextResponse.json({ error: "Nao foi possivel atualizar o projeto." }, { status: 500 });
   }
 
   return NextResponse.json({ projeto }, { status: 200 });
