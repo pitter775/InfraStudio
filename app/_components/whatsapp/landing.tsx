@@ -20,10 +20,12 @@ const navItems = [
   { href: "#alem-do-whatsapp", label: "Site + WhatsApp" },
 ] as const;
 
+type NavHref = (typeof navItems)[number]["href"];
+
 export function WhatsappLandingPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [activeSection, setActiveSection] = useState<string>("#valor");
+  const [activeSection, setActiveSection] = useState<NavHref>("#valor");
 
   useEffect(() => {
     const handleScroll = () => {
@@ -41,7 +43,7 @@ export function WhatsappLandingPage() {
             top: element.offsetTop,
           };
         })
-        .filter((entry): entry is { href: string; top: number } => entry !== null);
+        .filter((entry): entry is { href: NavHref; top: number } => entry !== null);
 
       const current = [...offsets]
         .reverse()

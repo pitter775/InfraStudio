@@ -138,6 +138,9 @@ type Connector = {
     seller_id?: string;
     nickname?: string;
     access_token?: string;
+    refresh_token?: string;
+    token_expires_at?: string;
+    user_id?: string;
   } | null;
   ativo: boolean;
   createdAt?: string;
