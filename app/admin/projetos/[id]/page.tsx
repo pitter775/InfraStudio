@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Activity, Bold, Bot, Boxes, Cable, CheckCircle2, Copy, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, Sparkles, TestTube2, Trash2, Waypoints, X } from "lucide-react";
+import { Activity, Bold, Bot, Boxes, Cable, CheckCircle2, Coins, Copy, Cpu, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, ShieldAlert, Sparkles, TestTube2, Trash2, Waypoints, X } from "lucide-react";
 import { getAgentRuntimeBlockEntries, normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
 
 type Projeto = {
@@ -155,6 +155,7 @@ type ProjetoDetalhe = {
   widgets: ChatWidget[];
   whatsappChannels: WhatsAppChannel[];
   chats: Chat[];
+  billing: ProjetoBillingSection | null;
   stats: {
     totalAgentes: number;
     agenteAtivoId: string | null;
@@ -164,6 +165,54 @@ type ProjetoDetalhe = {
     totalWhatsAppChannels: number;
     totalChats: number;
   };
+};
+
+type BillingPricingModel = {
+  id: string;
+  label: string;
+  inputPerMillionUsd: number;
+  outputPerMillionUsd: number;
+};
+
+type ProjetoPlanoBilling = {
+  id: string;
+  projetoId: string;
+  nomePlano: string;
+  modeloReferencia: string;
+  limiteTokensInputMensal: number | null;
+  limiteTokensOutputMensal: number | null;
+  limiteTokensTotalMensal: number | null;
+  limiteCustoMensal: number | null;
+  autoBloquear: boolean;
+  bloqueado: boolean;
+  bloqueadoMotivo: string | null;
+  observacoes: string | null;
+};
+
+type ProjetoBillingSection = {
+  canManage: boolean;
+  windowLabel: string;
+  plan: ProjetoPlanoBilling;
+  currentUsage: {
+    tokensInput: number;
+    tokensOutput: number;
+    totalTokens: number;
+    custoTotal: number;
+  };
+  pricingModels: BillingPricingModel[];
+};
+
+type BillingPlanFormState = {
+  nomePlano: string;
+  modeloReferencia: string;
+  limiteTokensInputMensal: string;
+  limiteTokensOutputMensal: string;
+  limiteTokensTotalMensal: string;
+  limiteCustoMensal: string;
+  autoBloquear: boolean;
+  bloqueado: boolean;
+  bloqueadoMotivo: string;
+  observacoes: string;
 };
 
 type AgentConnectionSummary = {
@@ -402,6 +451,34 @@ function formatDateTimeLabel(value: string | null | undefined) {
   }
 
   return new Date(value).toLocaleString("pt-BR");
+}
+
+function formatIntegerLabel(value: number) {
+  return value.toLocaleString("pt-BR");
+}
+
+function formatUsdLabel(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: value >= 1 ? 2 : 4,
+    maximumFractionDigits: value >= 1 ? 2 : 4,
+  }).format(value);
+}
+
+function createBillingPlanForm(billing: ProjetoBillingSection | null | undefined): BillingPlanFormState {
+  return {
+    nomePlano: billing?.plan.nomePlano ?? "padrao",
+    modeloReferencia: billing?.plan.modeloReferencia ?? "gpt-4o-mini",
+    limiteTokensInputMensal: billing?.plan.limiteTokensInputMensal?.toString() ?? "",
+    limiteTokensOutputMensal: billing?.plan.limiteTokensOutputMensal?.toString() ?? "",
+    limiteTokensTotalMensal: billing?.plan.limiteTokensTotalMensal?.toString() ?? "",
+    limiteCustoMensal: billing?.plan.limiteCustoMensal?.toString() ?? "",
+    autoBloquear: billing?.plan.autoBloquear ?? true,
+    bloqueado: billing?.plan.bloqueado ?? false,
+    bloqueadoMotivo: billing?.plan.bloqueadoMotivo ?? "",
+    observacoes: billing?.plan.observacoes ?? "",
+  };
 }
 
 function getChatLeadName(chat: Chat) {
@@ -3033,6 +3110,7 @@ export default function AdminProjetoDetalhePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [data, setData] = useState<ProjetoDetalhe | null>(null);
+  const [billingPlanForm, setBillingPlanForm] = useState<BillingPlanFormState>(createBillingPlanForm(null));
   const [agenteForm, setAgenteForm] = useState<AgenteFormState>(emptyAgenteForm);
   const [apiForm, setApiForm] = useState<ApiFormState>(emptyApiForm);
   const [connectorForm, setConnectorForm] = useState<ConnectorFormState>(emptyConnectorForm);
@@ -3045,6 +3123,7 @@ export default function AdminProjetoDetalhePage() {
   const [savingConnector, setSavingConnector] = useState(false);
   const [savingWidget, setSavingWidget] = useState(false);
   const [savingWhatsAppChannel, setSavingWhatsAppChannel] = useState(false);
+  const [savingBillingPlan, setSavingBillingPlan] = useState(false);
   const [connectingWhatsAppChannelId, setConnectingWhatsAppChannelId] = useState<string | null>(null);
   const [disconnectingWhatsAppChannelId, setDisconnectingWhatsAppChannelId] = useState<string | null>(null);
   const [deletingAgenteId, setDeletingAgenteId] = useState<string | null>(null);
@@ -3058,6 +3137,7 @@ export default function AdminProjetoDetalhePage() {
   const [feedbackConnector, setFeedbackConnector] = useState<string | null>(null);
   const [feedbackWidget, setFeedbackWidget] = useState<string | null>(null);
   const [feedbackWhatsApp, setFeedbackWhatsApp] = useState<string | null>(null);
+  const [feedbackBilling, setFeedbackBilling] = useState<string | null>(null);
   const [agenteModalOpen, setAgenteModalOpen] = useState(false);
   const [apiModalOpen, setApiModalOpen] = useState(false);
   const [connectorModalOpen, setConnectorModalOpen] = useState(false);
@@ -3095,6 +3175,7 @@ export default function AdminProjetoDetalhePage() {
 
     const payload = (await response.json()) as ProjetoDetalhe;
     setData(payload);
+    setBillingPlanForm(createBillingPlanForm(payload.billing));
     setAgenteForm((prev) => ({
       ...prev,
       projetoId: payload.projeto.id,
@@ -4511,6 +4592,56 @@ export default function AdminProjetoDetalhePage() {
     }
   };
 
+  const handleSaveBillingPlan = async () => {
+    if (!data?.billing?.canManage) {
+      return;
+    }
+
+    setSavingBillingPlan(true);
+    setFeedbackBilling(null);
+
+    try {
+      const response = await fetch(`/api/admin/projetos/${params.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(billingPlanForm),
+      });
+
+      const payload = (await response.json()) as {
+        error?: string;
+        plan?: ProjetoPlanoBilling;
+      };
+
+      if (!response.ok || !payload.plan) {
+        setFeedbackBilling(payload.error ?? "Nao foi possivel salvar o plano do projeto.");
+        return;
+      }
+
+      const savedPlan = payload.plan;
+      setBillingPlanForm(createBillingPlanForm({
+        canManage: data.billing.canManage,
+        currentUsage: data.billing.currentUsage,
+        plan: savedPlan,
+        pricingModels: data.billing.pricingModels,
+        windowLabel: data.billing.windowLabel,
+      }));
+      updateProjetoData((current) => ({
+        ...current,
+        billing: current.billing
+          ? {
+              ...current.billing,
+              plan: savedPlan,
+            }
+          : current.billing,
+      }));
+      setFeedbackBilling("Plano do projeto atualizado.");
+    } finally {
+      setSavingBillingPlan(false);
+    }
+  };
+
   const toggleApiCampo = (campo: ApiCampo) => {
     setApiForm((prev) => {
       const exists = prev.campos.some((item) => item.nome === campo.nome);
@@ -4657,6 +4788,10 @@ export default function AdminProjetoDetalhePage() {
     { key: "chats" as const, label: "Chats", icon: MessageSquareText },
     { key: "whatsapp" as const, label: "WhatsApp", icon: Waypoints },
   ];
+  const selectedBillingModel =
+    data.billing?.pricingModels.find((item) => item.id === billingPlanForm.modeloReferencia) ??
+    data.billing?.pricingModels.find((item) => item.id === data.billing?.plan.modeloReferencia) ??
+    null;
 
   return (
     <main className="space-y-6">
@@ -4749,17 +4884,207 @@ export default function AdminProjetoDetalhePage() {
         </div>
       </section>
 
-      {(feedbackAgente || feedbackApi || feedbackConnector || feedbackWidget || feedbackWhatsApp) && (
+      {(feedbackAgente || feedbackApi || feedbackConnector || feedbackWidget || feedbackWhatsApp || feedbackBilling) && (
         <section className="grid gap-3">
           {feedbackAgente ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackAgente}</div> : null}
           {feedbackApi ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackApi}</div> : null}
           {feedbackConnector ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackConnector}</div> : null}
           {feedbackWidget ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackWidget}</div> : null}
           {feedbackWhatsApp ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackWhatsApp}</div> : null}
+          {feedbackBilling ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackBilling}</div> : null}
         </section>
       )}
 
       <div className="space-y-4">
+        {data.billing ? (
+          <section className="space-y-4 rounded-[28px] border border-white/10 bg-white/[0.04] p-4 shadow-[0_18px_48px_rgba(2,8,23,0.22)] sm:p-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Coins size={18} className="text-emerald-200" />Plano e consumo de IA</h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Referencia financeira do projeto em {data.billing.windowLabel}, com {selectedBillingModel?.label ?? "GPT-4o Mini"} como base atual.
+                </p>
+              </div>
+              <div className="inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-300">
+                <ShieldAlert size={13} className={billingPlanForm.bloqueado ? "text-rose-300" : billingPlanForm.autoBloquear ? "text-amber-200" : "text-emerald-200"} />
+                {billingPlanForm.bloqueado ? "Bloqueio manual ativo" : billingPlanForm.autoBloquear ? "Bloqueio automatico ativo" : "Bloqueio automatico desligado"}
+              </div>
+            </div>
+
+            <div className="grid gap-3 xl:grid-cols-5">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Modelo atual</p>
+                <p className="mt-2 text-lg font-bold text-white">{selectedBillingModel?.label ?? data.billing.plan.modeloReferencia}</p>
+                <p className="mt-1 text-xs text-slate-400">{data.billing.plan.nomePlano}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tokens input</p>
+                <p className="mt-2 text-2xl font-black text-white">{formatIntegerLabel(data.billing.currentUsage.tokensInput)}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tokens output</p>
+                <p className="mt-2 text-2xl font-black text-white">{formatIntegerLabel(data.billing.currentUsage.tokensOutput)}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tokens totais</p>
+                <p className="mt-2 text-2xl font-black text-white">{formatIntegerLabel(data.billing.currentUsage.totalTokens)}</p>
+              </div>
+              <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/10 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100/75">Custo atual</p>
+                <p className="mt-2 text-2xl font-black text-white">{formatUsdLabel(data.billing.currentUsage.custoTotal)}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-slate-200">Nome do plano</span>
+                  <input
+                    value={billingPlanForm.nomePlano}
+                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, nomePlano: event.target.value }))}
+                    disabled={!data.billing.canManage}
+                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-200"><Cpu size={15} className="text-cyan-200" />Modelo de referencia</span>
+                  <select
+                    value={billingPlanForm.modeloReferencia}
+                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, modeloReferencia: event.target.value }))}
+                    disabled={!data.billing.canManage}
+                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {data.billing.pricingModels.map((item) => (
+                      <option key={item.id} value={item.id} className="bg-slate-950 text-white">
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-slate-200">Limite mensal de tokens input</span>
+                  <input
+                    value={billingPlanForm.limiteTokensInputMensal}
+                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, limiteTokensInputMensal: event.target.value }))}
+                    disabled={!data.billing.canManage}
+                    inputMode="numeric"
+                    placeholder="vazio = sem limite"
+                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-slate-200">Limite mensal de tokens output</span>
+                  <input
+                    value={billingPlanForm.limiteTokensOutputMensal}
+                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, limiteTokensOutputMensal: event.target.value }))}
+                    disabled={!data.billing.canManage}
+                    inputMode="numeric"
+                    placeholder="vazio = sem limite"
+                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-slate-200">Limite mensal total de tokens</span>
+                  <input
+                    value={billingPlanForm.limiteTokensTotalMensal}
+                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, limiteTokensTotalMensal: event.target.value }))}
+                    disabled={!data.billing.canManage}
+                    inputMode="numeric"
+                    placeholder="vazio = sem limite"
+                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-slate-200">Limite mensal de custo (USD)</span>
+                  <input
+                    value={billingPlanForm.limiteCustoMensal}
+                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, limiteCustoMensal: event.target.value.replace(",", ".") }))}
+                    disabled={!data.billing.canManage}
+                    inputMode="decimal"
+                    placeholder="vazio = sem limite"
+                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </label>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/10 p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-100/80">Tabela usada na referencia</p>
+                  <p className="mt-2 text-sm font-semibold text-white">{selectedBillingModel?.label ?? "GPT-4o Mini"}</p>
+                  <p className="mt-2 text-xs text-cyan-50/80">Input: {formatUsdLabel(selectedBillingModel?.inputPerMillionUsd ?? 0)} por 1M tokens</p>
+                  <p className="mt-1 text-xs text-cyan-50/80">Output: {formatUsdLabel(selectedBillingModel?.outputPerMillionUsd ?? 0)} por 1M tokens</p>
+                </div>
+
+                <label className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                  <span>
+                    <span className="block text-sm font-semibold text-white">Bloqueio automatico</span>
+                    <span className="mt-1 block text-xs text-slate-400">Interrompe consumo ao bater os limites configurados.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={billingPlanForm.autoBloquear}
+                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, autoBloquear: event.target.checked }))}
+                    disabled={!data.billing.canManage}
+                    className="h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400 disabled:cursor-not-allowed"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between gap-3 rounded-2xl border border-rose-400/15 bg-rose-500/10 px-4 py-3">
+                  <span>
+                    <span className="block text-sm font-semibold text-white">Bloqueio manual</span>
+                    <span className="mt-1 block text-xs text-rose-100/75">Forca a parada do uso mesmo sem atingir o limite.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={billingPlanForm.bloqueado}
+                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, bloqueado: event.target.checked }))}
+                    disabled={!data.billing.canManage}
+                    className="h-4 w-4 rounded border-white/20 bg-slate-950 text-rose-400 disabled:cursor-not-allowed"
+                  />
+                </label>
+
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-slate-200">Motivo do bloqueio</span>
+                  <textarea
+                    value={billingPlanForm.bloqueadoMotivo}
+                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, bloqueadoMotivo: event.target.value }))}
+                    disabled={!data.billing.canManage}
+                    rows={3}
+                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </label>
+
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-slate-200">Observacoes financeiras</span>
+                  <textarea
+                    value={billingPlanForm.observacoes}
+                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, observacoes: event.target.value }))}
+                    disabled={!data.billing.canManage}
+                    rows={4}
+                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </label>
+
+                {data.billing.canManage ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveBillingPlan()}
+                    disabled={savingBillingPlan}
+                    className={`inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-3 text-sm font-semibold text-white ${premiumInteractiveClass} disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    <Coins size={16} />
+                    {savingBillingPlan ? "Salvando plano..." : "Salvar definicoes do plano"}
+                  </button>
+                ) : (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+                    Voce pode visualizar o plano, mas nao tem permissao para alterar as definicoes financeiras deste projeto.
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
         <section className="mt-8 flex flex-wrap items-center justify-center gap-2">
           {projectTabs.map((tab) => {
             const Icon = tab.icon;

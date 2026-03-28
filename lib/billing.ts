@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getDefaultOpenAIModel } from "@/lib/openai-pricing";
+import { getDefaultOpenAIModel, resolvePricingModel } from "@/lib/openai-pricing";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type ProjetoPlanoRow = {
@@ -101,6 +101,12 @@ export type BillingSnapshot = {
   };
 };
 
+export type ProjetoBillingOverview = {
+  window: BillingWindow;
+  plano: ProjetoPlanoBilling;
+  consumoAtual: BillingUsageTotals;
+};
+
 export type BillingDecisionCode =
   | "allowed"
   | "project_manually_blocked"
@@ -186,6 +192,32 @@ function normalizeTotals(row?: ConsumoAggregateRow | null): BillingUsageTotals {
   };
 }
 
+function normalizeNullableInteger(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return Math.max(0, Math.round(parsed));
+}
+
+function normalizeNullableDecimal(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return Math.max(0, Number(parsed.toFixed(6)));
+}
+
 export async function getProjetoPlanoBilling(projetoId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
@@ -200,6 +232,33 @@ export async function getProjetoPlanoBilling(projetoId: string) {
   }
 
   return data ? mapProjetoPlano(data as ProjetoPlanoRow) : null;
+}
+
+export async function ensureProjetoPlanoBilling(projetoId: string) {
+  const current = await getProjetoPlanoBilling(projetoId);
+  if (current) {
+    return current;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("projetos_planos")
+    .insert(({
+      projeto_id: projetoId,
+      nome_plano: "padrao",
+      modelo_referencia: getDefaultOpenAIModel(),
+      auto_bloquear: true,
+      bloqueado: false,
+    }) as never)
+    .select("id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes")
+    .single();
+
+  if (error) {
+    console.error("[billing] failed to ensure project plan", error);
+    return null;
+  }
+
+  return mapProjetoPlano(data as ProjetoPlanoRow);
 }
 
 export async function getUsuarioLimiteBilling(usuarioId: string, projetoId: string) {
@@ -275,6 +334,66 @@ export async function getBillingSnapshot(input: {
       custoMensal: usuarioLimite?.limiteCustoMensal ?? projetoPlano?.limiteCustoMensal ?? null,
     },
   } satisfies BillingSnapshot;
+}
+
+export async function getProjetoBillingOverview(projetoId: string, referenceDate?: Date) {
+  const window = buildCurrentMonthWindow(referenceDate);
+  const [plano, consumoAtual] = await Promise.all([
+    ensureProjetoPlanoBilling(projetoId),
+    getBillingUsageTotals({ projetoId, window }),
+  ]);
+
+  if (!plano) {
+    return null;
+  }
+
+  return {
+    window,
+    plano,
+    consumoAtual,
+  } satisfies ProjetoBillingOverview;
+}
+
+export async function updateProjetoPlanoBilling(input: {
+  projetoId: string;
+  nomePlano?: string | null;
+  modeloReferencia?: string | null;
+  limiteTokensInputMensal?: number | string | null;
+  limiteTokensOutputMensal?: number | string | null;
+  limiteTokensTotalMensal?: number | string | null;
+  limiteCustoMensal?: number | string | null;
+  autoBloquear?: boolean | null;
+  bloqueado?: boolean | null;
+  bloqueadoMotivo?: string | null;
+  observacoes?: string | null;
+}) {
+  const supabase = getSupabaseAdminClient();
+  const payload = {
+    projeto_id: input.projetoId,
+    nome_plano: input.nomePlano?.trim() || "padrao",
+    modelo_referencia: resolvePricingModel(input.modeloReferencia),
+    limite_tokens_input_mensal: normalizeNullableInteger(input.limiteTokensInputMensal),
+    limite_tokens_output_mensal: normalizeNullableInteger(input.limiteTokensOutputMensal),
+    limite_tokens_total_mensal: normalizeNullableInteger(input.limiteTokensTotalMensal),
+    limite_custo_mensal: normalizeNullableDecimal(input.limiteCustoMensal),
+    auto_bloquear: input.autoBloquear !== false,
+    bloqueado: input.bloqueado === true,
+    bloqueado_motivo: input.bloqueadoMotivo?.trim() || null,
+    observacoes: input.observacoes?.trim() || null,
+  };
+
+  const { data, error } = await supabase
+    .from("projetos_planos")
+    .upsert(payload as never, { onConflict: "projeto_id" })
+    .select("id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes")
+    .single();
+
+  if (error) {
+    console.error("[billing] failed to update project plan", error);
+    return null;
+  }
+
+  return mapProjetoPlano(data as ProjetoPlanoRow);
 }
 
 function buildDecision(code: BillingDecisionCode, snapshot: BillingSnapshot, message: string | null): BillingDecision {

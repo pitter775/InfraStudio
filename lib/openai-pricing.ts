@@ -3,14 +3,31 @@ import "server-only";
 const DEFAULT_MODEL = "gpt-4o-mini";
 
 type ModelPricing = {
+  label: string;
   inputPerMillionUsd: number;
   outputPerMillionUsd: number;
 };
 
 const MODEL_PRICING: Record<string, ModelPricing> = {
   "gpt-4o-mini": {
+    label: "GPT-4o Mini",
     inputPerMillionUsd: 0.15,
     outputPerMillionUsd: 0.6,
+  },
+  "gpt-4o": {
+    label: "GPT-4o",
+    inputPerMillionUsd: 2.5,
+    outputPerMillionUsd: 10,
+  },
+  "gpt-4.1-mini": {
+    label: "GPT-4.1 Mini",
+    inputPerMillionUsd: 0.4,
+    outputPerMillionUsd: 1.6,
+  },
+  "gpt-4.1": {
+    label: "GPT-4.1",
+    inputPerMillionUsd: 2,
+    outputPerMillionUsd: 8,
   },
 };
 
@@ -20,13 +37,27 @@ function normalizeModel(model?: string | null) {
     .toLowerCase()
     .replace(/\s+/g, "")
     .replace(/^gpt4o-mini$/, "gpt-4o-mini")
-    .replace(/^gpt-4omini$/, "gpt-4o-mini");
+    .replace(/^gpt-4omini$/, "gpt-4o-mini")
+    .replace(/^gpt4o$/, "gpt-4o")
+    .replace(/^gpt41mini$/, "gpt-4.1-mini")
+    .replace(/^gpt-41-mini$/, "gpt-4.1-mini")
+    .replace(/^gpt41$/, "gpt-4.1")
+    .replace(/^gpt-41$/, "gpt-4.1");
 
   return normalized || DEFAULT_MODEL;
 }
 
 export function getDefaultOpenAIModel() {
   return DEFAULT_MODEL;
+}
+
+export function getOpenAIModelPricingOptions() {
+  return Object.entries(MODEL_PRICING).map(([id, pricing]) => ({
+    id,
+    label: pricing.label,
+    inputPerMillionUsd: pricing.inputPerMillionUsd,
+    outputPerMillionUsd: pricing.outputPerMillionUsd,
+  }));
 }
 
 export function resolvePricingModel(model?: string | null) {
