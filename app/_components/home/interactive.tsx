@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, Lock, LogOut, Menu, MessageCircle, Send, UserRound, X } from "lucide-react";
 import type { AppUser } from "@/lib/app-user";
 import { HOME_CHAT_WIDGET_SLUG, WHATSAPP_NUMBER } from "@/app/_components/home/data";
+import { isAdminUser } from "@/lib/access";
 import { cn } from "@/lib/utils";
 
 export function ExternalChatEmbed({
@@ -215,6 +216,8 @@ type NavbarProps = {
 export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const adminHomeHref = currentUser ? (isAdminUser(currentUser) ? "/admin/dashboard" : "/admin/projetos") : "/admin/dashboard";
+  const adminHomeLabel = currentUser ? (isAdminUser(currentUser) ? "Ir para admin" : "Abrir ambiente") : "Ir para admin";
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -313,11 +316,11 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
                 {currentUser ? (
                   <div className="space-y-3">
                     <Link
-                      href="/admin/usuarios"
+                      href={adminHomeHref}
                       onClick={closeMobileMenu}
                       className="block rounded-2xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-100"
                     >
-                      Ir para admin
+                      {adminHomeLabel}
                     </Link>
                     <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/10 px-4 py-3">
                       <p className="text-sm font-semibold text-white">{currentUser.name}</p>
@@ -412,13 +415,16 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
                 </button>
 
                 <div className="invisible absolute right-0 top-full z-20 mt-2 w-44 rounded-2xl border border-white/10 bg-slate-950/95 p-2 opacity-0 shadow-2xl backdrop-blur-xl transition-all duration-200 group-hover:visible group-hover:opacity-100">
-                  <Link
-                    href="/admin/dashboard"
-                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/8 hover:text-white"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.location.href = adminHomeHref;
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/8 hover:text-white"
                   >
                     <Lock size={14} />
-                    Admin
-                  </Link>
+                    {isAdminUser(currentUser) ? "Admin" : "Ambiente"}
+                  </button>
                   <button
                     type="button"
                     onClick={() => {

@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
-import { canAccessAdmin, canManageProject } from "@/lib/access";
+import { canAccessWorkspace, canManageProject } from "@/lib/access";
 import { createProjetoForUsuario, listProjetos, listProjetosByUsuario, updateProjeto } from "@/lib/projetos";
+import { createSession } from "@/lib/session";
+import { getUsuarioById } from "@/lib/usuarios";
 import { getSessionUser } from "@/lib/session";
 
 export async function GET() {
   const user = await getSessionUser();
 
-  if (!canAccessAdmin(user)) {
+  if (!canAccessWorkspace(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
@@ -17,7 +19,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = await getSessionUser();
 
-  if (!user || !canAccessAdmin(user)) {
+  if (!user || !canAccessWorkspace(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
@@ -46,13 +48,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Nao foi possivel criar o projeto." }, { status: 500 });
   }
 
+  const refreshedUser = await getUsuarioById(user.id);
+  if (refreshedUser) {
+    await createSession(refreshedUser);
+  }
+
   return NextResponse.json({ projeto }, { status: 201 });
 }
 
 export async function PUT(request: Request) {
   const user = await getSessionUser();
 
-  if (!user || !canAccessAdmin(user)) {
+  if (!user || !canAccessWorkspace(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 

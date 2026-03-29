@@ -50,6 +50,10 @@ export function canAccessAdmin(user: AppUser | null) {
   return Boolean(user?.isMaster || user?.memberships?.length);
 }
 
+export function canAccessWorkspace(user: AppUser | null) {
+  return Boolean(user);
+}
+
 export function isAdminUser(user: AppUser | null) {
   if (!user) {
     return false;

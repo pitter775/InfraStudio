@@ -38,6 +38,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Nome e email são obrigatórios." }, { status: 400 });
   }
 
+  if (!body.projetoId) {
+    return NextResponse.json({ error: "Selecione um projeto para vincular o usuario." }, { status: 400 });
+  }
+
   const created = await createUsuario({
     nome: body.nome,
     email: body.email,
@@ -77,6 +81,10 @@ export async function PUT(request: Request) {
 
   if (!body.id || !body.nome || !body.email) {
     return NextResponse.json({ error: "Id, nome e email são obrigatórios." }, { status: 400 });
+  }
+
+  if (!body.projetoId) {
+    return NextResponse.json({ error: "Selecione um projeto para vincular o usuario." }, { status: 400 });
   }
 
   const updated = await updateUsuario({

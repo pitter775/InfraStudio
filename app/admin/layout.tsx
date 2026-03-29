@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { getCurrentProjectUser, signOutProjectAuth } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
-import { canAccessAdmin } from "@/lib/access";
+import { canAccessWorkspace, isAdminUser } from "@/lib/access";
 import { cn } from "@/lib/utils";
 
 const adminLinks = [
@@ -60,7 +60,9 @@ function Sidebar({
   onLinkStart,
   onLogout,
 }: SidebarProps) {
-  const visibleLinks = adminLinks;
+  const visibleLinks = currentUser && !isAdminUser(currentUser)
+    ? adminLinks.filter((item) => item.href === "/admin/projetos" || item.href === "/admin/me")
+    : adminLinks;
 
   return (
     <>
@@ -218,7 +220,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   useEffect(() => {
     const loadUser = async () => {
       const user = await getCurrentProjectUser();
-      if (!canAccessAdmin(user)) {
+      if (!canAccessWorkspace(user)) {
         router.replace("/");
         return;
       }
@@ -246,7 +248,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
       <div className="infra-premium-bg flex min-h-screen items-center justify-center px-6 text-slate-200">
         <div className="infra-premium-panel rounded-[28px] px-6 py-5 text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Validando acesso</p>
-          <p className="mt-3 text-lg text-white">Carregando ambiente master...</p>
+          <p className="mt-3 text-lg text-white">Carregando ambiente...</p>
         </div>
       </div>
     );

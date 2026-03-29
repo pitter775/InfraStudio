@@ -206,7 +206,6 @@ async function syncUsuarioProjetoPapel(input: {
       .from("usuarios_projetos")
       .update({
         papel,
-        updated_at: new Date().toISOString(),
       } as never)
       .eq("usuario_id", input.usuarioId)
       .eq("projeto_id", input.projetoId);
@@ -225,7 +224,6 @@ async function syncUsuarioProjetoPapel(input: {
       projeto_id: input.projetoId,
       papel,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     } as never);
 
   if (error) {

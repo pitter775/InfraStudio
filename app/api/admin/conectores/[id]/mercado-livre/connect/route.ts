@@ -30,8 +30,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   try {
     const authorizationUrl = await buildMercadoLivreAuthorizationUrl({
-      connectorId: connector.id,
-      projetoId: connector.projetoId,
+      connector,
     });
 
     return NextResponse.redirect(authorizationUrl);

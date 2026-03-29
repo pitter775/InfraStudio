@@ -135,6 +135,8 @@ type Connector = {
   agenteId: string | null;
   endpointBase: string;
   configuracoes: {
+    app_id?: string;
+    client_secret?: string;
     seller_id?: string;
     nickname?: string;
     access_token?: string;
@@ -332,6 +334,8 @@ type ConnectorFormState = {
   projetoId: string;
   agenteId: string | null;
   endpointBase: string;
+  appId: string;
+  clientSecret: string;
   sellerId: string;
   nickname: string;
   accessToken: string;
@@ -1401,6 +1405,8 @@ const emptyConnectorForm: ConnectorFormState = {
   projetoId: "",
   agenteId: null,
   endpointBase: "https://api.mercadolibre.com",
+  appId: "",
+  clientSecret: "",
   sellerId: "",
   nickname: "",
   accessToken: "",
@@ -2639,6 +2645,26 @@ function ConnectorModal({
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <FormLabel>APP ID do Mercado Livre</FormLabel>
+              <input
+                value={form.appId}
+                onChange={(event) => onChange({ appId: event.target.value })}
+                placeholder="1234567890123456"
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+              />
+              <p className="mt-2 text-xs text-slate-400">Obrigatorio para o usuario concluir o OAuth da propria conta sem depender da configuracao global do servidor.</p>
+            </div>
+            <div>
+              <FormLabel>CLIENT SECRET do Mercado Livre</FormLabel>
+              <input
+                type="password"
+                value={form.clientSecret}
+                onChange={(event) => onChange({ clientSecret: event.target.value })}
+                placeholder="Cole o segredo da aplicacao"
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+              />
             </div>
             <div>
               <FormLabel>Seller ID</FormLabel>
@@ -3976,6 +4002,8 @@ export default function AdminProjetoDetalhePage() {
         agenteId: connectorForm.agenteId,
         endpointBase: connectorForm.endpointBase,
         configuracoes: {
+          app_id: connectorForm.appId.trim() || undefined,
+          client_secret: connectorForm.clientSecret.trim() || undefined,
           seller_id: connectorForm.sellerId.trim(),
           nickname: connectorForm.nickname.trim() || undefined,
           access_token: connectorForm.accessToken.trim() || undefined,
@@ -4006,6 +4034,8 @@ export default function AdminProjetoDetalhePage() {
         projetoId: payload.conector.projetoId ?? params.id,
         agenteId: payload.conector.agenteId,
         endpointBase: payload.conector.endpointBase || "https://api.mercadolibre.com",
+        appId: payload.conector.configuracoes?.app_id ?? "",
+        clientSecret: payload.conector.configuracoes?.client_secret ?? "",
         sellerId: payload.conector.configuracoes?.seller_id ?? "",
         nickname: payload.conector.configuracoes?.nickname ?? "",
         accessToken: payload.conector.configuracoes?.access_token ?? "",
@@ -4191,6 +4221,8 @@ export default function AdminProjetoDetalhePage() {
       projetoId: connector.projetoId ?? params.id,
       agenteId: connector.agenteId,
       endpointBase: connector.endpointBase || "https://api.mercadolibre.com",
+      appId: connector.configuracoes?.app_id ?? "",
+      clientSecret: connector.configuracoes?.client_secret ?? "",
       sellerId: connector.configuracoes?.seller_id ?? "",
       nickname: connector.configuracoes?.nickname ?? "",
       accessToken: connector.configuracoes?.access_token ?? "",

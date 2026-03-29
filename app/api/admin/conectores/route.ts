@@ -24,11 +24,15 @@ type ConnectorBody = {
 };
 
 function normalizeMercadoLivreConfig(configuracoes: MercadoLivreConnectorConfig | null | undefined) {
+  const appId = typeof configuracoes?.app_id === "string" ? configuracoes.app_id.trim() : "";
+  const clientSecret = typeof configuracoes?.client_secret === "string" ? configuracoes.client_secret.trim() : "";
   const sellerId = typeof configuracoes?.seller_id === "string" ? configuracoes.seller_id.trim() : "";
   const nickname = typeof configuracoes?.nickname === "string" ? configuracoes.nickname.trim() : "";
   const accessToken = typeof configuracoes?.access_token === "string" ? configuracoes.access_token.trim() : "";
 
   return {
+    app_id: appId || undefined,
+    client_secret: clientSecret || undefined,
     seller_id: sellerId,
     nickname: nickname || undefined,
     access_token: accessToken || undefined,
@@ -93,10 +97,6 @@ export async function POST(request: Request) {
   }
 
   const configuracoes = normalizeMercadoLivreConfig(body.configuracoes);
-  if (!configuracoes.seller_id) {
-    return NextResponse.json({ error: "Seller ID e obrigatorio para o conector Mercado Livre." }, { status: 400 });
-  }
-
   const conector = await createConector({
     projetoId: body.projetoId,
     agenteId: body.agenteId ?? null,
@@ -137,10 +137,6 @@ export async function PUT(request: Request) {
   }
 
   const configuracoes = normalizeMercadoLivreConfig(body.configuracoes);
-  if (!configuracoes.seller_id) {
-    return NextResponse.json({ error: "Seller ID e obrigatorio para o conector Mercado Livre." }, { status: 400 });
-  }
-
   const conector = await updateConector({
     id: body.id,
     projetoId: body.projetoId,

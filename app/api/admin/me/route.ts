@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { canAccessAdmin } from "@/lib/access";
+import { canAccessWorkspace } from "@/lib/access";
 import { createSession, getSessionUser } from "@/lib/session";
 import { getUsuarioById, updateUsuario } from "@/lib/usuarios";
 
 export async function POST(request: Request) {
   const sessionUser = await getSessionUser();
 
-  if (!sessionUser || !canAccessAdmin(sessionUser)) {
+  if (!sessionUser || !canAccessWorkspace(sessionUser)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 

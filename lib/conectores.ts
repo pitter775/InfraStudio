@@ -6,6 +6,8 @@ export const MERCADO_LIVRE_CONNECTOR_TYPE = "mercado_livre";
 export const MERCADO_LIVRE_ENDPOINT_BASE = "https://api.mercadolibre.com";
 
 export type MercadoLivreConnectorConfig = {
+  app_id?: string;
+  client_secret?: string;
   seller_id?: string;
   nickname?: string;
   access_token?: string;
@@ -60,7 +62,15 @@ function normalizeMercadoLivreConfig(configuracoes?: Record<string, unknown> | n
     return null;
   }
 
-  const sellerId =
+  const appId =
+    typeof configuracoes.app_id === "string" && configuracoes.app_id.trim()
+      ? configuracoes.app_id.trim()
+      : undefined;
+  const clientSecret =
+    typeof configuracoes.client_secret === "string" && configuracoes.client_secret.trim()
+      ? configuracoes.client_secret.trim()
+      : undefined;
+  const mlSellerId =
     typeof configuracoes.seller_id === "string" && configuracoes.seller_id.trim()
       ? configuracoes.seller_id.trim()
       : undefined;
@@ -85,12 +95,14 @@ function normalizeMercadoLivreConfig(configuracoes?: Record<string, unknown> | n
       ? configuracoes.user_id.trim()
       : undefined;
 
-  if (!sellerId && !nickname && !accessToken && !refreshToken && !tokenExpiresAt && !userId) {
+  if (!appId && !clientSecret && !mlSellerId && !nickname && !accessToken && !refreshToken && !tokenExpiresAt && !userId) {
     return null;
   }
 
   return {
-    seller_id: sellerId,
+    app_id: appId,
+    client_secret: clientSecret,
+    seller_id: mlSellerId,
     nickname,
     access_token: accessToken,
     refresh_token: refreshToken,

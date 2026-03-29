@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BriefcaseBusiness, Lock, Plus, Shield } from "lucide-react";
-import { canAccessAdmin } from "@/lib/access";
+import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
 
@@ -51,7 +51,7 @@ export default function AdminProjetosPage() {
       const user = await getCurrentProjectUser();
       setCurrentUser(user);
 
-      if (!canAccessAdmin(user)) {
+      if (!canAccessWorkspace(user)) {
         setLoading(false);
         return;
       }
@@ -111,7 +111,7 @@ export default function AdminProjetosPage() {
     );
   }
 
-  if (!canAccessAdmin(currentUser)) {
+  if (!canAccessWorkspace(currentUser)) {
     return (
       <main className="space-y-6">
         <section className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-8">
@@ -119,8 +119,8 @@ export default function AdminProjetosPage() {
             <Shield size={14} />
             Permissao insuficiente
           </div>
-          <h2 className="text-2xl font-bold text-white">Sem acesso ao admin</h2>
-          <p className="mt-3 max-w-xl text-slate-300">Seu usuario nao possui vinculo ativo com projetos.</p>
+          <h2 className="text-2xl font-bold text-white">Sem acesso ao ambiente</h2>
+          <p className="mt-3 max-w-xl text-slate-300">Seu usuario precisa estar autenticado para criar ou acessar projetos.</p>
         </section>
       </main>
     );

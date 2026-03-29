@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Activity,
   Bot,
@@ -14,6 +15,8 @@ import {
 } from "lucide-react";
 import { listProjectUsers } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
+import { getCurrentProjectUser } from "@/lib/auth";
+import { isAdminUser } from "@/lib/access";
 
 type Projeto = {
   id: string;
@@ -241,6 +244,7 @@ function RingChart({
 }
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [state, setState] = useState<DashboardState>({
     users: [],
@@ -254,6 +258,12 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     const loadDashboard = async () => {
+      const currentUser = await getCurrentProjectUser();
+      if (currentUser && !isAdminUser(currentUser)) {
+        router.replace("/admin/projetos");
+        return;
+      }
+
       const range = getDefaultMonthRange();
 
       const [users, projectResourcesResponse, chatsResponse, usageResponse] = await Promise.all([
@@ -279,7 +289,7 @@ export default function AdminDashboardPage() {
     };
 
     void loadDashboard();
-  }, []);
+  }, [router]);
 
   const { users, projetos, agentes, apis, widgets, chats, usage } = state;
   const activeProjects = projetos.filter((projeto) => projeto.status === "ativo").length;

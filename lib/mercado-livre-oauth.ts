@@ -32,6 +32,12 @@ type MercadoLivreUserResponse = {
   nickname?: string;
 };
 
+type MercadoLivreOAuthCredentials = {
+  appId: string;
+  clientSecret: string;
+  redirectUri: string;
+};
+
 function getMercadoLivreOAuthEnv() {
   return {
     appId: process.env.MERCADO_LIVRE_APP_ID?.trim() || process.env.MERCADO_LIVRE_CLIENT_ID?.trim() || "",
@@ -40,39 +46,49 @@ function getMercadoLivreOAuthEnv() {
   };
 }
 
-export function getMercadoLivreOAuthSetupStatus() {
+function getMercadoLivreOAuthCredentials(connector?: Pick<ConnectorRecord, "tipo" | "configuracoes"> | null): MercadoLivreOAuthCredentials {
   const env = getMercadoLivreOAuthEnv();
+  const config = connector ? getMercadoLivreConnectorConfig(connector) : null;
 
   return {
-    ready: Boolean(env.appId && env.clientSecret && env.redirectUri),
+    appId: config?.app_id?.trim() || env.appId,
+    clientSecret: config?.client_secret?.trim() || env.clientSecret,
+    redirectUri: env.redirectUri,
+  };
+}
+
+export function getMercadoLivreOAuthSetupStatus(connector?: Pick<ConnectorRecord, "tipo" | "configuracoes"> | null) {
+  const credentials = getMercadoLivreOAuthCredentials(connector);
+
+  return {
+    ready: Boolean(credentials.appId && credentials.clientSecret && credentials.redirectUri),
     missing: [
-      !env.appId ? "MERCADO_LIVRE_APP_ID" : null,
-      !env.clientSecret ? "MERCADO_LIVRE_CLIENT_SECRET" : null,
-      !env.redirectUri ? "MERCADO_LIVRE_REDIRECT_URI" : null,
+      !credentials.appId ? "APP ID do conector ou MERCADO_LIVRE_APP_ID" : null,
+      !credentials.clientSecret ? "CLIENT SECRET do conector ou MERCADO_LIVRE_CLIENT_SECRET" : null,
+      !credentials.redirectUri ? "MERCADO_LIVRE_REDIRECT_URI" : null,
     ].filter(Boolean) as string[],
   };
 }
 
 export async function buildMercadoLivreAuthorizationUrl(input: {
-  connectorId: string;
-  projetoId: string;
+  connector: ConnectorRecord;
 }) {
-  const env = getMercadoLivreOAuthEnv();
-  if (!env.appId || !env.clientSecret || !env.redirectUri) {
-    throw new Error("Configure MERCADO_LIVRE_APP_ID, MERCADO_LIVRE_CLIENT_SECRET e MERCADO_LIVRE_REDIRECT_URI no servidor.");
+  const credentials = getMercadoLivreOAuthCredentials(input.connector);
+  if (!credentials.appId || !credentials.clientSecret || !credentials.redirectUri) {
+    throw new Error("Preencha APP ID, CLIENT SECRET no conector ou configure MERCADO_LIVRE_APP_ID, MERCADO_LIVRE_CLIENT_SECRET e MERCADO_LIVRE_REDIRECT_URI no servidor.");
   }
 
   const state = randomUUID();
   const cookieStore = await cookies();
   const payload: MercadoLivreOAuthState = {
     state,
-    connectorId: input.connectorId,
-    projetoId: input.projetoId,
+    connectorId: input.connector.id,
+    projetoId: input.connector.projetoId ?? "",
   };
 
   cookieStore.set(OAUTH_COOKIE_NAME, Buffer.from(JSON.stringify(payload), "utf-8").toString("base64url"), {
     httpOnly: true,
-    secure: env.redirectUri.startsWith("https://"),
+    secure: credentials.redirectUri.startsWith("https://"),
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 15,
@@ -80,17 +96,17 @@ export async function buildMercadoLivreAuthorizationUrl(input: {
 
   const url = new URL(MERCADO_LIVRE_AUTH_URL);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("client_id", env.appId);
-  url.searchParams.set("redirect_uri", env.redirectUri);
+  url.searchParams.set("client_id", credentials.appId);
+  url.searchParams.set("redirect_uri", credentials.redirectUri);
   url.searchParams.set("state", state);
   url.searchParams.set("scope", "offline_access read");
 
   return url.toString();
 }
 
-async function exchangeCodeForTokens(code: string) {
-  const env = getMercadoLivreOAuthEnv();
-  if (!env.appId || !env.clientSecret || !env.redirectUri) {
+async function exchangeCodeForTokens(code: string, connector: ConnectorRecord) {
+  const credentials = getMercadoLivreOAuthCredentials(connector);
+  if (!credentials.appId || !credentials.clientSecret || !credentials.redirectUri) {
     throw new Error("OAuth do Mercado Livre nao esta configurado no servidor.");
   }
 
@@ -102,10 +118,10 @@ async function exchangeCodeForTokens(code: string) {
     },
     body: new URLSearchParams({
       grant_type: "authorization_code",
-      client_id: env.appId,
-      client_secret: env.clientSecret,
+      client_id: credentials.appId,
+      client_secret: credentials.clientSecret,
       code,
-      redirect_uri: env.redirectUri,
+      redirect_uri: credentials.redirectUri,
     }).toString(),
     cache: "no-store",
   });
@@ -118,9 +134,9 @@ async function exchangeCodeForTokens(code: string) {
   return (await response.json()) as MercadoLivreTokenResponse;
 }
 
-async function refreshMercadoLivreTokens(refreshToken: string) {
-  const env = getMercadoLivreOAuthEnv();
-  if (!env.appId || !env.clientSecret) {
+async function refreshMercadoLivreTokens(refreshToken: string, connector: ConnectorRecord) {
+  const credentials = getMercadoLivreOAuthCredentials(connector);
+  if (!credentials.appId || !credentials.clientSecret) {
     throw new Error("OAuth do Mercado Livre nao esta configurado no servidor.");
   }
 
@@ -132,8 +148,8 @@ async function refreshMercadoLivreTokens(refreshToken: string) {
     },
     body: new URLSearchParams({
       grant_type: "refresh_token",
-      client_id: env.appId,
-      client_secret: env.clientSecret,
+      client_id: credentials.appId,
+      client_secret: credentials.clientSecret,
       refresh_token: refreshToken,
     }).toString(),
     cache: "no-store",
@@ -192,6 +208,8 @@ async function persistMercadoLivreTokens(connector: ConnectorRecord, tokenPayloa
     ativo: connector.ativo,
     configuracoes: {
       ...connector.configuracoes,
+      app_id: currentConfig.app_id,
+      client_secret: currentConfig.client_secret,
       seller_id: sellerId || currentConfig.seller_id,
       nickname,
       access_token: accessToken,
@@ -235,7 +253,7 @@ export async function completeMercadoLivreOAuthCallback(searchParams: URLSearchP
     throw new Error("Conector do Mercado Livre nao encontrado para concluir a autorizacao.");
   }
 
-  const tokenPayload = await exchangeCodeForTokens(code);
+  const tokenPayload = await exchangeCodeForTokens(code, connector);
   const updatedConnector = await persistMercadoLivreTokens(connector, tokenPayload);
 
   return {
@@ -258,7 +276,7 @@ export async function ensureMercadoLivreAccessToken(connector: ConnectorRecord) 
     return accessToken || undefined;
   }
 
-  const refreshed = await refreshMercadoLivreTokens(refreshToken);
+  const refreshed = await refreshMercadoLivreTokens(refreshToken, connector);
   const updatedConnector = await persistMercadoLivreTokens(connector, refreshed);
   const updatedConfig = getMercadoLivreConnectorConfig(updatedConnector);
   return updatedConfig?.access_token?.trim() || undefined;

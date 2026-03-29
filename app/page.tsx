@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { AnimatePresence } from "motion/react";
 import { getAuthProviderLabel, getCurrentProjectUser, signInWithProjectAuth, signOutProjectAuth } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
+import { isAdminUser } from "@/lib/access";
 import { DEFAULT_CHAT_AGENT, DEFAULT_CHAT_PROJECT } from "@/app/_components/home/data";
 import {
   ChatWidget,
@@ -49,7 +50,7 @@ function HomePageContent() {
 
     if (result.user) {
       setCurrentUser(result.user);
-      window.location.href = "/admin/dashboard";
+      window.location.href = isAdminUser(result.user) ? "/admin/dashboard" : "/admin/projetos";
     }
 
     return result.error;

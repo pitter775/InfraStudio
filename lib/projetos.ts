@@ -186,7 +186,6 @@ export async function createProjetoForUsuario(input: {
       projeto_id: projeto.id,
       papel: "admin",
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     } as never);
 
   if (error) {

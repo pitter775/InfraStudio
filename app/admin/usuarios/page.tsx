@@ -17,6 +17,11 @@ type UsuarioFormState = {
   projetoId?: string | null;
 };
 
+type ProjetoOption = {
+  id: string;
+  nome: string;
+};
+
 const emptyForm: UsuarioFormState = {
   nome: "",
   email: "",
@@ -29,15 +34,21 @@ const emptyForm: UsuarioFormState = {
 export default function AdminUsuariosPage() {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [users, setUsers] = useState<AppUser[]>([]);
+  const [projects, setProjects] = useState<ProjetoOption[]>([]);
   const [form, setForm] = useState<UsuarioFormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
-      const [user, projectUsers] = await Promise.all([getCurrentProjectUser(), listProjectUsers()]);
+      const [user, projectUsers, projectsPayload] = await Promise.all([
+        getCurrentProjectUser(),
+        listProjectUsers(),
+        fetch("/api/admin/projetos", { cache: "no-store" }).then((response) => response.json()),
+      ]);
       setCurrentUser(user);
       setUsers(projectUsers);
+      setProjects((projectsPayload.projetos ?? []).map((project: { id: string; nome: string }) => ({ id: project.id, nome: project.nome })));
     };
 
     void loadData();
@@ -52,6 +63,12 @@ export default function AdminUsuariosPage() {
   const handleSubmit = async () => {
     setSaving(true);
     setFeedback(null);
+
+    if (!form.projetoId) {
+      setFeedback("Selecione um projeto para vincular o usuario.");
+      setSaving(false);
+      return;
+    }
 
     const method = form.id ? "PUT" : "POST";
     const response = await fetch("/api/admin/usuarios", {
@@ -210,6 +227,22 @@ export default function AdminUsuariosPage() {
                     >
                       <option value="viewer">Usuario comum</option>
                       <option value="admin">Admin</option>
+                    </select>
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-semibold text-slate-300">Projeto</span>
+                    <select
+                      value={form.projetoId ?? ""}
+                      onChange={(event) => setForm((prev) => ({ ...prev, projetoId: event.target.value || null }))}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
+                    >
+                      <option value="">Selecione um projeto</option>
+                      {projects.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project.nome}
+                        </option>
+                      ))}
                     </select>
                   </label>
 
