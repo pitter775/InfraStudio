@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BadgeCheck, Lock, Pencil, Plus, Shield, Trash2, UserRound, Users } from "lucide-react";
+import { BadgeCheck, Lock, LoaderCircle, Pencil, Plus, Shield, Trash2, UserRound, Users } from "lucide-react";
 import { canAccessGlobalAdmin } from "@/lib/access";
 import { getCurrentProjectUser, listProjectUsers } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -30,6 +30,22 @@ const emptyForm: UsuarioFormState = {
   papel: "viewer",
   projetoId: null,
 };
+
+const primaryActionButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14 disabled:cursor-not-allowed disabled:opacity-60";
+
+const neutralActionButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60";
+
+const warningActionButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-50 shadow-[0_10px_30px_rgba(245,158,11,0.12)] transition-all hover:border-amber-300/30 hover:bg-amber-500/14 disabled:cursor-not-allowed disabled:opacity-60";
+
+const dangerActionButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-50 shadow-[0_10px_30px_rgba(244,63,94,0.12)] transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60";
+
+function BusyIcon() {
+  return <LoaderCircle size={15} className="animate-spin" />;
+}
 
 export default function AdminUsuariosPage() {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
@@ -266,10 +282,10 @@ export default function AdminUsuariosPage() {
                       type="button"
                       onClick={() => void handleSubmit()}
                       disabled={saving}
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
+                      className={`${primaryActionButtonClass} flex-1`}
                     >
-                      {form.id ? <Pencil size={16} /> : <Plus size={16} />}
-                      {saving ? "Salvando..." : form.id ? "Atualizar usuário" : "Criar usuário"}
+                      {saving ? <BusyIcon /> : form.id ? <Pencil size={16} /> : <Plus size={16} />}
+                      {form.id ? "Salvar" : "Criar"}
                     </button>
                     <button
                       type="button"
@@ -277,7 +293,7 @@ export default function AdminUsuariosPage() {
                         setForm(emptyForm);
                         setFeedback(null);
                       }}
-                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white"
+                      className={neutralActionButtonClass}
                     >
                       Limpar
                     </button>
@@ -304,7 +320,7 @@ export default function AdminUsuariosPage() {
 
               <Link
                 href="/admin/dashboard"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-3 font-semibold text-white transition-colors hover:bg-white/10"
+                className={neutralActionButtonClass}
               >
                 Ir para dashboard
               </Link>
@@ -354,7 +370,7 @@ export default function AdminUsuariosPage() {
                             <button
                               type="button"
                               onClick={() => handleEdit(user)}
-                              className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-2 text-amber-100 transition-colors hover:bg-amber-500/20 hover:text-white"
+                              className={`${warningActionButtonClass} px-3 py-2`}
                               title="Editar"
                             >
                               <Pencil size={15} />
@@ -362,7 +378,7 @@ export default function AdminUsuariosPage() {
                             <button
                               type="button"
                               onClick={() => void handleDelete(user)}
-                              className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-2 text-rose-200"
+                              className={`${dangerActionButtonClass} px-3 py-2`}
                               title="Excluir"
                             >
                               <Trash2 size={15} />

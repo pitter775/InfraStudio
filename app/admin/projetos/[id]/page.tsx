@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Activity, ArrowLeft, Bold, Bot, Boxes, Cable, CheckCircle2, Coins, Copy, Cpu, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, ShieldAlert, Sparkles, TestTube2, Trash2, Waypoints, X } from "lucide-react";
+import { Activity, ArrowLeft, Bold, Bot, Boxes, Cable, CheckCircle2, Coins, Copy, Cpu, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, LoaderCircle, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, ShieldAlert, Sparkles, TestTube2, Trash2, Waypoints, X } from "lucide-react";
 import { getAgentRuntimeBlockEntries, normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
 
 type Projeto = {
@@ -1440,29 +1440,36 @@ const primaryActionButtonClass =
 const headerActionButtonClass =
   "inline-flex items-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14";
 
+const neutralActionButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60";
+
+const successActionButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-50 shadow-[0_10px_30px_rgba(16,185,129,0.12)] transition-all hover:border-emerald-300/30 hover:bg-emerald-500/14 disabled:cursor-not-allowed disabled:opacity-60";
+
+const dangerActionButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-50 shadow-[0_10px_30px_rgba(244,63,94,0.12)] transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60";
+
+const warningActionButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-50 shadow-[0_10px_30px_rgba(245,158,11,0.12)] transition-all hover:border-amber-300/30 hover:bg-amber-500/14 disabled:cursor-not-allowed disabled:opacity-60";
+
 function PremiumLoader({
-  title = "Load Premium",
-  subtitle = "Preparando sua experiencia...",
   compact = false,
 }: {
-  title?: string;
-  subtitle?: string;
   compact?: boolean;
 }) {
   return (
-    <div className={`overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.14),_transparent_28%),linear-gradient(135deg,rgba(15,23,42,0.94),rgba(2,8,23,0.82))] ${compact ? "p-5" : "p-7"}`}>
-      <div className="flex items-center gap-4">
-        <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-          <div className="absolute inset-0 rounded-2xl border border-cyan-300/20 animate-pulse" />
-          <Image src="/logo.png" alt="InfraStudio" width={32} height={32} className="h-8 w-8 object-contain" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-lg font-black text-white">{title}</p>
-          <p className="mt-1 text-sm text-slate-300">{subtitle}</p>
-        </div>
+    <div className={`flex items-center justify-center ${compact ? "min-h-[120px]" : "min-h-[220px]"}`}>
+      <div className="relative flex h-20 w-20 items-center justify-center">
+        <div className="absolute h-20 w-20 rounded-full bg-sky-500/20 blur-2xl animate-pulse" />
+        <div className="absolute h-14 w-14 rounded-full bg-cyan-400/15 blur-xl animate-pulse" />
+        <Image src="/logo.png" alt="InfraStudio" width={38} height={38} className="relative h-10 w-10 object-contain" />
       </div>
     </div>
   );
+}
+
+function BusyIcon() {
+  return <LoaderCircle size={15} className="animate-spin" />;
 }
 
 function ModalStickyFooter({
@@ -1521,7 +1528,7 @@ function DeleteProjectModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-60"
+            className={`${neutralActionButtonClass} px-3 disabled:opacity-60`}
             aria-label="Fechar modal"
           >
             <X size={18} />
@@ -1935,13 +1942,13 @@ function AgenteModal({
               disabled={saving}
               className={primaryActionButtonClass}
             >
-              {form.id ? <Pencil size={16} /> : <Plus size={16} />}
-              {saving ? "Salvando..." : form.id ? "Atualizar agente" : "Criar agente"}
+              {saving ? <BusyIcon /> : form.id ? <Pencil size={16} /> : <Plus size={16} />}
+              {form.id ? "Salvar" : "Criar"}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+              className={`${neutralActionButtonClass} px-3`}
               aria-label="Fechar modal"
             >
               <X size={18} />
@@ -2323,10 +2330,10 @@ function AgenteModal({
         </div>
           <ModalStickyFooter feedback={feedback}>
             <button type="button" onClick={onSubmit} disabled={saving} className={`${primaryActionButtonClass} flex-1`}>
-              {form.id ? <Pencil size={16} /> : <Plus size={16} />}
-              {saving ? "Salvando..." : form.id ? "Atualizar agente" : "Criar agente"}
+              {saving ? <BusyIcon /> : form.id ? <Pencil size={16} /> : <Plus size={16} />}
+              {form.id ? "Salvar" : "Criar"}
             </button>
-            <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
+            <button type="button" onClick={onClose} className={neutralActionButtonClass}>
               Cancelar
             </button>
           </ModalStickyFooter>
@@ -2392,7 +2399,7 @@ function ApiModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+            className={`${neutralActionButtonClass} px-3`}
             aria-label="Fechar modal"
           >
             <X size={18} />
@@ -2464,9 +2471,9 @@ function ApiModal({
             <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-white">Campos detectados</p>
-                <button type="button" onClick={onTest} disabled={testing || saving} className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100">
-                  <TestTube2 size={15} />
-                  {testing ? "Testando..." : "Testar API"}
+                <button type="button" onClick={onTest} disabled={testing || saving} className={primaryActionButtonClass}>
+                  {testing ? <BusyIcon /> : <TestTube2 size={15} />}
+                  Testar
                 </button>
               </div>
 
@@ -2512,10 +2519,10 @@ function ApiModal({
 
           <ModalStickyFooter feedback={feedback}>
             <button type="button" onClick={onSubmit} disabled={saving} className={`${primaryActionButtonClass} flex-1`}>
-              {form.id ? <Pencil size={16} /> : <Plus size={16} />}
-              {saving ? "Salvando..." : form.id ? "Atualizar API" : "Criar API"}
+              {saving ? <BusyIcon /> : form.id ? <Pencil size={16} /> : <Plus size={16} />}
+              {form.id ? "Salvar" : "Criar"}
             </button>
-            <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
+            <button type="button" onClick={onClose} className={neutralActionButtonClass}>
               Cancelar
             </button>
           </ModalStickyFooter>
@@ -2573,7 +2580,7 @@ function WidgetModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+              className={`${neutralActionButtonClass} px-3`}
               aria-label="Fechar modal"
             >
               <X size={18} />
@@ -2684,10 +2691,10 @@ function WidgetModal({
               disabled={saving}
               className={`${primaryActionButtonClass} flex-1`}
             >
-              {form.id ? <Pencil size={16} /> : <Plus size={16} />}
-              {saving ? "Salvando..." : form.id ? "Atualizar widget" : "Criar widget"}
+              {saving ? <BusyIcon /> : form.id ? <Pencil size={16} /> : <Plus size={16} />}
+              {form.id ? "Salvar" : "Criar"}
             </button>
-            <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
+            <button type="button" onClick={onClose} className={neutralActionButtonClass}>
               Cancelar
             </button>
           </ModalStickyFooter>
@@ -2731,15 +2738,15 @@ function ConnectorModal({
       <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Fonte de produto</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar fonte de produto" : "Nova fonte de produto"}</h2>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Integracao</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar integracao" : "Nova integracao"}</h2>
             <p className="mt-1 text-sm text-slate-400">Use este cadastro para o agente buscar produtos no Mercado Livre sem expor a resposta bruta da API.</p>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+              className={`${neutralActionButtonClass} px-3`}
               aria-label="Fechar modal"
             >
               <X size={18} />
@@ -2846,7 +2853,7 @@ function ConnectorModal({
             </div>
             {!form.id ? (
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
-                Salve a fonte de produto primeiro para habilitar o botao <span className="font-semibold">Conectar Mercado Livre</span> e concluir o OAuth automatico.
+                Salve a integracao primeiro para habilitar o botao <span className="font-semibold">Conectar Mercado Livre</span> e concluir o OAuth automatico.
               </div>
             ) : null}
             <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4">
@@ -2859,7 +2866,7 @@ function ConnectorModal({
                   <button
                     type="button"
                     onClick={() => setTutorialOpen((current) => !current)}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+                    className={primaryActionButtonClass}
                   >
                     {tutorialOpen ? <Minimize2 size={14} /> : <Expand size={14} />}
                     {tutorialOpen ? "Fechar tutorial" : "Mini tutorial"}
@@ -2867,7 +2874,7 @@ function ConnectorModal({
                   <button
                     type="button"
                     onClick={onCopyTutorial}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+                    className={primaryActionButtonClass}
                   >
                     {copiedTutorial ? <CheckCircle2 size={14} /> : <Copy size={14} />}
                     {copiedTutorial ? "Copiado" : "Copiar tutorial"}
@@ -2916,7 +2923,7 @@ function ConnectorModal({
             </div>
             <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
               <input type="checkbox" checked={form.ativo} onChange={(event) => onChange({ ativo: event.target.checked })} />
-              Fonte de produto ativa
+              Integracao ativa
             </label>
 
             
@@ -2926,7 +2933,7 @@ function ConnectorModal({
             {form.id ? (
               <a
                 href={`/api/admin/conectores/${form.id}/mercado-livre/connect`}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/15 hover:text-white"
+                className={successActionButtonClass}
               >
                 <ExternalLink size={15} />
                 Conectar Mercado Livre
@@ -2938,10 +2945,10 @@ function ConnectorModal({
               disabled={saving}
               className={`${primaryActionButtonClass} flex-1`}
             >
-              {form.id ? <Pencil size={16} /> : <Plus size={16} />}
-              {saving ? "Salvando..." : form.id ? "Atualizar fonte de produto" : "Criar fonte de produto"}
+              {saving ? <BusyIcon /> : form.id ? <Pencil size={16} /> : <Plus size={16} />}
+              {form.id ? "Salvar" : "Criar"}
             </button>
-            <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
+            <button type="button" onClick={onClose} className={neutralActionButtonClass}>
               Cancelar
             </button>
           </ModalStickyFooter>
@@ -2992,7 +2999,7 @@ function AgentStoreSearchModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+            className={`${neutralActionButtonClass} px-3`}
             aria-label="Fechar modal"
           >
             <X size={18} />
@@ -3015,10 +3022,10 @@ function AgentStoreSearchModal({
                 type="button"
                 onClick={onLoadLatest}
                 disabled={latestLoading}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100 disabled:opacity-60"
+                className={successActionButtonClass}
               >
-                <TestTube2 size={15} />
-                        {latestLoading ? "Load Premium" : "Listar ultimos"}
+                {latestLoading ? <BusyIcon /> : <TestTube2 size={15} />}
+                Listar
               </button>
             </div>
 
@@ -3031,7 +3038,7 @@ function AgentStoreSearchModal({
                   <p className="text-xs text-slate-300">
                     {latestResult.connector
                       ? `${latestResult.connector.nickname || latestResult.connector.nome} | seller ${latestResult.connector.sellerId}`
-                : "Sem fonte valida"}
+                : "Sem integracao valida"}
                   </p>
                 </div>
 
@@ -3053,7 +3060,7 @@ function AgentStoreSearchModal({
                             href={produto.link}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+                            className={primaryActionButtonClass}
                           >
                             <ExternalLink size={13} />
                             Abrir
@@ -3090,10 +3097,10 @@ function AgentStoreSearchModal({
               type="button"
               onClick={onRunSearch}
               disabled={searchLoading}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100 disabled:opacity-60"
+              className={successActionButtonClass}
             >
-              <TestTube2 size={15} />
-              {searchLoading ? "Testando..." : "Testar busca"}
+              {searchLoading ? <BusyIcon /> : <TestTube2 size={15} />}
+              Buscar
             </button>
           </div>
 
@@ -3126,7 +3133,7 @@ function AgentStoreSearchModal({
                           href={produto.link}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+                          className={primaryActionButtonClass}
                         >
                           <ExternalLink size={13} />
                           Abrir
@@ -3180,7 +3187,7 @@ function WhatsAppChannelModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+            className={`${neutralActionButtonClass} px-3`}
             aria-label="Fechar modal"
           >
             <X size={18} />
@@ -3240,10 +3247,10 @@ function WhatsAppChannelModal({
               disabled={saving}
               className={`${primaryActionButtonClass} flex-1`}
             >
-              {form.id ? <Pencil size={16} /> : <Plus size={16} />}
-              {saving ? "Salvando..." : form.id ? "Salvar alteracoes" : "Criar canal"}
+              {saving ? <BusyIcon /> : form.id ? <Pencil size={16} /> : <Plus size={16} />}
+              {form.id ? "Salvar" : "Criar"}
             </button>
-            <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
+            <button type="button" onClick={onClose} className={neutralActionButtonClass}>
               Cancelar
             </button>
           </ModalStickyFooter>
@@ -3282,7 +3289,7 @@ function ChatHistoryModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+            className={`${neutralActionButtonClass} px-3`}
             aria-label="Fechar modal"
           >
             <X size={18} />
@@ -3290,7 +3297,7 @@ function ChatHistoryModal({
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
-            {loading ? <PremiumLoader compact title="Load Premium" subtitle="Abrindo historico da conversa..." /> : null}
+            {loading ? <PremiumLoader compact /> : null}
           {!loading && error ? <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-6 text-sm text-rose-100">{error}</div> : null}
           {!loading && !error && detail ? (
             <div className="space-y-4">
@@ -3454,7 +3461,7 @@ export default function AdminProjetoDetalhePage() {
   const removeById = <T extends { id?: string }>(items: T[], id: string) => items.filter((entry) => entry.id !== id);
   const premiumTransitionClass = "transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]";
   const premiumInteractiveClass = `${premiumTransitionClass} hover:-translate-y-[1px]`;
-  const editButtonClass = `border border-amber-500/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20 hover:text-white ${premiumInteractiveClass}`;
+  const editButtonClass = `${warningActionButtonClass} ${premiumInteractiveClass}`;
   const buildProjectUrl = (mutate?: (nextParams: URLSearchParams) => void) => {
     const nextParams = new URLSearchParams(searchParams.toString());
     mutate?.(nextParams);
@@ -3477,7 +3484,7 @@ export default function AdminProjetoDetalhePage() {
     const oauthError = searchParams.get("mercado_livre_oauth_error");
 
     if (oauthStatus === "success") {
-      setFeedbackConnector("Conexao com o Mercado Livre concluida. A fonte de produto recebeu os tokens da loja.");
+      setFeedbackConnector("Conexao com o Mercado Livre concluida. A integracao recebeu os tokens da loja.");
       replaceProjectUrl((nextParams) => {
         nextParams.delete("mercado_livre_oauth");
         nextParams.delete("mercado_livre_oauth_error");
@@ -4273,11 +4280,11 @@ export default function AdminProjetoDetalhePage() {
         ativo: payload.conector.ativo,
       });
       setSavingConnector(false);
-      setFeedbackConnector("Fonte de produto criada com sucesso. Agora clique em Conectar Mercado Livre para autorizar a loja.");
+      setFeedbackConnector("Integracao criada com sucesso. Agora clique em Conectar Mercado Livre para autorizar a loja.");
       return;
     }
 
-    const message = connectorForm.id ? "Fonte de produto atualizada com sucesso." : "Fonte de produto criada com sucesso.";
+    const message = connectorForm.id ? "Integracao atualizada com sucesso." : "Integracao criada com sucesso.";
     resetConnectorForm();
     setSavingConnector(false);
     setConnectorModalOpen(false);
@@ -4703,7 +4710,7 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const handleDeleteConnector = async (connector: Connector) => {
-    const confirmed = window.confirm(`Remover completamente a fonte de produto "${connector.nome}"?`);
+    const confirmed = window.confirm(`Remover completamente a integracao "${connector.nome}"?`);
     if (!confirmed || !connector.id) {
       return;
     }
@@ -4725,7 +4732,7 @@ export default function AdminProjetoDetalhePage() {
 
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
-        setFeedbackConnector(payload.error ?? "Nao foi possivel excluir a fonte de produto.");
+        setFeedbackConnector(payload.error ?? "Nao foi possivel excluir a integracao.");
         return;
       }
 
@@ -4736,7 +4743,7 @@ export default function AdminProjetoDetalhePage() {
       if (connectorForm.id === connector.id) {
         resetConnectorForm();
       }
-      setFeedbackConnector(`Fonte de produto "${connector.nome}" removida completamente.`);
+      setFeedbackConnector(`Integracao "${connector.nome}" removida completamente.`);
     } finally {
       setDeletingConnectorId(null);
     }
@@ -5055,7 +5062,7 @@ export default function AdminProjetoDetalhePage() {
     return (
       <main className="space-y-6">
         <section className="px-1 py-2">
-          <PremiumLoader title="Load Premium" subtitle="Preparando o painel do projeto..." />
+          <PremiumLoader />
         </section>
       </main>
     );
@@ -5405,8 +5412,8 @@ export default function AdminProjetoDetalhePage() {
                     disabled={savingBillingPlan}
                     className={`inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-3 text-sm font-semibold text-white ${premiumInteractiveClass} disabled:cursor-not-allowed disabled:opacity-60`}
                   >
-                    <Coins size={16} />
-                    {savingBillingPlan ? "Salvando plano..." : "Salvar definicoes do plano"}
+                    {savingBillingPlan ? <BusyIcon /> : <Coins size={16} />}
+                    Salvar
                   </button>
                 ) : (
                   <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
@@ -5573,7 +5580,7 @@ export default function AdminProjetoDetalhePage() {
                         type="button"
                         onClick={() => void handleRunAgentDiagnostic(agente)}
                         disabled={runningAgentDiagnosticId === agente.id}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2.5 text-sm font-semibold text-cyan-100 disabled:opacity-60"
+                        className={primaryActionButtonClass}
                       >
                         <TestTube2 size={14} />
                         {runningAgentDiagnosticId === agente.id ? "Validando..." : "Validar"}
@@ -5581,7 +5588,7 @@ export default function AdminProjetoDetalhePage() {
                       <button
                         type="button"
                         onClick={() => handleOpenAgentStoreSearchModal(agente)}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2.5 text-sm font-semibold text-emerald-100 disabled:opacity-60"
+                        className={successActionButtonClass}
                       >
                         <TestTube2 size={14} />
                         Testar loja
@@ -5594,7 +5601,7 @@ export default function AdminProjetoDetalhePage() {
                         type="button"
                         onClick={() => void handleDeleteAgente(agente)}
                         disabled={deletingAgenteId === agente.id}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2.5 text-sm font-semibold text-rose-100 disabled:opacity-60"
+                        className={dangerActionButtonClass}
                       >
                         <Trash2 size={14} />
                         {deletingAgenteId === agente.id ? "Removendo..." : "Remover"}
@@ -5669,7 +5676,7 @@ export default function AdminProjetoDetalhePage() {
                         <Pencil size={14} />
                         Editar
                       </button>
-                      <button type="button" onClick={() => void handleDeleteApi(api)} className="inline-flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-100">
+                      <button type="button" onClick={() => void handleDeleteApi(api)} className={dangerActionButtonClass}>
                         <Trash2 size={14} />
                         Excluir
                       </button>
@@ -5730,7 +5737,7 @@ export default function AdminProjetoDetalhePage() {
                             type="button"
                             onClick={() => void handleDeleteConnector(connector)}
                             disabled={deletingConnectorId === connector.id}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-100 disabled:opacity-60"
+                            className={dangerActionButtonClass}
                           >
                             <Trash2 size={14} />
                             {deletingConnectorId === connector.id ? "Removendo..." : "Remover completamente"}
@@ -5794,7 +5801,7 @@ export default function AdminProjetoDetalhePage() {
                           type="button"
                           onClick={() => void handleConnectWhatsAppChannel(channel)}
                           disabled={connectingWhatsAppChannelId === channel.id}
-                          className="rounded-2xl bg-gradient-to-r from-emerald-500 to-green-400 px-5 py-3 text-sm font-bold text-slate-950 disabled:opacity-60"
+                          className={successActionButtonClass}
                         >
                           {connectingWhatsAppChannelId === channel.id ? "Conectando..." : isConnected ? "Reconectar WhatsApp" : "Conectar e gerar QR"}
                         </button>
@@ -5802,7 +5809,7 @@ export default function AdminProjetoDetalhePage() {
                           type="button"
                           onClick={() => void handleDisconnectWhatsAppChannel(channel)}
                           disabled={disconnectingWhatsAppChannelId === channel.id}
-                          className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-5 py-3 text-sm font-bold text-rose-100 disabled:opacity-60"
+                          className={dangerActionButtonClass}
                         >
                           {disconnectingWhatsAppChannelId === channel.id ? "Desconectando..." : "Desconectar"}
                         </button>
@@ -5818,7 +5825,7 @@ export default function AdminProjetoDetalhePage() {
                           type="button"
                           onClick={() => void handleDeleteWhatsAppChannel(channel)}
                           disabled={deletingWhatsAppChannelId === channel.id}
-                          className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-5 py-3 text-sm font-bold text-rose-100 disabled:opacity-60"
+                          className={dangerActionButtonClass}
                         >
                           {deletingWhatsAppChannelId === channel.id ? "Removendo..." : "Remover completamente"}
                         </button>
@@ -6004,7 +6011,7 @@ export default function AdminProjetoDetalhePage() {
                       type="button"
                       onClick={() => void handleDeleteWhatsAppChannel(primaryWhatsAppChannel)}
                       disabled={deletingWhatsAppChannelId === primaryWhatsAppChannel.id}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 font-semibold text-rose-100 transition-colors hover:bg-rose-500/15 hover:text-white disabled:opacity-60"
+                      className={dangerActionButtonClass}
                     >
                       <Trash2 size={16} />
                       {deletingWhatsAppChannelId === primaryWhatsAppChannel.id ? "Removendo..." : "Remover canal"}
@@ -6012,7 +6019,7 @@ export default function AdminProjetoDetalhePage() {
                     <button
                       type="button"
                       onClick={openNewWhatsAppChannelModal}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+                      className={headerActionButtonClass}
                     >
                       <Plus size={16} />
                       Novo canal
@@ -6161,7 +6168,7 @@ export default function AdminProjetoDetalhePage() {
                                   type="button"
                                   onClick={() => void handleDeleteWidget(widget)}
                                   disabled={deletingWidgetId === widget.id}
-                                  className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/20 bg-rose-500/10 px-3 py-1.5 text-[11px] font-semibold text-rose-100 transition-colors hover:bg-rose-500/15 hover:text-white disabled:opacity-60"
+                                  className={dangerActionButtonClass}
                                 >
                                   <Trash2 size={13} />
                                   {deletingWidgetId === widget.id ? "Removendo..." : "Remover"}
@@ -6361,7 +6368,7 @@ export default function AdminProjetoDetalhePage() {
                       type="button"
                       onClick={() => setChatPage((current) => Math.max(1, current - 1))}
                       disabled={currentChatPage <= 1}
-                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 disabled:opacity-40"
+                      className={neutralActionButtonClass}
                     >
                       Anterior
                     </button>
@@ -6369,7 +6376,7 @@ export default function AdminProjetoDetalhePage() {
                       type="button"
                       onClick={() => setChatPage((current) => Math.min(chatTotalPages, current + 1))}
                       disabled={currentChatPage >= chatTotalPages}
-                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 disabled:opacity-40"
+                      className={neutralActionButtonClass}
                     >
                       Proxima
                     </button>

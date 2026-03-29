@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BriefcaseBusiness, Cable, Lock, MessageSquareText, Plus, Shield, Bot } from "lucide-react";
+import { BriefcaseBusiness, Cable, LoaderCircle, Lock, MessageSquareText, Plus, Shield, Bot } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -38,6 +39,28 @@ const emptyProjetoForm: ProjetoFormState = {
   descricao: "",
   status: "ativo",
 };
+
+const primaryActionButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14 disabled:cursor-not-allowed disabled:opacity-60";
+
+const neutralActionButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60";
+
+function BusyIcon() {
+  return <LoaderCircle size={15} className="animate-spin" />;
+}
+
+function CenterLoader() {
+  return (
+    <div className="flex min-h-[220px] items-center justify-center">
+      <div className="relative flex h-20 w-20 items-center justify-center">
+        <div className="absolute h-20 w-20 rounded-full bg-sky-500/20 blur-2xl animate-pulse" />
+        <div className="absolute h-14 w-14 rounded-full bg-cyan-400/15 blur-xl animate-pulse" />
+        <Image src="/logo.png" alt="InfraStudio" width={38} height={38} className="relative h-10 w-10 object-contain" />
+      </div>
+    </div>
+  );
+}
 
 export default function AdminProjetosPage() {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
@@ -113,7 +136,7 @@ export default function AdminProjetosPage() {
     return (
       <main className="space-y-6">
         <section className="rounded-2xl border border-white/10 bg-white/5 p-8 text-slate-300">
-          Carregando projetos...
+          <CenterLoader />
         </section>
       </main>
     );
@@ -164,7 +187,7 @@ export default function AdminProjetosPage() {
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
+            className={primaryActionButtonClass}
           >
             <Plus size={16} />
             Criar projeto
@@ -205,7 +228,7 @@ export default function AdminProjetosPage() {
           <h2 className="text-xl font-bold text-white">Projetos vinculados</h2>
         </div>
         <div className="p-6">
-          {loading ? <div className="rounded-xl border border-white/10 bg-slate-950/30 p-5 text-sm text-slate-400">Carregando projetos...</div> : null}
+          {loading ? <CenterLoader /> : null}
           {!loading && !projetos.length ? <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/30 p-5 text-sm text-slate-400">Nenhum projeto vinculado ainda.</div> : null}
           {projetos.length ? (
             <div className="grid gap-4 xl:grid-cols-2">
@@ -225,7 +248,7 @@ export default function AdminProjetosPage() {
                       </div>
                       <Link
                         href={`/admin/projetos/${projeto.id}`}
-                        className="inline-flex min-w-[136px] items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-2.5 text-sm font-semibold text-blue-100"
+                        className={primaryActionButtonClass}
                       >
                         Abrir projeto
                       </Link>
@@ -286,9 +309,10 @@ export default function AdminProjetosPage() {
               <textarea value={form.descricao} onChange={(event) => setForm((current) => ({ ...current, descricao: event.target.value }))} placeholder="Descricao" rows={4} className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
             </div>
             <div className="mt-6 flex gap-3">
-              <button type="button" onClick={() => setModalOpen(false)} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200">Cancelar</button>
-              <button type="button" onClick={() => void handleSubmit()} disabled={saving} className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
-                {saving ? "Criando..." : "Criar projeto"}
+              <button type="button" onClick={() => setModalOpen(false)} className={neutralActionButtonClass}>Cancelar</button>
+              <button type="button" onClick={() => void handleSubmit()} disabled={saving} className={primaryActionButtonClass}>
+                {saving ? <BusyIcon /> : <Plus size={16} />}
+                Criar
               </button>
             </div>
           </div>

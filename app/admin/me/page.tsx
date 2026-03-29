@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Mail, Save, UserRound } from "lucide-react";
+import { LoaderCircle, Mail, Save, UserRound } from "lucide-react";
 import { getCurrentProjectUser } from "@/lib/auth";
 
 type ProfileState = {
@@ -9,6 +9,13 @@ type ProfileState = {
   email: string;
   senha: string;
 };
+
+const primaryActionButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14 disabled:cursor-not-allowed disabled:opacity-60";
+
+function BusyIcon() {
+  return <LoaderCircle size={15} className="animate-spin" />;
+}
 
 export default function AdminMePage() {
   const [form, setForm] = useState<ProfileState>({ nome: "", email: "", senha: "" });
@@ -82,9 +89,9 @@ export default function AdminMePage() {
             <input type="password" value={form.senha} onChange={(event) => setForm((current) => ({ ...current, senha: event.target.value }))} placeholder="Preencha apenas se quiser trocar" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
           </label>
           <div>
-            <button type="button" onClick={() => void handleSubmit()} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
-              <Save size={16} />
-              {saving ? "Salvando..." : "Salvar perfil"}
+            <button type="button" onClick={() => void handleSubmit()} disabled={saving} className={primaryActionButtonClass}>
+              {saving ? <BusyIcon /> : <Save size={16} />}
+              Salvar
             </button>
           </div>
         </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentProjectUser } from "@/lib/auth";
@@ -26,6 +27,18 @@ function formatInteger(value: number) {
 function readPayloadObject(payload: Record<string, unknown> | null, key: string) {
   const value = payload?.[key];
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function CenterLoader() {
+  return (
+    <div className="flex min-h-[220px] items-center justify-center">
+      <div className="relative flex h-20 w-20 items-center justify-center">
+        <div className="absolute h-20 w-20 rounded-full bg-sky-500/20 blur-2xl animate-pulse" />
+        <div className="absolute h-14 w-14 rounded-full bg-cyan-400/15 blur-xl animate-pulse" />
+        <Image src="/logo.png" alt="InfraStudio" width={38} height={38} className="relative h-10 w-10 object-contain" />
+      </div>
+    </div>
+  );
 }
 
 export default function AdminChatLogsPage() {
@@ -62,7 +75,7 @@ export default function AdminChatLogsPage() {
 
       {loading ? (
         <section className="rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-4 text-sm text-slate-400">
-          Carregando logs do chat...
+          <CenterLoader />
         </section>
       ) : null}
 
