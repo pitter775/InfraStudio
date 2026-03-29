@@ -443,8 +443,8 @@ export function PremiumHomeChatDemo() {
                           }, 140);
                         }}
                         className={cn(
-                          "w-full rounded-full border border-black/10 bg-white/85 px-3 py-2.5 text-[12px] font-medium text-[#202c33] transition-all duration-200 hover:bg-white active:scale-[0.985]",
-                          pressedAction === "edit" ? "scale-[0.985] bg-white" : "",
+                          "w-full rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-[12px] font-medium text-amber-900 transition-all duration-200 hover:bg-amber-500/20 hover:text-amber-950 active:scale-[0.985]",
+                          pressedAction === "edit" ? "scale-[0.985] bg-amber-500/20" : "",
                         )}
                       >
                         Editar informacoes

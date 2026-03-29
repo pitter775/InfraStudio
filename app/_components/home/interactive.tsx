@@ -1396,7 +1396,7 @@ export function HomeChatDemo() {
                     <button
                       type="button"
                       onClick={handleEditWhatsapp}
-                      className="rounded-full border border-white/15 bg-white/5 px-3 py-2 text-sm font-medium text-white/90"
+                      className="rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-100 transition-colors hover:bg-amber-500/20 hover:text-white"
                     >
                       Editar informações
                     </button>

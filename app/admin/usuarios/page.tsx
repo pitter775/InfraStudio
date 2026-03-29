@@ -354,7 +354,7 @@ export default function AdminUsuariosPage() {
                             <button
                               type="button"
                               onClick={() => handleEdit(user)}
-                              className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-200"
+                              className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-2 text-amber-100 transition-colors hover:bg-amber-500/20 hover:text-white"
                               title="Editar"
                             >
                               <Pencil size={15} />

@@ -3397,6 +3397,7 @@ export default function AdminProjetoDetalhePage() {
   const removeById = <T extends { id?: string }>(items: T[], id: string) => items.filter((entry) => entry.id !== id);
   const premiumTransitionClass = "transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]";
   const premiumInteractiveClass = `${premiumTransitionClass} hover:-translate-y-[1px]`;
+  const editButtonClass = `border border-amber-500/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20 hover:text-white ${premiumInteractiveClass}`;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -5432,7 +5433,7 @@ export default function AdminProjetoDetalhePage() {
                         <TestTube2 size={14} />
                         Testar loja
                       </button>
-                      <button type="button" onClick={() => handleEditAgente(agente)} className={`inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-semibold text-slate-200 ${premiumInteractiveClass}`}>
+                      <button type="button" onClick={() => handleEditAgente(agente)} className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold ${editButtonClass}`}>
                         <Pencil size={14} />
                         Editar
                       </button>
@@ -5511,7 +5512,7 @@ export default function AdminProjetoDetalhePage() {
                       ) : null}
                     </div>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => handleEditApi(api)} className={`inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 ${premiumInteractiveClass}`}>
+                      <button type="button" onClick={() => handleEditApi(api)} className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${editButtonClass}`}>
                         <Pencil size={14} />
                         Editar
                       </button>
@@ -5571,7 +5572,7 @@ export default function AdminProjetoDetalhePage() {
                           <ExternalLink size={14} />
                           Conectar ML
                         </a>
-                        <button type="button" onClick={() => handleEditConnector(connector)} className={`inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 ${premiumInteractiveClass}`}>
+                        <button type="button" onClick={() => handleEditConnector(connector)} className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${editButtonClass}`}>
                           <Pencil size={14} />
                           Editar
                         </button>
@@ -5670,7 +5671,7 @@ export default function AdminProjetoDetalhePage() {
                         <button
                           type="button"
                           onClick={() => handleEditWhatsAppChannel(channel)}
-                          className={`inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-slate-200 ${premiumInteractiveClass}`}
+                          className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold ${editButtonClass}`}
                         >
                           <Pencil size={15} />
                           Editar numero
@@ -5856,7 +5857,7 @@ export default function AdminProjetoDetalhePage() {
                     <button
                       type="button"
                       onClick={() => handleEditWhatsAppChannel(primaryWhatsAppChannel)}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                      className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 font-semibold ${editButtonClass}`}
                     >
                       <Pencil size={16} />
                       Editar canal
@@ -6014,7 +6015,7 @@ export default function AdminProjetoDetalhePage() {
                                 <button
                                   type="button"
                                   onClick={() => handleEditWidget(widget)}
-                                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                                  className={`rounded-full px-3 py-1.5 text-[11px] font-semibold ${editButtonClass}`}
                                 >
                                   Editar
                                 </button>
@@ -6076,7 +6077,7 @@ export default function AdminProjetoDetalhePage() {
                   <button
                     type="button"
                     onClick={() => handleEditWidget(data.widgets[0])}
-                    className={`inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-slate-200 ${premiumInteractiveClass} hover:bg-white/10 hover:text-white`}
+                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 font-semibold ${editButtonClass}`}
                   >
                     <Pencil size={16} />
                     Editar widget do site
