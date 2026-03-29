@@ -25,6 +25,8 @@ import type { AppUser } from "@/lib/app-user";
 import { canAccessGlobalAdmin, canAccessWorkspace } from "@/lib/access";
 import { cn } from "@/lib/utils";
 
+const SIDEBAR_COOKIE_NAME = "infrastudio_admin_sidebar";
+
 const adminLinks = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/projetos", label: "Projetos", icon: BriefcaseBusiness },
@@ -36,6 +38,25 @@ const adminLinks = [
 
 function isAdminLinkActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function readSidebarCollapsedCookie() {
+  if (typeof document === "undefined") {
+    return false;
+  }
+
+  const cookies = document.cookie.split(";");
+  const sidebarCookie = cookies.find((item) => item.trim().startsWith(`${SIDEBAR_COOKIE_NAME}=`));
+  const value = sidebarCookie?.split("=")[1]?.trim();
+  return value === "collapsed";
+}
+
+function persistSidebarCollapsedCookie(collapsed: boolean) {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  document.cookie = `${SIDEBAR_COOKIE_NAME}=${collapsed ? "collapsed" : "expanded"}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
 }
 
 type SidebarProps = {
@@ -221,7 +242,7 @@ function Sidebar({
 export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   const pathname = usePathname();
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(readSidebarCollapsedCookie);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
@@ -246,6 +267,10 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
     setMobileOpen(false);
     setLoadingHref(null);
   }, [pathname]);
+
+  useEffect(() => {
+    persistSidebarCollapsedCookie(collapsed);
+  }, [collapsed]);
 
   const handleLogout = async () => {
     await signOutProjectAuth();

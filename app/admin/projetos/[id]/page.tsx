@@ -1475,7 +1475,7 @@ function DeleteProjectModal({
           <div className="rounded-2xl border border-rose-400/18 bg-rose-500/10 p-4">
             <p className="text-sm font-semibold text-rose-50">Tudo abaixo sera removido junto com o projeto:</p>
             <p className="mt-2 text-sm leading-6 text-rose-100/90">
-              agentes, APIs, conectores, widgets, canais WhatsApp, chats, logs, configuracoes e vinculos relacionados.
+              agentes, APIs, fontes de produto, widgets, canais WhatsApp, chats, logs, configuracoes e vinculos relacionados.
             </p>
           </div>
 
@@ -2685,8 +2685,8 @@ function ConnectorModal({
       <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Conector</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar conector" : "Novo conector"}</h2>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Fonte de produto</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar fonte de produto" : "Nova fonte de produto"}</h2>
             <p className="mt-1 text-sm text-slate-400">Use este cadastro para o agente buscar produtos no Mercado Livre sem expor a resposta bruta da API.</p>
           </div>
           <div className="flex items-center gap-2">
@@ -2798,7 +2798,7 @@ function ConnectorModal({
             </div>
             {!form.id ? (
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
-                Salve o conector primeiro para habilitar o botao <span className="font-semibold">Conectar Mercado Livre</span> e concluir o OAuth automatico.
+                Salve a fonte de produto primeiro para habilitar o botao <span className="font-semibold">Conectar Mercado Livre</span> e concluir o OAuth automatico.
               </div>
             ) : null}
             <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4">
@@ -2868,7 +2868,7 @@ function ConnectorModal({
             </div>
             <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
               <input type="checkbox" checked={form.ativo} onChange={(event) => onChange({ ativo: event.target.checked })} />
-              Conector ativo
+              Fonte de produto ativa
             </label>
 
             <div className="flex gap-3">
@@ -2879,7 +2879,7 @@ function ConnectorModal({
                 className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
               >
                 {form.id ? <Pencil size={16} /> : <Plus size={16} />}
-                {saving ? "Salvando..." : form.id ? "Atualizar conector" : "Criar conector"}
+                {saving ? "Salvando..." : form.id ? "Atualizar fonte de produto" : "Criar fonte de produto"}
               </button>
               <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
                 Cancelar
@@ -2974,7 +2974,7 @@ function AgentStoreSearchModal({
                   <p className="text-xs text-slate-300">
                     {latestResult.connector
                       ? `${latestResult.connector.nickname || latestResult.connector.nome} | seller ${latestResult.connector.sellerId}`
-                      : "Sem conector valido"}
+                : "Sem fonte valida"}
                   </p>
                 </div>
 
@@ -3408,7 +3408,7 @@ export default function AdminProjetoDetalhePage() {
     const oauthError = searchParams.get("mercado_livre_oauth_error");
 
     if (oauthStatus === "success") {
-      setFeedbackConnector("Conexao com o Mercado Livre concluida. O conector recebeu os tokens da loja.");
+      setFeedbackConnector("Conexao com o Mercado Livre concluida. A fonte de produto recebeu os tokens da loja.");
       router.replace(`/admin/projetos/${params.id}`);
       return;
     }
@@ -3826,7 +3826,7 @@ export default function AdminProjetoDetalhePage() {
       await loadProjeto();
       setFeedbackAgente(
         payload.ok
-          ? `Validacao concluida para "${agente.nome}". Chat, APIs, conectores e WhatsApp foram verificados.`
+          ? `Validacao concluida para "${agente.nome}". Chat, APIs, fontes de produto e WhatsApp foram verificados.`
           : `Validacao concluida para "${agente.nome}" com alertas. Veja os blocos de status do agente.`,
       );
     } catch (error) {
@@ -4179,11 +4179,11 @@ export default function AdminProjetoDetalhePage() {
         ativo: payload.conector.ativo,
       });
       setSavingConnector(false);
-      setFeedbackConnector("Conector criado com sucesso. Agora clique em Conectar Mercado Livre para autorizar a loja.");
+      setFeedbackConnector("Fonte de produto criada com sucesso. Agora clique em Conectar Mercado Livre para autorizar a loja.");
       return;
     }
 
-    const message = connectorForm.id ? "Conector atualizado com sucesso." : "Conector criado com sucesso.";
+    const message = connectorForm.id ? "Fonte de produto atualizada com sucesso." : "Fonte de produto criada com sucesso.";
     resetConnectorForm();
     setSavingConnector(false);
     setConnectorModalOpen(false);
@@ -4590,7 +4590,7 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const handleDeleteConnector = async (connector: Connector) => {
-    const confirmed = window.confirm(`Remover completamente o conector "${connector.nome}"?`);
+    const confirmed = window.confirm(`Remover completamente a fonte de produto "${connector.nome}"?`);
     if (!confirmed || !connector.id) {
       return;
     }
@@ -4612,7 +4612,7 @@ export default function AdminProjetoDetalhePage() {
 
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
-        setFeedbackConnector(payload.error ?? "Nao foi possivel excluir o conector.");
+        setFeedbackConnector(payload.error ?? "Nao foi possivel excluir a fonte de produto.");
         return;
       }
 
@@ -4623,7 +4623,7 @@ export default function AdminProjetoDetalhePage() {
       if (connectorForm.id === connector.id) {
         resetConnectorForm();
       }
-      setFeedbackConnector(`Conector "${connector.nome}" removido completamente.`);
+      setFeedbackConnector(`Fonte de produto "${connector.nome}" removida completamente.`);
     } finally {
       setDeletingConnectorId(null);
     }
@@ -4945,7 +4945,7 @@ export default function AdminProjetoDetalhePage() {
   const overviewStats = [
     { key: "agentes", label: "Agentes", value: data.stats.totalAgentes, icon: Bot, tone: "text-cyan-100", accent: "from-cyan-500/20 via-cyan-500/8 to-transparent" },
     { key: "apis", label: "APIs", value: data.stats.totalApis, icon: Activity, tone: "text-sky-100", accent: "from-sky-500/20 via-sky-500/8 to-transparent" },
-    { key: "conectores", label: "Conectores", value: data.stats.totalConectores, icon: Cable, tone: "text-violet-100", accent: "from-violet-500/20 via-violet-500/8 to-transparent" },
+    { key: "conectores", label: "Fontes de produto", value: data.stats.totalConectores, icon: Cable, tone: "text-violet-100", accent: "from-violet-500/20 via-violet-500/8 to-transparent" },
     { key: "widgets", label: "Widgets", value: data.stats.totalWidgets, icon: PanelsTopLeft, tone: "text-amber-100", accent: "from-amber-500/20 via-amber-500/8 to-transparent" },
     { key: "whatsapp", label: "WhatsApp", value: data.stats.totalWhatsAppChannels, icon: Waypoints, tone: "text-emerald-100", accent: "from-emerald-500/20 via-emerald-500/8 to-transparent" },
     { key: "chats", label: "Chats", value: data.stats.totalChats, icon: MessageSquareText, tone: "text-rose-100", accent: "from-rose-500/20 via-rose-500/8 to-transparent" },
@@ -4953,7 +4953,7 @@ export default function AdminProjetoDetalhePage() {
   const projectTabs = [
     { key: "agentes" as const, label: "Agentes", icon: Bot },
     { key: "apis" as const, label: "APIs", icon: Activity },
-    { key: "conectores" as const, label: "Conectores", icon: Cable },
+    { key: "conectores" as const, label: "Fontes", icon: Cable },
     { key: "chats" as const, label: "Chats", icon: MessageSquareText },
     { key: "whatsapp" as const, label: "WhatsApp", icon: Waypoints },
   ];
@@ -5349,7 +5349,7 @@ export default function AdminProjetoDetalhePage() {
                           </span>
                           {diagnostic ? (
                             <span className="text-[10px] uppercase tracking-[0.16em] text-slate-500">
-                              {diagnostic.summary.activeConnectors}/{diagnostic.summary.connectors} conectores
+                              {diagnostic.summary.activeConnectors}/{diagnostic.summary.connectors} fontes
                             </span>
                           ) : null}
                         </div>
@@ -5375,7 +5375,7 @@ export default function AdminProjetoDetalhePage() {
                                 {[
                                   diagnostic.connections.widgets.length ? `${diagnostic.connections.widgets.length} widget(s)` : null,
                                   diagnostic.connections.whatsappChannels.length ? `${diagnostic.connections.whatsappChannels.length} WhatsApp` : null,
-                                  diagnostic.connections.connectors.length ? `${diagnostic.connections.connectors.length} conector(es)` : null,
+                                  diagnostic.connections.connectors.length ? `${diagnostic.connections.connectors.length} fonte(s)` : null,
                                   diagnostic.connections.apis.length ? `${diagnostic.connections.apis.length} API(s)` : null,
                                 ].filter(Boolean).join(" | ") || "sem vínculos diretos"}
                               </span>
@@ -5508,12 +5508,12 @@ export default function AdminProjetoDetalhePage() {
         <section className={`${activeTab === "conectores" ? "block" : "hidden"} ${premiumTransitionClass} overflow-hidden rounded-2xl border border-white/10 bg-white/5`}>
           <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Cable size={18} className="text-violet-200" />Conectores do projeto</h3>
+              <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Cable size={18} className="text-violet-200" />Fontes de produto do projeto</h3>
               <p className="mt-1 text-sm text-slate-400">Cadastre fontes de produto por agente. O primeiro tipo disponivel e o `mercado_livre`.</p>
             </div>
             <button type="button" onClick={openNewConnectorModal} className={`inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white ${premiumInteractiveClass}`}>
               <Plus size={16} />
-              Novo conector
+              Nova fonte
             </button>
           </div>
           <div className="space-y-3 p-4">
@@ -5566,7 +5566,7 @@ export default function AdminProjetoDetalhePage() {
                 );
               })
             ) : (
-              <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhum conector cadastrado para este projeto ainda.</div>
+              <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhuma fonte de produto cadastrada para este projeto ainda.</div>
             )}
           </div>
         </section>

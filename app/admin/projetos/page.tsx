@@ -235,7 +235,7 @@ export default function AdminProjetosPage() {
                       <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
                         <div className="flex items-center gap-2 text-violet-100">
                           <Cable size={16} />
-                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Conectores</p>
+                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Fontes de produto</p>
                         </div>
                         <p className="mt-3 text-2xl font-extrabold text-white">{projeto.stats.totalConectores}</p>
                         <p className="mt-1 text-xs text-slate-400">{projeto.stats.conectoresAtivos} ativos</p>
