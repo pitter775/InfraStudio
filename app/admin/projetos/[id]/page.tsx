@@ -5016,6 +5016,10 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const [activeTab, setActiveTab] = useState<ProjectTab>("agentes");
+  const [renderedTab, setRenderedTab] = useState<ProjectTab>("agentes");
+  const [tabContentVisible, setTabContentVisible] = useState(true);
+  const tabSwitchTimeoutRef = useRef<number | null>(null);
+  const tabRevealTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
@@ -5023,6 +5027,39 @@ export default function AdminProjetoDetalhePage() {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    return () => {
+      if (tabSwitchTimeoutRef.current) {
+        window.clearTimeout(tabSwitchTimeoutRef.current);
+      }
+      if (tabRevealTimeoutRef.current) {
+        window.clearTimeout(tabRevealTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (tabSwitchTimeoutRef.current) {
+      window.clearTimeout(tabSwitchTimeoutRef.current);
+    }
+    if (tabRevealTimeoutRef.current) {
+      window.clearTimeout(tabRevealTimeoutRef.current);
+    }
+
+    if (activeTab === renderedTab) {
+      setTabContentVisible(true);
+      return;
+    }
+
+    setTabContentVisible(false);
+    tabSwitchTimeoutRef.current = window.setTimeout(() => {
+      setRenderedTab(activeTab);
+      tabRevealTimeoutRef.current = window.setTimeout(() => {
+        setTabContentVisible(true);
+      }, 28);
+    }, 140);
+  }, [activeTab, renderedTab]);
 
   useEffect(() => {
     if (!data) {
@@ -5121,16 +5158,12 @@ export default function AdminProjetoDetalhePage() {
     data.billing?.pricingModels.find((item) => item.id === billingPlanForm.modeloReferencia) ??
     data.billing?.pricingModels.find((item) => item.id === data.billing?.plan.modeloReferencia) ??
     null;
+  const tabContentTransitionClass = `transform-gpu transition-all duration-200 ease-out ${tabContentVisible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"}`;
 
   return (
     <main className="space-y-6">
       <section className="px-1 py-1">
-        <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(250,204,21,0.12),_transparent_28%),linear-gradient(135deg,rgba(15,23,42,0.94),rgba(2,8,23,0.82))] p-4 shadow-[0_24px_80px_rgba(2,8,23,0.45)] sm:p-5">
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:18px_18px] opacity-25" />
-          <div className="pointer-events-none absolute -left-16 top-12 h-36 w-36 rounded-full bg-cyan-500/10 blur-3xl" />
-          <div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-amber-400/10 blur-3xl" />
-
-          <div className="relative space-y-4">
+          <div className="space-y-3">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 space-y-3">
                 <Link
@@ -5158,9 +5191,8 @@ export default function AdminProjetoDetalhePage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2.5">
-                  <div className="relative inline-flex min-w-[240px] items-start gap-3 overflow-hidden rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-3.5 py-3 backdrop-blur-sm">
-                    <div className="pointer-events-none absolute right-3 top-3 h-14 w-14 rounded-full bg-cyan-400/16 blur-2xl" />
-                    <div className="pointer-events-none absolute right-4 top-4 text-cyan-100/20">
+                  <div className="relative inline-flex min-w-[220px] items-start gap-3 overflow-hidden rounded-2xl border border-cyan-400/18 bg-cyan-500/[0.06] px-3 py-2.5 shadow-[0_16px_34px_rgba(8,47,73,0.18)]">
+                    <div className="pointer-events-none absolute right-4 top-3 text-cyan-100/18">
                       <Bot size={28} />
                     </div>
                     <div className="min-w-0">
@@ -5195,14 +5227,13 @@ export default function AdminProjetoDetalhePage() {
                 return (
                   <div
                     key={item.key}
-                    className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/45 px-3.5 py-3 backdrop-blur-sm"
+                    className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-2.5 shadow-[0_16px_34px_rgba(2,8,23,0.18)]"
                   >
-                    <div className={`pointer-events-none absolute right-3 top-3 h-16 w-16 rounded-full blur-2xl ${item.glow}`} />
-                    <div className={`pointer-events-none absolute right-4 top-4 ${item.tone} opacity-20`}>
-                      <Icon size={30} />
+                    <div className={`pointer-events-none absolute right-4 top-3 ${item.tone} opacity-16`}>
+                      <Icon size={26} />
                     </div>
-                    <div className="relative flex items-start gap-4">
-                      <p className="min-w-[48px] text-4xl font-black leading-none text-white">{item.value}</p>
+                    <div className="relative flex items-start gap-3">
+                      <p className="min-w-[42px] text-[2rem] font-black leading-none text-white/92">{item.value}</p>
                       <div className="min-w-0">
                         <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
                       </div>
@@ -5211,9 +5242,7 @@ export default function AdminProjetoDetalhePage() {
                 );
               })}
             </div>
-
           </div>
-        </div>
       </section>
 
       {(feedbackAgente || feedbackApi || feedbackConnector || feedbackWidget || feedbackWhatsApp || feedbackBilling) && (
@@ -5417,7 +5446,7 @@ export default function AdminProjetoDetalhePage() {
           </section>
         ) : null}
 
-        <section className="mt-8 flex flex-wrap items-center justify-center gap-2">
+        <section className="mt-12 flex flex-wrap items-center justify-center gap-2">
           {projectTabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.key;
@@ -5446,7 +5475,7 @@ export default function AdminProjetoDetalhePage() {
           })}
         </section>
 
-        <section className={`${activeTab === "agentes" ? "block" : "hidden"} ${premiumTransitionClass}`}>
+        <section className={`${renderedTab === "agentes" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
           <div className="flex flex-col gap-4 px-2 py-2 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Bot size={18} className="text-cyan-200" />Agentes do projeto</h3>
@@ -5472,15 +5501,15 @@ export default function AdminProjetoDetalhePage() {
                 const latestDiagnostic = latestAgentDiagnosticById[agente.id];
 
                 return (
-                  <article key={agente.id} className={`relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
+                  <article key={agente.id} className={`relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.024),rgba(255,255,255,0.012))] p-4 shadow-[0_16px_34px_rgba(2,8,23,0.2)] ${premiumTransitionClass}`}>
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute right-3 top-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-400/10 bg-cyan-400/5 text-cyan-200/10"
+                      className="pointer-events-none absolute right-4 top-4 text-cyan-200/14"
                     >
-                      <Bot size={36} strokeWidth={1.6} />
+                      <Bot size={34} strokeWidth={1.6} />
                     </div>
 
-                    <div className="relative flex items-start justify-between gap-3 pr-14">
+                    <div className="relative flex items-start justify-between gap-3 pr-12">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <h4 className="truncate text-base font-bold text-white">{agente.nome}</h4>
@@ -5609,7 +5638,7 @@ export default function AdminProjetoDetalhePage() {
           </div>
         </section>
 
-        <section className={`${activeTab === "apis" ? "block" : "hidden"} ${premiumTransitionClass}`}>
+        <section className={`${renderedTab === "apis" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
           <div className="flex flex-col gap-4 px-2 py-2 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Activity size={18} className="text-sky-200" />APIs do projeto</h3>
@@ -5684,7 +5713,7 @@ export default function AdminProjetoDetalhePage() {
 
       </div>
 
-      <section className={`${activeTab === "whatsapp" ? "block" : "hidden"} ${premiumTransitionClass}`}>
+      <section className={`${renderedTab === "whatsapp" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
         <div className="space-y-6">
           <section>
             <div className="flex flex-col gap-4 px-2 py-2 lg:flex-row lg:items-center lg:justify-between">
@@ -5869,7 +5898,7 @@ export default function AdminProjetoDetalhePage() {
               })() : (
                 <div className="grid gap-4 xl:col-span-2 xl:grid-cols-[minmax(0,1.15fr),420px]">
                   <div className="grid gap-4">
-                    <div className="rounded-[28px] border border-dashed border-cyan-500/20 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),rgba(8,47,73,0.08)_35%,rgba(2,6,23,0.78)_75%)] p-7">
+                    <div className="px-1 py-2">
                       <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Primeiro passo</p>
                       <h4 className="mt-3 text-3xl font-black text-white">Crie o numero que vai atender no WhatsApp</h4>
                       <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
@@ -6204,7 +6233,7 @@ export default function AdminProjetoDetalhePage() {
         </div>
       </section>
 
-      <section className={`${activeTab === "chats" ? "block" : "hidden"} ${premiumTransitionClass}`}>
+      <section className={`${renderedTab === "chats" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
         <div className="grid gap-6">
           <section>
             <div className="flex flex-col gap-4 px-2 py-2 lg:flex-row lg:items-center lg:justify-between">

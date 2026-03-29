@@ -255,7 +255,7 @@ export default function AdminProjetosPage() {
           {projetos.length ? (
             <div className="grid gap-4 xl:grid-cols-2">
               {projetos.map((projeto) => (
-                <div key={projeto.id} className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))] p-6 shadow-[0_14px_28px_rgba(0,0,0,0.24)]">
+                <div key={projeto.id} className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.026),rgba(255,255,255,0.012))] p-6 shadow-[0_18px_38px_rgba(2,8,23,0.22)]">
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="min-w-0 flex-1">
@@ -305,7 +305,7 @@ export default function AdminProjetosPage() {
                       ].map((item) => {
                         const Icon = item.icon;
                         return (
-                          <div key={`${projeto.id}-${item.label}`} className="relative overflow-hidden rounded-2xl border border-white/7 bg-white/[0.02] p-4 shadow-[0_10px_20px_rgba(0,0,0,0.16)]">
+                          <div key={`${projeto.id}-${item.label}`} className="relative overflow-hidden rounded-2xl border border-white/7 bg-white/[0.024] p-4 shadow-[0_12px_24px_rgba(2,8,23,0.18)]">
                             <div className={`pointer-events-none absolute right-4 top-4 ${item.tone} opacity-16`}>
                               <Icon size={28} />
                             </div>
