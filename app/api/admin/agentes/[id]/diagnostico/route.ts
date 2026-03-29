@@ -49,7 +49,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const [apis, widgets, channels, connectors, chats] = await Promise.all([
     listApis(agente.projetoId),
-    listChatWidgets(),
+    listChatWidgets(agente.projetoId),
     listWhatsAppChannels(agente.projetoId),
     listConectores(agente.projetoId),
     listChats(agente.projetoId),
@@ -160,7 +160,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   const [apis, widgets, channels, connectors] = await Promise.all([
     listApis(agente.projetoId),
-    listChatWidgets(),
+    listChatWidgets(agente.projetoId),
     listWhatsAppChannels(agente.projetoId),
     listConectores(agente.projetoId),
   ]);

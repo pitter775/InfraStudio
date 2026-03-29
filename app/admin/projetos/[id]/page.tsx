@@ -3395,6 +3395,12 @@ export default function AdminProjetoDetalhePage() {
   const [agentStoreSearchLoading, setAgentStoreSearchLoading] = useState(false);
   const [agentStoreLatestResult, setAgentStoreLatestResult] = useState<AgentStoreLatestResult | null>(null);
   const [agentStoreSearchResult, setAgentStoreSearchResult] = useState<AgentStoreSearchResult | null>(null);
+  const [activeTab, setActiveTab] = useState<ProjectTab>("agentes");
+  const [renderedTab, setRenderedTab] = useState<ProjectTab>("agentes");
+  const [tabContentVisible, setTabContentVisible] = useState(true);
+  const pendingAgentDiagnosticsRef = useRef<Record<string, boolean>>({});
+  const tabSwitchTimeoutRef = useRef<number | null>(null);
+  const tabRevealTimeoutRef = useRef<number | null>(null);
 
   const loadProjeto = async () => {
     const response = await fetch(`/api/admin/projetos/${params.id}`, { cache: "no-store" });
@@ -3403,15 +3409,29 @@ export default function AdminProjetoDetalhePage() {
     }
 
     const payload = (await response.json()) as ProjetoDetalhe;
+    pendingAgentDiagnosticsRef.current = {};
+    setAgentDiagnosticsById({});
+    setLatestAgentDiagnosticById({});
     setData(payload);
     setBillingPlanForm(createBillingPlanForm(payload.billing));
     setAgenteForm((prev) => ({
       ...prev,
       projetoId: payload.projeto.id,
     }));
+  };
+
+  const loadAgentDiagnostics = async (agentes: Agente[]) => {
+    const pending = agentes.filter((agente) => !agentDiagnosticsById[agente.id] && !pendingAgentDiagnosticsRef.current[agente.id]);
+    if (!pending.length) {
+      return;
+    }
+
+    pending.forEach((agente) => {
+      pendingAgentDiagnosticsRef.current[agente.id] = true;
+    });
 
     const diagnosticsEntries = await Promise.all(
-      payload.agentes.map(async (agente) => {
+      pending.map(async (agente) => {
         try {
           const diagnosticResponse = await fetch(`/api/admin/agentes/${agente.id}/diagnostico`, { cache: "no-store" });
           if (!diagnosticResponse.ok) {
@@ -3422,13 +3442,21 @@ export default function AdminProjetoDetalhePage() {
           return [agente.id, diagnosticPayload] as const;
         } catch {
           return null;
+        } finally {
+          delete pendingAgentDiagnosticsRef.current[agente.id];
         }
       }),
     );
 
-    setAgentDiagnosticsById(
-      Object.fromEntries(diagnosticsEntries.filter((entry): entry is readonly [string, AgentDiagnosticsOverview] => Boolean(entry))),
-    );
+    const nextEntries = diagnosticsEntries.filter((entry): entry is readonly [string, AgentDiagnosticsOverview] => Boolean(entry));
+    if (!nextEntries.length) {
+      return;
+    }
+
+    setAgentDiagnosticsById((current) => ({
+      ...current,
+      ...Object.fromEntries(nextEntries),
+    }));
   };
 
   const withComputedProjectStats = (current: ProjetoDetalhe): ProjetoDetalhe => ({
@@ -3480,6 +3508,14 @@ export default function AdminProjetoDetalhePage() {
   }, [params.id]);
 
   useEffect(() => {
+    if (activeTab !== "agentes" || !data?.agentes.length) {
+      return;
+    }
+
+    void loadAgentDiagnostics(data.agentes);
+  }, [activeTab, data?.agentes, agentDiagnosticsById]);
+
+  useEffect(() => {
     const oauthStatus = searchParams.get("mercado_livre_oauth");
     const oauthError = searchParams.get("mercado_livre_oauth_error");
 
@@ -3502,23 +3538,41 @@ export default function AdminProjetoDetalhePage() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!data?.whatsappChannels.length) {
+    if (activeTab !== "whatsapp" || !data?.whatsappChannels.length) {
+      return;
+    }
+
+    const channelsToSync = data.whatsappChannels.filter((channel) => {
+      if (channel.status !== "ativo") {
+        return false;
+      }
+
+      const connectionStatus = channel.sessionData?.connectionStatus ?? "offline";
+      return (
+        connectionStatus !== "online" ||
+        connectingWhatsAppChannelId === channel.id ||
+        disconnectingWhatsAppChannelId === channel.id ||
+        !channel.sessionData?.lastSyncAt
+      );
+    });
+
+    if (!channelsToSync.length) {
       return;
     }
 
     const sync = () => {
-      for (const channel of data.whatsappChannels) {
+      for (const channel of channelsToSync) {
         void refreshWhatsAppRuntime(channel.id);
       }
     };
 
     sync();
-    const timer = window.setInterval(sync, 5000);
+    const timer = window.setInterval(sync, 12000);
 
     return () => {
       window.clearInterval(timer);
     };
-  }, [data?.whatsappChannels]);
+  }, [activeTab, connectingWhatsAppChannelId, data?.whatsappChannels, disconnectingWhatsAppChannelId]);
 
   const resetAgenteForm = () => {
     setAgenteForm({
@@ -5014,12 +5068,6 @@ export default function AdminProjetoDetalhePage() {
       });
     });
   };
-
-  const [activeTab, setActiveTab] = useState<ProjectTab>("agentes");
-  const [renderedTab, setRenderedTab] = useState<ProjectTab>("agentes");
-  const [tabContentVisible, setTabContentVisible] = useState(true);
-  const tabSwitchTimeoutRef = useRef<number | null>(null);
-  const tabRevealTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");

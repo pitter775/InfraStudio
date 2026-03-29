@@ -30,18 +30,17 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
   }
 
-  const [projetos, agentes, chats, apis, allWidgets, whatsappChannels, conectores, billing] = await Promise.all([
+  const [projetos, agentes, chats, apis, widgets, whatsappChannels, conectores, billing] = await Promise.all([
     listProjetos(),
     listAgentes(id),
     listChats(id),
     listApis(id),
-    listChatWidgets(),
+    listChatWidgets(id),
     listWhatsAppChannels(id),
     listConectores(id),
     getProjetoBillingOverview(id),
   ]);
   const projeto = projetos.find((item) => item.id === id) ?? null;
-  const widgets = allWidgets.filter((widget) => widget.projetoId === id);
 
   if (!projeto) {
     return NextResponse.json({ error: "Projeto não encontrado." }, { status: 404 });

@@ -54,12 +54,18 @@ function mapChatWidget(row: ChatWidgetRow): ChatWidgetRecord {
   };
 }
 
-export async function listChatWidgets() {
+export async function listChatWidgets(projetoId?: string | null) {
   const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("chat_widgets")
     .select("id, nome, slug, projeto_id, agente_id, dominio, whatsapp_celular, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
     .order("created_at", { ascending: true });
+
+  if (projetoId) {
+    query = query.eq("projeto_id", projetoId);
+  }
+
+  const { data, error } = await query;
 
   if (error || !data) {
     console.error("[chat-widgets] failed to list widgets", error);
