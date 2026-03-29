@@ -1363,7 +1363,7 @@ type ApiCampoTreeDraftNode = {
   children: Map<string, ApiCampoTreeDraftNode>;
 };
 
-type ProjectTab = "agentes" | "apis" | "whatsapp" | "chats";
+type ProjectTab = "agentes" | "apis" | "whatsapp" | "mercado" | "chats";
 
 const defaultConfiguracoes = {
   objetivo: "Qualificar leads e operar o atendimento do projeto com contexto de negocio.",
@@ -3629,7 +3629,7 @@ export default function AdminProjetoDetalhePage() {
   const openNewConnectorModal = () => {
     resetConnectorForm();
     replaceProjectUrl((nextParams) => {
-      nextParams.set("tab", "whatsapp");
+      nextParams.set("tab", "mercado");
       nextParams.delete("fonte");
     });
     setConnectorModalOpen(true);
@@ -4343,7 +4343,7 @@ export default function AdminProjetoDetalhePage() {
     setSavingConnector(false);
     setConnectorModalOpen(false);
     replaceProjectUrl((nextParams) => {
-      nextParams.set("tab", "whatsapp");
+      nextParams.set("tab", "mercado");
       nextParams.delete("fonte");
     });
     setFeedbackConnector(message);
@@ -4526,7 +4526,7 @@ export default function AdminProjetoDetalhePage() {
     });
     setFeedbackConnector(null);
     replaceProjectUrl((nextParams) => {
-      nextParams.set("tab", "whatsapp");
+      nextParams.set("tab", "mercado");
       if (connector.id) {
         nextParams.set("fonte", connector.id);
       }
@@ -4538,7 +4538,7 @@ export default function AdminProjetoDetalhePage() {
     setConnectorModalOpen(false);
     resetConnectorForm();
     replaceProjectUrl((nextParams) => {
-      nextParams.set("tab", "whatsapp");
+      nextParams.set("tab", "mercado");
       nextParams.delete("fonte");
     });
   };
@@ -5071,7 +5071,7 @@ export default function AdminProjetoDetalhePage() {
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "agentes" || tabParam === "apis" || tabParam === "whatsapp" || tabParam === "chats") {
+    if (tabParam === "agentes" || tabParam === "apis" || tabParam === "whatsapp" || tabParam === "mercado" || tabParam === "chats") {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
@@ -5124,7 +5124,7 @@ export default function AdminProjetoDetalhePage() {
       return;
     }
 
-    setActiveTab("whatsapp");
+    setActiveTab("mercado");
     setConnectorForm({
       id: connector.id,
       nome: connector.nome,
@@ -5199,8 +5199,9 @@ export default function AdminProjetoDetalhePage() {
   const projectTabs = [
     { key: "agentes" as const, label: "Agentes", icon: Bot },
     { key: "apis" as const, label: "APIs", icon: Activity },
-    { key: "chats" as const, label: "Chats", icon: MessageSquareText },
     { key: "whatsapp" as const, label: "WhatsApp", icon: Waypoints },
+    { key: "mercado" as const, label: "Mercado Livre", icon: Cable },
+    { key: "chats" as const, label: "Chats", icon: MessageSquareText },
   ];
   const selectedBillingModel =
     data.billing?.pricingModels.find((item) => item.id === billingPlanForm.modeloReferencia) ??
@@ -5761,17 +5762,17 @@ export default function AdminProjetoDetalhePage() {
 
       </div>
 
-      <section className={`${renderedTab === "whatsapp" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
+      <section className={`${renderedTab === "mercado" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
         <div className="space-y-6">
           <section>
             <div className="flex flex-col gap-4 px-2 py-2 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Cable size={18} className="text-violet-200" />Integracoes do projeto</h3>
-                <p className="mt-1 text-sm text-slate-400">Gerencie aqui as integracoes do projeto e os canais que usam essas configuracoes.</p>
+                <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Cable size={18} className="text-violet-200" />Mercado Livre</h3>
+                <p className="mt-1 text-sm text-slate-400">Gerencie aqui as lojas e credenciais do Mercado Livre deste projeto.</p>
               </div>
               <button type="button" onClick={openNewConnectorModal} className={`${headerActionButtonClass} ${premiumInteractiveClass}`}>
                 <Plus size={16} />
-                Nova integracao
+                Nova loja
               </button>
             </div>
             <div className="space-y-3 pt-2">
@@ -5817,10 +5818,15 @@ export default function AdminProjetoDetalhePage() {
                   );
                 })
               ) : (
-                <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhuma integracao cadastrada para este projeto ainda.</div>
+                <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhuma loja do Mercado Livre cadastrada para este projeto ainda.</div>
               )}
             </div>
           </section>
+        </div>
+      </section>
+
+      <section className={`${renderedTab === "whatsapp" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
+        <div className="space-y-6">
           <section className="overflow-hidden rounded-2xl border border-cyan-500/20 bg-cyan-500/10">
             <div className="px-6 py-5">
               <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Waypoints size={18} className="text-cyan-100" />WhatsApp do projeto</h3>
