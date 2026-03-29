@@ -176,25 +176,31 @@ export default function AdminProjetosPage() {
 
       {!loading && projetos.length ? (
         <section className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Projetos</p>
-            <p className="mt-2 text-3xl font-extrabold text-white">{projetos.length}</p>
+          <div className="rounded-2xl border border-white/10 p-5">
+            <div className="flex items-end gap-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Projetos</p>
+              <p className="text-3xl font-extrabold leading-none text-white">{projetos.length}</p>
+            </div>
             <p className="mt-2 text-sm text-slate-400">Workspaces disponiveis para abrir e operar.</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Agentes</p>
-            <p className="mt-2 text-3xl font-extrabold text-white">{projetos.reduce((sum, projeto) => sum + projeto.stats.totalAgentes, 0)}</p>
+          <div className="rounded-2xl border border-white/10 p-5">
+            <div className="flex items-end gap-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Agentes</p>
+              <p className="text-3xl font-extrabold leading-none text-white">{projetos.reduce((sum, projeto) => sum + projeto.stats.totalAgentes, 0)}</p>
+            </div>
             <p className="mt-2 text-sm text-slate-400">Total consolidado de agentes em todos os projetos visiveis.</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Chats</p>
-            <p className="mt-2 text-3xl font-extrabold text-white">{projetos.reduce((sum, projeto) => sum + projeto.stats.totalChats, 0)}</p>
+          <div className="rounded-2xl border border-white/10 p-5">
+            <div className="flex items-end gap-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Chats</p>
+              <p className="text-3xl font-extrabold leading-none text-white">{projetos.reduce((sum, projeto) => sum + projeto.stats.totalChats, 0)}</p>
+            </div>
             <p className="mt-2 text-sm text-slate-400">Conversas acumuladas nos projetos vinculados.</p>
           </div>
         </section>
       ) : null}
 
-      <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+      <section className="overflow-hidden rounded-2xl border border-white/10">
         <div className="border-b border-white/10 px-6 py-5">
           <h2 className="text-xl font-bold text-white">Projetos vinculados</h2>
         </div>
@@ -204,49 +210,61 @@ export default function AdminProjetosPage() {
           {projetos.length ? (
             <div className="grid gap-4 xl:grid-cols-2">
               {projetos.map((projeto) => (
-                <div key={projeto.id} className="rounded-[24px] border border-white/10 p-5">
-                  <div className="flex flex-col gap-5">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div key={projeto.id} className="rounded-[24px] border border-white/10 p-6">
+                  <div className="flex flex-col gap-6">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-3">
-                          <h3 className="text-xl font-bold text-white">{projeto.nome}</h3>
+                          <h3 className="text-2xl font-bold text-white">{projeto.nome}</h3>
                           <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-200">{projeto.status}</span>
                           {projeto.tipo ? (
                             <span className="rounded-full bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-300">{projeto.tipo}</span>
                           ) : null}
                         </div>
-                        <p className="mt-3 text-sm leading-relaxed text-slate-400">{projeto.descricao || "Sem descricao."}</p>
-                        {projeto.slug ? <p className="mt-3 text-xs uppercase tracking-[0.14em] text-slate-500">slug: {projeto.slug}</p> : null}
+                        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">{projeto.descricao || "Sem descricao."}</p>
                       </div>
-                      <Link href={`/admin/projetos/${projeto.id}`} className="inline-flex items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-100">
+                      <Link
+                        href={`/admin/projetos/${projeto.id}`}
+                        className="inline-flex min-w-[136px] items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-2.5 text-sm font-semibold text-blue-100"
+                      >
                         Abrir projeto
                       </Link>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
-                        <div className="flex items-center gap-2 text-cyan-100">
-                          <Bot size={16} />
-                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Agentes</p>
-                        </div>
-                        <p className="mt-3 text-2xl font-extrabold text-white">{projeto.stats.totalAgentes}</p>
-                        <p className="mt-1 text-xs text-slate-400">{projeto.stats.agentesAtivos} ativos</p>
+                    <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+                      <div className="rounded-2xl border border-white/8 p-4">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Slug do projeto</p>
+                        <p className="mt-2 truncate text-lg font-bold text-white">{projeto.slug || "Sem slug"}</p>
                       </div>
-                      <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
-                        <div className="flex items-center gap-2 text-violet-100">
-                          <Cable size={16} />
-                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Fontes de produto</p>
+                      <div className="rounded-2xl border border-white/8 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-2 text-cyan-100">
+                            <Bot size={16} />
+                            <p className="truncate text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Agentes</p>
+                          </div>
+                          <p className="text-3xl font-extrabold leading-none text-white">{projeto.stats.totalAgentes}</p>
                         </div>
-                        <p className="mt-3 text-2xl font-extrabold text-white">{projeto.stats.totalConectores}</p>
-                        <p className="mt-1 text-xs text-slate-400">{projeto.stats.conectoresAtivos} ativos</p>
+                        <p className="mt-2 text-xs text-slate-400">{projeto.stats.agentesAtivos} ativos</p>
                       </div>
-                      <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
-                        <div className="flex items-center gap-2 text-emerald-100">
-                          <MessageSquareText size={16} />
-                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Chats</p>
+                      <div className="rounded-2xl border border-white/8 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-2 text-violet-100">
+                            <Cable size={16} />
+                            <p className="truncate text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Fontes de produto</p>
+                          </div>
+                          <p className="text-3xl font-extrabold leading-none text-white">{projeto.stats.totalConectores}</p>
                         </div>
-                        <p className="mt-3 text-2xl font-extrabold text-white">{projeto.stats.totalChats}</p>
-                        <p className="mt-1 text-xs text-slate-400">historico do projeto</p>
+                        <p className="mt-2 text-xs text-slate-400">{projeto.stats.conectoresAtivos} ativos</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/8 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-2 text-emerald-100">
+                            <MessageSquareText size={16} />
+                            <p className="truncate text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Chats</p>
+                          </div>
+                          <p className="text-3xl font-extrabold leading-none text-white">{projeto.stats.totalChats}</p>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-400">Historico do projeto</p>
                       </div>
                     </div>
                   </div>

@@ -780,6 +780,16 @@ function inferShortDescription(summary: string) {
   return `${firstParagraph.slice(0, 157).trimEnd()}...`;
 }
 
+function slugifyAgentValue(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -1895,16 +1905,8 @@ function AgenteModal({
         <div className="grid max-h-[calc(92vh-88px)] gap-0 overflow-x-hidden overflow-y-auto lg:grid-cols-[1.05fr_0.95fr]">
           <div className="min-w-0 space-y-4 p-6">
             <div>
-              <FormLabel>Slug</FormLabel>
-              <input value={form.slug} onChange={(event) => onChange({ slug: event.target.value })} placeholder="agente-comercial-principal" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
-            </div>
-            <div>
               <FormLabel>Nome do agente</FormLabel>
               <input value={form.nome} onChange={(event) => onChange({ nome: event.target.value })} placeholder="Agente comercial principal" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
-            </div>
-            <div>
-              <FormLabel>Descricao curta</FormLabel>
-              <input value={form.descricao} onChange={(event) => onChange({ descricao: event.target.value })} placeholder="Resumo curto para identificar esse agente" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
             </div>
             <div>
               <div className="mb-2 flex items-center justify-between gap-3">
@@ -1969,7 +1971,7 @@ function AgenteModal({
                 onInput={(event) => updatePromptBase(event.currentTarget.innerHTML)}
                 className={`w-full overflow-y-auto rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none transition-all duration-300 [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-base [&_h3]:font-bold [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-2 [&_strong]:font-extrabold [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 ${promptExpanded ? "min-h-[560px]" : "min-h-[290px]"}`}
               />
-              <p className="mt-2 text-xs text-slate-400">Ao validar, o texto e reorganizado para leitura humana e o JSON tecnico e regenerado automaticamente sem virar um resumao podado.</p>
+              <p className="mt-2 text-xs text-slate-400">Preencha o resumo do agente. O slug e a descricao curta sao gerados automaticamente em segundo plano.</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -3776,13 +3778,28 @@ export default function AdminProjetoDetalhePage() {
     }
   };
 
-  const prepareAgenteForm = (form: AgenteFormState) => {
-    const organizedPromptBase = normalizeAgentText(form.promptBase);
-    const generatedConfig = buildAgentConfigFromSummary(organizedPromptBase);
+  const applyAgenteAutoFields = (form: AgenteFormState): AgenteFormState => {
+    const normalizedPromptBase = normalizeAgentText(form.promptBase);
+    const descricaoAutomatica = inferShortDescription(normalizedPromptBase || form.nome);
+    const preserveExistingSlug = Boolean(form.id && form.slug.trim());
+    const slugBase = form.nome.trim() || descricaoAutomatica || "agente-do-projeto";
 
     return {
       ...form,
-      descricao: form.descricao.trim() || inferShortDescription(organizedPromptBase),
+      descricao: descricaoAutomatica,
+      slug: preserveExistingSlug ? form.slug.trim() : slugifyAgentValue(slugBase),
+      promptBase: normalizedPromptBase || form.promptBase,
+    };
+  };
+
+  const prepareAgenteForm = (form: AgenteFormState) => {
+    const formWithAutoFields = applyAgenteAutoFields(form);
+    const organizedPromptBase = normalizeAgentText(formWithAutoFields.promptBase);
+    const generatedConfig = buildAgentConfigFromSummary(organizedPromptBase);
+
+    return {
+      ...formWithAutoFields,
+      descricao: inferShortDescription(organizedPromptBase || formWithAutoFields.nome),
       promptBase: organizedPromptBase,
       configuracoes: JSON.stringify(generatedConfig, null, 2),
     };
@@ -3980,7 +3997,7 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const handleEditAgente = (agente: Agente) => {
-    setAgenteForm({
+    setAgenteForm(applyAgenteAutoFields({
       id: agente.id,
       projetoId: agente.projetoId ?? params.id,
       slug: agente.slug ?? "",
@@ -3992,7 +4009,7 @@ export default function AdminProjetoDetalhePage() {
       apiIds: agente.apiIds ?? [],
       arquivos: agente.arquivos ?? [],
       arquivoIdsRemovidos: [],
-    });
+    }));
     setPendingAgenteArquivos([]);
     setFeedbackAgente(null);
     setAgenteModalOpen(true);
@@ -5302,8 +5319,15 @@ export default function AdminProjetoDetalhePage() {
                 const latestDiagnostic = latestAgentDiagnosticById[agente.id];
 
                 return (
-                  <article key={agente.id} className={`flex h-full flex-col rounded-2xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
-                    <div className="flex items-start justify-between gap-3">
+                  <article key={agente.id} className={`relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute right-3 top-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-400/10 bg-cyan-400/5 text-cyan-200/10"
+                    >
+                      <Bot size={36} strokeWidth={1.6} />
+                    </div>
+
+                    <div className="relative flex items-start justify-between gap-3 pr-14">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <h4 className="truncate text-base font-bold text-white">{agente.nome}</h4>
@@ -6233,7 +6257,7 @@ export default function AdminProjetoDetalhePage() {
           setAgenteModalOpen(false);
           resetAgenteForm();
         }}
-        onChange={(next) => setAgenteForm((prev) => ({ ...prev, ...next }))}
+        onChange={(next) => setAgenteForm((prev) => applyAgenteAutoFields({ ...prev, ...next }))}
         onAddFiles={handleAddAgenteFiles}
         onRemovePendingFile={handleRemovePendingAgenteFile}
         onRemoveUploadedFile={handleRemoveUploadedAgenteFile}
