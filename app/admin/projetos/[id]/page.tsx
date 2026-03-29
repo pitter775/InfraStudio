@@ -5104,12 +5104,12 @@ export default function AdminProjetoDetalhePage() {
   const currentChatPage = Math.min(chatPage, chatTotalPages);
   const paginatedChats = sortedChats.slice((currentChatPage - 1) * chatsPerPage, currentChatPage * chatsPerPage);
   const overviewStats = [
-    { key: "agentes", label: "Agentes", value: data.stats.totalAgentes, icon: Bot, tone: "text-cyan-100", accent: "from-cyan-500/20 via-cyan-500/8 to-transparent" },
-    { key: "apis", label: "APIs", value: data.stats.totalApis, icon: Activity, tone: "text-sky-100", accent: "from-sky-500/20 via-sky-500/8 to-transparent" },
-    { key: "conectores", label: "Fontes de produto", value: data.stats.totalConectores, icon: Cable, tone: "text-violet-100", accent: "from-violet-500/20 via-violet-500/8 to-transparent" },
-    { key: "widgets", label: "Widgets", value: data.stats.totalWidgets, icon: PanelsTopLeft, tone: "text-amber-100", accent: "from-amber-500/20 via-amber-500/8 to-transparent" },
-    { key: "whatsapp", label: "WhatsApp", value: data.stats.totalWhatsAppChannels, icon: Waypoints, tone: "text-emerald-100", accent: "from-emerald-500/20 via-emerald-500/8 to-transparent" },
-    { key: "chats", label: "Chats", value: data.stats.totalChats, icon: MessageSquareText, tone: "text-rose-100", accent: "from-rose-500/20 via-rose-500/8 to-transparent" },
+    { key: "agentes", label: "Agentes", value: data.stats.totalAgentes, icon: Bot, tone: "text-cyan-100", glow: "bg-cyan-400/16" },
+    { key: "apis", label: "APIs", value: data.stats.totalApis, icon: Activity, tone: "text-sky-100", glow: "bg-sky-400/16" },
+    { key: "conectores", label: "Integracoes", value: data.stats.totalConectores, icon: Cable, tone: "text-violet-100", glow: "bg-violet-400/16" },
+    { key: "widgets", label: "Widgets", value: data.stats.totalWidgets, icon: PanelsTopLeft, tone: "text-amber-100", glow: "bg-amber-400/16" },
+    { key: "whatsapp", label: "WhatsApp", value: data.stats.totalWhatsAppChannels, icon: Waypoints, tone: "text-emerald-100", glow: "bg-emerald-400/16" },
+    { key: "chats", label: "Chats", value: data.stats.totalChats, icon: MessageSquareText, tone: "text-rose-100", glow: "bg-rose-400/16" },
   ] as const;
   const projectTabs = [
     { key: "agentes" as const, label: "Agentes", icon: Bot },
@@ -5158,18 +5158,10 @@ export default function AdminProjetoDetalhePage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2.5">
-                  <div className="inline-flex min-w-[180px] items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-3 backdrop-blur-sm">
-                    <div className="mt-0.5 rounded-xl border border-white/10 bg-white/5 p-2 text-cyan-100">
-                      <Boxes size={15} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">Slug do projeto</p>
-                      <p className="mt-1 truncate text-sm font-semibold text-white" title={data.projeto.slug ?? "sem-slug"}>{data.projeto.slug ?? "sem-slug"}</p>
-                    </div>
-                  </div>
-                  <div className="inline-flex min-w-[240px] items-start gap-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-3.5 py-3 backdrop-blur-sm">
-                    <div className="mt-0.5 rounded-xl border border-cyan-300/20 bg-cyan-400/10 p-2 text-cyan-100">
-                      <Bot size={15} />
+                  <div className="relative inline-flex min-w-[240px] items-start gap-3 overflow-hidden rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-3.5 py-3 backdrop-blur-sm">
+                    <div className="pointer-events-none absolute right-3 top-3 h-14 w-14 rounded-full bg-cyan-400/16 blur-2xl" />
+                    <div className="pointer-events-none absolute right-4 top-4 text-cyan-100/20">
+                      <Bot size={28} />
                     </div>
                     <div className="min-w-0">
                       <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-100/75">Agente ativo</p>
@@ -5196,7 +5188,7 @@ export default function AdminProjetoDetalhePage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-6">
+            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
               {overviewStats.map((item) => {
                 const Icon = item.icon;
 
@@ -5205,14 +5197,14 @@ export default function AdminProjetoDetalhePage() {
                     key={item.key}
                     className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/45 px-3.5 py-3 backdrop-blur-sm"
                   >
-                    <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${item.accent}`} />
-                    <div className="relative flex items-center justify-between gap-3">
-                      <div>
+                    <div className={`pointer-events-none absolute right-3 top-3 h-16 w-16 rounded-full blur-2xl ${item.glow}`} />
+                    <div className={`pointer-events-none absolute right-4 top-4 ${item.tone} opacity-20`}>
+                      <Icon size={30} />
+                    </div>
+                    <div className="relative flex items-start gap-4">
+                      <p className="min-w-[48px] text-4xl font-black leading-none text-white">{item.value}</p>
+                      <div className="min-w-0">
                         <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
-                        <p className="mt-1 text-2xl font-black leading-none text-white">{item.value}</p>
-                      </div>
-                      <div className={`rounded-2xl border border-white/10 bg-white/5 p-2.5 ${item.tone}`}>
-                        <Icon size={16} />
                       </div>
                     </div>
                   </div>
