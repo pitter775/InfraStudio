@@ -1,9 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Activity, Bold, Bot, Boxes, Cable, CheckCircle2, Coins, Copy, Cpu, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, ShieldAlert, Sparkles, TestTube2, Trash2, Waypoints, X } from "lucide-react";
+import { Activity, ArrowLeft, Bold, Bot, Boxes, Cable, CheckCircle2, Coins, Copy, Cpu, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, ShieldAlert, Sparkles, TestTube2, Trash2, Waypoints, X } from "lucide-react";
 import { getAgentRuntimeBlockEntries, normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
 
 type Projeto = {
@@ -1362,7 +1363,7 @@ type ApiCampoTreeDraftNode = {
   children: Map<string, ApiCampoTreeDraftNode>;
 };
 
-type ProjectTab = "agentes" | "apis" | "conectores" | "whatsapp" | "chats";
+type ProjectTab = "agentes" | "apis" | "whatsapp" | "chats";
 
 const defaultConfiguracoes = {
   objetivo: "Qualificar leads e operar o atendimento do projeto com contexto de negocio.",
@@ -1438,6 +1439,31 @@ const primaryActionButtonClass =
 
 const headerActionButtonClass =
   "inline-flex items-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14";
+
+function PremiumLoader({
+  title = "Load Premium",
+  subtitle = "Preparando sua experiencia...",
+  compact = false,
+}: {
+  title?: string;
+  subtitle?: string;
+  compact?: boolean;
+}) {
+  return (
+    <div className={`overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.14),_transparent_28%),linear-gradient(135deg,rgba(15,23,42,0.94),rgba(2,8,23,0.82))] ${compact ? "p-5" : "p-7"}`}>
+      <div className="flex items-center gap-4">
+        <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+          <div className="absolute inset-0 rounded-2xl border border-cyan-300/20 animate-pulse" />
+          <Image src="/logo.png" alt="InfraStudio" width={32} height={32} className="h-8 w-8 object-contain" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-lg font-black text-white">{title}</p>
+          <p className="mt-1 text-sm text-slate-300">{subtitle}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ModalStickyFooter({
   children,
@@ -2992,7 +3018,7 @@ function AgentStoreSearchModal({
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100 disabled:opacity-60"
               >
                 <TestTube2 size={15} />
-                {latestLoading ? "Carregando..." : "Listar ultimos"}
+                        {latestLoading ? "Load Premium" : "Listar ultimos"}
               </button>
             </div>
 
@@ -3250,7 +3276,7 @@ function ChatHistoryModal({
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Conversa</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{detail?.chat.titulo ?? "Carregando conversa"}</h2>
+                    <h2 className="mt-2 text-2xl font-extrabold text-white">{detail?.chat.titulo ?? "Load Premium"}</h2>
             {detail ? <p className="mt-1 text-sm text-slate-400">Atualizada em {new Date(detail.chat.updatedAt).toLocaleString("pt-BR")}</p> : null}
           </div>
           <button
@@ -3264,7 +3290,7 @@ function ChatHistoryModal({
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          {loading ? <div className="rounded-xl border border-white/10 bg-slate-950/30 p-6 text-sm text-slate-300">Carregando historico da conversa...</div> : null}
+            {loading ? <PremiumLoader compact title="Load Premium" subtitle="Abrindo historico da conversa..." /> : null}
           {!loading && error ? <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-6 text-sm text-rose-100">{error}</div> : null}
           {!loading && !error && detail ? (
             <div className="space-y-4">
@@ -3542,7 +3568,7 @@ export default function AdminProjetoDetalhePage() {
   const openNewConnectorModal = () => {
     resetConnectorForm();
     replaceProjectUrl((nextParams) => {
-      nextParams.set("tab", "conectores");
+      nextParams.set("tab", "whatsapp");
       nextParams.delete("fonte");
     });
     setConnectorModalOpen(true);
@@ -4256,7 +4282,7 @@ export default function AdminProjetoDetalhePage() {
     setSavingConnector(false);
     setConnectorModalOpen(false);
     replaceProjectUrl((nextParams) => {
-      nextParams.set("tab", "conectores");
+      nextParams.set("tab", "whatsapp");
       nextParams.delete("fonte");
     });
     setFeedbackConnector(message);
@@ -4439,7 +4465,7 @@ export default function AdminProjetoDetalhePage() {
     });
     setFeedbackConnector(null);
     replaceProjectUrl((nextParams) => {
-      nextParams.set("tab", "conectores");
+      nextParams.set("tab", "whatsapp");
       if (connector.id) {
         nextParams.set("fonte", connector.id);
       }
@@ -4451,7 +4477,7 @@ export default function AdminProjetoDetalhePage() {
     setConnectorModalOpen(false);
     resetConnectorForm();
     replaceProjectUrl((nextParams) => {
-      nextParams.set("tab", "conectores");
+      nextParams.set("tab", "whatsapp");
       nextParams.delete("fonte");
     });
   };
@@ -4986,7 +5012,7 @@ export default function AdminProjetoDetalhePage() {
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "agentes" || tabParam === "apis" || tabParam === "conectores" || tabParam === "whatsapp" || tabParam === "chats") {
+    if (tabParam === "agentes" || tabParam === "apis" || tabParam === "whatsapp" || tabParam === "chats") {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
@@ -5006,7 +5032,7 @@ export default function AdminProjetoDetalhePage() {
       return;
     }
 
-    setActiveTab("conectores");
+    setActiveTab("whatsapp");
     setConnectorForm({
       id: connector.id,
       nome: connector.nome,
@@ -5029,7 +5055,7 @@ export default function AdminProjetoDetalhePage() {
     return (
       <main className="space-y-6">
         <section className="px-1 py-2">
-          <h1 className="text-3xl font-extrabold text-white">Carregando projeto...</h1>
+          <PremiumLoader title="Load Premium" subtitle="Preparando o painel do projeto..." />
         </section>
       </main>
     );
@@ -5081,7 +5107,6 @@ export default function AdminProjetoDetalhePage() {
   const projectTabs = [
     { key: "agentes" as const, label: "Agentes", icon: Bot },
     { key: "apis" as const, label: "APIs", icon: Activity },
-    { key: "conectores" as const, label: "Fontes", icon: Cable },
     { key: "chats" as const, label: "Chats", icon: MessageSquareText },
     { key: "whatsapp" as const, label: "WhatsApp", icon: Waypoints },
   ];
@@ -5101,6 +5126,14 @@ export default function AdminProjetoDetalhePage() {
           <div className="relative space-y-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 space-y-3">
+                <Link
+                  href="/admin/projetos"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 text-rose-50 shadow-[0_10px_30px_rgba(244,63,94,0.12)] transition-all hover:border-rose-300/30 hover:bg-rose-400/14"
+                  aria-label="Voltar para projetos"
+                  title="Voltar para projetos"
+                >
+                  <ArrowLeft size={18} />
+                </Link>
                 <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-amber-100/90">
                   <Sparkles size={13} />
                   Projeto
@@ -5394,7 +5427,13 @@ export default function AdminProjetoDetalhePage() {
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => {
+                  setActiveTab(tab.key);
+                  replaceProjectUrl((nextParams) => {
+                    nextParams.set("tab", tab.key);
+                    nextParams.delete("fonte");
+                  });
+                }}
                 className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-3.5 py-2 text-sm font-semibold ${premiumInteractiveClass} ${
                   active
                     ? "border-cyan-400/30 bg-cyan-400/14 text-cyan-50 shadow-[0_10px_25px_rgba(34,211,238,0.12)]"
@@ -5644,85 +5683,74 @@ export default function AdminProjetoDetalhePage() {
           </div>
         </section>
 
-        <section className={`${activeTab === "conectores" ? "block" : "hidden"} ${premiumTransitionClass} overflow-hidden rounded-2xl border border-white/10 bg-white/5`}>
-          <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Cable size={18} className="text-violet-200" />Fontes de produto do projeto</h3>
-              <p className="mt-1 text-sm text-slate-400">Cadastre fontes de produto por agente. O primeiro tipo disponivel e o `mercado_livre`.</p>
-            </div>
-            <button type="button" onClick={openNewConnectorModal} className={`${headerActionButtonClass} ${premiumInteractiveClass}`}>
-              <Plus size={16} />
-              Nova fonte
-            </button>
-          </div>
-          <div className="space-y-3 p-4">
-            {data.conectores.length ? (
-              data.conectores.map((connector) => {
-                const agente = connector.agenteId ? data.agentes.find((item) => item.id === connector.agenteId) ?? null : null;
-                return (
-                  <div key={connector.id} className={`rounded-xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <h4 className="text-base font-bold text-white">{connector.nome}</h4>
-                          <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200">{connector.tipo}</span>
-                          <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${connector.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
-                            {connector.ativo ? "ativo" : "inativo"}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm text-slate-400">Agente: {agente?.nome ?? "nao vinculado"}</p>
-                        <p className="mt-1 text-sm text-slate-400">Seller ID: {connector.configuracoes?.seller_id ?? "nao informado"}</p>
-                        {connector.configuracoes?.nickname ? <p className="mt-1 text-sm text-slate-400">Nickname: {connector.configuracoes.nickname}</p> : null}
-                        <p className="mt-1 text-sm text-slate-400">
-                          OAuth: {connector.configuracoes?.refresh_token ? "conectado" : connector.configuracoes?.access_token ? "token manual" : "nao conectado"}
-                        </p>
-                        <p className="mt-1 truncate text-xs text-cyan-200/80">{connector.endpointBase}</p>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <a
-                          href={`/api/admin/conectores/${connector.id}/mercado-livre/connect`}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100"
-                        >
-                          <ExternalLink size={14} />
-                          Conectar ML
-                        </a>
-                        <button type="button" onClick={() => handleEditConnector(connector)} className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${editButtonClass}`}>
-                          <Pencil size={14} />
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleDeleteConnector(connector)}
-                          disabled={deletingConnectorId === connector.id}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-100 disabled:opacity-60"
-                        >
-                          <Trash2 size={14} />
-                          {deletingConnectorId === connector.id ? "Removendo..." : "Remover completamente"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhuma fonte de produto cadastrada para este projeto ainda.</div>
-            )}
-          </div>
-        </section>
-
       </div>
 
       <section className={`${activeTab === "whatsapp" ? "block" : "hidden"} ${premiumTransitionClass}`}>
         <div className="space-y-6">
+          <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+            <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Cable size={18} className="text-violet-200" />Fontes e canais conectados</h3>
+                <p className="mt-1 text-sm text-slate-400">Gerencie aqui as fontes do projeto e os canais que herdam essas configuracoes.</p>
+              </div>
+              <button type="button" onClick={openNewConnectorModal} className={`${headerActionButtonClass} ${premiumInteractiveClass}`}>
+                <Plus size={16} />
+                Nova fonte
+              </button>
+            </div>
+            <div className="space-y-3 p-4">
+              {data.conectores.length ? (
+                data.conectores.map((connector) => {
+                  const agente = connector.agenteId ? data.agentes.find((item) => item.id === connector.agenteId) ?? null : null;
+                  return (
+                    <div key={connector.id} className={`rounded-xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <h4 className="text-base font-bold text-white">{connector.nome}</h4>
+                            <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200">{connector.tipo}</span>
+                            <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${connector.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
+                              {connector.ativo ? "ativo" : "inativo"}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm text-slate-400">Agente: {agente?.nome ?? "nao vinculado"}</p>
+                          <p className="mt-1 text-sm text-slate-400">Seller ID: {connector.configuracoes?.seller_id ?? "nao informado"}</p>
+                          {connector.configuracoes?.nickname ? <p className="mt-1 text-sm text-slate-400">Nickname: {connector.configuracoes.nickname}</p> : null}
+                          <p className="mt-1 text-sm text-slate-400">
+                            OAuth: {connector.configuracoes?.refresh_token ? "conectado" : connector.configuracoes?.access_token ? "token manual" : "nao conectado"}
+                          </p>
+                          <p className="mt-1 truncate text-xs text-cyan-200/80">{connector.endpointBase}</p>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <button type="button" onClick={() => handleEditConnector(connector)} className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${editButtonClass}`}>
+                            <Pencil size={14} />
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteConnector(connector)}
+                            disabled={deletingConnectorId === connector.id}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-100 disabled:opacity-60"
+                          >
+                            <Trash2 size={14} />
+                            {deletingConnectorId === connector.id ? "Removendo..." : "Remover completamente"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhuma fonte cadastrada para este projeto ainda.</div>
+              )}
+            </div>
+          </section>
           <section className="overflow-hidden rounded-2xl border border-cyan-500/20 bg-cyan-500/10">
             <div className="border-b border-cyan-500/20 px-6 py-5">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">whatsapp-web.js</p>
-              <h3 className="mt-2 inline-flex items-center gap-2 text-xl font-bold text-white"><Waypoints size={18} className="text-cyan-100" />Canal oficial com sessao persistente</h3>
-              <p className="mt-2 max-w-3xl text-sm text-cyan-50/80">
-                O motor real fica no `whatsapp-service`, separado do Next.js. A aba usa `POST /connect`, `GET /status` e `GET /qr` para acompanhar a sessao.
-              </p>
+              <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Waypoints size={18} className="text-cyan-100" />WhatsApp do projeto</h3>
+              <p className="mt-2 max-w-3xl text-sm text-cyan-50/80">Conecte, acompanhe e ajuste o numero principal que atende seus clientes.</p>
               {!process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL ? (
-                <p className="mt-3 text-xs text-amber-200/90">Defina `NEXT_PUBLIC_WHATSAPP_SERVICE_URL` para habilitar a conexao e a leitura do QR.</p>
+                <p className="mt-3 text-xs text-amber-200/90">A conexao do WhatsApp ainda nao esta disponivel neste ambiente.</p>
               ) : null}
             </div>
             <div className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1.35fr),minmax(340px,0.92fr)] xl:items-start">
@@ -5748,7 +5776,7 @@ export default function AdminProjetoDetalhePage() {
                         </div>
                       </div>
 
-                      <div className="mt-6 grid gap-4 md:grid-cols-3">
+                      <div className="mt-6 grid gap-4 md:grid-cols-2">
                         <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
                           <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Estado</p>
                           <p className="mt-3 text-lg font-bold text-white">{isConnected ? "WhatsApp conectado" : isWaitingQr ? "Escaneie o QR" : "Aguardando conexao"}</p>
@@ -5758,10 +5786,6 @@ export default function AdminProjetoDetalhePage() {
                           <p className="mt-3 text-sm font-semibold text-white">
                             {channel.sessionData?.lastSyncAt ? new Date(channel.sessionData.lastSyncAt).toLocaleString("pt-BR") : "nao sincronizada"}
                           </p>
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Worker</p>
-                          <p className="mt-3 text-sm font-semibold text-white">{channel.sessionData?.worker || "whatsapp-service"}</p>
                         </div>
                       </div>
 
@@ -6356,10 +6380,6 @@ export default function AdminProjetoDetalhePage() {
           </section>
         </div>
       </section>
-
-        <Link href="/admin/projetos" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-3 font-semibold text-white transition-colors hover:bg-white/10">
-          Voltar para projetos
-        </Link>
 
       <AgenteModal
         open={agenteModalOpen}
