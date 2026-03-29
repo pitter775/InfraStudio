@@ -181,7 +181,7 @@ export default function AdminProjetosPage() {
         </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-4xl font-extrabold text-white">Seus projetos</h1>
+            <h1 className="text-4xl font-extrabold text-slate-50">Seus projetos</h1>
             <p className="mt-4 max-w-3xl text-slate-400">Abra um projeto para continuar o trabalho no contexto correto.</p>
           </div>
           <button
@@ -227,13 +227,13 @@ export default function AdminProjetosPage() {
           ].map((item) => {
             const Icon = item.icon;
             return (
-              <div key={item.label} className="relative overflow-hidden rounded-2xl border border-white/10 p-5">
+              <div key={item.label} className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.015] p-5 shadow-[0_18px_45px_rgba(2,8,23,0.18)]">
                 <div className={`pointer-events-none absolute right-3 top-3 h-16 w-16 rounded-full blur-2xl ${item.glow}`} />
                 <div className={`pointer-events-none absolute right-4 top-4 ${item.tone} opacity-20`}>
                   <Icon size={34} />
                 </div>
                 <div className="relative flex items-start gap-4">
-                  <p className="min-w-[56px] text-4xl font-black leading-none text-white">{item.value}</p>
+                  <p className="min-w-[56px] text-4xl font-black leading-none text-slate-100">{item.value}</p>
                   <div className="min-w-0">
                     <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
                     <p className="mt-2 text-sm text-slate-400">{item.description}</p>
@@ -247,7 +247,7 @@ export default function AdminProjetosPage() {
 
       <section className="overflow-hidden rounded-2xl">
         <div className="px-1 py-2">
-          <h2 className="text-xl font-bold text-white">Meus projetos</h2>
+          <h2 className="text-xl font-bold text-slate-50">Meus projetos</h2>
           <p className="mt-2 text-sm text-slate-400">Escolha um projeto para continuar de onde voce parou.</p>
         </div>
         <div className="p-6">
@@ -256,12 +256,12 @@ export default function AdminProjetosPage() {
           {projetos.length ? (
             <div className="grid gap-4 xl:grid-cols-2">
               {projetos.map((projeto) => (
-                <div key={projeto.id} className="rounded-[24px] border border-white/10 p-6 shadow-[0_18px_45px_rgba(2,8,23,0.28)]">
+                <div key={projeto.id} className="rounded-[24px] border border-white/8 bg-transparent p-6 shadow-[0_14px_28px_rgba(0,0,0,0.24)]">
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-3">
-                          <h3 className="text-2xl font-bold text-white">{projeto.nome}</h3>
+                          <h3 className="text-2xl font-bold text-slate-50">{projeto.nome}</h3>
                           <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-200">{projeto.status}</span>
                           {projeto.tipo ? (
                             <span className="rounded-full bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-300">{projeto.tipo}</span>
@@ -306,13 +306,13 @@ export default function AdminProjetosPage() {
                       ].map((item) => {
                         const Icon = item.icon;
                         return (
-                          <div key={`${projeto.id}-${item.label}`} className="relative overflow-hidden rounded-2xl border border-white/8 p-4">
+                          <div key={`${projeto.id}-${item.label}`} className="relative overflow-hidden rounded-2xl border border-white/7 bg-transparent p-4 shadow-[0_10px_20px_rgba(0,0,0,0.16)]">
                             <div className={`pointer-events-none absolute right-3 top-3 h-14 w-14 rounded-full blur-2xl ${item.glow}`} />
                             <div className={`pointer-events-none absolute right-4 top-4 ${item.tone} opacity-20`}>
                               <Icon size={28} />
                             </div>
                             <div className="relative flex items-start gap-4">
-                              <p className="min-w-[42px] text-4xl font-black leading-none text-white">{item.value}</p>
+                              <p className="min-w-[42px] text-4xl font-black leading-none text-slate-100">{item.value}</p>
                               <div className="min-w-0">
                                 <p className="truncate text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">{item.label}</p>
                                 <p className="mt-2 text-xs text-slate-400">{item.description}</p>

@@ -180,7 +180,7 @@ function Sidebar({
         <div className="border-t border-white/10 px-2 pt-4">
           <div
             className={cn(
-              "infra-premium-panel rounded-2xl p-3",
+              "rounded-2xl p-3",
               collapsed ? "flex flex-col items-center gap-3" : "space-y-3",
             )}
           >
@@ -202,37 +202,56 @@ function Sidebar({
             </div>
 
             {!collapsed ? (
-                <div className="rounded-xl border border-emerald-400/18 bg-emerald-400/10 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <>
+                <div className="rounded-xl border border-emerald-400/18 bg-emerald-400/10 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100">
                   {currentUser?.isMaster ? "master" : currentUser?.role ?? "sem acesso"}
                 </div>
-              ) : null}
 
-            <Link
-              href="/"
-              className={cn(
-                "infra-premium-panel inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:text-white",
-                collapsed ? "h-11 w-11 p-0" : "w-full",
-              )}
-              title={collapsed ? "Voltar ao site" : undefined}
-            >
-              <Globe size={16} />
-              {!collapsed ? <span>Voltar ao site</span> : null}
-            </Link>
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    href="/"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                    title="Site"
+                  >
+                    <Globe size={16} />
+                    <span>Site</span>
+                  </Link>
 
-            <button
-              type="button"
-              onClick={() => {
-                void onLogout();
-              }}
-              className={cn(
-                "infra-premium-panel inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:text-white",
-                collapsed ? "w-11 h-11 p-0" : "w-full",
-              )}
-              title={collapsed ? "Sair" : undefined}
-            >
-              <LogOut size={16} />
-              {!collapsed ? <span>Sair</span> : null}
-            </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void onLogout();
+                    }}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                    title="Sair"
+                  >
+                    <LogOut size={16} />
+                    <span>Sair</span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                  title="Site"
+                >
+                  <Globe size={16} />
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    void onLogout();
+                  }}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                  title="Sair"
+                >
+                  <LogOut size={16} />
+                </button>
+              </>
+            )}
           </div>
         </div>
       </aside>
