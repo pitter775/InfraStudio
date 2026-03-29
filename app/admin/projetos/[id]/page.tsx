@@ -1433,6 +1433,12 @@ function FormLabel({ children }: { children: string }) {
   return <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{children}</label>;
 }
 
+const primaryActionButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14 disabled:cursor-not-allowed disabled:opacity-60";
+
+const headerActionButtonClass =
+  "inline-flex items-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14";
+
 function ModalStickyFooter({
   children,
   feedback,
@@ -1442,7 +1448,7 @@ function ModalStickyFooter({
 }) {
   return (
     <div className="sticky bottom-0 border-t border-white/10 bg-brand-dark/95 px-6 py-4 backdrop-blur">
-      <div className="flex gap-3">{children}</div>
+      <div className="flex flex-wrap gap-3">{children}</div>
       {feedback ? <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</div> : null}
     </div>
   );
@@ -1901,7 +1907,7 @@ function AgenteModal({
               type="button"
               onClick={onSubmit}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(37,99,235,0.28)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
+              className={primaryActionButtonClass}
             >
               {form.id ? <Pencil size={16} /> : <Plus size={16} />}
               {saving ? "Salvando..." : form.id ? "Atualizar agente" : "Criar agente"}
@@ -2290,7 +2296,7 @@ function AgenteModal({
           </div>
         </div>
           <ModalStickyFooter feedback={feedback}>
-            <button type="button" onClick={onSubmit} disabled={saving} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
+            <button type="button" onClick={onSubmit} disabled={saving} className={`${primaryActionButtonClass} flex-1`}>
               {form.id ? <Pencil size={16} /> : <Plus size={16} />}
               {saving ? "Salvando..." : form.id ? "Atualizar agente" : "Criar agente"}
             </button>
@@ -2479,7 +2485,7 @@ function ApiModal({
           </div>
 
           <ModalStickyFooter feedback={feedback}>
-            <button type="button" onClick={onSubmit} disabled={saving} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
+            <button type="button" onClick={onSubmit} disabled={saving} className={`${primaryActionButtonClass} flex-1`}>
               {form.id ? <Pencil size={16} /> : <Plus size={16} />}
               {saving ? "Salvando..." : form.id ? "Atualizar API" : "Criar API"}
             </button>
@@ -2650,7 +2656,7 @@ function WidgetModal({
               type="button"
               onClick={onSubmit}
               disabled={saving}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
+              className={`${primaryActionButtonClass} flex-1`}
             >
               {form.id ? <Pencil size={16} /> : <Plus size={16} />}
               {saving ? "Salvando..." : form.id ? "Atualizar widget" : "Criar widget"}
@@ -2704,15 +2710,6 @@ function ConnectorModal({
             <p className="mt-1 text-sm text-slate-400">Use este cadastro para o agente buscar produtos no Mercado Livre sem expor a resposta bruta da API.</p>
           </div>
           <div className="flex items-center gap-2">
-            {form.id ? (
-              <a
-                href={`/api/admin/conectores/${form.id}/mercado-livre/connect`}
-                className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/15 hover:text-white"
-              >
-                <ExternalLink size={14} />
-                Conectar Mercado Livre
-              </a>
-            ) : null}
             <button
               type="button"
               onClick={onClose}
@@ -2900,11 +2897,20 @@ function ConnectorModal({
           </div>
         </div>
           <ModalStickyFooter feedback={feedback}>
+            {form.id ? (
+              <a
+                href={`/api/admin/conectores/${form.id}/mercado-livre/connect`}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/15 hover:text-white"
+              >
+                <ExternalLink size={15} />
+                Conectar Mercado Livre
+              </a>
+            ) : null}
             <button
               type="button"
               onClick={onSubmit}
               disabled={saving}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
+              className={`${primaryActionButtonClass} flex-1`}
             >
               {form.id ? <Pencil size={16} /> : <Plus size={16} />}
               {saving ? "Salvando..." : form.id ? "Atualizar fonte de produto" : "Criar fonte de produto"}
@@ -3206,7 +3212,7 @@ function WhatsAppChannelModal({
               type="button"
               onClick={onSubmit}
               disabled={saving}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
+              className={`${primaryActionButtonClass} flex-1`}
             >
               {form.id ? <Pencil size={16} /> : <Plus size={16} />}
               {saving ? "Salvando..." : form.id ? "Salvar alteracoes" : "Criar canal"}
@@ -5571,7 +5577,7 @@ export default function AdminProjetoDetalhePage() {
               <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Activity size={18} className="text-sky-200" />APIs do projeto</h3>
               <p className="mt-1 text-sm text-slate-400">Gerencie as APIs externas, teste o retorno e controle os campos ativos.</p>
             </div>
-            <button type="button" onClick={openNewApiModal} className={`inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white ${premiumInteractiveClass}`}>
+            <button type="button" onClick={openNewApiModal} className={`${headerActionButtonClass} ${premiumInteractiveClass}`}>
               <Plus size={16} />
               Nova API
             </button>
@@ -5644,7 +5650,7 @@ export default function AdminProjetoDetalhePage() {
               <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Cable size={18} className="text-violet-200" />Fontes de produto do projeto</h3>
               <p className="mt-1 text-sm text-slate-400">Cadastre fontes de produto por agente. O primeiro tipo disponivel e o `mercado_livre`.</p>
             </div>
-            <button type="button" onClick={openNewConnectorModal} className={`inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white ${premiumInteractiveClass}`}>
+            <button type="button" onClick={openNewConnectorModal} className={`${headerActionButtonClass} ${premiumInteractiveClass}`}>
               <Plus size={16} />
               Nova fonte
             </button>
@@ -5876,7 +5882,7 @@ export default function AdminProjetoDetalhePage() {
                       <button
                         type="button"
                         onClick={openNewWhatsAppChannelModal}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+                        className={headerActionButtonClass}
                       >
                         <Plus size={16} />
                         Novo canal oficial
@@ -6005,7 +6011,7 @@ export default function AdminProjetoDetalhePage() {
               <button
                 type="button"
                 onClick={openNewWidgetModal}
-                className="inline-flex w-full items-center justify-center gap-2 self-start rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 px-4 py-3 font-semibold text-slate-950 lg:w-auto lg:shrink-0"
+                className={`${headerActionButtonClass} w-full self-start lg:w-auto lg:shrink-0`}
               >
                 <Plus size={16} />
                 Novo canal WhatsApp
@@ -6194,7 +6200,7 @@ export default function AdminProjetoDetalhePage() {
                 <button
                   type="button"
                   onClick={openNewWidgetModal}
-                  className={`inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white ${premiumInteractiveClass}`}
+                  className={`${headerActionButtonClass} ${premiumInteractiveClass}`}
                 >
                   <Plus size={16} />
                   Criar widget do site
