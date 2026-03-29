@@ -5582,8 +5582,8 @@ export default function AdminProjetoDetalhePage() {
                         disabled={runningAgentDiagnosticId === agente.id}
                         className={primaryActionButtonClass}
                       >
-                        <TestTube2 size={14} />
-                        {runningAgentDiagnosticId === agente.id ? "Validando..." : "Validar"}
+                        {runningAgentDiagnosticId === agente.id ? <BusyIcon /> : <TestTube2 size={14} />}
+                        Validar
                       </button>
                       <button
                         type="button"
@@ -5631,8 +5631,8 @@ export default function AdminProjetoDetalhePage() {
           <div className="space-y-3 p-4">
             {data.apis.length ? (
               data.apis.map((api) => (
-                <div key={api.id} className={`rounded-xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
-                  <div className="flex items-start justify-between gap-4">
+                    <div key={api.id} className={`rounded-xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-3">
                         <h4 className="text-base font-bold text-white">{api.nome}</h4>
@@ -5671,8 +5671,8 @@ export default function AdminProjetoDetalhePage() {
                         </p>
                       ) : null}
                     </div>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => handleEditApi(api)} className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${editButtonClass}`}>
+                      <div className="flex flex-col gap-2 sm:flex-row md:flex-col">
+                      <button type="button" onClick={() => handleEditApi(api)} className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${editButtonClass}`}>
                         <Pencil size={14} />
                         Editar
                       </button>
@@ -5711,7 +5711,7 @@ export default function AdminProjetoDetalhePage() {
                   const agente = connector.agenteId ? data.agentes.find((item) => item.id === connector.agenteId) ?? null : null;
                   return (
                     <div key={connector.id} className={`rounded-xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
-                      <div className="flex items-start justify-between gap-4">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-3">
                             <h4 className="text-base font-bold text-white">{connector.nome}</h4>
@@ -5728,7 +5728,7 @@ export default function AdminProjetoDetalhePage() {
                           </p>
                           <p className="mt-1 truncate text-xs text-cyan-200/80">{connector.endpointBase}</p>
                         </div>
-                        <div className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-2 sm:flex-row md:flex-col md:items-stretch">
                           <button type="button" onClick={() => handleEditConnector(connector)} className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${editButtonClass}`}>
                             <Pencil size={14} />
                             Editar
@@ -5803,7 +5803,8 @@ export default function AdminProjetoDetalhePage() {
                           disabled={connectingWhatsAppChannelId === channel.id}
                           className={successActionButtonClass}
                         >
-                          {connectingWhatsAppChannelId === channel.id ? "Conectando..." : isConnected ? "Reconectar WhatsApp" : "Conectar e gerar QR"}
+                          {connectingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
+                          {isConnected ? "Reconectar" : "Conectar"}
                         </button>
                         <button
                           type="button"
@@ -5811,7 +5812,8 @@ export default function AdminProjetoDetalhePage() {
                           disabled={disconnectingWhatsAppChannelId === channel.id}
                           className={dangerActionButtonClass}
                         >
-                          {disconnectingWhatsAppChannelId === channel.id ? "Desconectando..." : "Desconectar"}
+                          {disconnectingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
+                          Desconectar
                         </button>
                         <button
                           type="button"
@@ -5819,7 +5821,7 @@ export default function AdminProjetoDetalhePage() {
                           className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold ${editButtonClass}`}
                         >
                           <Pencil size={15} />
-                          Editar numero
+                          Editar
                         </button>
                         <button
                           type="button"
@@ -5827,7 +5829,8 @@ export default function AdminProjetoDetalhePage() {
                           disabled={deletingWhatsAppChannelId === channel.id}
                           className={dangerActionButtonClass}
                         >
-                          {deletingWhatsAppChannelId === channel.id ? "Removendo..." : "Remover completamente"}
+                          {deletingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
+                          Remover
                         </button>
                         <button
                           type="button"
