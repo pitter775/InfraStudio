@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { canAccessWorkspace, isAdminUser } from "@/lib/access";
+import { canAccessGlobalAdmin, canAccessWorkspace } from "@/lib/access";
 import { getSessionUser } from "@/lib/session";
 
 export default async function AdminIndexPage() {
@@ -8,5 +8,5 @@ export default async function AdminIndexPage() {
     redirect("/");
   }
 
-  redirect(!isAdminUser(user) ? "/admin/projetos" : "/admin/dashboard");
+  redirect(canAccessGlobalAdmin(user) ? "/admin/dashboard" : "/admin/projetos");
 }

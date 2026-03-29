@@ -50,6 +50,10 @@ export function canAccessAdmin(user: AppUser | null) {
   return Boolean(user?.isMaster || user?.memberships?.length);
 }
 
+export function canAccessGlobalAdmin(user: AppUser | null) {
+  return Boolean(user?.isMaster);
+}
+
 export function canAccessWorkspace(user: AppUser | null) {
   return Boolean(user);
 }
@@ -64,6 +68,10 @@ export function isAdminUser(user: AppUser | null) {
   }
 
   return Boolean(user.memberships?.some((membership) => membership.papel === "admin"));
+}
+
+export function isGlobalAdminUser(user: AppUser | null) {
+  return Boolean(user?.isMaster);
 }
 
 export function getUserProjectIds(user: AppUser | null) {

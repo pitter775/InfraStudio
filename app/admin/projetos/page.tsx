@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BriefcaseBusiness, Lock, Plus, Shield } from "lucide-react";
+import { BriefcaseBusiness, Cable, Lock, MessageSquareText, Plus, Shield, Bot } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -10,8 +10,17 @@ import type { AppUser } from "@/lib/app-user";
 type Projeto = {
   id: string;
   nome: string;
+  slug?: string | null;
+  tipo?: string | null;
   descricao: string;
   status: string;
+  stats: {
+    totalAgentes: number;
+    agentesAtivos: number;
+    totalConectores: number;
+    conectoresAtivos: number;
+    totalChats: number;
+  };
 };
 
 type ProjetoFormState = {
@@ -79,7 +88,21 @@ export default function AdminProjetosPage() {
       return;
     }
 
-    setProjetos((current) => [...current, payload.projeto!].sort((left, right) => left.nome.localeCompare(right.nome, "pt-BR")));
+    setProjetos((current) =>
+      [
+        ...current,
+        {
+          ...payload.projeto!,
+          stats: payload.projeto?.stats ?? {
+            totalAgentes: 0,
+            agentesAtivos: 0,
+            totalConectores: 0,
+            conectoresAtivos: 0,
+            totalChats: 0,
+          },
+        },
+      ].sort((left, right) => left.nome.localeCompare(right.nome, "pt-BR")),
+    );
     setForm(emptyProjetoForm);
     setModalOpen(false);
     setSaving(false);
@@ -151,29 +174,86 @@ export default function AdminProjetosPage() {
 
       {feedback ? <section className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</section> : null}
 
+      {!loading && projetos.length ? (
+        <section className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Projetos</p>
+            <p className="mt-2 text-3xl font-extrabold text-white">{projetos.length}</p>
+            <p className="mt-2 text-sm text-slate-400">Workspaces disponiveis para abrir e operar.</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Agentes</p>
+            <p className="mt-2 text-3xl font-extrabold text-white">{projetos.reduce((sum, projeto) => sum + projeto.stats.totalAgentes, 0)}</p>
+            <p className="mt-2 text-sm text-slate-400">Total consolidado de agentes em todos os projetos visiveis.</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Chats</p>
+            <p className="mt-2 text-3xl font-extrabold text-white">{projetos.reduce((sum, projeto) => sum + projeto.stats.totalChats, 0)}</p>
+            <p className="mt-2 text-sm text-slate-400">Conversas acumuladas nos projetos vinculados.</p>
+          </div>
+        </section>
+      ) : null}
+
       <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
         <div className="border-b border-white/10 px-6 py-5">
           <h2 className="text-xl font-bold text-white">Projetos vinculados</h2>
         </div>
-        <div className="space-y-4 p-6">
+        <div className="p-6">
           {loading ? <div className="rounded-xl border border-white/10 bg-slate-950/30 p-5 text-sm text-slate-400">Carregando projetos...</div> : null}
           {!loading && !projetos.length ? <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/30 p-5 text-sm text-slate-400">Nenhum projeto vinculado ainda.</div> : null}
-          {projetos.map((projeto) => (
-            <div key={projeto.id} className="rounded-2xl border border-white/10 bg-slate-950/30 p-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h3 className="text-lg font-bold text-white">{projeto.nome}</h3>
-                    <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-200">{projeto.status}</span>
+          {projetos.length ? (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {projetos.map((projeto) => (
+                <div key={projeto.id} className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.88),rgba(2,6,23,0.94))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                  <div className="flex flex-col gap-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h3 className="text-xl font-bold text-white">{projeto.nome}</h3>
+                          <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-200">{projeto.status}</span>
+                          {projeto.tipo ? (
+                            <span className="rounded-full bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-300">{projeto.tipo}</span>
+                          ) : null}
+                        </div>
+                        <p className="mt-3 text-sm leading-relaxed text-slate-400">{projeto.descricao || "Sem descricao."}</p>
+                        {projeto.slug ? <p className="mt-3 text-xs uppercase tracking-[0.14em] text-slate-500">slug: {projeto.slug}</p> : null}
+                      </div>
+                      <Link href={`/admin/projetos/${projeto.id}`} className="inline-flex items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-100">
+                        Abrir projeto
+                      </Link>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
+                        <div className="flex items-center gap-2 text-cyan-100">
+                          <Bot size={16} />
+                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Agentes</p>
+                        </div>
+                        <p className="mt-3 text-2xl font-extrabold text-white">{projeto.stats.totalAgentes}</p>
+                        <p className="mt-1 text-xs text-slate-400">{projeto.stats.agentesAtivos} ativos</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
+                        <div className="flex items-center gap-2 text-violet-100">
+                          <Cable size={16} />
+                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Conectores</p>
+                        </div>
+                        <p className="mt-3 text-2xl font-extrabold text-white">{projeto.stats.totalConectores}</p>
+                        <p className="mt-1 text-xs text-slate-400">{projeto.stats.conectoresAtivos} ativos</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
+                        <div className="flex items-center gap-2 text-emerald-100">
+                          <MessageSquareText size={16} />
+                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Chats</p>
+                        </div>
+                        <p className="mt-3 text-2xl font-extrabold text-white">{projeto.stats.totalChats}</p>
+                        <p className="mt-1 text-xs text-slate-400">historico do projeto</p>
+                      </div>
+                    </div>
                   </div>
-                  <p className="mt-3 text-sm leading-relaxed text-slate-400">{projeto.descricao || "Sem descricao."}</p>
                 </div>
-                <Link href={`/admin/projetos/${projeto.id}`} className="inline-flex items-center rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-100">
-                  Abrir projeto
-                </Link>
-              </div>
+              ))}
             </div>
-          ))}
+          ) : null}
         </div>
       </section>
 

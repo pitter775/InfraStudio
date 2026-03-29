@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getCurrentProjectUser } from "@/lib/auth";
+import { canAccessGlobalAdmin } from "@/lib/access";
 
 type ChatLog = {
   id: string;
@@ -26,11 +29,18 @@ function readPayloadObject(payload: Record<string, unknown> | null, key: string)
 }
 
 export default function AdminChatLogsPage() {
+  const router = useRouter();
   const [logs, setLogs] = useState<ChatLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
+      const currentUser = await getCurrentProjectUser();
+      if (!canAccessGlobalAdmin(currentUser)) {
+        router.replace("/admin/projetos");
+        return;
+      }
+
       const response = await fetch("/api/admin/chat-logs", { cache: "no-store" });
       const payload = (await response.json()) as { logs?: ChatLog[] };
       setLogs(payload.logs ?? []);
@@ -38,7 +48,7 @@ export default function AdminChatLogsPage() {
     };
 
     void load();
-  }, []);
+  }, [router]);
 
   return (
     <main className="space-y-5">

@@ -14,6 +14,16 @@ export type ProjetoRecord = {
   siteChatAtivo: boolean;
 };
 
+export type ProjetoOverviewRecord = ProjetoRecord & {
+  stats: {
+    totalAgentes: number;
+    agentesAtivos: number;
+    totalConectores: number;
+    conectoresAtivos: number;
+    totalChats: number;
+  };
+};
+
 type ProjetoRow = {
   id: string;
   nome: string | null;
@@ -53,6 +63,47 @@ export async function listProjetos() {
   return data.map((row) => mapProjeto(row as ProjetoRow));
 }
 
+async function attachProjetoStats(projetos: ProjetoRecord[]) {
+  if (!projetos.length) {
+    return [] as ProjetoOverviewRecord[];
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const projetoIds = projetos.map((projeto) => projeto.id);
+
+  const [agentesResponse, conectoresResponse, chatsResponse] = await Promise.all([
+    supabase.from("agentes").select("projeto_id, ativo").in("projeto_id", projetoIds),
+    supabase.from("conectores").select("projeto_id, ativo").in("projeto_id", projetoIds),
+    supabase.from("chats").select("projeto_id").in("projeto_id", projetoIds),
+  ]);
+
+  const agentesRows = (agentesResponse.data ?? []) as Array<{ projeto_id: string | null; ativo: boolean | null }>;
+  const conectoresRows = (conectoresResponse.data ?? []) as Array<{ projeto_id: string | null; ativo: boolean | null }>;
+  const chatsRows = (chatsResponse.data ?? []) as Array<{ projeto_id: string | null }>;
+
+  return projetos.map<ProjetoOverviewRecord>((projeto) => {
+    const agentes = agentesRows.filter((item) => item.projeto_id === projeto.id);
+    const conectores = conectoresRows.filter((item) => item.projeto_id === projeto.id);
+    const chats = chatsRows.filter((item) => item.projeto_id === projeto.id);
+
+    return {
+      ...projeto,
+      stats: {
+        totalAgentes: agentes.length,
+        agentesAtivos: agentes.filter((item) => item.ativo !== false).length,
+        totalConectores: conectores.length,
+        conectoresAtivos: conectores.filter((item) => item.ativo !== false).length,
+        totalChats: chats.length,
+      },
+    };
+  });
+}
+
+export async function listProjetosWithStats() {
+  const projetos = await listProjetos();
+  return attachProjetoStats(projetos);
+}
+
 export async function listProjetosByUsuario(usuarioId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
@@ -76,6 +127,11 @@ export async function listProjetosByUsuario(usuarioId: string) {
     .filter((item): item is ProjetoRecord => Boolean(item));
 
   return projetos.sort((left, right) => left.nome.localeCompare(right.nome, "pt-BR"));
+}
+
+export async function listProjetosByUsuarioWithStats(usuarioId: string) {
+  const projetos = await listProjetosByUsuario(usuarioId);
+  return attachProjetoStats(projetos);
 }
 
 export async function getProjetoBySlug(slug: string) {

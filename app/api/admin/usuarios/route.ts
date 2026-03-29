@@ -1,28 +1,24 @@
 import { NextResponse } from "next/server";
-import { canAccessAdmin, resolveCurrentProjectId } from "@/lib/access";
+import { canAccessGlobalAdmin } from "@/lib/access";
 import { getSessionUser } from "@/lib/session";
-import { createUsuario, listUsuarios, listUsuariosByProjeto, updateUsuario } from "@/lib/usuarios";
+import { createUsuario, listUsuarios, updateUsuario } from "@/lib/usuarios";
 
 export async function GET() {
   const user = await getSessionUser();
 
-  if (!canAccessAdmin(user)) {
+  if (!canAccessGlobalAdmin(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
-  const usuarios = user?.isMaster ? await listUsuarios() : await listUsuariosByProjeto(resolveCurrentProjectId(user) ?? "");
+  const usuarios = await listUsuarios();
   return NextResponse.json({ users: usuarios }, { status: 200 });
 }
 
 export async function POST(request: Request) {
   const user = await getSessionUser();
 
-  if (!canAccessAdmin(user)) {
+  if (!canAccessGlobalAdmin(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
-  }
-
-  if (!user?.isMaster) {
-    return NextResponse.json({ error: "Apenas o master pode criar usuarios no momento." }, { status: 403 });
   }
 
   const body = (await request.json()) as {
@@ -48,7 +44,7 @@ export async function POST(request: Request) {
     senha: body.senha,
     ativo: body.ativo,
     papel: body.papel,
-    projetoId: body.projetoId ?? resolveCurrentProjectId(user),
+    projetoId: body.projetoId,
   });
 
   if (!created) {
@@ -61,12 +57,8 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const user = await getSessionUser();
 
-  if (!canAccessAdmin(user)) {
+  if (!canAccessGlobalAdmin(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
-  }
-
-  if (!user?.isMaster) {
-    return NextResponse.json({ error: "Apenas o master pode editar usuarios no momento." }, { status: 403 });
   }
 
   const body = (await request.json()) as {
@@ -94,7 +86,7 @@ export async function PUT(request: Request) {
     senha: body.senha,
     ativo: body.ativo,
     papel: body.papel,
-    projetoId: body.projetoId ?? resolveCurrentProjectId(user),
+    projetoId: body.projetoId,
   });
 
   if (!updated) {

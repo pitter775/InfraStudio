@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { canAccessAdmin } from "@/lib/access";
+import { canAccessGlobalAdmin } from "@/lib/access";
 import { getTokenUsageOverview } from "@/lib/ia-usage";
 import { getSessionUser } from "@/lib/session";
 
 export async function GET() {
   const user = await getSessionUser();
 
-  if (!user || !canAccessAdmin(user)) {
+  if (!user || !canAccessGlobalAdmin(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 

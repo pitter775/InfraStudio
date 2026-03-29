@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canAccessAdmin } from "@/lib/access";
+import { canAccessGlobalAdmin } from "@/lib/access";
 import { getSessionUser } from "@/lib/session";
 import { deleteUsuario, setUsuarioAtivo } from "@/lib/usuarios";
 
@@ -12,7 +12,7 @@ type RouteContext = {
 export async function PATCH(request: Request, context: RouteContext) {
   const user = await getSessionUser();
 
-  if (!canAccessAdmin(user)) {
+  if (!canAccessGlobalAdmin(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
@@ -35,7 +35,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   const user = await getSessionUser();
 
-  if (!canAccessAdmin(user)) {
+  if (!canAccessGlobalAdmin(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 

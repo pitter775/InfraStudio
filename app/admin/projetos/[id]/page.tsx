@@ -1423,6 +1423,105 @@ function FormLabel({ children }: { children: string }) {
   return <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{children}</label>;
 }
 
+function DeleteProjectModal({
+  open,
+  projectName,
+  confirmationValue,
+  saving,
+  onChangeConfirmation,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  projectName: string;
+  confirmationValue: string;
+  saving: boolean;
+  onChangeConfirmation: (value: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  const confirmationMatches = confirmationValue.trim() === projectName.trim();
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/82 px-4 py-6 backdrop-blur-md">
+      <div className="w-full max-w-2xl rounded-[28px] border border-rose-400/18 bg-[#07111f] shadow-[0_30px_80px_rgba(2,6,23,0.75)]">
+        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-6 py-5">
+          <div className="min-w-0">
+            <div className="inline-flex items-center gap-2 rounded-full border border-rose-400/20 bg-rose-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-rose-100">
+              <Trash2 size={13} />
+              Exclusao permanente
+            </div>
+            <h2 className="mt-3 text-2xl font-extrabold text-white">Remover projeto e todos os dados relacionados</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              Esta acao apaga o projeto <span className="font-semibold text-white">{projectName}</span> de forma permanente.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-60"
+            aria-label="Fechar modal"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-5 px-6 py-5">
+          <div className="rounded-2xl border border-rose-400/18 bg-rose-500/10 p-4">
+            <p className="text-sm font-semibold text-rose-50">Tudo abaixo sera removido junto com o projeto:</p>
+            <p className="mt-2 text-sm leading-6 text-rose-100/90">
+              agentes, APIs, conectores, widgets, canais WhatsApp, chats, logs, configuracoes e vinculos relacionados.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Confirmacao obrigatoria</p>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              Para continuar, digite exatamente o nome do projeto:
+              <span className="ml-2 font-semibold text-white">{projectName}</span>
+            </p>
+            <input
+              value={confirmationValue}
+              onChange={(event) => onChangeConfirmation(event.target.value)}
+              placeholder={projectName}
+              disabled={saving}
+              className="mt-4 w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-rose-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+            {!confirmationMatches && confirmationValue.trim() ? (
+              <p className="mt-2 text-xs text-amber-200">O nome digitado precisa ser exatamente igual ao nome do projeto.</p>
+            ) : null}
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-60"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={saving || !confirmationMatches}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-500/12 px-4 py-3 text-sm font-semibold text-rose-50 transition-colors hover:bg-rose-500/18 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 size={15} />
+              {saving ? "Removendo projeto..." : "Remover projeto permanentemente"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AgenteAssetPreview({
   file,
   categoria,
@@ -3157,6 +3256,8 @@ export default function AdminProjetoDetalhePage() {
   const [deletingWidgetId, setDeletingWidgetId] = useState<string | null>(null);
   const [deletingWhatsAppChannelId, setDeletingWhatsAppChannelId] = useState<string | null>(null);
   const [deletingProject, setDeletingProject] = useState(false);
+  const [deleteProjectModalOpen, setDeleteProjectModalOpen] = useState(false);
+  const [deleteProjectConfirmation, setDeleteProjectConfirmation] = useState("");
   const [testingApi, setTestingApi] = useState(false);
   const [feedbackAgente, setFeedbackAgente] = useState<string | null>(null);
   const [feedbackApi, setFeedbackApi] = useState<string | null>(null);
@@ -4597,10 +4698,8 @@ export default function AdminProjetoDetalhePage() {
 
   const handleDeleteProject = async () => {
     const projectName = data?.projeto.nome ?? "este projeto";
-    const confirmed = window.confirm(
-      `Remover completamente o projeto "${projectName}"?\n\nIsso apaga agentes, APIs, conectores, widgets, WhatsApp, chats, logs e vinculos do projeto.`,
-    );
-    if (!confirmed) {
+    if (deleteProjectConfirmation.trim() !== projectName.trim()) {
+      setFeedbackWhatsApp("Digite o nome exato do projeto para confirmar a exclusao.");
       return;
     }
 
@@ -4618,6 +4717,8 @@ export default function AdminProjetoDetalhePage() {
         return;
       }
 
+      setDeleteProjectModalOpen(false);
+      setDeleteProjectConfirmation("");
       router.push("/admin/projetos");
     } finally {
       setDeletingProject(false);
@@ -4879,7 +4980,10 @@ export default function AdminProjetoDetalhePage() {
 
               <button
                 type="button"
-                onClick={() => void handleDeleteProject()}
+                onClick={() => {
+                  setDeleteProjectConfirmation("");
+                  setDeleteProjectModalOpen(true);
+                }}
                 disabled={deletingProject}
                 className="inline-flex items-center justify-center gap-2 self-start rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-50 shadow-[0_10px_30px_rgba(244,63,94,0.12)] transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:opacity-60"
               >
@@ -4888,7 +4992,7 @@ export default function AdminProjetoDetalhePage() {
               </button>
             </div>
 
-            <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-6">
+            <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-6">
               {overviewStats.map((item) => {
                 const Icon = item.icon;
 
@@ -6322,6 +6426,21 @@ export default function AdminProjetoDetalhePage() {
           setChatHistoryError(null);
           setChatDetail(null);
         }}
+      />
+      <DeleteProjectModal
+        open={deleteProjectModalOpen}
+        projectName={data.projeto.nome}
+        confirmationValue={deleteProjectConfirmation}
+        saving={deletingProject}
+        onChangeConfirmation={setDeleteProjectConfirmation}
+        onClose={() => {
+          if (deletingProject) {
+            return;
+          }
+          setDeleteProjectModalOpen(false);
+          setDeleteProjectConfirmation("");
+        }}
+        onConfirm={() => void handleDeleteProject()}
       />
     </main>
   );

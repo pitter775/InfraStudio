@@ -16,7 +16,7 @@ import {
 import { listProjectUsers } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
 import { getCurrentProjectUser } from "@/lib/auth";
-import { isAdminUser } from "@/lib/access";
+import { canAccessGlobalAdmin } from "@/lib/access";
 
 type Projeto = {
   id: string;
@@ -259,7 +259,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const loadDashboard = async () => {
       const currentUser = await getCurrentProjectUser();
-      if (currentUser && !isAdminUser(currentUser)) {
+      if (!canAccessGlobalAdmin(currentUser)) {
         router.replace("/admin/projetos");
         return;
       }

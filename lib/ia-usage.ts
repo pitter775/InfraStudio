@@ -3,7 +3,7 @@ import "server-only";
 import { estimateOpenAICostUsd, getDefaultOpenAIModel } from "@/lib/openai-pricing";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { AppUser } from "@/lib/app-user";
-import { isAdminUser } from "@/lib/access";
+import { isGlobalAdminUser } from "@/lib/access";
 
 type ChatUsageRow = {
   id: string;
@@ -206,7 +206,7 @@ function sumTokenUsage(items: Array<{ tokensInput: number; tokensOutput: number;
 
 export async function getTokenUsageOverview(user: AppUser): Promise<TokenUsageOverview> {
   const supabase = getSupabaseAdminClient();
-  const admin = isAdminUser(user);
+  const admin = isGlobalAdminUser(user);
   let query = supabase
     .from("consumos")
     .select("usuario_id, projeto_id, tokens_input, tokens_output, custo_total");

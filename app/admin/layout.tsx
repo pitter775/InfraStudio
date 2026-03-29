@@ -19,9 +19,10 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { FooterSection } from "@/app/_components/home/sections";
 import { getCurrentProjectUser, signOutProjectAuth } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
-import { canAccessWorkspace, isAdminUser } from "@/lib/access";
+import { canAccessGlobalAdmin, canAccessWorkspace } from "@/lib/access";
 import { cn } from "@/lib/utils";
 
 const adminLinks = [
@@ -60,7 +61,7 @@ function Sidebar({
   onLinkStart,
   onLogout,
 }: SidebarProps) {
-  const visibleLinks = currentUser && !isAdminUser(currentUser)
+  const visibleLinks = currentUser && !canAccessGlobalAdmin(currentUser)
     ? adminLinks.filter((item) => item.href === "/admin/projetos" || item.href === "/admin/me")
     : adminLinks;
 
@@ -280,7 +281,9 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
               Menu
             </button>
             <div className="flex items-center gap-3">
-              <p className="text-sm font-semibold text-slate-300">Painel admin</p>
+              <p className="text-sm font-semibold text-slate-300">
+                {canAccessGlobalAdmin(currentUser) ? "Painel admin" : "Ambiente do projeto"}
+              </p>
               <Link
                 href="/"
                 className="infra-premium-panel inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-white"
@@ -292,7 +295,10 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
           </div>
         </div>
 
-         <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">{children}</div>
+         <div className="flex min-h-screen flex-col">
+          <div className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</div>
+          <FooterSection />
+         </div>
       </div>
     </div>
   );

@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { BriefcaseBusiness, Coins, FolderKanban, UserRound, Users } from "lucide-react";
+import { getCurrentProjectUser } from "@/lib/auth";
+import { canAccessGlobalAdmin } from "@/lib/access";
 
 type UsageGroup = {
   id: string;
@@ -61,6 +64,7 @@ function formatCurrency(value: number) {
 }
 
 export default function AdminUsagePage() {
+  const router = useRouter();
   const [overview, setOverview] = useState<UsageOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedUsuarioId, setSelectedUsuarioId] = useState<string | null>(null);
@@ -68,6 +72,12 @@ export default function AdminUsagePage() {
 
   useEffect(() => {
     const load = async () => {
+      const currentUser = await getCurrentProjectUser();
+      if (!canAccessGlobalAdmin(currentUser)) {
+        router.replace("/admin/projetos");
+        return;
+      }
+
       const response = await fetch("/api/admin/ia-usage", { cache: "no-store" });
       const payload = (await response.json()) as { overview?: UsageOverview };
       setOverview(payload.overview ?? null);
@@ -76,7 +86,7 @@ export default function AdminUsagePage() {
     };
 
     void load();
-  }, []);
+  }, [router]);
 
   const projetosDoUsuario = useMemo<UserProjectView[]>(() => {
     if (!overview) {

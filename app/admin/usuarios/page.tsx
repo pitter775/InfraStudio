@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BadgeCheck, Lock, Pencil, Plus, Shield, Trash2, UserRound, Users } from "lucide-react";
-import { canAccessAdmin } from "@/lib/access";
+import { canAccessGlobalAdmin } from "@/lib/access";
 import { getCurrentProjectUser, listProjectUsers } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
 
@@ -41,12 +41,18 @@ export default function AdminUsuariosPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      const [user, projectUsers, projectsPayload] = await Promise.all([
-        getCurrentProjectUser(),
+      const user = await getCurrentProjectUser();
+      setCurrentUser(user);
+
+      if (!canAccessGlobalAdmin(user)) {
+        return;
+      }
+
+      const [projectUsers, projectsPayload] = await Promise.all([
         listProjectUsers(),
         fetch("/api/admin/projetos", { cache: "no-store" }).then((response) => response.json()),
       ]);
-      setCurrentUser(user);
+
       setUsers(projectUsers);
       setProjects((projectsPayload.projetos ?? []).map((project: { id: string; nome: string }) => ({ id: project.id, nome: project.nome })));
     };
@@ -54,7 +60,7 @@ export default function AdminUsuariosPage() {
     void loadData();
   }, []);
 
-  const isAllowed = canAccessAdmin(currentUser);
+  const isAllowed = canAccessGlobalAdmin(currentUser);
 
   const refreshUsers = async () => {
     setUsers(await listProjectUsers());
