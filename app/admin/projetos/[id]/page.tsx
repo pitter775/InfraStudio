@@ -5446,8 +5446,8 @@ export default function AdminProjetoDetalhePage() {
           })}
         </section>
 
-        <section className={`${activeTab === "agentes" ? "block" : "hidden"} ${premiumTransitionClass} overflow-hidden rounded-2xl border border-white/10 bg-white/5`}>
-          <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+        <section className={`${activeTab === "agentes" ? "block" : "hidden"} ${premiumTransitionClass}`}>
+          <div className="flex flex-col gap-4 px-2 py-2 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Bot size={18} className="text-cyan-200" />Agentes do projeto</h3>
               <p className="mt-1 text-sm text-slate-400">O agente ativo atende este projeto e pode consumir as APIs marcadas.</p>
@@ -5461,7 +5461,7 @@ export default function AdminProjetoDetalhePage() {
               Novo agente
             </button>
           </div>
-          <div className="p-4">
+          <div className="pt-2">
             {data.agentes.length ? (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {data.agentes.map((agente) => {
@@ -5609,8 +5609,8 @@ export default function AdminProjetoDetalhePage() {
           </div>
         </section>
 
-        <section className={`${activeTab === "apis" ? "block" : "hidden"} ${premiumTransitionClass} overflow-hidden rounded-2xl border border-white/10 bg-white/5`}>
-          <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+        <section className={`${activeTab === "apis" ? "block" : "hidden"} ${premiumTransitionClass}`}>
+          <div className="flex flex-col gap-4 px-2 py-2 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Activity size={18} className="text-sky-200" />APIs do projeto</h3>
               <p className="mt-1 text-sm text-slate-400">Gerencie as APIs externas, teste o retorno e controle os campos ativos.</p>
@@ -5620,7 +5620,7 @@ export default function AdminProjetoDetalhePage() {
               Nova API
             </button>
           </div>
-          <div className="space-y-3 p-4">
+          <div className="space-y-3 pt-2">
             {data.apis.length ? (
               data.apis.map((api) => (
                     <div key={api.id} className={`rounded-xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
@@ -5686,8 +5686,8 @@ export default function AdminProjetoDetalhePage() {
 
       <section className={`${activeTab === "whatsapp" ? "block" : "hidden"} ${premiumTransitionClass}`}>
         <div className="space-y-6">
-          <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-            <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+          <section>
+            <div className="flex flex-col gap-4 px-2 py-2 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Cable size={18} className="text-violet-200" />Integracoes do projeto</h3>
                 <p className="mt-1 text-sm text-slate-400">Gerencie aqui as integracoes do projeto e os canais que usam essas configuracoes.</p>
@@ -5697,7 +5697,7 @@ export default function AdminProjetoDetalhePage() {
                 Nova integracao
               </button>
             </div>
-            <div className="space-y-3 p-4">
+            <div className="space-y-3 pt-2">
               {data.conectores.length ? (
                 data.conectores.map((connector) => {
                   const agente = connector.agenteId ? data.agentes.find((item) => item.id === connector.agenteId) ?? null : null;
@@ -5745,7 +5745,7 @@ export default function AdminProjetoDetalhePage() {
             </div>
           </section>
           <section className="overflow-hidden rounded-2xl border border-cyan-500/20 bg-cyan-500/10">
-            <div className="border-b border-cyan-500/20 px-6 py-5">
+            <div className="px-6 py-5">
               <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Waypoints size={18} className="text-cyan-100" />WhatsApp do projeto</h3>
               <p className="mt-2 max-w-3xl text-sm text-cyan-50/80">Conecte, acompanhe e ajuste o numero principal que atende seus clientes.</p>
               {!process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL ? (
@@ -6045,8 +6045,8 @@ export default function AdminProjetoDetalhePage() {
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-            <div className="border-b border-white/10 px-6 py-5">
+          <section>
+            <div className="px-2 py-2">
               <h3 className="text-xl font-bold text-white">Canais configurados</h3>
               <p className="mt-1 text-sm text-slate-400">Cada widget pode virar um botao free de WhatsApp com copia pronta em JS.</p>
             </div>
@@ -6206,8 +6206,8 @@ export default function AdminProjetoDetalhePage() {
 
       <section className={`${activeTab === "chats" ? "block" : "hidden"} ${premiumTransitionClass}`}>
         <div className="grid gap-6">
-          <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-            <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+          <section>
+            <div className="flex flex-col gap-4 px-2 py-2 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><MessageSquareText size={18} className="text-rose-200" />Conversas do projeto</h3>
                 <p className="mt-1 text-sm text-slate-400">Historico recente dos chats do site e dos sistemas para auditoria, contexto e acompanhamento comercial.</p>
