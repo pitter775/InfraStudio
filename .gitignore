@@ -13,3 +13,4 @@ whatsapp-service/.wwebjs_cache/
 tsconfig.tsbuildinfo
 .env*
 !.env.example
+database/geral-schema.sql

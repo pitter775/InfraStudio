@@ -204,7 +204,7 @@ export default function AdminProjetosPage() {
           {projetos.length ? (
             <div className="grid gap-4 xl:grid-cols-2">
               {projetos.map((projeto) => (
-                <div key={projeto.id} className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.88),rgba(2,6,23,0.94))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                <div key={projeto.id} className="rounded-[24px] border border-white/10 p-5">
                   <div className="flex flex-col gap-5">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0 flex-1">

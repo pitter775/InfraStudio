@@ -12,6 +12,7 @@ type RouteContext = {
 
 export async function GET(_request: Request, context: RouteContext) {
   const user = await getSessionUser();
+  const requestUrl = new URL(_request.url);
 
   if (!canAccessAdmin(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
@@ -31,6 +32,7 @@ export async function GET(_request: Request, context: RouteContext) {
   try {
     const authorizationUrl = await buildMercadoLivreAuthorizationUrl({
       connector,
+      origin: requestUrl.origin,
     });
 
     return NextResponse.redirect(authorizationUrl);

@@ -83,8 +83,14 @@ function Sidebar({
           "lg:translate-x-0",
         )}
       >
-        <div className="flex items-center justify-between px-2">
-            <Link href="/" className="flex items-center gap-3 overflow-hidden px-2 py-2">
+        <div className={cn("px-2", collapsed ? "flex justify-center" : "flex items-center justify-between")}>
+            <Link
+              href="/"
+              className={cn(
+                "flex items-center gap-3 overflow-hidden px-2 py-2",
+                collapsed ? "pointer-events-none absolute opacity-0" : "",
+              )}
+            >
               <div className="flex h-11 w-11 shrink-0 items-center justify-center">
                 <img src="/logo.png" alt="InfraStudio" className="h-8 w-8 object-contain" />
               </div>
@@ -95,11 +101,14 @@ function Sidebar({
               ) : null}
             </Link>
 
-          <div className="flex items-center gap-2">
+          <div className={cn("flex items-center gap-2", collapsed ? "justify-center" : "")}>
             <button
               type="button"
               onClick={onCollapseToggle}
-                className="infra-premium-panel hidden rounded-xl p-2 text-slate-300 transition-colors hover:text-white lg:inline-flex"
+                className={cn(
+                  "infra-premium-panel hidden rounded-xl p-2 text-slate-300 transition-colors hover:text-white lg:inline-flex",
+                  collapsed ? "h-11 w-11 items-center justify-center" : "",
+                )}
               aria-label="Recolher menu"
             >
               {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}

@@ -5,7 +5,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
 
   try {
-    const { projetoId } = await completeMercadoLivreOAuthCallback(url.searchParams);
+    const { projetoId } = await completeMercadoLivreOAuthCallback(url.searchParams, url.origin);
     return NextResponse.redirect(new URL(`/admin/projetos/${projetoId}?mercado_livre_oauth=success`, url.origin));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Nao foi possivel concluir a conexao com o Mercado Livre.";

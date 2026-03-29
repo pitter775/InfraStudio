@@ -2674,6 +2674,8 @@ function ConnectorModal({
   onCopyTutorial: () => void;
   onSubmit: () => void;
 }) {
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+
   if (!open) {
     return null;
   }
@@ -2802,33 +2804,67 @@ function ConnectorModal({
             <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-white">Tutorial para o cliente da loja</p>
-                  <p className="mt-1 text-xs text-cyan-100/80">Use esse texto para pedir o APP ID e o CLIENT SECRET da conta do Mercado Livre.</p>
+                  <p className="text-sm font-semibold text-white">Cadastro guiado do app Mercado Livre</p>
+                  <p className="mt-1 text-xs text-cyan-100/80">Abra o mini tutorial para ver os links, campos e permissoes que o usuario precisa preencher.</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={onCopyTutorial}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
-                >
-                  {copiedTutorial ? <CheckCircle2 size={14} /> : <Copy size={14} />}
-                  {copiedTutorial ? "Copiado" : "Copiar tutorial"}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTutorialOpen((current) => !current)}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+                  >
+                    {tutorialOpen ? <Minimize2 size={14} /> : <Expand size={14} />}
+                    {tutorialOpen ? "Fechar tutorial" : "Mini tutorial"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onCopyTutorial}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+                  >
+                    {copiedTutorial ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                    {copiedTutorial ? "Copiado" : "Copiar tutorial"}
+                  </button>
+                </div>
               </div>
-              <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4 text-xs leading-6 text-slate-200">
+              {tutorialOpen ? <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4 text-xs leading-6 text-slate-200">
                 <p>Abre esse link:</p>
                 <p className="font-semibold text-white">https://developers.mercadolivre.com.br/apps</p>
                 <p className="mt-3">Clica em “Criar aplicação”</p>
                 <p className="mt-3">Preenche assim:</p>
                 <p>Nome: InfraStudio</p>
                 <p>Tipo: Web</p>
-                <p>URL de retorno:</p>
+                <p>URL de retorno OAuth:</p>
                 <p className="font-semibold text-white">https://infrastudio.vercel.app/api/admin/conectores/mercado-livre/callback</p>
+                <p className="mt-3">Callback URL Notifications / webhook:</p>
+                <p className="font-semibold text-white">https://infrastudio.vercel.app/api/mercado-livre/webhook</p>
                 <p className="mt-3">Depois de criar, vao aparecer 2 codigos na tela:</p>
                 <p>APP ID</p>
                 <p>CLIENT SECRET</p>
                 <p className="mt-3">Envie esses dois dados para configurar a integracao da loja.</p>
                 <p className="mt-3">Se aparecer botao de “autorizar” ou “permitir”, pode seguir normalmente.</p>
-              </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-3 text-emerald-50">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100">Obrigatorio agora</p>
+                    <p className="mt-2">Tipo do app: Web</p>
+                    <p>URL de retorno OAuth configurada</p>
+                    <p>APP ID</p>
+                    <p>CLIENT SECRET</p>
+                  </div>
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-3 text-amber-50">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-100">Links para cadastro</p>
+                    <p className="mt-2">OAuth callback:</p>
+                    <p className="font-semibold text-white">https://infrastudio.vercel.app/api/admin/conectores/mercado-livre/callback</p>
+                    <p className="mt-2">Webhook de notificacoes:</p>
+                    <p className="font-semibold text-white">https://infrastudio.vercel.app/api/mercado-livre/webhook</p>
+                  </div>
+                </div>
+                <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Permissoes e marcacoes</p>
+                  <p className="mt-2">Permita a autorizacao da conta quando o Mercado Livre pedir o consentimento.</p>
+                  <p>Se houver secao de notificacoes ou Callback URL Notifications, cole a URL de webhook acima.</p>
+                  <p>Para a integracao atual do InfraStudio, o essencial e concluir o OAuth e informar APP ID + CLIENT SECRET.</p>
+                </div>
+              </div> : null}
             </div>
             <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
               <input type="checkbox" checked={form.ativo} onChange={(event) => onChange({ ativo: event.target.checked })} />
@@ -5255,9 +5291,10 @@ export default function AdminProjetoDetalhePage() {
               Novo agente
             </button>
           </div>
-          <div className="space-y-3 p-4">
+          <div className="p-4">
             {data.agentes.length ? (
-              data.agentes.map((agente) => {
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {data.agentes.map((agente) => {
                 const linkedApis = getAgentLinkedApis(agente);
                 const inactiveApis = getAgentInactiveApis(agente);
                 const requiredParameters = getAgentRequiredParameters(agente);
@@ -5265,215 +5302,130 @@ export default function AdminProjetoDetalhePage() {
                 const latestDiagnostic = latestAgentDiagnosticById[agente.id];
 
                 return (
-                  <div key={agente.id} className={`rounded-xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-3">
-                          <h4 className="text-base font-bold text-white">{agente.nome}</h4>
-                          <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${agente.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
+                  <article key={agente.id} className={`flex h-full flex-col rounded-2xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="truncate text-base font-bold text-white">{agente.nome}</h4>
+                          <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${agente.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
                             {agente.ativo ? "ativo" : "inativo"}
                           </span>
-                          {agente.ativo ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-blue-200">
-                              <CheckCircle2 size={12} />
-                              em uso
+                        </div>
+                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descrição."}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">APIs</p>
+                        <p className="mt-1 text-lg font-black text-white">{linkedApis.length}</p>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Contexto</p>
+                        <p className="mt-1 text-lg font-black text-white">{requiredParameters.length}</p>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Inativas</p>
+                        <p className="mt-1 text-lg font-black text-white">{inactiveApis.length}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 space-y-2 text-xs text-slate-300">
+                      <p className="line-clamp-2">
+                        APIs: <span className="text-cyan-200/85">{linkedApis.length ? linkedApis.map((api) => api.nome).join(", ") : "nenhuma"}</span>
+                      </p>
+                      {requiredParameters.length ? (
+                        <p className="line-clamp-2 text-cyan-100/80">
+                          Contexto obrigatório: {requiredParameters.map((parametro) => parametro.nome).join(", ")}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    {latestDiagnostic ? (
+                      <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${latestDiagnostic.ok ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-200"}`}>
+                            {latestDiagnostic.ok ? "validado" : "com alertas"}
+                          </span>
+                          {diagnostic ? (
+                            <span className="text-[10px] uppercase tracking-[0.16em] text-slate-500">
+                              {diagnostic.summary.activeConnectors}/{diagnostic.summary.connectors} conectores
                             </span>
                           ) : null}
                         </div>
-                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descricao."}</p>
-                        <p className="mt-3 text-xs text-cyan-200/80">APIs vinculadas: {linkedApis.length ? linkedApis.map((api) => api.nome).join(", ") : "nenhuma"}</p>
-                        {inactiveApis.length ? (
-                          <p className="mt-2 text-xs text-amber-200/80">APIs inativas ignoradas no runtime: {inactiveApis.map((api) => api.nome).join(", ")}</p>
-                        ) : null}
-                        {requiredParameters.length ? (
-                          <p className="mt-1 text-xs text-cyan-100/80">O chat precisa enviar no contexto: {requiredParameters.map((parametro) => parametro.nome).join(", ")}</p>
-                        ) : null}
-
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                          <p className="rounded-lg border border-white/8 bg-white/[0.03] px-2.5 py-2 text-slate-300">
+                            Chat: <span className={latestDiagnostic.checks.chat.ok ? "text-emerald-300" : "text-amber-200"}>{latestDiagnostic.checks.chat.detail}</span>
+                          </p>
+                          <p className="rounded-lg border border-white/8 bg-white/[0.03] px-2.5 py-2 text-slate-300">
+                            WhatsApp: <span className={latestDiagnostic.checks.whatsapp.ok ? "text-emerald-300" : "text-amber-200"}>{latestDiagnostic.checks.whatsapp.detail}</span>
+                          </p>
+                          <p className="rounded-lg border border-white/8 bg-white/[0.03] px-2.5 py-2 text-slate-300">
+                            Loja: <span className={latestDiagnostic.checks.connectors.ok ? "text-emerald-300" : "text-amber-200"}>{latestDiagnostic.checks.connectors.detail}</span>
+                          </p>
+                          <p className="rounded-lg border border-white/8 bg-white/[0.03] px-2.5 py-2 text-slate-300">
+                            Agente: <span className={latestDiagnostic.checks.agent.ok ? "text-emerald-300" : "text-amber-200"}>{latestDiagnostic.checks.agent.detail}</span>
+                          </p>
+                        </div>
                         {diagnostic ? (
-                          <div className="mt-4 grid gap-3 md:grid-cols-5">
-                            <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-3">
-                              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">APIs</p>
-                              <p className="mt-2 text-sm font-bold text-white">{diagnostic.summary.activeApis}/{diagnostic.summary.linkedApis}</p>
-                            </div>
-                            <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-3">
-                              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Widgets</p>
-                              <p className="mt-2 text-sm font-bold text-white">{diagnostic.summary.activeWidgets}/{diagnostic.summary.widgets}</p>
-                            </div>
-                            <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-3">
-                              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">WhatsApp</p>
-                              <p className="mt-2 text-sm font-bold text-white">{diagnostic.summary.onlineWhatsAppChannels}/{diagnostic.summary.whatsappChannels}</p>
-                            </div>
-                            <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-3">
-                              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Conectores</p>
-                              <p className="mt-2 text-sm font-bold text-white">{diagnostic.summary.activeConnectors}/{diagnostic.summary.connectors}</p>
-                            </div>
-                            <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-3">
-                              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Chats</p>
-                              <p className="mt-2 text-sm font-bold text-white">{diagnostic.summary.chats}</p>
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {diagnostic ? (
-                          <div className="mt-3 space-y-2">
-                            <p className="text-xs font-semibold text-slate-300">
+                          <div className="mt-3 space-y-2 text-xs text-slate-300">
+                            <p>
                               Conectado em:{" "}
-                              {[
-                                diagnostic.connections.widgets.length ? `${diagnostic.connections.widgets.length} widget(s) diretos` : null,
-                                diagnostic.connections.whatsappChannels.length ? `${diagnostic.connections.whatsappChannels.length} canal(is) WhatsApp` : null,
-                                diagnostic.connections.connectors.length ? `${diagnostic.connections.connectors.length} conector(es)` : null,
-                                diagnostic.connections.apis.length ? `${diagnostic.connections.apis.length} API(s)` : null,
-                              ]
-                                .filter(Boolean)
-                                .join(" | ") || "sem vinculos diretos"}
-                            </p>
-                            {diagnostic.summary.fallbackWidgets ? (
-                              <p className="text-xs text-amber-200/80">
-                                Widgets genericos do projeto: {diagnostic.summary.fallbackWidgets}. Eles podem atender sem ficar presos a este agente.
-                              </p>
-                            ) : null}
-                            {diagnostic.connections.whatsappChannels.length ? (
-                              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-3">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-200">WhatsApp ativo no agente</p>
-                                <div className="mt-2 space-y-1">
-                                  {diagnostic.connections.whatsappChannels.map((channel) => (
-                                    <p key={channel.id} className="text-sm font-semibold text-white">
-                                      {formatWhatsAppPhone(channel.numero)}{" "}
-                                      <span className={`text-xs font-medium ${channel.connectionStatus === "online" ? "text-emerald-200" : "text-amber-200"}`}>
-                                        {channel.status} | {channel.connectionStatus}
-                                      </span>
-                                    </p>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
-                            {diagnostic.connections.connectors.length ? (
-                              <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-3">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">Loja conectada ao agente</p>
-                                <div className="mt-2 space-y-1">
-                                  {diagnostic.connections.connectors.map((connector) => (
-                                    <p key={connector.id ?? connector.nome} className="text-sm font-semibold text-white">
-                                      {connector.nickname || connector.nome}
-                                      <span className="ml-2 text-xs font-medium text-cyan-100/80">
-                                        {connector.tipo}
-                                        {connector.sellerId ? ` | seller ${connector.sellerId}` : ""}
-                                      </span>
-                                    </p>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
-                            {diagnostic.warnings.map((warning) => (
-                              <p key={warning} className="text-xs text-amber-200/80">{warning}</p>
-                            ))}
-                          </div>
-                        ) : null}
-
-                        {latestDiagnostic ? (
-                          <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 p-3">
-                            <div className="flex items-center gap-2">
-                              <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${latestDiagnostic.ok ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-200"}`}>
-                                {latestDiagnostic.ok ? "validado" : "com alertas"}
+                              <span className="text-slate-200">
+                                {[
+                                  diagnostic.connections.widgets.length ? `${diagnostic.connections.widgets.length} widget(s)` : null,
+                                  diagnostic.connections.whatsappChannels.length ? `${diagnostic.connections.whatsappChannels.length} WhatsApp` : null,
+                                  diagnostic.connections.connectors.length ? `${diagnostic.connections.connectors.length} conector(es)` : null,
+                                  diagnostic.connections.apis.length ? `${diagnostic.connections.apis.length} API(s)` : null,
+                                ].filter(Boolean).join(" | ") || "sem vínculos diretos"}
                               </span>
-                              <p className="text-xs text-slate-300">Teste de loja, APIs, WhatsApp e chat do agente</p>
-                            </div>
-                            <div className="mt-3 grid gap-2 md:grid-cols-2">
-                              <p className="text-xs text-slate-300">Chat: <span className={latestDiagnostic.checks.chat.ok ? "text-emerald-300" : "text-amber-200"}>{latestDiagnostic.checks.chat.detail}</span></p>
-                              <p className="text-xs text-slate-300">WhatsApp: <span className={latestDiagnostic.checks.whatsapp.ok ? "text-emerald-300" : "text-amber-200"}>{latestDiagnostic.checks.whatsapp.detail}</span></p>
-                              <p className="text-xs text-slate-300">Conectores: <span className={latestDiagnostic.checks.connectors.ok ? "text-emerald-300" : "text-amber-200"}>{latestDiagnostic.checks.connectors.detail}</span></p>
-                              <p className="text-xs text-slate-300">Agente: <span className={latestDiagnostic.checks.agent.ok ? "text-emerald-300" : "text-amber-200"}>{latestDiagnostic.checks.agent.detail}</span></p>
-                            </div>
-                            {diagnostic?.connections.connectors.length ? (
-                              <div className="mt-3 space-y-1">
-                                {diagnostic.connections.connectors.map((connector) => (
-                                  <p key={connector.id ?? connector.nome} className="text-xs text-slate-300">
-                                    Conector {connector.nome}:{" "}
-                                    <span className={connector.ativo ? "text-emerald-300" : "text-slate-400"}>
-                                      {connector.tipo}
-                                      {connector.nickname ? ` | ${connector.nickname}` : ""}
-                                      {connector.sellerId ? ` | seller ${connector.sellerId}` : ""}
-                                    </span>
-                                  </p>
-                                ))}
-                              </div>
-                            ) : null}
-                            {diagnostic?.connections.whatsappChannels.length ? (
-                              <div className="mt-3 space-y-1">
-                                {diagnostic.connections.whatsappChannels.map((channel) => (
-                                  <p key={channel.id} className="text-xs text-slate-300">
-                                    Canal WhatsApp {formatWhatsAppPhone(channel.numero)}:{" "}
-                                    <span className={channel.connectionStatus === "online" ? "text-emerald-300" : "text-amber-200"}>
-                                      {channel.status} | {channel.connectionStatus}
-                                    </span>
-                                  </p>
-                                ))}
-                              </div>
-                            ) : null}
-                            {diagnostic?.connections.widgets.length ? (
-                              <div className="mt-3 space-y-1">
-                                {diagnostic.connections.widgets.map((widget) => (
-                                  <p key={widget.id ?? widget.slug} className="text-xs text-slate-300">
-                                    Widget {widget.nome}:{" "}
-                                    <span className={widget.ativo ? "text-emerald-300" : "text-slate-400"}>
-                                      slug {widget.slug}
-                                      {widget.dominio ? ` | ${widget.dominio}` : ""}
-                                    </span>
-                                  </p>
-                                ))}
-                              </div>
-                            ) : null}
-                            {latestDiagnostic.checks.apis.length ? (
-                              <div className="mt-3 space-y-1">
-                                {latestDiagnostic.checks.apis.map((apiCheck) => (
-                                  <p key={apiCheck.id} className="text-xs text-slate-300">
-                                    API {apiCheck.nome}:{" "}
-                                    <span className={apiCheck.ok ? "text-emerald-300" : apiCheck.status === "pendente_contexto" ? "text-cyan-200" : "text-amber-200"}>
-                                      {apiCheck.detail}
-                                    </span>
-                                  </p>
-                                ))}
+                            </p>
+                            {diagnostic.warnings.length ? (
+                              <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-amber-100/85">
+                                {diagnostic.warnings.join(" | ")}
                               </div>
                             ) : null}
                           </div>
                         ) : null}
+                      </div>
+                    ) : null}
 
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void handleRunAgentDiagnostic(agente)}
-                          disabled={runningAgentDiagnosticId === agente.id}
-                          className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-100 disabled:opacity-60"
-                        >
-                          <TestTube2 size={14} />
-                          {runningAgentDiagnosticId === agente.id ? "Validando..." : "Validar tudo"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenAgentStoreSearchModal(agente)}
-                          className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100 disabled:opacity-60"
-                        >
-                          <TestTube2 size={14} />
-                          Testar busca da loja
-                        </button>
-                        <button type="button" onClick={() => handleEditAgente(agente)} className={`inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 ${premiumInteractiveClass}`}>
-                          <Pencil size={14} />
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleDeleteAgente(agente)}
-                          disabled={deletingAgenteId === agente.id}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-100 disabled:opacity-60"
-                        >
-                          <Trash2 size={14} />
-                          {deletingAgenteId === agente.id ? "Removendo..." : "Remover completamente"}
-                        </button>
-                      </div>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleRunAgentDiagnostic(agente)}
+                        disabled={runningAgentDiagnosticId === agente.id}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2.5 text-sm font-semibold text-cyan-100 disabled:opacity-60"
+                      >
+                        <TestTube2 size={14} />
+                        {runningAgentDiagnosticId === agente.id ? "Validando..." : "Validar"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenAgentStoreSearchModal(agente)}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2.5 text-sm font-semibold text-emerald-100 disabled:opacity-60"
+                      >
+                        <TestTube2 size={14} />
+                        Testar loja
+                      </button>
+                      <button type="button" onClick={() => handleEditAgente(agente)} className={`inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-semibold text-slate-200 ${premiumInteractiveClass}`}>
+                        <Pencil size={14} />
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteAgente(agente)}
+                        disabled={deletingAgenteId === agente.id}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2.5 text-sm font-semibold text-rose-100 disabled:opacity-60"
+                      >
+                        <Trash2 size={14} />
+                        {deletingAgenteId === agente.id ? "Removendo..." : "Remover"}
+                      </button>
                     </div>
-                  </div>
+                  </article>
                 );
-              })
+              })}
+              </div>
             ) : (
               <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhum agente cadastrado para este projeto ainda.</div>
             )}
@@ -6381,8 +6333,16 @@ export default function AdminProjetoDetalhePage() {
               "Preenche assim:",
               "Nome: InfraStudio",
               "Tipo: Web",
-              "URL de retorno:",
+              "URL de retorno OAuth:",
               "https://infrastudio.vercel.app/api/admin/conectores/mercado-livre/callback",
+              "",
+              "Callback URL Notifications / webhook:",
+              "https://infrastudio.vercel.app/api/mercado-livre/webhook",
+              "",
+              "Permissoes e marcacoes:",
+              "- Permita a autorizacao da conta quando o Mercado Livre pedir",
+              "- Se houver secao de notificacoes ou Callback URL Notifications, cole a URL de webhook acima",
+              "- Para a integracao atual do InfraStudio, o essencial e concluir o OAuth e pegar APP ID + CLIENT SECRET",
               "",
               "Depois de criar, vao aparecer 2 codigos na tela:",
               "APP ID",
