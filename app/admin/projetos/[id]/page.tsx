@@ -5690,12 +5690,12 @@ export default function AdminProjetoDetalhePage() {
           <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
             <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Cable size={18} className="text-violet-200" />Fontes e canais conectados</h3>
-                <p className="mt-1 text-sm text-slate-400">Gerencie aqui as fontes do projeto e os canais que herdam essas configuracoes.</p>
+                <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Cable size={18} className="text-violet-200" />Integracoes do projeto</h3>
+                <p className="mt-1 text-sm text-slate-400">Gerencie aqui as integracoes do projeto e os canais que usam essas configuracoes.</p>
               </div>
               <button type="button" onClick={openNewConnectorModal} className={`${headerActionButtonClass} ${premiumInteractiveClass}`}>
                 <Plus size={16} />
-                Nova fonte
+                Nova integracao
               </button>
             </div>
             <div className="space-y-3 p-4">
@@ -5741,7 +5741,7 @@ export default function AdminProjetoDetalhePage() {
                   );
                 })
               ) : (
-                <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhuma fonte cadastrada para este projeto ainda.</div>
+                <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhuma integracao cadastrada para este projeto ainda.</div>
               )}
             </div>
           </section>
