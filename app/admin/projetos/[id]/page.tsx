@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Activity, Bold, Bot, Boxes, Cable, CheckCircle2, Coins, Copy, Cpu, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, ShieldAlert, Sparkles, TestTube2, Trash2, Waypoints, X } from "lucide-react";
 import { getAgentRuntimeBlockEntries, normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
 
@@ -1433,6 +1433,21 @@ function FormLabel({ children }: { children: string }) {
   return <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{children}</label>;
 }
 
+function ModalStickyFooter({
+  children,
+  feedback,
+}: {
+  children: ReactNode;
+  feedback?: string | null;
+}) {
+  return (
+    <div className="sticky bottom-0 border-t border-white/10 bg-brand-dark/95 px-6 py-4 backdrop-blur">
+      <div className="flex gap-3">{children}</div>
+      {feedback ? <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</div> : null}
+    </div>
+  );
+}
+
 function DeleteProjectModal({
   open,
   projectName,
@@ -1902,8 +1917,9 @@ function AgenteModal({
           </div>
         </div>
 
-        <div className="grid max-h-[calc(92vh-88px)] gap-0 overflow-x-hidden overflow-y-auto lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="min-w-0 space-y-4 p-6">
+        <div className="flex max-h-[calc(92vh-88px)] flex-col">
+          <div className="grid flex-1 gap-0 overflow-x-hidden overflow-y-auto lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="min-w-0 space-y-4 p-6 pb-8">
             <div>
               <FormLabel>Nome do agente</FormLabel>
               <input value={form.nome} onChange={(event) => onChange({ nome: event.target.value })} placeholder="Agente comercial principal" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
@@ -2097,7 +2113,7 @@ function AgenteModal({
             </div>
           </div>
 
-          <div className="min-w-0 border-t border-white/10 bg-white/[0.03] p-6 lg:border-l lg:border-t-0">
+          <div className="min-w-0 border-t border-white/10 bg-white/[0.03] p-6 pb-8 lg:border-l lg:border-t-0">
             <div className="sticky top-0 z-10 mb-5 rounded-2xl border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.16),rgba(6,95,70,0.1))] p-4 backdrop-blur-xl">
               <label className="flex cursor-pointer items-start gap-3">
                 <input
@@ -2271,18 +2287,17 @@ function AgenteModal({
               </div>
             ) : null}
 
-            <div className="mt-6 flex gap-3">
-              <button type="button" onClick={onSubmit} disabled={saving} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
-                {form.id ? <Pencil size={16} /> : <Plus size={16} />}
-                {saving ? "Salvando..." : form.id ? "Atualizar agente" : "Criar agente"}
-              </button>
-              <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
-                Cancelar
-              </button>
-            </div>
-
-            {feedback ? <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</div> : null}
           </div>
+        </div>
+          <ModalStickyFooter feedback={feedback}>
+            <button type="button" onClick={onSubmit} disabled={saving} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
+              {form.id ? <Pencil size={16} /> : <Plus size={16} />}
+              {saving ? "Salvando..." : form.id ? "Atualizar agente" : "Criar agente"}
+            </button>
+            <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
+              Cancelar
+            </button>
+          </ModalStickyFooter>
         </div>
       </div>
     </div>
@@ -2463,19 +2478,15 @@ function ApiModal({
             </div>
           </div>
 
-          <div className="border-t border-white/10 bg-brand-dark/95 px-6 py-4 backdrop-blur">
-            <div className="flex gap-3">
-              <button type="button" onClick={onSubmit} disabled={saving} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
-                {form.id ? <Pencil size={16} /> : <Plus size={16} />}
-                {saving ? "Salvando..." : form.id ? "Atualizar API" : "Criar API"}
-              </button>
-              <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
-                Cancelar
-              </button>
-            </div>
-
-            {feedback ? <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</div> : null}
-          </div>
+          <ModalStickyFooter feedback={feedback}>
+            <button type="button" onClick={onSubmit} disabled={saving} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white">
+              {form.id ? <Pencil size={16} /> : <Plus size={16} />}
+              {saving ? "Salvando..." : form.id ? "Atualizar API" : "Criar API"}
+            </button>
+            <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
+              Cancelar
+            </button>
+          </ModalStickyFooter>
         </div>
       </div>
     </div>
@@ -2538,7 +2549,8 @@ function WidgetModal({
           </div>
         </div>
 
-        <div className="max-h-[calc(92vh-88px)] overflow-y-auto p-6">
+        <div className="flex max-h-[calc(92vh-88px)] flex-col">
+          <div className="flex-1 overflow-y-auto px-6 pt-6 pb-8">
           <div className="space-y-4">
             <div>
               <FormLabel>Nome do widget</FormLabel>
@@ -2630,23 +2642,23 @@ function WidgetModal({
               Fundo transparente
             </label>
 
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={onSubmit}
-                disabled={saving}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
-              >
-                {form.id ? <Pencil size={16} /> : <Plus size={16} />}
-                {saving ? "Salvando..." : form.id ? "Atualizar widget" : "Criar widget"}
-              </button>
-              <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
-                Cancelar
-              </button>
-            </div>
-
-            {feedback ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</div> : null}
+            
           </div>
+        </div>
+          <ModalStickyFooter feedback={feedback}>
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={saving}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
+            >
+              {form.id ? <Pencil size={16} /> : <Plus size={16} />}
+              {saving ? "Salvando..." : form.id ? "Atualizar widget" : "Criar widget"}
+            </button>
+            <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
+              Cancelar
+            </button>
+          </ModalStickyFooter>
         </div>
       </div>
     </div>
@@ -2712,7 +2724,8 @@ function ConnectorModal({
           </div>
         </div>
 
-        <div className="max-h-[calc(92vh-88px)] overflow-y-auto p-6">
+        <div className="flex max-h-[calc(92vh-88px)] flex-col">
+          <div className="flex-1 overflow-y-auto px-6 pt-6 pb-8">
           <div className="space-y-4">
             <div>
               <FormLabel>Nome</FormLabel>
@@ -2798,6 +2811,16 @@ function ConnectorModal({
               />
               <p className="mt-2 text-xs text-slate-400">Opcional para busca publica. Necessario para listar os ultimos produtos da loja quando a API exigir autenticacao.</p>
             </div>
+            <div>
+              <FormLabel>URL base para gestao</FormLabel>
+              <input
+                value={form.endpointBase}
+                onChange={(event) => onChange({ endpointBase: event.target.value })}
+                placeholder="https://api.mercadolibre.com"
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+              />
+              <p className="mt-2 text-xs text-slate-400">Use a URL base do ambiente usado na integracao para gerir a conta e o OAuth entre usuarios.</p>
+            </div>
             {!form.id ? (
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
                 Salve a fonte de produto primeiro para habilitar o botao <span className="font-semibold">Conectar Mercado Livre</span> e concluir o OAuth automatico.
@@ -2873,23 +2896,23 @@ function ConnectorModal({
               Fonte de produto ativa
             </label>
 
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={onSubmit}
-                disabled={saving}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
-              >
-                {form.id ? <Pencil size={16} /> : <Plus size={16} />}
-                {saving ? "Salvando..." : form.id ? "Atualizar fonte de produto" : "Criar fonte de produto"}
-              </button>
-              <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
-                Cancelar
-              </button>
-            </div>
-
-            {feedback ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</div> : null}
+            
           </div>
+        </div>
+          <ModalStickyFooter feedback={feedback}>
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={saving}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
+            >
+              {form.id ? <Pencil size={16} /> : <Plus size={16} />}
+              {saving ? "Salvando..." : form.id ? "Atualizar fonte de produto" : "Criar fonte de produto"}
+            </button>
+            <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
+              Cancelar
+            </button>
+          </ModalStickyFooter>
         </div>
       </div>
     </div>
@@ -3132,7 +3155,8 @@ function WhatsAppChannelModal({
           </button>
         </div>
 
-        <div className="max-h-[calc(92vh-88px)] overflow-y-auto p-6">
+        <div className="flex max-h-[calc(92vh-88px)] flex-col">
+          <div className="flex-1 overflow-y-auto px-6 pt-6 pb-8">
           <div className="space-y-4">
             <div>
               <FormLabel>Numero</FormLabel>
@@ -3174,23 +3198,23 @@ function WhatsAppChannelModal({
               </select>
             </div>
 
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={onSubmit}
-                disabled={saving}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
-              >
-                {form.id ? <Pencil size={16} /> : <Plus size={16} />}
-                {saving ? "Salvando..." : form.id ? "Salvar alteracoes" : "Criar canal"}
-              </button>
-              <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
-                Cancelar
-              </button>
-            </div>
-
-            {feedback ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</div> : null}
+            
           </div>
+        </div>
+          <ModalStickyFooter feedback={feedback}>
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={saving}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white"
+            >
+              {form.id ? <Pencil size={16} /> : <Plus size={16} />}
+              {saving ? "Salvando..." : form.id ? "Salvar alteracoes" : "Criar canal"}
+            </button>
+            <button type="button" onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">
+              Cancelar
+            </button>
+          </ModalStickyFooter>
         </div>
       </div>
     </div>
@@ -5304,7 +5328,11 @@ export default function AdminProjetoDetalhePage() {
               <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Bot size={18} className="text-cyan-200" />Agentes do projeto</h3>
               <p className="mt-1 text-sm text-slate-400">O agente ativo atende este projeto e pode consumir as APIs marcadas.</p>
             </div>
-            <button type="button" onClick={openNewAgenteModal} className={`inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white ${premiumInteractiveClass}`}>
+            <button
+              type="button"
+              onClick={openNewAgenteModal}
+              className={`inline-flex items-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14 ${premiumInteractiveClass}`}
+            >
               <Plus size={16} />
               Novo agente
             </button>
