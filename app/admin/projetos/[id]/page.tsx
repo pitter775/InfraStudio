@@ -3296,6 +3296,7 @@ export default function AdminProjetoDetalhePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const currentPath = `/admin/projetos/${params.id}`;
   const [data, setData] = useState<ProjetoDetalhe | null>(null);
   const [billingPlanForm, setBillingPlanForm] = useState<BillingPlanFormState>(createBillingPlanForm(null));
   const [agenteForm, setAgenteForm] = useState<AgenteFormState>(emptyAgenteForm);
@@ -3422,6 +3423,15 @@ export default function AdminProjetoDetalhePage() {
   const premiumTransitionClass = "transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]";
   const premiumInteractiveClass = `${premiumTransitionClass} hover:-translate-y-[1px]`;
   const editButtonClass = `border border-amber-500/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20 hover:text-white ${premiumInteractiveClass}`;
+  const buildProjectUrl = (mutate?: (nextParams: URLSearchParams) => void) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    mutate?.(nextParams);
+    const query = nextParams.toString();
+    return query ? `${currentPath}?${query}` : currentPath;
+  };
+  const replaceProjectUrl = (mutate?: (nextParams: URLSearchParams) => void) => {
+    router.replace(buildProjectUrl(mutate), { scroll: false });
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -3436,15 +3446,21 @@ export default function AdminProjetoDetalhePage() {
 
     if (oauthStatus === "success") {
       setFeedbackConnector("Conexao com o Mercado Livre concluida. A fonte de produto recebeu os tokens da loja.");
-      router.replace(`/admin/projetos/${params.id}`);
+      replaceProjectUrl((nextParams) => {
+        nextParams.delete("mercado_livre_oauth");
+        nextParams.delete("mercado_livre_oauth_error");
+      });
       return;
     }
 
     if (oauthError) {
       setFeedbackConnector(oauthError);
-      router.replace(`/admin/projetos/${params.id}`);
+      replaceProjectUrl((nextParams) => {
+        nextParams.delete("mercado_livre_oauth");
+        nextParams.delete("mercado_livre_oauth_error");
+      });
     }
-  }, [params.id, router, searchParams]);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!data?.whatsappChannels.length) {
@@ -3519,6 +3535,10 @@ export default function AdminProjetoDetalhePage() {
 
   const openNewConnectorModal = () => {
     resetConnectorForm();
+    replaceProjectUrl((nextParams) => {
+      nextParams.set("tab", "conectores");
+      nextParams.delete("fonte");
+    });
     setConnectorModalOpen(true);
   };
 
@@ -4229,6 +4249,10 @@ export default function AdminProjetoDetalhePage() {
     resetConnectorForm();
     setSavingConnector(false);
     setConnectorModalOpen(false);
+    replaceProjectUrl((nextParams) => {
+      nextParams.set("tab", "conectores");
+      nextParams.delete("fonte");
+    });
     setFeedbackConnector(message);
   };
 
@@ -4408,7 +4432,22 @@ export default function AdminProjetoDetalhePage() {
       ativo: connector.ativo,
     });
     setFeedbackConnector(null);
+    replaceProjectUrl((nextParams) => {
+      nextParams.set("tab", "conectores");
+      if (connector.id) {
+        nextParams.set("fonte", connector.id);
+      }
+    });
     setConnectorModalOpen(true);
+  };
+
+  const handleCloseConnectorModal = () => {
+    setConnectorModalOpen(false);
+    resetConnectorForm();
+    replaceProjectUrl((nextParams) => {
+      nextParams.set("tab", "conectores");
+      nextParams.delete("fonte");
+    });
   };
 
   const handleEditWhatsAppChannel = (channel: WhatsAppChannel) => {
@@ -4938,6 +4977,47 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const [activeTab, setActiveTab] = useState<ProjectTab>("agentes");
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "agentes" || tabParam === "apis" || tabParam === "conectores" || tabParam === "whatsapp" || tabParam === "chats") {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!data) {
+      return;
+    }
+
+    const fonteId = searchParams.get("fonte");
+    if (!fonteId) {
+      return;
+    }
+
+    const connector = data.conectores.find((item) => item.id === fonteId);
+    if (!connector) {
+      return;
+    }
+
+    setActiveTab("conectores");
+    setConnectorForm({
+      id: connector.id,
+      nome: connector.nome,
+      tipo: connector.tipo === "mercado_livre" ? "mercado_livre" : "mercado_livre",
+      projetoId: connector.projetoId ?? params.id,
+      agenteId: connector.agenteId,
+      endpointBase: connector.endpointBase || "https://api.mercadolibre.com",
+      appId: connector.configuracoes?.app_id ?? "",
+      clientSecret: connector.configuracoes?.client_secret ?? "",
+      sellerId: connector.configuracoes?.seller_id ?? "",
+      nickname: connector.configuracoes?.nickname ?? "",
+      accessToken: connector.configuracoes?.access_token ?? "",
+      ativo: connector.ativo,
+    });
+    setFeedbackConnector(null);
+    setConnectorModalOpen(true);
+  }, [data, params.id, searchParams]);
 
   if (!data) {
     return (
@@ -6363,10 +6443,7 @@ export default function AdminProjetoDetalhePage() {
         saving={savingConnector}
         feedback={feedbackConnector}
         copiedTutorial={copiedSnippetKey === "mercado-livre-oauth-tutorial"}
-        onClose={() => {
-          setConnectorModalOpen(false);
-          resetConnectorForm();
-        }}
+        onClose={handleCloseConnectorModal}
         onChange={(next) =>
           setConnectorForm((prev) => ({
             ...prev,
