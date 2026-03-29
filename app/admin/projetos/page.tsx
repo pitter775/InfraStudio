@@ -245,9 +245,10 @@ export default function AdminProjetosPage() {
         </section>
       ) : null}
 
-      <section className="overflow-hidden rounded-2xl border border-white/10">
-        <div className="border-b border-white/10 px-6 py-5">
-          <h2 className="text-xl font-bold text-white">Projetos vinculados</h2>
+      <section className="overflow-hidden rounded-2xl">
+        <div className="px-1 py-2">
+          <h2 className="text-xl font-bold text-white">Meus projetos</h2>
+          <p className="mt-2 text-sm text-slate-400">Escolha um projeto para continuar de onde voce parou.</p>
         </div>
         <div className="p-6">
           {loading ? <CenterLoader /> : null}
@@ -255,7 +256,7 @@ export default function AdminProjetosPage() {
           {projetos.length ? (
             <div className="grid gap-4 xl:grid-cols-2">
               {projetos.map((projeto) => (
-                <div key={projeto.id} className="rounded-[24px] border border-white/10 p-6">
+                <div key={projeto.id} className="rounded-[24px] border border-white/10 p-6 shadow-[0_18px_45px_rgba(2,8,23,0.28)]">
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="min-w-0 flex-1">
