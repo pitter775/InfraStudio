@@ -3398,9 +3398,11 @@ export default function AdminProjetoDetalhePage() {
   const [activeTab, setActiveTab] = useState<ProjectTab>("agentes");
   const [renderedTab, setRenderedTab] = useState<ProjectTab>("agentes");
   const [tabContentVisible, setTabContentVisible] = useState(true);
+  const [tabsPinned, setTabsPinned] = useState(false);
   const pendingAgentDiagnosticsRef = useRef<Record<string, boolean>>({});
   const tabSwitchTimeoutRef = useRef<number | null>(null);
   const tabRevealTimeoutRef = useRef<number | null>(null);
+  const tabsNavRef = useRef<HTMLElement | null>(null);
 
   const loadProjeto = async () => {
     const response = await fetch(`/api/admin/projetos/${params.id}`, { cache: "no-store" });
@@ -3514,6 +3516,26 @@ export default function AdminProjetoDetalhePage() {
 
     void loadAgentDiagnostics(data.agentes);
   }, [activeTab, data?.agentes, agentDiagnosticsById]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const tabsElement = tabsNavRef.current;
+      if (!tabsElement) {
+        return;
+      }
+
+      setTabsPinned(tabsElement.getBoundingClientRect().top <= 12);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, []);
 
   useEffect(() => {
     const oauthStatus = searchParams.get("mercado_livre_oauth");
@@ -5495,8 +5517,10 @@ export default function AdminProjetoDetalhePage() {
           </section>
         ) : null}
 
-        <section className="sticky top-3 z-30 mt-12">
-          <div className="mx-auto flex w-full max-w-max flex-wrap items-center justify-center gap-2 rounded-[26px] border border-white/8 bg-[#07111f]/82 px-3 py-3 shadow-[0_18px_38px_rgba(2,8,23,0.34)] backdrop-blur-md">
+        <section
+          ref={tabsNavRef}
+          className={`sticky top-3 z-30 mt-12 flex flex-wrap items-center justify-center gap-2 rounded-[26px] px-3 py-3 transition-all duration-200 ${tabsPinned ? "bg-[#07111f]/82 shadow-[0_18px_38px_rgba(2,8,23,0.34)] backdrop-blur-md" : "bg-transparent shadow-none backdrop-blur-0"}`}
+        >
             {projectTabs.map((tab) => {
               const Icon = tab.icon;
               const active = activeTab === tab.key;
@@ -5523,7 +5547,6 @@ export default function AdminProjetoDetalhePage() {
                 </button>
               );
             })}
-          </div>
         </section>
 
         <section className={`${renderedTab === "agentes" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
