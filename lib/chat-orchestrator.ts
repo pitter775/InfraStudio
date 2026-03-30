@@ -1420,7 +1420,7 @@ function extractOutputText(payload: OpenAIResponsesPayload) {
 type CatalogItem = {
   slug: "site-comum" | "chat-ia" | "automacao-whatsapp" | "integracao-crm" | "sistema-sob-medida-simples";
   nome: string;
-  preco: number;
+  precoLabel: string;
 };
 
 function detectCatalogItems(history: ConversationMessage[]) {
@@ -1431,25 +1431,26 @@ function detectCatalogItems(history: ConversationMessage[]) {
 
   const items: CatalogItem[] = [];
   const has = (pattern: RegExp) => pattern.test(userText);
+  const asksForChat = has(/\bchat\b|\bia no site\b|\bagente no site\b|\batendimento com ia\b/);
 
-  if (has(/\bsite\b|\blanding page\b|\bpagina\b/)) {
-    items.push({ slug: "site-comum", nome: "Site comum", preco: 300 });
+  if (has(/\bsite\b|\blanding page\b|\bpagina\b/) && !asksForChat) {
+    items.push({ slug: "site-comum", nome: "Criacao de site", precoLabel: "R$300 a R$1000" });
   }
 
-  if (has(/\bchat\b|\bia no site\b|\bagente no site\b|\batendimento com ia\b/)) {
-    items.push({ slug: "chat-ia", nome: "Chat com IA", preco: 700 });
+  if (asksForChat) {
+    items.push({ slug: "chat-ia", nome: "Chat com IA (widget)", precoLabel: "R$50 de adesao + R$20/mês" });
   }
 
   if (has(/\bwhatsapp\b|\bautomatiza(?:r|cao) whatsapp\b|\batendimento no whatsapp\b/)) {
-    items.push({ slug: "automacao-whatsapp", nome: "Automacao WhatsApp", preco: 1000 });
+    items.push({ slug: "automacao-whatsapp", nome: "Atendimento com agentes no WhatsApp", precoLabel: "A partir de R$200/mês" });
   }
 
   if (has(/\bcrm\b|\bintegrac(?:ao|a)o com crm\b/)) {
-    items.push({ slug: "integracao-crm", nome: "Integracao CRM", preco: 1000 });
+    items.push({ slug: "integracao-crm", nome: "Integracao/API", precoLabel: "R$400 a R$1000" });
   }
 
-  if (has(/\bsistema\b|\bpainel\b|\bcadastro\b|\bproduto\b|\bprodutos\b|\badmin\b|\badm\b|\blistagem\b|\bcatalogo\b|\bcatalogo\b/)) {
-    items.push({ slug: "sistema-sob-medida-simples", nome: "Sistema sob medida simples", preco: 2000 });
+  if (!asksForChat && has(/\bsistema\b|\bpainel\b|\bcadastro\b|\bproduto\b|\bprodutos\b|\badmin\b|\badm\b|\blistagem\b|\bcatalogo\b|\bcatalogo\b/)) {
+    items.push({ slug: "sistema-sob-medida-simples", nome: "Sistema com IA", precoLabel: "R$500 a R$2000" });
   }
 
   return items.filter((item, index, array) => array.findIndex((entry) => entry.slug === item.slug) === index);
@@ -1484,8 +1485,7 @@ function buildCatalogPricingReply(history: ConversationMessage[], context?: Conv
     return null;
   }
 
-  const total = catalogItems.reduce((sum, item) => sum + item.preco, 0);
-  const labels = catalogItems.map((item) => `${item.nome}: R$ ${item.preco.toLocaleString("pt-BR")}`);
+  const labels = catalogItems.map((item) => `${item.nome}: ${item.precoLabel}`);
   const joinedLabels = labels.join(" + ");
 
   if (catalogItems.length === 1) {
@@ -1494,7 +1494,7 @@ function buildCatalogPricingReply(history: ConversationMessage[], context?: Conv
           "✓ **Melhor encaixe inicial**",
           labels[0],
           "",
-          "→ Se quiser, eu sigo com voce por aqui ou te encaminho no WhatsApp para fecharmos o proximo passo.",
+          "→ Se quiser, eu sigo com voce por aqui e ja te explico como isso entra no seu caso, ou te encaminho no WhatsApp para fecharmos mais rapido.",
         ].join("\n")
       : `Pelo que voce descreveu, isso encaixa em ${joinedLabels}. Se quiser, eu sigo com voce por aqui ou te encaminho no WhatsApp para fecharmos o proximo passo.`;
   }
@@ -1504,11 +1504,9 @@ function buildCatalogPricingReply(history: ConversationMessage[], context?: Conv
         "✓ **Melhor encaixe inicial**",
         ...labels.map((label) => `- ${label}`),
         "",
-        `**Estimativa inicial:** R$ ${total.toLocaleString("pt-BR")}`,
-        "",
-        "→ Se quiser, eu posso te direcionar no WhatsApp para alinharmos os detalhes finais.",
+        "→ Se quiser, eu posso te dizer qual combinacao faz mais sentido para o seu caso e te direcionar no WhatsApp para alinharmos os detalhes finais.",
       ].join("\n")
-    : `Pelo que voce descreveu, isso encaixa no nosso catalogo como ${joinedLabels}. Nesse cenario, a estimativa inicial fica em R$ ${total.toLocaleString("pt-BR")} no total. Se quiser, eu posso te direcionar no WhatsApp para alinharmos os detalhes finais.`;
+    : `Pelo que voce descreveu, isso encaixa no nosso catalogo como ${joinedLabels}. Se quiser, eu posso te direcionar no WhatsApp para alinharmos os detalhes finais.`;
 }
 
 function maybeAskForLeadIdentification(context: ConversationContext, history: ConversationMessage[], latestUserMessage: string) {
@@ -1604,6 +1602,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     agent,
     apiContexts,
   });
+  const catalogPricingReply = buildCatalogPricingReply(history, context);
   const mercadoLivrePromptContext = buildMercadoLivrePromptContext(mercadoLivreProducts);
   const directMercadoLivreReply = buildMercadoLivreReply(mercadoLivreProducts, context);
   const mercadoLivreNoResultsReply =
@@ -1645,6 +1644,26 @@ export async function generateSalesReply(history: ConversationMessage[], context
       metadata: {
         provider: "heuristic",
         model: "mercado_livre_no_results",
+        agenteId: agent?.id ?? null,
+        agenteNome: agent?.nome ?? null,
+      },
+    };
+  }
+
+  if (catalogPricingReply) {
+    await appendRuntimeErrorLog({
+      source: "chat_orchestrator.trace",
+      message: "Resposta heuristica de precificacao do catalogo acionada.",
+      ...traceBase,
+      payload: { ...traceBase.payload, ...resourceTrace, mode: "catalog_pricing" },
+    });
+    return {
+      reply: formatHeuristicReply(catalogPricingReply, context),
+      assets: [],
+      usage: { inputTokens: 0, outputTokens: 0 },
+      metadata: {
+        provider: "heuristic",
+        model: "catalog_pricing",
         agenteId: agent?.id ?? null,
         agenteNome: agent?.nome ?? null,
       },
