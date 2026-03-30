@@ -11,7 +11,10 @@ export type ProjetoRecord = {
   tipo: string | null;
   descricao: string;
   status: string;
+  modoCobranca: "plano" | "manual" | "ilimitado";
   siteChatAtivo: boolean;
+  criadorNome: string | null;
+  criadorEmail: string | null;
 };
 
 export type ProjetoOverviewRecord = ProjetoRecord & {
@@ -31,7 +34,23 @@ type ProjetoRow = {
   tipo: string | null;
   descricao: string | null;
   status: string | null;
+  modo_cobranca: "plano" | "manual" | "ilimitado" | null;
   configuracoes: Record<string, unknown> | null;
+};
+
+type ProjetoMembershipRow = {
+  projeto_id: string | null;
+  created_at: string | null;
+  usuarios:
+    | {
+        nome: string | null;
+        email: string | null;
+      }
+    | Array<{
+        nome: string | null;
+        email: string | null;
+      }>
+    | null;
 };
 
 function mapProjeto(row: ProjetoRow): ProjetoRecord {
@@ -44,7 +63,10 @@ function mapProjeto(row: ProjetoRow): ProjetoRecord {
     tipo: row.tipo ?? null,
     descricao: row.descricao?.trim() || "",
     status: row.status ?? "ativo",
+    modoCobranca: row.modo_cobranca ?? "plano",
     siteChatAtivo: configuracoes.site_chat_ativo === true,
+    criadorNome: null,
+    criadorEmail: null,
   };
 }
 
@@ -52,7 +74,7 @@ export async function listProjetos() {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("projetos")
-    .select("id, nome, slug, tipo, descricao, status, configuracoes")
+    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, configuracoes")
     .order("nome", { ascending: true });
 
   if (error || !data) {
@@ -71,23 +93,31 @@ async function attachProjetoStats(projetos: ProjetoRecord[]) {
   const supabase = getSupabaseAdminClient();
   const projetoIds = projetos.map((projeto) => projeto.id);
 
-  const [agentesResponse, conectoresResponse, chatsResponse] = await Promise.all([
+  const [agentesResponse, conectoresResponse, chatsResponse, membershipsResponse] = await Promise.all([
     supabase.from("agentes").select("projeto_id, ativo").in("projeto_id", projetoIds),
     supabase.from("conectores").select("projeto_id, ativo").in("projeto_id", projetoIds),
     supabase.from("chats").select("projeto_id").in("projeto_id", projetoIds),
+    supabase.from("usuarios_projetos").select("projeto_id, created_at, usuarios(nome, email)").in("projeto_id", projetoIds),
   ]);
 
   const agentesRows = (agentesResponse.data ?? []) as Array<{ projeto_id: string | null; ativo: boolean | null }>;
   const conectoresRows = (conectoresResponse.data ?? []) as Array<{ projeto_id: string | null; ativo: boolean | null }>;
   const chatsRows = (chatsResponse.data ?? []) as Array<{ projeto_id: string | null }>;
+  const membershipsRows = (membershipsResponse.data ?? []) as ProjetoMembershipRow[];
 
   return projetos.map<ProjetoOverviewRecord>((projeto) => {
     const agentes = agentesRows.filter((item) => item.projeto_id === projeto.id);
     const conectores = conectoresRows.filter((item) => item.projeto_id === projeto.id);
     const chats = chatsRows.filter((item) => item.projeto_id === projeto.id);
+    const criador = membershipsRows
+      .filter((item) => item.projeto_id === projeto.id)
+      .sort((left, right) => new Date(left.created_at ?? 0).getTime() - new Date(right.created_at ?? 0).getTime())[0] ?? null;
+    const creatorUser = Array.isArray(criador?.usuarios) ? criador?.usuarios[0] ?? null : criador?.usuarios ?? null;
 
     return {
       ...projeto,
+      criadorNome: creatorUser?.nome?.trim() || projeto.criadorNome,
+      criadorEmail: creatorUser?.email?.trim() || projeto.criadorEmail,
       stats: {
         totalAgentes: agentes.length,
         agentesAtivos: agentes.filter((item) => item.ativo !== false).length,
@@ -108,7 +138,7 @@ export async function listProjetosByUsuario(usuarioId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("usuarios_projetos")
-    .select("projetos(id, nome, slug, tipo, descricao, status, configuracoes)")
+    .select("projetos(id, nome, slug, tipo, descricao, status, modo_cobranca, configuracoes)")
     .eq("usuario_id", usuarioId);
 
   if (error || !data) {
@@ -138,7 +168,7 @@ export async function getProjetoBySlug(slug: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("projetos")
-    .select("id, nome, slug, tipo, descricao, status, configuracoes")
+    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, configuracoes")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -156,7 +186,7 @@ export async function getProjetoById(id: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("projetos")
-    .select("id, nome, slug, tipo, descricao, status, configuracoes")
+    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, configuracoes")
     .eq("id", id)
     .maybeSingle();
 
@@ -190,6 +220,7 @@ export async function createProjeto(input: {
   tipo?: string | null;
   descricao?: string | null;
   status?: string | null;
+  modoCobranca?: "plano" | "manual" | "ilimitado";
   siteChatAtivo?: boolean;
 }) {
   const supabase = getSupabaseAdminClient();
@@ -202,13 +233,14 @@ export async function createProjeto(input: {
       tipo: input.tipo?.trim() || null,
       descricao: input.descricao?.trim() || null,
       status: input.status?.trim() || "ativo",
+      modo_cobranca: input.modoCobranca ?? "plano",
       configuracoes: {
         site_chat_ativo: input.siteChatAtivo ?? false,
       },
       created_at: now,
       updated_at: now,
     } as never)
-    .select("id, nome, slug, tipo, descricao, status, configuracoes")
+    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, configuracoes")
     .single();
 
   if (error || !data) {
@@ -226,6 +258,7 @@ export async function createProjetoForUsuario(input: {
   tipo?: string | null;
   descricao?: string | null;
   status?: string | null;
+  modoCobranca?: "plano" | "manual" | "ilimitado";
   siteChatAtivo?: boolean;
 }) {
   const supabase = getSupabaseAdminClient();
@@ -260,6 +293,7 @@ export async function updateProjeto(input: {
   tipo?: string | null;
   descricao?: string | null;
   status?: string | null;
+  modoCobranca?: "plano" | "manual" | "ilimitado";
   siteChatAtivo?: boolean;
 }) {
   const supabase = getSupabaseAdminClient();
@@ -282,11 +316,12 @@ export async function updateProjeto(input: {
       tipo: input.tipo?.trim() || null,
       descricao: input.descricao?.trim() || null,
       status: input.status?.trim() || "ativo",
+      modo_cobranca: input.modoCobranca ?? undefined,
       configuracoes: nextConfiguracoes,
       updated_at: new Date().toISOString(),
     } as never)
     .eq("id", input.id)
-    .select("id, nome, slug, tipo, descricao, status, configuracoes")
+    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, configuracoes")
     .single();
 
   if (error || !data) {

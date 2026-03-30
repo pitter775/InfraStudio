@@ -3,6 +3,7 @@ import { appendChatRequestLog, appendSystemLog } from "@/lib/chat-logs";
 import { enrichLeadContext, generateSalesReply, shouldRefreshSummary, summarizeConversation } from "@/lib/chat-orchestrator";
 import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetByProjetoAgente, getChatWidgetBySlug } from "@/lib/chat-widgets";
 import { appendMessage, createChat, findActiveChatByChannel, getChatById, getChatContext, listChatMessages, type ChatChannelKind, updateChatContext, updateChatStats } from "@/lib/chats";
+import { registrarUso, verifyProjetoBillingAccess } from "@/lib/billing";
 import { estimateOpenAICostUsd } from "@/lib/openai-pricing";
 import { getProjetoById, getProjetoByIdentifier } from "@/lib/projetos";
 import { appendRuntimeErrorLog } from "@/lib/runtime-error-log";
@@ -68,6 +69,15 @@ function buildSilentChatResult(chatId?: string | null) {
   return {
     chatId: chatId ?? "",
     reply: "",
+    assets: [],
+    whatsapp: null,
+  };
+}
+
+function buildBillingBlockedResult(chatId: string, message: string) {
+  return {
+    chatId,
+    reply: message,
     assets: [],
     whatsapp: null,
   };
@@ -557,6 +567,25 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
   }
 
   const history = await listChatMessages(chat.id);
+  const billingAccess = chat.projetoId ? await verifyProjetoBillingAccess(chat.projetoId) : null;
+  if (billingAccess && !billingAccess.allowed) {
+    await appendChatFailureLog({
+      projetoId: chat.projetoId,
+      agenteId: authoritativeAgent?.id ?? chat.agenteId,
+      chatId: chat.id,
+      origem: "chat_service.billing_guardrail",
+      descricao: billingAccess.message ?? "Projeto bloqueado por limite de uso.",
+      payload: {
+        code: billingAccess.code,
+      },
+    });
+
+    return buildBillingBlockedResult(
+      chat.id,
+      billingAccess.message ?? "O limite mensal deste projeto foi atingido. Fale com o administrador para liberar novo ciclo ou ajustar o plano.",
+    );
+  }
+
   const currentContext = chatContext;
   const extraContext = isPlainObject(effectiveBody.context) ? effectiveBody.context : null;
   const mergedCurrentContext = mergeContext(currentContext, extraContext);
@@ -762,6 +791,21 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     totalCustoToAdd: estimatedCostUsd,
     contexto: nextContext,
   });
+
+  if (chat.projetoId) {
+    await registrarUso(
+      chat.projetoId,
+      ai.usage.inputTokens + ai.usage.outputTokens,
+      estimatedCostUsd,
+      {
+        tokensInput: ai.usage.inputTokens,
+        tokensOutput: ai.usage.outputTokens,
+        usuarioId: chat.usuarioId,
+        origem: channelKind,
+        referenciaId: assistantMessage.id,
+      },
+    );
+  }
 
   await appendChatRequestLog({
     projetoId: nextContext.projeto?.id ?? null,

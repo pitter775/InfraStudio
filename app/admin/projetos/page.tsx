@@ -15,6 +15,14 @@ type Projeto = {
   tipo?: string | null;
   descricao: string;
   status: string;
+  modoCobranca: "plano" | "manual" | "ilimitado";
+  criadorNome?: string | null;
+  criadorEmail?: string | null;
+  billing?: {
+    planoAtual: string;
+    usoPercentual: number | null;
+    bloqueado: boolean;
+  };
   stats: {
     totalAgentes: number;
     agentesAtivos: number;
@@ -30,6 +38,7 @@ type ProjetoFormState = {
   tipo: string;
   descricao: string;
   status: string;
+  modoCobranca: "plano" | "manual" | "ilimitado";
 };
 
 const emptyProjetoForm: ProjetoFormState = {
@@ -38,6 +47,7 @@ const emptyProjetoForm: ProjetoFormState = {
   tipo: "",
   descricao: "",
   status: "ativo",
+  modoCobranca: "plano",
 };
 
 const primaryActionButtonClass =
@@ -72,9 +82,28 @@ export default function AdminProjetosPage() {
   const [modalOpen, setModalOpen] = useState(false);
 
   const loadProjetos = async () => {
-    const response = await fetch("/api/admin/projetos", { cache: "no-store" });
-    const payload = (await response.json()) as { projetos?: Projeto[] };
-    setProjetos(payload.projetos ?? []);
+    const [projetosResponse, usoResponse] = await Promise.all([
+      fetch("/api/admin/projetos", { cache: "no-store" }).then((response) => response.json()),
+      fetch("/api/admin/uso", { cache: "no-store" }).then((response) => response.json()).catch(() => ({ uso: [] })),
+    ]);
+    const billingMap = new Map(
+      ((usoResponse.uso ?? []) as Array<{
+        projetoId: string;
+        plano: { nomePlano: string; bloqueado: boolean };
+        percentualUso: number | null;
+        status: "ativo" | "bloqueado";
+      }>).map((item) => [
+        item.projetoId,
+        {
+          planoAtual: item.plano.nomePlano,
+          usoPercentual: item.percentualUso,
+          bloqueado: item.status === "bloqueado" || item.plano.bloqueado,
+        },
+      ]),
+    );
+
+    const payload = projetosResponse as { projetos?: Projeto[] };
+    setProjetos((payload.projetos ?? []).map((projeto) => ({ ...projeto, billing: billingMap.get(projeto.id) })));
     setLoading(false);
   };
 
@@ -130,6 +159,40 @@ export default function AdminProjetosPage() {
     setModalOpen(false);
     setSaving(false);
     setFeedback("Projeto criado com sucesso.");
+  };
+
+  const handleModoCobrancaChange = async (projeto: Projeto, modoCobranca: "plano" | "manual" | "ilimitado") => {
+    const response = await fetch("/api/admin/projetos", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: projeto.id,
+        nome: projeto.nome,
+        slug: projeto.slug,
+        tipo: projeto.tipo,
+        descricao: projeto.descricao,
+        status: projeto.status,
+        modoCobranca,
+      }),
+    });
+    const payload = (await response.json()) as { error?: string; projeto?: Projeto };
+
+    if (!response.ok) {
+      setFeedback(payload.error ?? "Nao foi possivel atualizar o modo de cobranca.");
+      return;
+    }
+
+    setProjetos((current) =>
+      current.map((item) =>
+        item.id === projeto.id
+          ? {
+              ...item,
+              modoCobranca,
+            }
+          : item,
+      ),
+    );
+    setFeedback("Modo de cobranca atualizado.");
   };
 
   if (loading && !currentUser) {
@@ -262,11 +325,47 @@ export default function AdminProjetosPage() {
                         <div className="flex flex-wrap items-center gap-3">
                           <h3 className="text-2xl font-bold text-slate-50">{projeto.nome}</h3>
                           <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-200">{projeto.status}</span>
+                          <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${projeto.billing?.bloqueado ? "bg-rose-500/15 text-rose-200" : "bg-emerald-500/15 text-emerald-300"}`}>
+                            {projeto.billing?.bloqueado ? "bloqueado" : "ativo"}
+                          </span>
                           {projeto.tipo ? (
                             <span className="rounded-full bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-300">{projeto.tipo}</span>
                           ) : null}
                         </div>
                         <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">{projeto.descricao || "Sem descricao."}</p>
+                        <div className="mt-4 grid gap-3 md:grid-cols-3">
+                          <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-4 py-3">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Plano atual</p>
+                            <p className="mt-2 text-sm font-semibold text-white">{projeto.billing?.planoAtual ?? "Sem plano"}</p>
+                          </div>
+                          <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-4 py-3">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Uso atual</p>
+                            <p className="mt-2 text-sm font-semibold text-white">
+                              {projeto.billing?.usoPercentual === null || projeto.billing?.usoPercentual === undefined ? "Sem limite" : `${Math.round(projeto.billing.usoPercentual)}%`}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-4 py-3">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Modo de cobranca</p>
+                            {currentUser?.isMaster ? (
+                              <select
+                                value={projeto.modoCobranca}
+                                onChange={(event) => void handleModoCobrancaChange(projeto, event.target.value as Projeto["modoCobranca"])}
+                                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 text-sm text-white outline-none"
+                              >
+                                <option value="plano">plano</option>
+                                <option value="manual">manual</option>
+                                <option value="ilimitado">ilimitado</option>
+                              </select>
+                            ) : (
+                              <p className="mt-2 text-sm font-semibold text-white">{projeto.modoCobranca}</p>
+                            )}
+                          </div>
+                        </div>
+                        {projeto.criadorNome || projeto.criadorEmail ? (
+                          <p className="mt-2 text-xs text-slate-500">
+                            Criado por {projeto.criadorNome ?? projeto.criadorEmail}
+                          </p>
+                        ) : null}
                       </div>
                       <Link
                         href={`/admin/projetos/${projeto.id}`}
@@ -344,6 +443,11 @@ export default function AdminProjetosPage() {
               <input value={form.nome} onChange={(event) => setForm((current) => ({ ...current, nome: event.target.value }))} placeholder="Nome" className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
               <input value={form.slug} onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))} placeholder="Slug" className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
               <input value={form.tipo} onChange={(event) => setForm((current) => ({ ...current, tipo: event.target.value }))} placeholder="Tipo" className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
+              <select value={form.modoCobranca} onChange={(event) => setForm((current) => ({ ...current, modoCobranca: event.target.value as ProjetoFormState["modoCobranca"] }))} className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none">
+                <option value="plano">plano</option>
+                <option value="manual">manual</option>
+                <option value="ilimitado">ilimitado</option>
+              </select>
               <textarea value={form.descricao} onChange={(event) => setForm((current) => ({ ...current, descricao: event.target.value }))} placeholder="Descricao" rows={4} className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
             </div>
             <div className="mt-6 flex gap-3">

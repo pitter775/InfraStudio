@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     tipo?: string;
     descricao?: string;
     status?: string;
+    modoCobranca?: "plano" | "manual" | "ilimitado";
   };
 
   if (!body.nome?.trim()) {
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
     tipo: body.tipo,
     descricao: body.descricao,
     status: body.status,
+    modoCobranca: body.modoCobranca,
   });
 
   if (!projeto) {
@@ -70,6 +72,7 @@ export async function PUT(request: Request) {
     tipo?: string;
     descricao?: string;
     status?: string;
+    modoCobranca?: "plano" | "manual" | "ilimitado";
   };
 
   if (!body.id || !body.nome?.trim()) {
@@ -87,6 +90,7 @@ export async function PUT(request: Request) {
     tipo: body.tipo,
     descricao: body.descricao,
     status: body.status,
+    modoCobranca: body.modoCobranca,
   });
 
   if (!projeto) {

@@ -16,6 +16,7 @@ import {
   LogOut,
   Menu,
   Globe,
+  Layers3,
   Settings,
   UserRound,
   Users,
@@ -32,6 +33,9 @@ const SIDEBAR_COOKIE_NAME = "infrastudio_admin_sidebar";
 const adminLinks = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/projetos", label: "Projetos", icon: BriefcaseBusiness },
+  { href: "/admin/planos", label: "Planos", icon: Coins },
+  { href: "/admin/assinaturas", label: "Assinaturas", icon: Layers3 },
+  { href: "/admin/uso", label: "Uso por Projeto", icon: ActivitySquare },
   { href: "/admin/me", label: "Meu Perfil", icon: Settings },
   { href: "/admin/usage", label: "Uso de Tokens", icon: Coins },
   { href: "/admin/chat-logs", label: "Logs", icon: ActivitySquare },
@@ -157,7 +161,7 @@ function Sidebar({
                 key={item.href}
                 type="button"
                 onClick={() => {
-                  if (!isAdminLinkActive(pathname, item.href)) {
+                  if (pathname !== item.href) {
                     onNavigate(item.href);
                   }
                   onCloseMobile();
@@ -306,7 +310,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   };
 
   const handleNavigate = (href: string) => {
-    if (href === pathname || loadingHref === href) {
+    if (loadingHref === href) {
       return;
     }
 

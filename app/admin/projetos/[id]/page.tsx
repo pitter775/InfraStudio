@@ -5518,11 +5518,41 @@ export default function AdminProjetoDetalhePage() {
     { key: "chats", label: "Chats", value: data.stats.totalChats, icon: MessageSquareText, tone: "text-rose-100", glow: "bg-rose-400/16" },
   ] as const;
   const projectTabs = [
-    { key: "agentes" as const, label: "Agentes", icon: Bot },
-    { key: "apis" as const, label: "APIs", icon: Activity },
-    { key: "whatsapp" as const, label: "WhatsApp", icon: Waypoints },
-    { key: "mercado" as const, label: "Mercado Livre", icon: Cable },
-    { key: "chats" as const, label: "Chats", icon: MessageSquareText },
+    {
+      key: "agentes" as const,
+      label: "Agentes",
+      icon: Bot,
+      activeClass: "border-cyan-400/30 bg-cyan-400/14 text-cyan-50 shadow-[0_10px_25px_rgba(34,211,238,0.12)]",
+      inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-400/18 hover:bg-cyan-400/[0.08] hover:text-cyan-50",
+    },
+    {
+      key: "apis" as const,
+      label: "APIs",
+      icon: Activity,
+      activeClass: "border-sky-400/30 bg-sky-400/14 text-sky-50 shadow-[0_10px_25px_rgba(56,189,248,0.12)]",
+      inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-sky-400/18 hover:bg-sky-400/[0.08] hover:text-sky-50",
+    },
+    {
+      key: "whatsapp" as const,
+      label: "WhatsApp",
+      icon: Waypoints,
+      activeClass: "border-emerald-400/30 bg-emerald-400/14 text-emerald-50 shadow-[0_10px_25px_rgba(52,211,153,0.12)]",
+      inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-emerald-400/18 hover:bg-emerald-400/[0.08] hover:text-emerald-50",
+    },
+    {
+      key: "mercado" as const,
+      label: "Mercado Livre",
+      icon: Cable,
+      activeClass: "border-amber-400/30 bg-amber-400/14 text-amber-50 shadow-[0_10px_25px_rgba(251,191,36,0.12)]",
+      inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-amber-400/18 hover:bg-amber-400/[0.08] hover:text-amber-50",
+    },
+    {
+      key: "chats" as const,
+      label: "Chats",
+      icon: MessageSquareText,
+      activeClass: "border-violet-400/30 bg-violet-400/14 text-violet-50 shadow-[0_10px_25px_rgba(167,139,250,0.12)]",
+      inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-violet-400/18 hover:bg-violet-400/[0.08] hover:text-violet-50",
+    },
   ];
   const selectedBillingModel =
     data.billing?.pricingModels.find((item) => item.id === billingPlanForm.modeloReferencia) ??
@@ -5838,8 +5868,8 @@ export default function AdminProjetoDetalhePage() {
                     }}
                     className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-3.5 py-2 text-sm font-semibold ${premiumInteractiveClass} ${
                       active
-                        ? "border-cyan-400/30 bg-cyan-400/14 text-cyan-50 shadow-[0_10px_25px_rgba(34,211,238,0.12)]"
-                        : "border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.07]"
+                        ? tab.activeClass
+                        : tab.inactiveClass
                     }`}
                   >
                     <Icon size={15} />
@@ -5971,7 +6001,7 @@ export default function AdminProjetoDetalhePage() {
                       </div>
                     ) : null}
 
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                       <button
                         type="button"
                         onClick={() => void handleRunAgentDiagnostic(agente)}
