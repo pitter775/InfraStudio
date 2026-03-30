@@ -1431,7 +1431,11 @@ function detectCatalogItems(history: ConversationMessage[]) {
 
   const items: CatalogItem[] = [];
   const has = (pattern: RegExp) => pattern.test(userText);
-  const asksForChat = has(/\bchat\b|\bia no site\b|\bagente no site\b|\batendimento com ia\b/);
+  const asksForChat = has(
+    /\bchat\b|\bwidget\b|\bia no site\b|\bagente no site\b|\batendimento com ia\b|\bchat no site\b|\bchat no sistema\b|\bchat em sistema\b|\bchat em um sistema\b|\bsistema legado\b|\bsite legado\b|\badicionar o chat\b|\bcolocar o chat\b|\bimplantar o chat\b/,
+  );
+  const asksForStandaloneSystem = !asksForChat &&
+    has(/\bsistema\b|\bpainel\b|\bcadastro\b|\bproduto\b|\bprodutos\b|\badmin\b|\badm\b|\blistagem\b|\bcatalogo\b/);
 
   if (has(/\bsite\b|\blanding page\b|\bpagina\b/) && !asksForChat) {
     items.push({ slug: "site-comum", nome: "Criacao de site", precoLabel: "R$300 a R$1000" });
@@ -1449,7 +1453,7 @@ function detectCatalogItems(history: ConversationMessage[]) {
     items.push({ slug: "integracao-crm", nome: "Integracao/API", precoLabel: "R$400 a R$1000" });
   }
 
-  if (!asksForChat && has(/\bsistema\b|\bpainel\b|\bcadastro\b|\bproduto\b|\bprodutos\b|\badmin\b|\badm\b|\blistagem\b|\bcatalogo\b|\bcatalogo\b/)) {
+  if (asksForStandaloneSystem) {
     items.push({ slug: "sistema-sob-medida-simples", nome: "Sistema com IA", precoLabel: "R$500 a R$2000" });
   }
 
@@ -1461,6 +1465,9 @@ function isOutOfScopeForCatalog(history: ConversationMessage[]) {
     .filter((item) => item.role === "user")
     .map((item) => normalizeText(item.content))
     .join(" ");
+  const asksForChat = /\bchat\b|\bwidget\b|\bia no site\b|\bagente no site\b|\batendimento com ia\b|\bchat no site\b|\bchat no sistema\b|\bchat em sistema\b|\bchat em um sistema\b|\bsistema legado\b|\bsite legado\b|\badicionar o chat\b|\bcolocar o chat\b|\bimplantar o chat\b/.test(
+    userText,
+  );
 
   const complexSignals = [
     /\berp\b/,
@@ -1476,7 +1483,7 @@ function isOutOfScopeForCatalog(history: ConversationMessage[]) {
   ];
 
   const catalogItems = detectCatalogItems(history);
-  return catalogItems.length === 0 || complexSignals.some((pattern) => pattern.test(userText));
+  return catalogItems.length === 0 || (!asksForChat && complexSignals.some((pattern) => pattern.test(userText)));
 }
 
 function buildCatalogPricingReply(history: ConversationMessage[], context?: ConversationContext) {
