@@ -1480,7 +1480,7 @@ function ModalStickyFooter({
   feedback?: string | null;
 }) {
   return (
-    <div className="sticky bottom-0 border-t border-white/10 bg-brand-dark/95 px-6 py-4 backdrop-blur">
+    <div className="sticky bottom-0 border-t border-white/10 bg-brand-dark/95 px-6 py-4 shadow-[0_-18px_40px_rgba(2,8,23,0.38)] backdrop-blur">
       <div className="flex flex-wrap gap-3">{children}</div>
       {feedback ? <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</div> : null}
     </div>
@@ -2408,7 +2408,7 @@ function ApiModal({
 
         <div className="flex max-h-[calc(92vh-88px)] flex-col">
           <div className="flex-1 overflow-y-auto p-6">
-            <div className="space-y-4 pb-6">
+            <div className="space-y-4 pb-24">
             <div>
               <FormLabel>Nome da API</FormLabel>
               <input value={form.nome} onChange={(event) => onChange({ nome: event.target.value })} placeholder="Consulta de imoveis" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
@@ -2589,7 +2589,7 @@ function WidgetModal({
         </div>
 
         <div className="flex max-h-[calc(92vh-88px)] flex-col">
-          <div className="flex-1 overflow-y-auto px-6 pt-6 pb-8">
+          <div className="flex-1 overflow-y-auto px-6 pt-6 pb-28">
           <div className="space-y-4">
             <div>
               <FormLabel>Nome do widget</FormLabel>
@@ -2755,7 +2755,7 @@ function ConnectorModal({
         </div>
 
         <div className="flex max-h-[calc(92vh-88px)] flex-col">
-          <div className="flex-1 overflow-y-auto px-6 pt-6 pb-8">
+          <div className="flex-1 overflow-y-auto px-6 pt-6 pb-28">
           <div className="space-y-4">
             <div>
               <FormLabel>Nome</FormLabel>
@@ -3195,7 +3195,7 @@ function WhatsAppChannelModal({
         </div>
 
         <div className="flex max-h-[calc(92vh-88px)] flex-col">
-          <div className="flex-1 overflow-y-auto px-6 pt-6 pb-8">
+          <div className="flex-1 overflow-y-auto px-6 pt-6 pb-28">
           <div className="space-y-4">
             <div>
               <FormLabel>Numero</FormLabel>
