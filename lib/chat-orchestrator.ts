@@ -5,6 +5,7 @@ import { getAgenteById, type AgenteRecord } from "@/lib/agentes";
 import { normalizeAgentRuntimeConfig, selectAgentRuntimeLines } from "@/lib/agent-runtime";
 import { buildAgenteApiRuntimeContext, type ApiRuntimeContext } from "@/lib/apis";
 import { getChatChannelPolicy } from "@/lib/chat-channel-policy";
+import { listConectoresByAgente, MERCADO_LIVRE_CONNECTOR_TYPE } from "@/lib/conectores";
 import { buscarProdutosMercadoLivrePorAgente, type ProdutoPadronizado } from "@/lib/mercado-livre";
 import { appendRuntimeErrorLog } from "@/lib/runtime-error-log";
 import { getProjetoOpenAIConfig } from "@/lib/segredos";
@@ -1169,9 +1170,45 @@ function buildLegacyAgentPrompt(agent: AgenteRecord | null) {
 
 function shouldSearchProducts(message: string) {
   const normalized = normalizeText(message);
+  const commercialServiceSignals = [
+    /\bpreco\b/,
+    /\bvalor\b/,
+    /\borcamento\b/,
+    /\bquanto\b/,
+    /\bmedia de valor\b/,
+    /\bestimativa\b/,
+    /\bsistema\b/,
+    /\bsite\b/,
+    /\bchat\b/,
+    /\bagente\b/,
+    /\bautomac(?:ao|a)o\b/,
+    /\bintegrac(?:ao|a)o\b/,
+    /\bwhatsapp\b/,
+  ];
+
+  if (commercialServiceSignals.some((pattern) => pattern.test(normalized))) {
+    const explicitCatalogSignals = [
+      /\bproduto\b/,
+      /\bprodutos\b/,
+      /\bitem\b/,
+      /\bitens\b/,
+      /\bcatalogo\b/,
+      /\bcatálogo\b/,
+      /\bloja\b/,
+      /\bmercado livre\b/,
+      /\bml\b/,
+      /\bsku\b/,
+      /\bmodelo\b/,
+      /\bcor\b/,
+      /\btamanho\b/,
+    ];
+
+    if (!explicitCatalogSignals.some((pattern) => pattern.test(normalized))) {
+      return false;
+    }
+  }
 
   const productSignals = [
-    "tem ",
     "tem algum",
     "tem alguma",
     "voce tem",
@@ -1194,12 +1231,20 @@ function shouldSearchProducts(message: string) {
     "estou procurando",
   ];
 
-  return productSignals.some((signal) => normalized.includes(signal));
+  if (productSignals.some((signal) => normalized.includes(signal))) {
+    return true;
+  }
+
+  return /\btem\b.+\b(produt|item|modelo|cor|tamanho|sku|na loja)\b/.test(normalized);
 }
 
 function shouldContinueProductSearch(history: ConversationMessage[], latestUserMessage: string, context?: ConversationContext) {
   const normalized = normalizeText(latestUserMessage).trim();
   if (!normalized) {
+    return false;
+  }
+
+  if (/\b(preco|valor|orcamento|quanto|media de valor|estimativa|sistema|site|chat|agente|automac(?:ao|a)o|integrac(?:ao|a)o|whatsapp)\b/.test(normalized)) {
     return false;
   }
 
@@ -1509,12 +1554,15 @@ export async function generateSalesReply(history: ConversationMessage[], context
   }
   const runtimeAssets = buildRuntimeReplyAssets(agent?.arquivos ?? []);
   const apiContexts = agent?.id ? await buildAgenteApiRuntimeContext(agent.id, (context ?? {}) as Record<string, unknown>) : [];
+  const mercadoLivreConnectors = agent?.id ? await listConectoresByAgente(agent.id, MERCADO_LIVRE_CONNECTOR_TYPE) : [];
+  const hasMercadoLivreConnector = mercadoLivreConnectors.length > 0;
   const mercadoLivreProducts =
-    agent?.id && productSearchRequested ? await buscarProdutosMercadoLivrePorAgente(agent.id, productSearchTerm) : [];
+    agent?.id && productSearchRequested && hasMercadoLivreConnector ? await buscarProdutosMercadoLivrePorAgente(agent.id, productSearchTerm) : [];
   const resourceTrace = {
     apiNames: apiContexts.map((item) => item.nome),
     apiErrors: apiContexts.filter((item) => item.erro).map((item) => ({ nome: item.nome, erro: item.erro })),
     mercadoLivreRequested: productSearchRequested,
+    mercadoLivreConnectorActive: hasMercadoLivreConnector,
     mercadoLivreTerm: productSearchTerm || null,
     mercadoLivreCount: mercadoLivreProducts.length,
   };
@@ -1536,7 +1584,9 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const mercadoLivrePromptContext = buildMercadoLivrePromptContext(mercadoLivreProducts);
   const directMercadoLivreReply = buildMercadoLivreReply(mercadoLivreProducts, context);
   const mercadoLivreNoResultsReply =
-    productSearchRequested && agent?.id && mercadoLivreProducts.length === 0 ? buildMercadoLivreNoResultsReply(productSearchTerm, context) : null;
+    productSearchRequested && agent?.id && hasMercadoLivreConnector && mercadoLivreProducts.length === 0
+      ? buildMercadoLivreNoResultsReply(productSearchTerm, context)
+      : null;
 
   if (directMercadoLivreReply) {
     await appendRuntimeErrorLog({
