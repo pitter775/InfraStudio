@@ -3399,10 +3399,12 @@ export default function AdminProjetoDetalhePage() {
   const [renderedTab, setRenderedTab] = useState<ProjectTab>("agentes");
   const [tabContentVisible, setTabContentVisible] = useState(true);
   const [tabsPinned, setTabsPinned] = useState(false);
+  const [tabsBarHeight, setTabsBarHeight] = useState(0);
   const pendingAgentDiagnosticsRef = useRef<Record<string, boolean>>({});
   const tabSwitchTimeoutRef = useRef<number | null>(null);
   const tabRevealTimeoutRef = useRef<number | null>(null);
-  const tabsNavRef = useRef<HTMLElement | null>(null);
+  const tabsAnchorRef = useRef<HTMLDivElement | null>(null);
+  const tabsBarRef = useRef<HTMLDivElement | null>(null);
 
   const loadProjeto = async () => {
     const response = await fetch(`/api/admin/projetos/${params.id}`, { cache: "no-store" });
@@ -3519,12 +3521,14 @@ export default function AdminProjetoDetalhePage() {
 
   useEffect(() => {
     const handleScroll = () => {
-      const tabsElement = tabsNavRef.current;
-      if (!tabsElement) {
+      const anchorElement = tabsAnchorRef.current;
+      const barElement = tabsBarRef.current;
+      if (!anchorElement || !barElement) {
         return;
       }
 
-      setTabsPinned(tabsElement.getBoundingClientRect().top <= 12);
+      setTabsPinned(anchorElement.getBoundingClientRect().top <= 12);
+      setTabsBarHeight(barElement.offsetHeight);
     };
 
     handleScroll();
@@ -5517,37 +5521,39 @@ export default function AdminProjetoDetalhePage() {
           </section>
         ) : null}
 
-        <section
-          ref={tabsNavRef}
-          className={`sticky top-3 z-30 mt-12 flex flex-wrap items-center justify-center gap-2 rounded-[26px] px-3 py-3 transition-all duration-200 ${tabsPinned ? "bg-[#07111f]/82 shadow-[0_18px_38px_rgba(2,8,23,0.34)] backdrop-blur-md" : "bg-transparent shadow-none backdrop-blur-0"}`}
-        >
-            {projectTabs.map((tab) => {
-              const Icon = tab.icon;
-              const active = activeTab === tab.key;
+        <div ref={tabsAnchorRef} className="mt-12" style={{ minHeight: tabsBarHeight ? `${tabsBarHeight}px` : undefined }}>
+          <section
+            ref={tabsBarRef}
+            className={`${tabsPinned ? "fixed left-1/2 top-3 z-40 -translate-x-1/2" : "relative"} flex w-max max-w-[calc(100vw-1.5rem)] flex-wrap items-center justify-center gap-2 rounded-[26px] px-3 py-3 transition-all duration-200 ${tabsPinned ? "bg-[#07111f]/82 shadow-[0_18px_38px_rgba(2,8,23,0.34)] backdrop-blur-md" : "bg-transparent shadow-none backdrop-blur-0"}`}
+          >
+              {projectTabs.map((tab) => {
+                const Icon = tab.icon;
+                const active = activeTab === tab.key;
 
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => {
-                    setActiveTab(tab.key);
-                    replaceProjectUrl((nextParams) => {
-                      nextParams.set("tab", tab.key);
-                      nextParams.delete("fonte");
-                    });
-                  }}
-                  className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-3.5 py-2 text-sm font-semibold ${premiumInteractiveClass} ${
-                    active
-                      ? "border-cyan-400/30 bg-cyan-400/14 text-cyan-50 shadow-[0_10px_25px_rgba(34,211,238,0.12)]"
-                      : "border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.07]"
-                  }`}
-                >
-                  <Icon size={15} />
-                  {tab.label}
-                </button>
-              );
-            })}
-        </section>
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(tab.key);
+                      replaceProjectUrl((nextParams) => {
+                        nextParams.set("tab", tab.key);
+                        nextParams.delete("fonte");
+                      });
+                    }}
+                    className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-3.5 py-2 text-sm font-semibold ${premiumInteractiveClass} ${
+                      active
+                        ? "border-cyan-400/30 bg-cyan-400/14 text-cyan-50 shadow-[0_10px_25px_rgba(34,211,238,0.12)]"
+                        : "border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.07]"
+                    }`}
+                  >
+                    <Icon size={15} />
+                    {tab.label}
+                  </button>
+                );
+              })}
+          </section>
+        </div>
 
         <section className={`${renderedTab === "agentes" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
           <div className="flex flex-col gap-4 px-2 py-2 lg:flex-row lg:items-center lg:justify-between">
