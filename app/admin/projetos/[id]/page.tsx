@@ -2974,9 +2974,10 @@ function WidgetModal({
                 placeholder="+55 11 99999-9999"
                 inputMode="tel"
                 autoComplete="tel"
-                maxLength={17}
+                maxLength={20}
                 className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
               />
+              <p className="mt-2 text-xs text-slate-400">Pode digitar ou colar livremente. O sistema limpa e salva apenas os numeros.</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-[0.7fr_0.3fr]">
               <div>
@@ -7355,8 +7356,7 @@ export default function AdminProjetoDetalhePage() {
           setWidgetForm((prev) => ({
             ...prev,
             ...next,
-            whatsappCelular:
-              next.whatsappCelular !== undefined ? formatWhatsAppPhone(next.whatsappCelular) : prev.whatsappCelular,
+            whatsappCelular: next.whatsappCelular !== undefined ? next.whatsappCelular : prev.whatsappCelular,
             projetoId: params.id,
           }))
         }
