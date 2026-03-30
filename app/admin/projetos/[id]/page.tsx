@@ -4170,6 +4170,47 @@ export default function AdminProjetoDetalhePage() {
     ].join("\n");
   };
 
+  const buildHostControlSnippet = (widget: ChatWidget) => {
+    const base = origin || "https://seu-dominio";
+    const projetoRef = data?.projeto.slug || data?.projeto.id || "seu-projeto";
+    const agente = getResolvedWidgetAgent(widget);
+    const agenteRef = agente?.slug || agente?.id || "agente-do-projeto";
+
+    return [
+      `<!-- SDK do chat ${widget.nome} -->`,
+      `<script src="${base}/chat.js" data-projeto="${projetoRef}" data-agente="${agenteRef}"></script>`,
+      "<script>",
+      "  const isAllowedRoute = window.location.pathname.startsWith('/');",
+      "  const hasUnlockedChat = true;",
+      "",
+      "  if (!isAllowedRoute || !hasUnlockedChat) {",
+      "    window.InfraChat.destroy();",
+      "  } else {",
+      "    window.InfraChat.mount({",
+      `      projeto: '${projetoRef}',`,
+      `      agente: '${agenteRef}',`,
+      `      apiBase: '${base}',`,
+      "      strictHostControl: true,",
+      "      context: {",
+      "        route: { path: window.location.pathname },",
+      "        resource: { id: 'recurso-atual', tipo: 'recurso' },",
+      "        ui: {",
+      `          title: '${widget.nome.replace(/'/g, "\\'")}',`,
+      `          theme: '${widget.tema}',`,
+      `          accent: '${widget.corPrimaria}',`,
+      `          transparent: ${widget.fundoTransparente ? "true" : "false"},`,
+      "        },",
+      "      },",
+      "      policy: {",
+      "        allowed: true,",
+      "        allowedRoutes: ['/'],",
+      "      },",
+      "    });",
+      "  }",
+      "</script>",
+    ].join("\n");
+  };
+
   const buildWhatsappSnippet = (widget: ChatWidget) => {
     const digits = sanitizePhoneDigits(widget.whatsappCelular);
     const phone = digits ? `55${digits}` : "5511999999999";
@@ -6779,7 +6820,7 @@ export default function AdminProjetoDetalhePage() {
               </div>
             </div>
             <div className="space-y-4 p-6">
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.9fr)]">
+              <div className="hidden grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.9fr)]">
                 <div className="rounded-2xl border border-cyan-500/20 bg-slate-950/35 p-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
@@ -6852,6 +6893,187 @@ export default function AdminProjetoDetalhePage() {
                   ))}
                 </div>
               </div>
+              <section className="space-y-4">
+                <div className="flex flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-slate-950/35 p-5">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-100">Widgets do chat</p>
+                      <h4 className="mt-1 text-lg font-bold text-white">Widgets criados para este projeto</h4>
+                      <p className="mt-1 max-w-3xl text-sm text-slate-400">
+                        Cada card abaixo mostra o widget, o agente resolvido e os codigos prontos para instalar no site com modo controlado pelo host.
+                      </p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      {[
+                        { label: "Widgets", value: data.widgets.length, tone: "border-cyan-500/20 bg-cyan-500/10 text-cyan-100" },
+                        { label: "Chats do site", value: siteChatsCount, tone: "border-cyan-500/20 bg-cyan-500/10 text-cyan-100" },
+                        { label: "Leads identificados", value: identifiedChatsCount, tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100" },
+                        { label: "Tokens totais", value: totalChatTokens, tone: "border-white/10 bg-slate-950/40 text-white" },
+                      ].map((item) => (
+                        <div key={`chat-widget-metric-${item.label}`} className={`rounded-xl border px-4 py-3 ${item.tone}`}>
+                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] opacity-80">{item.label}</p>
+                          <p className="mt-2 text-2xl font-black">{item.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {data.widgets.length ? (
+                  <div className="space-y-4">
+                    {data.widgets.map((widget) => {
+                      const agente = getResolvedWidgetAgent(widget);
+                      const widgetSnippetKey = `chat-tab-widget:${widget.slug}`;
+                      const hostSnippetKey = `chat-tab-host:${widget.slug}`;
+                      const widgetExpanded = expandedSnippetKeys[widgetSnippetKey] === true;
+                      const hostExpanded = expandedSnippetKeys[hostSnippetKey] === true;
+
+                      return (
+                        <div key={`chat-widget-card-${widget.id ?? widget.slug}`} className="rounded-2xl border border-white/10 bg-slate-950/30 p-5">
+                          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-3">
+                                <h4 className="text-lg font-bold text-white">{widget.nome}</h4>
+                                <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${widget.ativo ? "bg-emerald-500/10 text-emerald-200" : "bg-slate-800 text-slate-400"}`}>
+                                  {widget.ativo ? "ativo" : "inativo"}
+                                </span>
+                                <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-100">
+                                  slug {widget.slug}
+                                </span>
+                              </div>
+                              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                <div className="rounded-xl border border-white/10 bg-slate-950/40 px-3 py-3">
+                                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Agente</p>
+                                  <p className="mt-1 text-sm font-semibold text-white">{agente?.nome ?? "agente ativo do projeto"}</p>
+                                </div>
+                                <div className="rounded-xl border border-white/10 bg-slate-950/40 px-3 py-3">
+                                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Dominio</p>
+                                  <p className="mt-1 truncate text-sm font-semibold text-white">{widget.dominio || "nao informado"}</p>
+                                </div>
+                                <div className="rounded-xl border border-white/10 bg-slate-950/40 px-3 py-3">
+                                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Tema</p>
+                                  <p className="mt-1 text-sm font-semibold text-white">{widget.tema}</p>
+                                </div>
+                                <div className="rounded-xl border border-white/10 bg-slate-950/40 px-3 py-3">
+                                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Cor principal</p>
+                                  <div className="mt-1 flex items-center gap-2">
+                                    <span className="h-3 w-3 rounded-full border border-white/20" style={{ backgroundColor: widget.corPrimaria }} />
+                                    <p className="text-sm font-semibold text-white">{widget.corPrimaria}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleEditWidget(widget)}
+                                className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 font-semibold ${editButtonClass}`}
+                              >
+                                <Pencil size={16} />
+                                Editar chat
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  toggleSnippetExpanded(widgetSnippetKey);
+                                  toggleSnippetExpanded(hostSnippetKey);
+                                }}
+                                className={neutralActionButtonClass}
+                              >
+                                {widgetExpanded || hostExpanded ? <Minimize2 size={14} /> : <Expand size={14} />}
+                                {widgetExpanded || hostExpanded ? "Ocultar codigos" : "Ver codigos"}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-100">Como integrar sem vazar contexto</p>
+                            <div className="mt-2 grid gap-2 text-sm text-amber-50/90 lg:grid-cols-2">
+                              <p>1. O host decide quando o chat pode existir. O widget nao assume autonomia.</p>
+                              <p>2. Ao sair do contexto autorizado, chame `window.InfraChat.destroy()` imediatamente.</p>
+                              <p>3. Ao trocar tenant, usuario, agente, recurso ou rota, invalide o contexto anterior.</p>
+                              <p>4. Carregue o SDK uma vez, mas so monte o chat por comando explicito.</p>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <a
+                                href="/docs/chat-widget-host-control"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-amber-50 transition-colors hover:bg-white/10 hover:text-white"
+                              >
+                                <ExternalLink size={13} />
+                                Abrir documentacao completa
+                              </a>
+                            </div>
+                          </div>
+
+                          {widgetExpanded || hostExpanded ? (
+                            <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                              <div className="rounded-2xl border border-cyan-500/20 bg-[#07111f] p-4">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                  <div>
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-100">Snippet de instalacao</p>
+                                    <p className="mt-1 text-xs text-slate-300">Carrega o SDK e monta o chat com o contexto inicial da pagina.</p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleCopySnippet(widgetSnippetKey, buildWidgetSnippet(widget))}
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
+                                  >
+                                    {copiedSnippetKey === widgetSnippetKey ? <CheckCircle2 size={13} /> : <Copy size={13} />}
+                                    {copiedSnippetKey === widgetSnippetKey ? "Copiado" : "Copiar"}
+                                  </button>
+                                </div>
+                                <div className="mt-4 overflow-x-auto rounded-xl border border-cyan-500/20 bg-[#04111d]">
+                                  <pre className="min-h-[220px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
+                                    {buildWidgetSnippet(widget)
+                                      .split("\n")
+                                      .map((line, index) => (
+                                        <div key={`${widget.slug}-chat-tab-widget-line-${index}`}>{renderSnippetLine(line)}</div>
+                                      ))}
+                                  </pre>
+                                </div>
+                              </div>
+
+                              <div className="rounded-2xl border border-emerald-500/20 bg-[#081611] p-4">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                  <div>
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-100">Exemplo recomendado host-controlled</p>
+                                    <p className="mt-1 text-xs text-emerald-50/80">Use este modelo quando o site precisa decidir quando o chat pode montar, atualizar ou destruir.</p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleCopySnippet(hostSnippetKey, buildHostControlSnippet(widget))}
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/15 hover:text-white"
+                                  >
+                                    {copiedSnippetKey === hostSnippetKey ? <CheckCircle2 size={13} /> : <Copy size={13} />}
+                                    {copiedSnippetKey === hostSnippetKey ? "Copiado" : "Copiar"}
+                                  </button>
+                                </div>
+                                <div className="mt-4 overflow-x-auto rounded-xl border border-emerald-500/20 bg-[#07110d]">
+                                  <pre className="min-h-[220px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
+                                    {buildHostControlSnippet(widget)
+                                      .split("\n")
+                                      .map((line, index) => (
+                                        <div key={`${widget.slug}-chat-tab-host-line-${index}`}>{renderSnippetLine(line)}</div>
+                                      ))}
+                                  </pre>
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">
+                    Nenhum widget de chat criado ainda. Crie um widget para exibir aqui os cards com os codigos de integracao.
+                  </div>
+                )}
+              </section>
+
               <div className="hidden grid gap-4 xl:grid-cols-4">
                 <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-4">
                   <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-200">Potencial comercial</p>
