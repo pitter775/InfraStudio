@@ -4108,6 +4108,13 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const getAgentInactiveApis = (agente: Agente) => getAgentLinkedApis(agente).filter((api) => !api.ativo);
+  const getAgentWidgets = (agente: Agente) =>
+    data?.widgets.filter((widget) => (widget.agenteId ? widget.agenteId === agente.id : agente.ativo)) ?? [];
+
+  const getAgentWhatsAppChannels = (agente: Agente) =>
+    data?.whatsappChannels.filter((channel) => (channel.agenteId ? channel.agenteId === agente.id : agente.ativo)) ?? [];
+
+  const getAgentConnectors = (agente: Agente) => data?.conectores.filter((connector) => connector.agenteId === agente.id) ?? [];
 
   const getWidgetRequiredParameters = (widget: ChatWidget) => {
     const agente = getResolvedWidgetAgent(widget);
@@ -6029,8 +6036,64 @@ export default function AdminProjetoDetalhePage() {
                 const linkedApis = getAgentLinkedApis(agente);
                 const inactiveApis = getAgentInactiveApis(agente);
                 const requiredParameters = getAgentRequiredParameters(agente);
+                const agentWidgets = getAgentWidgets(agente);
+                const activeAgentWidgets = agentWidgets.filter((widget) => widget.ativo);
+                const agentWhatsAppChannels = getAgentWhatsAppChannels(agente);
+                const onlineAgentWhatsAppChannels = agentWhatsAppChannels.filter((channel) => {
+                  const runtimeStatus = serviceStatusByChannel[channel.id] ?? getChannelStatusLabel(channel.sessionData?.connectionStatus);
+                  return runtimeStatus === "conectado" || runtimeStatus === "online";
+                });
+                const agentConnectors = getAgentConnectors(agente);
+                const activeAgentConnectors = agentConnectors.filter((connector) => connector.ativo);
                 const diagnostic = agentDiagnosticsById[agente.id];
                 const latestDiagnostic = latestAgentDiagnosticById[agente.id];
+                const agentOptions = [
+                  {
+                    key: "apis",
+                    label: "APIs",
+                    icon: Activity,
+                    active: linkedApis.length > 0,
+                    detail: linkedApis.length,
+                    activeClass: "border-sky-400/25 bg-sky-400/12 text-sky-100",
+                    inactiveClass: "border-white/8 bg-white/[0.02] text-slate-500",
+                  },
+                  {
+                    key: "whatsapp",
+                    label: "WhatsApp",
+                    icon: Waypoints,
+                    active: agentWhatsAppChannels.length > 0,
+                    detail: onlineAgentWhatsAppChannels.length > 0 ? onlineAgentWhatsAppChannels.length : agentWhatsAppChannels.length,
+                    activeClass: "border-emerald-400/25 bg-emerald-400/12 text-emerald-100",
+                    inactiveClass: "border-white/8 bg-white/[0.02] text-slate-500",
+                  },
+                  {
+                    key: "mercado",
+                    label: "Mercado Livre",
+                    icon: Cable,
+                    active: agentConnectors.length > 0,
+                    detail: activeAgentConnectors.length > 0 ? activeAgentConnectors.length : agentConnectors.length,
+                    activeClass: "border-amber-400/25 bg-amber-400/12 text-amber-100",
+                    inactiveClass: "border-white/8 bg-white/[0.02] text-slate-500",
+                  },
+                  {
+                    key: "widgets",
+                    label: "Widgets",
+                    icon: PanelsTopLeft,
+                    active: agentWidgets.length > 0,
+                    detail: activeAgentWidgets.length > 0 ? activeAgentWidgets.length : agentWidgets.length,
+                    activeClass: "border-violet-400/25 bg-violet-400/12 text-violet-100",
+                    inactiveClass: "border-white/8 bg-white/[0.02] text-slate-500",
+                  },
+                  {
+                    key: "chats",
+                    label: "Chats",
+                    icon: MessageSquareText,
+                    active: (diagnostic?.summary.chats ?? 0) > 0,
+                    detail: diagnostic?.summary.chats ?? 0,
+                    activeClass: "border-rose-400/25 bg-rose-400/12 text-rose-100",
+                    inactiveClass: "border-white/8 bg-white/[0.02] text-slate-500",
+                  },
+                ] as const;
 
                 return (
                   <article key={agente.id} className={`relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.024),rgba(255,255,255,0.012))] p-4 shadow-[0_16px_34px_rgba(2,8,23,0.2)] ${premiumTransitionClass}`}>
@@ -6077,6 +6140,27 @@ export default function AdminProjetoDetalhePage() {
                           Contexto obrigatório: {requiredParameters.map((parametro) => parametro.nome).join(", ")}
                         </p>
                       ) : null}
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {agentOptions.map((option) => {
+                        const Icon = option.icon;
+
+                        return (
+                          <span
+                            key={option.key}
+                            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                              option.active ? option.activeClass : option.inactiveClass
+                            }`}
+                          >
+                            <Icon size={13} />
+                            {option.label}
+                            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${option.active ? "bg-black/15 text-current" : "bg-white/5 text-slate-400"}`}>
+                              {option.detail}
+                            </span>
+                          </span>
+                        );
+                      })}
                     </div>
 
                     {latestDiagnostic ? (
@@ -6144,7 +6228,7 @@ export default function AdminProjetoDetalhePage() {
                         className={successActionButtonClass}
                       >
                         <TestTube2 size={14} />
-                        Testar loja
+                        Testar
                       </button>
                       <button type="button" onClick={() => handleEditAgente(agente)} className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold ${editButtonClass}`}>
                         <Pencil size={14} />
