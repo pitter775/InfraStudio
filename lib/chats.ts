@@ -19,6 +19,7 @@ export type ChatRecord = {
   canal: ChatChannelKind;
   identificadorExterno: string | null;
   contexto: Record<string, unknown> | null;
+  ultimaMensagem: string | null;
 };
 
 export type ChatMessageRecord = {
@@ -101,6 +102,7 @@ function mapChat(row: ChatRow): ChatRecord {
     canal: (row.canal?.trim() || "web") as ChatChannelKind,
     identificadorExterno: row.identificador_externo?.trim() || null,
     contexto: row.contexto,
+    ultimaMensagem: null,
   };
 }
 
@@ -345,7 +347,47 @@ export async function listChats(projetoId?: string | null) {
     return [];
   }
 
-  return data.map((row) => mapChat(row as ChatRow));
+  const chats = data.map((row) => mapChat(row as ChatRow));
+  const chatIds = chats.map((chat) => chat.id);
+
+  if (!chatIds.length) {
+    return chats;
+  }
+
+  const { data: messagesData, error: messagesError } = await supabase
+    .from("mensagens")
+    .select("chat_id, role, conteudo, created_at")
+    .in("chat_id", chatIds)
+    .neq("role", "system")
+    .order("created_at", { ascending: false });
+
+  if (messagesError || !messagesData) {
+    if (messagesError) {
+      console.error("[chats] failed to load latest chat messages", messagesError);
+    }
+    return chats;
+  }
+
+  const latestMessageByChatId = new Map<string, string>();
+
+  for (const row of messagesData as Array<{ chat_id: string | null; conteudo: string | null }>) {
+    const chatId = row.chat_id ?? "";
+    if (!chatId || latestMessageByChatId.has(chatId)) {
+      continue;
+    }
+
+    const content = row.conteudo?.trim() || "";
+    if (!content) {
+      continue;
+    }
+
+    latestMessageByChatId.set(chatId, content);
+  }
+
+  return chats.map((chat) => ({
+    ...chat,
+    ultimaMensagem: latestMessageByChatId.get(chat.id) ?? null,
+  }));
 }
 
 export async function listChatMessages(chatId: string) {

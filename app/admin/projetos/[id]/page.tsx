@@ -80,6 +80,7 @@ type Chat = {
   canal: string;
   identificadorExterno: string | null;
   contexto: Record<string, unknown> | null;
+  ultimaMensagem: string | null;
 };
 
 type ChatMessage = {
@@ -501,6 +502,65 @@ function getChatSummary(chat: Chat) {
   return memory?.resumo?.trim() || null;
 }
 
+function parseChatSummary(rawSummary: string | null | undefined) {
+  const summary = rawSummary?.trim();
+  if (!summary) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(summary) as {
+      objetivo?: string | null;
+      lead?: string | null;
+      restricoes?: string | null;
+      proximo_passo?: string | null;
+    };
+    const parts = [
+      parsed.objetivo ? `Objetivo: ${parsed.objetivo}` : null,
+      parsed.lead ? `Lead: ${parsed.lead}` : null,
+      parsed.restricoes ? `Contexto: ${parsed.restricoes}` : null,
+      parsed.proximo_passo ? `Proximo passo: ${parsed.proximo_passo}` : null,
+    ].filter(Boolean);
+
+    return parts.length ? parts.join(" | ") : summary;
+  } catch {
+    return summary;
+  }
+}
+
+function getChatSessionPreview(chat: Chat) {
+  const parsedSummary = parseChatSummary(getChatSummary(chat));
+  if (parsedSummary) {
+    return parsedSummary;
+  }
+
+  const qualification = chat.contexto?.qualificacao as {
+    objetivo?: string | null;
+    dor_principal?: string | null;
+    segmento?: string | null;
+  } | undefined;
+  const fallbackContext = [
+    qualification?.objetivo ? `Objetivo: ${qualification.objetivo}` : null,
+    qualification?.dor_principal ? `Dor: ${qualification.dor_principal}` : null,
+    qualification?.segmento ? `Segmento: ${qualification.segmento}` : null,
+  ].filter(Boolean);
+
+  if (fallbackContext.length) {
+    return fallbackContext.join(" | ");
+  }
+
+  return chat.ultimaMensagem?.trim() || null;
+}
+
+function formatChatPreview(chat: Chat) {
+  const preview = getChatSessionPreview(chat);
+  if (!preview) {
+    return "Sem resumo consolidado ainda. Clique para abrir a conversa completa.";
+  }
+
+  return preview.replace(/\s+/g, " ").trim();
+}
+
 function getChatPriorityScore(chat: Chat) {
   const lead = chat.contexto?.lead as { identificado?: boolean } | undefined;
   const qualification = chat.contexto?.qualificacao as { pronto_para_whatsapp?: boolean } | undefined;
@@ -514,12 +574,28 @@ function getChatPriorityScore(chat: Chat) {
   return score;
 }
 
+function isWhatsAppChatChannel(chat: Chat) {
+  return chat.canal === "whatsapp";
+}
+
+function isSiteChatChannel(chat: Chat) {
+  return !isWhatsAppChatChannel(chat);
+}
+
 function getChatChannelLabel(chat: Chat) {
-  return chat.canal === "whatsapp" ? "WhatsApp" : "Site";
+  if (isWhatsAppChatChannel(chat)) {
+    return "WhatsApp";
+  }
+
+  if (chat.canal === "home_chat_widget") {
+    return "Site interno";
+  }
+
+  return "Site";
 }
 
 function getChatChannelTone(chat: Chat) {
-  return chat.canal === "whatsapp" ? "bg-emerald-500/10 text-emerald-200" : "bg-cyan-500/10 text-cyan-100";
+  return isWhatsAppChatChannel(chat) ? "bg-emerald-500/10 text-emerald-200" : "bg-cyan-500/10 text-cyan-100";
 }
 
 function normalizeAgentText(value: string) {
@@ -5492,21 +5568,35 @@ export default function AdminProjetoDetalhePage() {
 
   const agenteAtivo = data.agentes.find((agente) => agente.ativo) ?? null;
   const primaryWhatsAppChannel = data.whatsappChannels[0] ?? null;
+  const siteWidget = data.widgets[0] ?? null;
+  const siteWidgetSnippetKey = siteWidget ? `site-chat-snippet-${siteWidget.id ?? siteWidget.slug}` : null;
+  const siteWidgetSnippet = siteWidget ? buildWidgetSnippet(siteWidget) : "";
   const recentWhatsAppChats = data.chats
-    .filter((chat) => chat.canal === "whatsapp")
+    .filter((chat) => isWhatsAppChatChannel(chat))
     .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
     .slice(0, 3);
   const identifiedChatsCount = data.chats.filter((chat) => {
     const lead = chat.contexto?.lead as { identificado?: boolean } | undefined;
     return Boolean(lead?.identificado);
   }).length;
-  const whatsappChatsCount = data.chats.filter((chat) => chat.canal === "whatsapp").length;
+  const whatsappChatsCount = data.chats.filter((chat) => isWhatsAppChatChannel(chat)).length;
   const channelReadyChatsCount = data.chats.filter((chat) => {
     const qualification = chat.contexto?.qualificacao as { pronto_para_whatsapp?: boolean } | undefined;
     return Boolean(qualification?.pronto_para_whatsapp);
   }).length;
   const totalChatTokens = data.chats.reduce((sum, chat) => sum + (chat.totalTokens || 0), 0);
-  const filteredChats = data.chats.filter((chat) => chatChannelFilter === "todos" ? true : chat.canal === chatChannelFilter);
+  const siteChatsCount = data.chats.filter((chat) => isSiteChatChannel(chat)).length;
+  const filteredChats = data.chats.filter((chat) => {
+    if (chatChannelFilter === "todos") {
+      return true;
+    }
+
+    if (chatChannelFilter === "web") {
+      return isSiteChatChannel(chat);
+    }
+
+    return isWhatsAppChatChannel(chat);
+  });
   const sortedChats = [...filteredChats].sort((left, right) => {
     if (chatSortMode === "tokens") {
       return right.totalTokens - left.totalTokens || new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
@@ -6689,7 +6779,80 @@ export default function AdminProjetoDetalhePage() {
               </div>
             </div>
             <div className="space-y-4 p-6">
-              <div className="grid gap-4 xl:grid-cols-4">
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.9fr)]">
+                <div className="rounded-2xl border border-cyan-500/20 bg-slate-950/35 p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-100">Codigo do chat do site</p>
+                      <h4 className="mt-1 text-lg font-bold text-white">{siteWidget?.nome ?? "Configure um widget para este projeto"}</h4>
+                      <p className="mt-1 text-sm text-slate-400">
+                        {siteWidget
+                          ? "Copie o snippet abaixo para instalar o chat. Mantive esse bloco no topo para nao precisar navegar pela aba."
+                          : "Ainda nao existe widget de site configurado para este projeto."}
+                      </p>
+                    </div>
+                    {siteWidget && siteWidgetSnippetKey ? (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedSnippetKeys((current) => ({
+                              ...current,
+                              [siteWidgetSnippetKey]: !current[siteWidgetSnippetKey],
+                            }))
+                          }
+                          className={neutralActionButtonClass}
+                        >
+                          {expandedSnippetKeys[siteWidgetSnippetKey] ? <Minimize2 size={14} /> : <Expand size={14} />}
+                          {expandedSnippetKeys[siteWidgetSnippetKey] ? "Recolher" : "Expandir codigo"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleCopySnippet(siteWidgetSnippetKey, siteWidgetSnippet)}
+                          className={`${headerActionButtonClass} ${premiumInteractiveClass}`}
+                        >
+                          {copiedSnippetKey === siteWidgetSnippetKey ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                          {copiedSnippetKey === siteWidgetSnippetKey ? "Copiado" : "Copiar snippet"}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                  {siteWidget ? (
+                    expandedSnippetKeys[siteWidgetSnippetKey ?? ""] === true ? (
+                      <div className="mt-4 overflow-x-auto rounded-xl border border-white/10 bg-[#07111f]">
+                        <pre className="max-h-[320px] min-h-[180px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
+                          {siteWidgetSnippet.split("\n").map((line, index) => (
+                            <div key={`site-widget-line-${index}`}>{renderSnippetLine(line)}</div>
+                          ))}
+                        </pre>
+                      </div>
+                    ) : (
+                      <div className="mt-4 rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
+                        Snippet pronto para copiar. Clique em <span className="font-semibold text-white">Expandir codigo</span> para revisar antes de usar.
+                      </div>
+                    )
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-dashed border-white/10 bg-slate-950/20 px-4 py-6 text-sm text-slate-400">
+                      Crie um widget do site para gerar aqui o codigo de instalacao.
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  {[
+                    { label: "Chats do site", value: siteChatsCount, tone: "border-cyan-500/20 bg-cyan-500/10 text-cyan-100" },
+                    { label: "Leads identificados", value: identifiedChatsCount, tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100" },
+                    { label: "Prontos para comercial", value: channelReadyChatsCount, tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100" },
+                    { label: "Tokens totais", value: totalChatTokens, tone: "border-white/10 bg-slate-950/40 text-white" },
+                  ].map((item) => (
+                    <div key={item.label} className={`rounded-xl border px-4 py-3 ${item.tone}`}>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] opacity-80">{item.label}</p>
+                      <p className="mt-2 text-2xl font-black">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="hidden grid gap-4 xl:grid-cols-4">
                 <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-4">
                   <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-200">Potencial comercial</p>
                   <p className="mt-2 text-2xl font-black text-white">{channelReadyChatsCount}</p>
@@ -6758,6 +6921,63 @@ export default function AdminProjetoDetalhePage() {
               </div>
 
               {data.chats.length ? (
+                <div className="space-y-3">
+                  {paginatedChats.map((chat) => (
+                    <button
+                      key={`compact-${chat.id}`}
+                      type="button"
+                      onClick={() => void handleOpenChatHistory(chat)}
+                      className="block w-full rounded-xl border border-white/10 bg-slate-950/25 px-4 py-3 text-left transition-colors hover:border-cyan-500/30 hover:bg-slate-950/45"
+                    >
+                      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2 text-cyan-200">
+                            <MessageSquare size={14} />
+                            <p className="truncate font-semibold text-white">{chat.titulo}</p>
+                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(chat)}`}>
+                              {getChatChannelLabel(chat)}
+                            </span>
+                            {getChatPriorityScore(chat) >= 5 ? (
+                              <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-200">
+                                potencial
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">{new Date(chat.updatedAt).toLocaleString("pt-BR")}</p>
+                          <p className="mt-2 line-clamp-2 text-sm text-slate-300">{formatChatPreview(chat)}</p>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-4 xl:min-w-[560px] xl:grid-cols-4">
+                          <div className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2.5">
+                            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Lead</p>
+                            <p className="mt-1 truncate text-sm font-semibold text-white">{getChatLeadName(chat)}</p>
+                          </div>
+                          <div className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2.5">
+                            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Objetivo</p>
+                            <p className="mt-1 truncate text-sm font-semibold text-white">{getChatObjective(chat)}</p>
+                          </div>
+                          <div className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2.5">
+                            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Tokens</p>
+                            <p className="mt-1 text-sm font-semibold text-cyan-100">{chat.totalTokens}</p>
+                          </div>
+                          <div className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2.5">
+                            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Score</p>
+                            <p className="mt-1 text-sm font-semibold text-white">{getChatPriorityScore(chat)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {!data.chats.length ? (
+                <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">
+                  Nenhum chat registrado para este projeto ainda.
+                </div>
+              ) : null}
+
+              <div className="hidden">
+              {data.chats.length ? (
                 paginatedChats.map((chat) => (
                   <button
                     key={chat.id}
@@ -6808,6 +7028,7 @@ export default function AdminProjetoDetalhePage() {
               ) : (
                 <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhum chat registrado para este projeto ainda.</div>
               )}
+              </div>
               {sortedChats.length > chatsPerPage ? (
                 <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-slate-400">

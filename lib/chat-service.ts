@@ -1,4 +1,4 @@
-import { getAgenteById, getAgenteByIdentifier, type AgenteRecord } from "@/lib/agentes";
+import { getAgenteAtivo, getAgenteById, getAgenteByIdentifier, type AgenteRecord } from "@/lib/agentes";
 import { appendChatRequestLog, appendSystemLog } from "@/lib/chat-logs";
 import { enrichLeadContext, generateSalesReply, shouldRefreshSummary, summarizeConversation } from "@/lib/chat-orchestrator";
 import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetByProjetoAgente, getChatWidgetBySlug } from "@/lib/chat-widgets";
@@ -269,7 +269,8 @@ async function resolveChatChannel(body: ChatRequestBody): Promise<ResolvedChatCh
 
   const projeto = await getProjetoById(widget.projetoId);
   const widgetAgent = widget?.agenteId && projeto ? await getAgenteById(widget.agenteId) : null;
-  const agente = widgetAgent && widgetAgent.ativo && widgetAgent.projetoId === projeto?.id ? widgetAgent : null;
+  const widgetLockedAgent = widgetAgent && widgetAgent.ativo && widgetAgent.projetoId === projeto?.id ? widgetAgent : null;
+  const agente = widgetLockedAgent ?? (projeto ? await getAgenteAtivo(projeto.id) : null);
 
   return {
     projeto,
