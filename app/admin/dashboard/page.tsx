@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Activity,
   Bot,
@@ -13,10 +12,7 @@ import {
   Users,
   Waypoints,
 } from "lucide-react";
-import { listProjectUsers } from "@/lib/auth";
-import type { AppUser } from "@/lib/app-user";
 import { getCurrentProjectUser } from "@/lib/auth";
-import { canAccessGlobalAdmin } from "@/lib/access";
 
 type Projeto = {
   id: string;
@@ -99,7 +95,9 @@ type IaUsageSummary = {
 };
 
 type DashboardState = {
-  users: AppUser[];
+  usersCount: number;
+  scope: "global" | "user";
+  userName: string;
   projetos: Projeto[];
   agentes: Agente[];
   apis: Api[];
@@ -144,17 +142,6 @@ function summarizeTitle(value: string, max = 34) {
   }
 
   return `${compact.slice(0, max - 1).trimEnd()}...`;
-}
-
-function getDefaultMonthRange() {
-  const now = new Date();
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
-
-  return {
-    startDate: start.toISOString().slice(0, 10),
-    endDate: end.toISOString().slice(0, 10),
-  };
 }
 
 function MiniAreaChart({ values }: { values: number[] }) {
@@ -249,10 +236,11 @@ function RingChart({
 }
 
 export default function AdminDashboardPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [state, setState] = useState<DashboardState>({
-    users: [],
+    usersCount: 0,
+    scope: "user",
+    userName: "",
     projetos: [],
     agentes: [],
     apis: [],
@@ -264,39 +252,36 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const loadDashboard = async () => {
       const currentUser = await getCurrentProjectUser();
-      if (!canAccessGlobalAdmin(currentUser)) {
-        router.replace("/admin/projetos");
+      if (!currentUser) {
+        setLoading(false);
         return;
       }
 
-      const range = getDefaultMonthRange();
+      const response = await fetch("/api/admin/dashboard", { cache: "no-store" });
+      if (!response.ok) {
+        setLoading(false);
+        return;
+      }
 
-      const [users, projectResourcesResponse, chatsResponse, usageResponse] = await Promise.all([
-        listProjectUsers(),
-        fetch("/api/admin/chat-widgets", { cache: "no-store" }).then((response) => response.json()),
-        fetch("/api/admin/chats", { cache: "no-store" }).then((response) => response.json()),
-        fetch(`/api/admin/ia-usage?startDate=${range.startDate}&endDate=${range.endDate}`, { cache: "no-store" }).then((response) =>
-          response.json(),
-        ),
-      ]);
-
+      const payload = (await response.json()) as Partial<DashboardState>;
       setState({
-        users,
-        projetos: projectResourcesResponse.projetos ?? [],
-        agentes: projectResourcesResponse.agentes ?? [],
-        apis: projectResourcesResponse.apis ?? [],
-        widgets: projectResourcesResponse.widgets ?? [],
-        chats: chatsResponse.chats ?? [],
-        usage: usageResponse.summary ?? null,
+        usersCount: payload.usersCount ?? 0,
+        scope: payload.scope ?? (currentUser.isMaster ? "global" : "user"),
+        userName: payload.userName ?? currentUser.name,
+        projetos: payload.projetos ?? [],
+        agentes: payload.agentes ?? [],
+        apis: payload.apis ?? [],
+        widgets: payload.widgets ?? [],
+        chats: payload.chats ?? [],
+        usage: payload.usage ?? null,
       });
-
       setLoading(false);
     };
 
     void loadDashboard();
-  }, [router]);
+  }, []);
 
-  const { users, projetos, agentes, apis, widgets, chats, usage } = state;
+  const { usersCount, scope, userName, projetos, agentes, apis, widgets, chats, usage } = state;
   const activeProjects = projetos.filter((projeto) => projeto.status === "ativo").length;
   const totalChatTokens = chats.reduce((sum, chat) => sum + Number(chat.totalTokens ?? 0), 0);
   const totalChatCost = chats.reduce((sum, chat) => sum + Number(chat.totalCusto ?? 0), 0);
@@ -338,9 +323,9 @@ export default function AdminDashboardPage() {
       tone: "text-cyan-200",
     },
     {
-      label: "Usuarios",
-      value: formatInteger(users.length),
-      detail: "Equipe com acesso",
+      label: "Usuários",
+      value: formatInteger(usersCount),
+      detail: scope === "global" ? "Equipe com acesso" : "Contexto dos seus projetos",
       icon: Users,
       tone: "text-emerald-200",
     },
@@ -354,7 +339,7 @@ export default function AdminDashboardPage() {
     {
       label: "Tokens",
       value: formatCompact(usage?.totalTokens ?? totalChatTokens),
-      detail: usage ? `${usage.periodLabel}` : "Historico geral",
+      detail: usage ? `${usage.periodLabel}` : "Histórico geral",
       icon: Sparkles,
       tone: "text-fuchsia-200",
     },
@@ -380,11 +365,15 @@ export default function AdminDashboardPage() {
         <div className="px-2 py-2">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-200">
             <Activity size={13} />
-            Dashboard
+            {scope === "global" ? "Dashboard" : "Meu dashboard"}
           </div>
-          <h1 className="text-[2rem] font-extrabold tracking-tight text-white">Visao geral da operacao</h1>
+          <h1 className="text-[2rem] font-extrabold tracking-tight text-white">
+            {scope === "global" ? "Visão geral da operação" : `Visão geral de ${userName}`}
+          </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-            Projetos, uso de IA, volume de chats e custo em uma leitura mais limpa, densa e menor.
+            {scope === "global"
+              ? "Projetos, uso de IA, volume de chats e custo em uma leitura mais limpa, densa e menor."
+              : "Um painel consolidado só com os projetos, chats e consumo de IA que fazem parte do seu contexto."}
           </p>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -430,7 +419,7 @@ export default function AdminDashboardPage() {
                 <div className="pointer-events-none absolute right-3 top-3 text-indigo-200/20">
                   <Waypoints size={18} />
                 </div>
-                <p className="text-slate-500">Saida</p>
+                <p className="text-slate-500">Saída</p>
                 <p className="mt-1 font-bold text-white">{formatCompact(usage?.tokensOutput ?? 0)}</p>
               </div>
               <div className="relative rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
@@ -544,7 +533,7 @@ export default function AdminDashboardPage() {
 
             {!(usage?.topChats ?? []).length && (
               <div className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-5 text-sm text-slate-400">
-                Ainda nao ha chats com consumo de IA para montar este ranking.
+                Ainda não há chats com consumo de IA para montar este ranking.
               </div>
             )}
           </div>
@@ -572,21 +561,21 @@ export default function AdminDashboardPage() {
               </p>
             </div>
             <div className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Historico de chats</p>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Histórico de chats</p>
               <p className="mt-2 text-lg font-bold text-white">{formatInteger(chats.length)}</p>
               <p className="mt-1 text-xs text-slate-400">{formatCompact(totalChatTokens)} tokens acumulados</p>
             </div>
             <div className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Media por chat</p>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Média por chat</p>
               <p className="mt-2 text-lg font-bold text-white">
                 {formatInteger(usage?.activeChats ? Math.round((usage.totalTokens || 0) / usage.activeChats) : 0)}
               </p>
               <p className="mt-1 text-xs text-slate-400">tokens no periodo filtrado</p>
             </div>
             <div className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Usuarios com acesso</p>
-              <p className="mt-2 text-lg font-bold text-white">{formatInteger(users.length)}</p>
-              <p className="mt-1 text-xs text-slate-400">visao administrativa geral</p>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Usuários com acesso</p>
+              <p className="mt-2 text-lg font-bold text-white">{formatInteger(usersCount)}</p>
+              <p className="mt-1 text-xs text-slate-400">{scope === "global" ? "visão administrativa geral" : "base relacionada aos seus projetos"}</p>
             </div>
           </div>
         </div>
@@ -598,7 +587,7 @@ export default function AdminDashboardPage() {
             </div>
             <div>
               <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Atividade recente</p>
-              <h2 className="mt-1 text-lg font-bold text-white">Ultimas mensagens com consumo</h2>
+              <h2 className="mt-1 text-lg font-bold text-white">Últimas mensagens com consumo</h2>
             </div>
           </div>
 
@@ -608,7 +597,7 @@ export default function AdminDashboardPage() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold text-white">{summarizeTitle(item.titulo, 42)}</p>
                   <p className="mt-1 text-xs text-slate-400">
-                    {item.leadNome ?? "Lead nao identificado"} | {item.agenteNome ?? "Sem agente"}
+                    {item.leadNome ?? "Lead não identificado"} | {item.agenteNome ?? "Sem agente"}
                   </p>
                   <p className="mt-2 text-[11px] uppercase tracking-[0.16em] text-slate-500">
                     {item.role} | {formatDateTime(item.createdAt)}

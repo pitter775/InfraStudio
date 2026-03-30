@@ -39,7 +39,7 @@ const adminLinks = [
   { href: "/admin/me", label: "Meu Perfil", icon: Settings },
   { href: "/admin/usage", label: "Uso de Tokens", icon: Coins },
   { href: "/admin/chat-logs", label: "Logs", icon: ActivitySquare },
-  { href: "/admin/usuarios", label: "Usuarios", icon: Users },
+  { href: "/admin/usuarios", label: "Usuários", icon: Users },
 ];
 
 function isAdminLinkActive(pathname: string, href: string) {
@@ -89,7 +89,7 @@ function Sidebar({
   onLogout,
 }: SidebarProps) {
   const visibleLinks = currentUser && !canAccessGlobalAdmin(currentUser)
-    ? adminLinks.filter((item) => item.href === "/admin/projetos" || item.href === "/admin/me")
+    ? adminLinks.filter((item) => item.href === "/admin/dashboard" || item.href === "/admin/projetos" || item.href === "/admin/me")
     : adminLinks;
 
   return (
@@ -189,29 +189,8 @@ function Sidebar({
               collapsed ? "flex flex-col items-center gap-3" : "space-y-3",
             )}
           >
-            <div className={cn("flex items-center gap-3", collapsed ? "justify-center" : "")}>
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/24 to-cyan-400/12 text-blue-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-                <UserRound size={18} />
-              </div>
-              {!collapsed ? (
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">{currentUser?.name ?? "Não autenticado"}</p>
-                  <p className="truncate text-xs text-slate-400">{currentUser?.email ?? "Login pela home"}</p>
-                  {!currentUser?.isMaster && currentUser?.memberships?.[0]?.projetoNome ? (
-                    <p className="truncate text-[11px] uppercase tracking-[0.16em] text-cyan-200/80">
-                      {currentUser.memberships[0].projetoNome}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-
             {!collapsed ? (
               <>
-                <div className="rounded-xl border border-emerald-400/18 bg-emerald-400/10 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100">
-                  {currentUser?.isMaster ? "master" : currentUser?.role ?? "sem acesso"}
-                </div>
-
                 <div className="grid grid-cols-2 gap-2">
                   <Link
                     href="/"
@@ -332,7 +311,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
             <div className="absolute h-14 w-14 rounded-full bg-cyan-400/15 blur-xl animate-pulse" />
             <Image src="/logo.png" alt="InfraStudio" width={38} height={38} className="relative h-10 w-10 object-contain" />
           </div>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">{loggingOut ? "Encerrando sessao" : "Validando acesso"}</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">{loggingOut ? "Encerrando sessão" : "Validando acesso"}</p>
           <p className="mt-3 text-lg text-white">{loggingOut ? "Saindo do painel..." : "Carregando ambiente..."}</p>
         </div>
       </div>

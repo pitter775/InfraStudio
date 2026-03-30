@@ -31,7 +31,7 @@ type PlanoOption = {
 
 function formatDate(value: string | null) {
   if (!value) {
-    return "Nao iniciado";
+    return "Não iniciado";
   }
 
   return new Date(value).toLocaleDateString("pt-BR");
@@ -81,7 +81,7 @@ export default function AdminAssinaturasPage() {
     const payload = (await response.json()) as { error?: string };
 
     if (!response.ok) {
-      setFeedback(payload.error ?? "Nao foi possivel salvar a assinatura.");
+      setFeedback(payload.error ?? "Não foi possível salvar a assinatura.");
       setSaving(false);
       return;
     }
@@ -119,7 +119,7 @@ export default function AdminAssinaturasPage() {
     const payload = (await response.json()) as { error?: string };
 
     if (!response.ok) {
-      setFeedback(payload.error ?? "Nao foi possivel trocar o plano.");
+      setFeedback(payload.error ?? "Não foi possível trocar o plano.");
       setUpdatingProjetoId(null);
       return;
     }
@@ -184,7 +184,7 @@ export default function AdminAssinaturasPage() {
                     <span className="rounded-full bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-300">{item.modoCobranca}</span>
                   </div>
                   <p className="mt-2 text-sm text-slate-300">Plano atual: {item.planoNome}</p>
-                  <p className="mt-1 text-sm text-slate-400">Status: {item.status ?? "sem assinatura"} | Inicio: {formatDate(item.dataInicio)} | Fim: {formatDate(item.dataFim)}</p>
+                  <p className="mt-1 text-sm text-slate-400">Status: {item.status ?? "sem assinatura"} | Início: {formatDate(item.dataInicio)} | Fim: {formatDate(item.dataFim)}</p>
                   <p className="mt-1 text-sm text-slate-400">Uso atual: {item.usoPercentual === null ? "sem limite" : `${Math.round(item.usoPercentual)}%`}</p>
                 </div>
 
@@ -198,7 +198,7 @@ export default function AdminAssinaturasPage() {
                       className="mt-3 w-full rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <option value="">
-                        {item.modoCobranca === "plano" ? item.planoNome || "Selecione o plano" : "Disponivel apenas em modo plano"}
+                        {item.modoCobranca === "plano" ? item.planoNome || "Selecione o plano" : "Disponível apenas em modo plano"}
                       </option>
                       {planos
                         .filter((plano) => plano.ativo)
@@ -210,8 +210,8 @@ export default function AdminAssinaturasPage() {
                     </select>
                     <p className="mt-2 text-xs text-slate-400">
                       {item.modoCobranca === "plano"
-                        ? "Ao mudar aqui, a assinatura, o snapshot e o ciclo sao atualizados imediatamente."
-                        : `Projeto em modo ${item.modoCobranca}. Altere o modo de cobranca para plano para habilitar a troca.`}
+                        ? "Ao mudar aqui, a assinatura, o snapshot e o ciclo são atualizados imediatamente."
+                        : `Projeto em modo ${item.modoCobranca}. Altere o modo de cobrança para plano para habilitar a troca.`}
                     </p>
                   </div>
 

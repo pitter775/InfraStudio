@@ -154,7 +154,7 @@ export default function AdminProjetosPage() {
     const payload = (await response.json()) as { error?: string; projeto?: Projeto };
 
     if (!response.ok) {
-      setFeedback(payload.error ?? "Nao foi possivel criar o projeto.");
+      setFeedback(payload.error ?? "Não foi possível criar o projeto.");
       setSaving(false);
       return;
     }
@@ -197,7 +197,7 @@ export default function AdminProjetosPage() {
     const payload = (await response.json()) as { error?: string; projeto?: Projeto };
 
     if (!response.ok) {
-      setFeedback(payload.error ?? "Nao foi possivel atualizar o modo de cobranca.");
+      setFeedback(payload.error ?? "Não foi possível atualizar o modo de cobrança.");
       return;
     }
 
@@ -211,7 +211,7 @@ export default function AdminProjetosPage() {
           : item,
       ),
     );
-    setFeedback("Modo de cobranca atualizado.");
+    setFeedback("Modo de cobrança atualizado.");
   };
 
   const handlePlanoChange = async (projeto: Projeto, planoId: string) => {
@@ -234,7 +234,7 @@ export default function AdminProjetosPage() {
     const payload = (await response.json()) as { error?: string };
 
     if (!response.ok) {
-      setFeedback(payload.error ?? "Nao foi possivel trocar o plano do projeto.");
+      setFeedback(payload.error ?? "Não foi possível trocar o plano do projeto.");
       setUpdatingPlanoProjetoId(null);
       return;
     }
@@ -262,7 +262,7 @@ export default function AdminProjetosPage() {
             <Lock size={14} />
             Acesso bloqueado
           </div>
-          <h2 className="text-2xl font-bold text-white">Voce ainda nao fez login</h2>
+          <h2 className="text-2xl font-bold text-white">Você ainda não fez login</h2>
           <p className="mt-3 max-w-xl text-slate-300">Entre para acessar seus projetos.</p>
         </section>
       </main>
@@ -275,10 +275,10 @@ export default function AdminProjetosPage() {
         <section className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-8">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-rose-400/20 bg-slate-950/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-rose-200">
             <Shield size={14} />
-            Permissao insuficiente
+            Permissão insuficiente
           </div>
           <h2 className="text-2xl font-bold text-white">Sem acesso ao ambiente</h2>
-          <p className="mt-3 max-w-xl text-slate-300">Seu usuario precisa estar autenticado para criar ou acessar projetos.</p>
+          <p className="mt-3 max-w-xl text-slate-300">Seu usuário precisa estar autenticado para criar ou acessar projetos.</p>
         </section>
       </main>
     );
@@ -315,7 +315,7 @@ export default function AdminProjetosPage() {
             {
               label: "Projetos",
               value: projetos.length,
-              description: "Workspaces disponiveis para abrir e operar.",
+              description: "Workspaces disponíveis para abrir e operar.",
               icon: BriefcaseBusiness,
               tone: "text-amber-200",
               glow: "bg-amber-400/16",
@@ -323,7 +323,7 @@ export default function AdminProjetosPage() {
             {
               label: "Agentes",
               value: projetos.reduce((sum, projeto) => sum + projeto.stats.totalAgentes, 0),
-              description: "Total consolidado de agentes em todos os projetos visiveis.",
+              description: "Total consolidado de agentes em todos os projetos visíveis.",
               icon: Bot,
               tone: "text-cyan-200",
               glow: "bg-cyan-400/16",
@@ -359,7 +359,7 @@ export default function AdminProjetosPage() {
       <section className="overflow-hidden rounded-2xl">
         <div className="px-1 py-2">
           <h2 className="text-xl font-bold text-slate-50">Meus projetos</h2>
-          <p className="mt-2 text-sm text-slate-400">Escolha um projeto para continuar de onde voce parou.</p>
+          <p className="mt-2 text-sm text-slate-400">Escolha um projeto para continuar de onde você parou.</p>
         </div>
         <div className="px-1 py-4">
           {loading ? <CenterLoader /> : null}
@@ -381,7 +381,7 @@ export default function AdminProjetosPage() {
                             <span className="rounded-full bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-300">{projeto.tipo}</span>
                           ) : null}
                         </div>
-                        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">{projeto.descricao || "Sem descricao."}</p>
+                        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">{projeto.descricao || "Sem descrição."}</p>
                         <div className="mt-4 grid gap-3 md:grid-cols-3">
                           <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-4 py-3">
                             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Plano atual</p>
@@ -412,7 +412,7 @@ export default function AdminProjetosPage() {
                             </p>
                           </div>
                           <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-4 py-3">
-                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Modo de cobranca</p>
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Modo de cobrança</p>
                             {currentUser?.isMaster ? (
                               <select
                                 value={projeto.modoCobranca}
@@ -453,7 +453,7 @@ export default function AdminProjetosPage() {
                           glow: "bg-cyan-400/14",
                         },
                         {
-                          label: "Integracoes",
+                          label: "Integrações",
                           value: projeto.stats.totalConectores,
                           description: `${projeto.stats.conectoresAtivos} ativas`,
                           icon: Cable,
@@ -463,7 +463,7 @@ export default function AdminProjetosPage() {
                         {
                           label: "Chats",
                           value: projeto.stats.totalChats,
-                          description: "Historico do projeto",
+                          description: "Histórico do projeto",
                           icon: MessageSquareText,
                           tone: "text-emerald-200",
                           glow: "bg-emerald-400/14",
@@ -515,7 +515,7 @@ export default function AdminProjetosPage() {
                 <option value="manual">manual</option>
                 <option value="ilimitado">ilimitado</option>
               </select>
-              <textarea value={form.descricao} onChange={(event) => setForm((current) => ({ ...current, descricao: event.target.value }))} placeholder="Descricao" rows={4} className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
+              <textarea value={form.descricao} onChange={(event) => setForm((current) => ({ ...current, descricao: event.target.value }))} placeholder="Descrição" rows={4} className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
             </div>
             <div className="mt-6 flex gap-3">
               <button type="button" onClick={() => setModalOpen(false)} className={neutralActionButtonClass}>Cancelar</button>

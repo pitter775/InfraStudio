@@ -83,7 +83,7 @@ export default function AdminPlanosPage() {
     const payload = (await response.json()) as { error?: string };
 
     if (!response.ok) {
-      setFeedback(payload.error ?? "Nao foi possivel salvar o plano.");
+      setFeedback(payload.error ?? "Não foi possível salvar o plano.");
       setSaving(false);
       return;
     }
@@ -107,7 +107,7 @@ export default function AdminPlanosPage() {
   };
 
   const handleDeletePlano = async (plano: Plano) => {
-    const confirmed = window.confirm(`Excluir o plano "${plano.nome}"? Essa acao nao pode ser desfeita.`);
+    const confirmed = window.confirm(`Excluir o plano "${plano.nome}"? Essa ação não pode ser desfeita.`);
     if (!confirmed) {
       return;
     }
@@ -121,7 +121,7 @@ export default function AdminPlanosPage() {
     const payload = (await response.json().catch(() => null)) as { error?: string } | null;
 
     if (!response.ok) {
-      setFeedback(payload?.error ?? "Nao foi possivel excluir o plano.");
+      setFeedback(payload?.error ?? "Não foi possível excluir o plano.");
       setDeletingPlanoId(null);
       return;
     }
@@ -142,7 +142,7 @@ export default function AdminPlanosPage() {
           Planos
         </div>
         <h1 className="text-4xl font-extrabold text-white">Planos SaaS</h1>
-        <p className="mt-4 max-w-3xl text-slate-400">Crie, ajuste limites e controle quais planos ficam disponiveis para assinatura.</p>
+        <p className="mt-4 max-w-3xl text-slate-400">Crie, ajuste limites e controle quais planos ficam disponíveis para assinatura.</p>
       </section>
 
       {feedback ? <section className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</section> : null}
@@ -151,7 +151,7 @@ export default function AdminPlanosPage() {
         <article className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Planos cadastrados</p>
           <p className="mt-3 text-4xl font-black text-white">{planos.length}</p>
-          <p className="mt-2 text-sm text-slate-400">Quantidade total de planos disponiveis no cadastro SaaS.</p>
+          <p className="mt-2 text-sm text-slate-400">Quantidade total de planos disponíveis no cadastro SaaS.</p>
         </article>
         <article className="rounded-3xl border border-emerald-400/15 bg-emerald-500/10 p-5">
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100/80">Planos ativos</p>
@@ -159,7 +159,7 @@ export default function AdminPlanosPage() {
           <p className="mt-2 text-sm text-emerald-50/80">Esses planos podem ser aplicados imediatamente nas assinaturas.</p>
         </article>
         <article className="rounded-3xl border border-cyan-400/15 bg-cyan-500/10 p-5">
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-100/80">Lista rapida</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-100/80">Lista rápida</p>
           <p className="mt-3 text-sm font-semibold text-white">
             {planos.length ? planos.map((plano) => plano.nome).join(" • ") : "Nenhum plano carregado ainda."}
           </p>
@@ -172,7 +172,7 @@ export default function AdminPlanosPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-2xl font-bold text-white">{form.id ? "Editar plano" : "Novo plano"}</h2>
-              <p className="mt-1 text-sm text-slate-400">Os limites daqui alimentam snapshot, assinatura e bloqueio automatico.</p>
+              <p className="mt-1 text-sm text-slate-400">Os limites daqui alimentam snapshot, assinatura e bloqueio automático.</p>
             </div>
             <button
               type="button"
@@ -184,14 +184,35 @@ export default function AdminPlanosPage() {
           </div>
 
           <div className="mt-6 grid gap-4">
-            <input value={form.nome} onChange={(event) => setForm((current) => ({ ...current, nome: event.target.value }))} placeholder="Nome do plano" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
-            <input value={form.precoMensal} onChange={(event) => setForm((current) => ({ ...current, precoMensal: event.target.value }))} placeholder="Preco mensal" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
-            <input value={form.limiteTokensTotalMensal} onChange={(event) => setForm((current) => ({ ...current, limiteTokensTotalMensal: event.target.value }))} placeholder="Limite tokens total mensal" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
-            <input value={form.limiteCustoMensal} onChange={(event) => setForm((current) => ({ ...current, limiteCustoMensal: event.target.value }))} placeholder="Limite custo mensal" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold text-slate-200">Nome do plano</span>
+              <input value={form.nome} onChange={(event) => setForm((current) => ({ ...current, nome: event.target.value }))} placeholder="Nome do plano" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold text-slate-200">Preço mensal</span>
+              <input value={form.precoMensal} onChange={(event) => setForm((current) => ({ ...current, precoMensal: event.target.value }))} placeholder="Preço mensal" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold text-slate-200">Limite tokens total mensal</span>
+              <input value={form.limiteTokensTotalMensal} onChange={(event) => setForm((current) => ({ ...current, limiteTokensTotalMensal: event.target.value }))} placeholder="Limite tokens total mensal" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold text-slate-200">Limite de custo mensal</span>
+              <input value={form.limiteCustoMensal} onChange={(event) => setForm((current) => ({ ...current, limiteCustoMensal: event.target.value }))} placeholder="Limite de custo mensal" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
+            </label>
             <div className="grid gap-4 md:grid-cols-3">
-              <input value={form.maxAgentes} onChange={(event) => setForm((current) => ({ ...current, maxAgentes: event.target.value }))} placeholder="Max agentes" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
-              <input value={form.maxApis} onChange={(event) => setForm((current) => ({ ...current, maxApis: event.target.value }))} placeholder="Max APIs" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
-              <input value={form.maxWhatsapp} onChange={(event) => setForm((current) => ({ ...current, maxWhatsapp: event.target.value }))} placeholder="Max WhatsApp" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold text-slate-200">Max agentes</span>
+                <input value={form.maxAgentes} onChange={(event) => setForm((current) => ({ ...current, maxAgentes: event.target.value }))} placeholder="Max agentes" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
+              </label>
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold text-slate-200">Max APIs</span>
+                <input value={form.maxApis} onChange={(event) => setForm((current) => ({ ...current, maxApis: event.target.value }))} placeholder="Max APIs" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
+              </label>
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold text-slate-200">Max WhatsApp</span>
+                <input value={form.maxWhatsapp} onChange={(event) => setForm((current) => ({ ...current, maxWhatsapp: event.target.value }))} placeholder="Max WhatsApp" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
+              </label>
             </div>
             <label className="inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm text-slate-200">
               <input type="checkbox" checked={form.ativo} onChange={(event) => setForm((current) => ({ ...current, ativo: event.target.checked }))} />
@@ -230,7 +251,7 @@ export default function AdminPlanosPage() {
                         {plano.ativo ? "ativo" : "inativo"}
                       </span>
                     </div>
-                    <p className="mt-2 text-sm text-slate-300">{formatCurrency(plano.precoMensal)} / mes</p>
+                    <p className="mt-2 text-sm text-slate-300">{formatCurrency(plano.precoMensal)} / mês</p>
                     <p className="mt-2 text-sm text-slate-400">
                       Tokens: {(plano.limiteTokensTotalMensal ?? 0).toLocaleString("pt-BR")} | Custo: {formatCurrency(plano.limiteCustoMensal ?? 0)}
                     </p>
