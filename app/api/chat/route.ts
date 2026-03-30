@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as ChatRequestBody;
     const result = await processIncomingChatMessage({
       ...body,
-      canal: body.canal ?? "web",
+      canal: body.canal,
       source: body.source ?? "site_widget",
     });
 
