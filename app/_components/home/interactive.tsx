@@ -82,7 +82,7 @@ type LoginModalProps = {
 };
 
 export function LoginModal({ open, onClose, onLogin, authProvider }: LoginModalProps) {
-  const [email, setEmail] = useState("adm@adm");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -153,7 +153,7 @@ export function LoginModal({ open, onClose, onLogin, authProvider }: LoginModalP
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-500 focus:border-blue-500/60"
-              placeholder="adm@adm"
+              placeholder="voce@empresa.com"
             />
           </div>
 
@@ -171,20 +171,13 @@ export function LoginModal({ open, onClose, onLogin, authProvider }: LoginModalP
             />
           </div>
 
-          <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/8 p-4 text-sm text-emerald-100">
-            <p className="font-semibold">{authProvider === "database" ? "Autenticação própria" : "Acesso demo"}</p>
-            {authProvider === "database" ? (
-              <>
-                <p className="mt-1 text-emerald-200/80">Use um usuário cadastrado na tabela `public.usuarios`.</p>
-                <p className="text-emerald-200/80">Exemplo atual: `adm@adm`</p>
-              </>
-            ) : (
-              <>
-                <p className="mt-1 text-emerald-200/80">Email: admin@infrastudio.com</p>
-                <p className="text-emerald-200/80">Senha: admin123</p>
-              </>
-            )}
-          </div>
+          {authProvider === "database" ? null : (
+            <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/8 p-4 text-sm text-emerald-100">
+              <p className="font-semibold">Acesso demo</p>
+              <p className="mt-1 text-emerald-200/80">Email: admin@infrastudio.com</p>
+              <p className="text-emerald-200/80">Senha: admin123</p>
+            </div>
+          )}
 
           {error ? (
             <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">

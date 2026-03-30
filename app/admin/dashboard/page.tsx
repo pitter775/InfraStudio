@@ -201,11 +201,13 @@ function RingChart({
   total,
   label,
   accent,
+  icon: Icon,
 }: {
   value: number;
   total: number;
   label: string;
   accent: string;
+  icon: typeof Bot;
 }) {
   const radius = 28;
   const circumference = 2 * Math.PI * radius;
@@ -214,7 +216,10 @@ function RingChart({
   const dashOffset = circumference * (1 - ratio);
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3">
+    <div className="relative flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3">
+      <div className="pointer-events-none absolute right-4 top-4 text-slate-600/70">
+        <Icon size={24} />
+      </div>
       <div className="relative h-16 w-16 shrink-0">
         <svg viewBox="0 0 72 72" className="h-16 w-16 -rotate-90">
           <circle cx="36" cy="36" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
@@ -330,54 +335,54 @@ export default function AdminDashboardPage() {
       value: formatInteger(projetos.length),
       detail: `${formatInteger(activeProjects)} ativos`,
       icon: BriefcaseBusiness,
-      tint: "from-cyan-400/20 to-sky-500/10",
+      tone: "text-cyan-200",
     },
     {
       label: "Usuarios",
       value: formatInteger(users.length),
       detail: "Equipe com acesso",
       icon: Users,
-      tint: "from-emerald-400/20 to-teal-500/10",
+      tone: "text-emerald-200",
     },
     {
       label: "Chats",
       value: formatInteger(chats.length),
       detail: `${formatInteger(usage?.activeChats ?? 0)} com IA no periodo`,
       icon: MessageSquare,
-      tint: "from-orange-400/20 to-amber-500/10",
+      tone: "text-orange-200",
     },
     {
       label: "Tokens",
       value: formatCompact(usage?.totalTokens ?? totalChatTokens),
       detail: usage ? `${usage.periodLabel}` : "Historico geral",
       icon: Sparkles,
-      tint: "from-fuchsia-400/18 to-violet-500/10",
+      tone: "text-fuchsia-200",
     },
     {
       label: "Custo",
       value: formatCurrency(usage?.totalCost ?? totalChatCost, usage?.costCurrency ?? "USD"),
       detail: usage?.hasCostData ? `Estimado em ${usage?.costModel ?? "gpt-4o-mini"}` : "Sem custo calculado",
       icon: Coins,
-      tint: "from-lime-400/20 to-emerald-500/10",
+      tone: "text-lime-200",
     },
     {
       label: "Agentes",
       value: formatInteger(agentes.length),
       detail: `${formatInteger(widgets.length)} widgets | ${formatInteger(apis.length)} APIs`,
       icon: Bot,
-      tint: "from-indigo-400/20 to-blue-500/10",
+      tone: "text-indigo-200",
     },
   ];
 
   return (
     <main className="space-y-5">
       <section className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-        <div className="rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.96))] px-5 py-5">
+        <div className="px-2 py-2">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-200">
             <Activity size={13} />
             Dashboard
           </div>
-          <h1 className="text-[2rem] font-extrabold tracking-tight text-white">Visao geral compacta da operacao</h1>
+          <h1 className="text-[2rem] font-extrabold tracking-tight text-white">Visao geral da operacao</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
             Projetos, uso de IA, volume de chats e custo em uma leitura mais limpa, densa e menor.
           </p>
@@ -387,9 +392,9 @@ export default function AdminDashboardPage() {
               const Icon = item.icon;
 
               return (
-                <div key={item.label} className="rounded-[20px] border border-white/8 bg-white/[0.04] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                  <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br ${item.tint} text-white`}>
-                    <Icon size={18} />
+                <div key={item.label} className="relative rounded-[20px] border border-white/8 bg-white/[0.04] p-4 shadow-[0_18px_36px_rgba(2,8,23,0.18)]">
+                  <div className={`pointer-events-none absolute right-4 top-4 ${item.tone} opacity-20`}>
+                    <Icon size={30} />
                   </div>
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
                   <p className="mt-2 text-2xl font-extrabold text-white">{item.value}</p>
@@ -414,15 +419,24 @@ export default function AdminDashboardPage() {
             </div>
             <MiniAreaChart values={topChatSeries} />
             <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-              <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+              <div className="relative rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+                <div className="pointer-events-none absolute right-3 top-3 text-cyan-200/20">
+                  <Sparkles size={18} />
+                </div>
                 <p className="text-slate-500">Entrada</p>
                 <p className="mt-1 font-bold text-white">{formatCompact(usage?.tokensInput ?? 0)}</p>
               </div>
-              <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+              <div className="relative rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+                <div className="pointer-events-none absolute right-3 top-3 text-indigo-200/20">
+                  <Waypoints size={18} />
+                </div>
                 <p className="text-slate-500">Saida</p>
                 <p className="mt-1 font-bold text-white">{formatCompact(usage?.tokensOutput ?? 0)}</p>
               </div>
-              <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+              <div className="relative rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+                <div className="pointer-events-none absolute right-3 top-3 text-emerald-200/20">
+                  <Coins size={18} />
+                </div>
                 <p className="text-slate-500">Custo</p>
                 <p className="mt-1 font-bold text-white">{formatCurrency(usage?.totalCost ?? 0, usage?.costCurrency ?? "USD")}</p>
               </div>
@@ -430,8 +444,8 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <RingChart value={usage?.activeChats ?? 0} total={Math.max(chats.length, 1)} label="Chats com IA" accent="rgba(34,197,94,0.95)" />
-            <RingChart value={activeProjects} total={Math.max(projetos.length, 1)} label="Projetos ativos" accent="rgba(251,191,36,0.95)" />
+            <RingChart value={usage?.activeChats ?? 0} total={Math.max(chats.length, 1)} label="Chats com IA" accent="rgba(34,197,94,0.95)" icon={MessageSquare} />
+            <RingChart value={activeProjects} total={Math.max(projetos.length, 1)} label="Projetos ativos" accent="rgba(251,191,36,0.95)" icon={BriefcaseBusiness} />
           </div>
         </div>
       </section>

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import {
   ActivitySquare,
@@ -68,7 +69,7 @@ type SidebarProps = {
   loadingHref: string | null;
   onCollapseToggle: () => void;
   onCloseMobile: () => void;
-  onLinkStart: (href: string) => void;
+  onNavigate: (href: string) => void;
   onLogout: () => Promise<void> | void;
 };
 
@@ -80,7 +81,7 @@ function Sidebar({
   loadingHref,
   onCollapseToggle,
   onCloseMobile,
-  onLinkStart,
+  onNavigate,
   onLogout,
 }: SidebarProps) {
   const visibleLinks = currentUser && !canAccessGlobalAdmin(currentUser)
@@ -152,12 +153,12 @@ function Sidebar({
             const isLoading = loadingHref === item.href;
 
             return (
-              <Link
+              <button
                 key={item.href}
-                href={item.href}
+                type="button"
                 onClick={() => {
                   if (!isAdminLinkActive(pathname, item.href)) {
-                    onLinkStart(item.href);
+                    onNavigate(item.href);
                   }
                   onCloseMobile();
                 }}
@@ -172,7 +173,7 @@ function Sidebar({
               >
                 {isLoading ? <LoaderCircle size={18} className="shrink-0 animate-spin" /> : <Icon size={18} className="shrink-0" />}
                 {!collapsed ? <span>{item.label}</span> : null}
-              </Link>
+              </button>
             );
           })}
         </nav>
@@ -267,6 +268,8 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
   const [loadingHref, setLoadingHref] = useState<string | null>(null);
+  const [contentTransitionKey, setContentTransitionKey] = useState(pathname);
+  const [contentVisible, setContentVisible] = useState(true);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -285,8 +288,23 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
 
   useEffect(() => {
     setMobileOpen(false);
-    setLoadingHref(null);
+    if (pathname !== contentTransitionKey) {
+      setContentVisible(false);
+      const frame = window.setTimeout(() => {
+        setContentTransitionKey(pathname);
+        setLoadingHref(null);
+        setContentVisible(true);
+      }, 160);
+
+      return () => window.clearTimeout(frame);
+    }
   }, [pathname]);
+
+  useEffect(() => {
+    adminLinks.forEach((item) => {
+      router.prefetch(item.href);
+    });
+  }, [router]);
 
   useEffect(() => {
     persistSidebarCollapsedCookie(collapsed);
@@ -296,6 +314,16 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
     await signOutProjectAuth();
     setCurrentUser(null);
     window.location.href = "/";
+  };
+
+  const handleNavigate = (href: string) => {
+    if (href === pathname || loadingHref === href) {
+      return;
+    }
+
+    setLoadingHref(href);
+    router.prefetch(href);
+    router.push(href);
   };
 
   if (!authResolved) {
@@ -324,7 +352,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
         loadingHref={loadingHref}
         onCollapseToggle={() => setCollapsed((value) => !value)}
         onCloseMobile={() => setMobileOpen(false)}
-        onLinkStart={setLoadingHref}
+        onNavigate={handleNavigate}
         onLogout={handleLogout}
       />
 
@@ -355,7 +383,19 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
         </div>
 
          <div className="flex min-h-screen flex-col">
-          <div className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</div>
+          <div className="relative flex-1 overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={contentTransitionKey}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: contentVisible ? 1 : 0, y: contentVisible ? 0 : 10 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.26, ease: "easeOut" }}
+              >
+                {children}
+              </motion.div>
+            </AnimatePresence>
+          </div>
           <FooterSection />
          </div>
       </div>
