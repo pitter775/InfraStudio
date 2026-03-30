@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Activity, ArrowLeft, Bold, Bot, Boxes, Cable, CheckCircle2, Coins, Copy, Cpu, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, LoaderCircle, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, ShieldAlert, Sparkles, TestTube2, Trash2, Waypoints, X } from "lucide-react";
+import { Activity, ArrowLeft, Bold, Bot, Boxes, Cable, CheckCircle2, ChevronDown, Coins, Copy, Cpu, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, LoaderCircle, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, ShieldAlert, Sparkles, TestTube2, Trash2, Waypoints, X } from "lucide-react";
 import { getAgentRuntimeBlockEntries, normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
 
 type Projeto = {
@@ -3749,6 +3749,7 @@ export default function AdminProjetoDetalhePage() {
   const [tabContentVisible, setTabContentVisible] = useState(true);
   const [tabsPinned, setTabsPinned] = useState(false);
   const [tabsBarHeight, setTabsBarHeight] = useState(0);
+  const [projectDetailsExpanded, setProjectDetailsExpanded] = useState(false);
   const pendingAgentDiagnosticsRef = useRef<Record<string, boolean>>({});
   const tabSwitchTimeoutRef = useRef<number | null>(null);
   const tabRevealTimeoutRef = useRef<number | null>(null);
@@ -5768,28 +5769,6 @@ export default function AdminProjetoDetalhePage() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-              {overviewStats.map((item) => {
-                const Icon = item.icon;
-
-                return (
-                  <div
-                    key={item.key}
-                    className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-2.5 shadow-[0_16px_34px_rgba(2,8,23,0.18)]"
-                  >
-                    <div className={`pointer-events-none absolute right-4 top-3 ${item.tone} opacity-16`}>
-                      <Icon size={26} />
-                    </div>
-                    <div className="relative flex items-start gap-3">
-                      <p className="min-w-[42px] text-[2rem] font-black leading-none text-white/92">{item.value}</p>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </div>
       </section>
 
@@ -6189,6 +6168,55 @@ export default function AdminProjetoDetalhePage() {
               <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhum agente cadastrado para este projeto ainda.</div>
             )}
           </div>
+          <section className="mt-6 rounded-2xl border border-white/8 bg-white/[0.025] px-4 py-4 shadow-[0_12px_30px_rgba(2,8,23,0.12)] sm:px-5">
+            <button
+              type="button"
+              onClick={() => setProjectDetailsExpanded((current) => !current)}
+              aria-expanded={projectDetailsExpanded}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl text-left transition-colors hover:text-white"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-200">Detalhes do projeto</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                  Informacoes auxiliares do projeto para consulta rapida, com menos destaque visual que os agentes.
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold text-slate-300">
+                {projectDetailsExpanded ? "Ocultar" : "Mostrar"}
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform duration-300 ${projectDetailsExpanded ? "rotate-180" : "rotate-0"}`}
+                />
+              </span>
+            </button>
+
+            <div
+              className={`grid overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                projectDetailsExpanded ? "mt-4 grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0"
+              }`}
+            >
+              <div className="min-h-0 overflow-hidden">
+                <div className="grid gap-2.5 pt-1 sm:grid-cols-2 xl:grid-cols-3">
+                  {overviewStats.map((item) => {
+                    const Icon = item.icon;
+
+                    return (
+                      <div
+                        key={item.key}
+                        className="relative overflow-hidden rounded-xl border border-white/8 bg-slate-950/25 px-3.5 py-3 shadow-[0_10px_24px_rgba(2,8,23,0.12)]"
+                      >
+                        <div className={`pointer-events-none absolute right-3 top-3 ${item.tone} opacity-20`}>
+                          <Icon size={18} />
+                        </div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
+                        <p className="mt-2 text-2xl font-black leading-none text-slate-100">{item.value}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </section>
         </section>
 
         <section className={`${renderedTab === "apis" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
