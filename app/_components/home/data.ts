@@ -110,6 +110,33 @@ export const SERVICE_ITEMS: ServiceItem[] = [
   },
 ];
 
+export const USE_CASE_ITEMS: ServiceItem[] = [
+  {
+    icon: Smartphone,
+    title: "WhatsApp",
+    description: "Atenda clientes automaticamente no canal que eles mais usam no dia a dia.",
+    delay: 0.1,
+  },
+  {
+    icon: MessageSquare,
+    title: "Site",
+    description: "Responda visitantes em tempo real enquanto eles navegam pela sua página.",
+    delay: 0.2,
+  },
+  {
+    icon: Puzzle,
+    title: "Sistema",
+    description: "Leve o atendente para dentro do seu fluxo interno ou painel operacional.",
+    delay: 0.3,
+  },
+  {
+    icon: ShoppingBag,
+    title: "Loja (Mercado Livre)",
+    description: "Automatize respostas e ganhe velocidade no atendimento da sua operação.",
+    delay: 0.4,
+  },
+];
+
 export const DEMO_FEATURES = [
   { title: "IA nativa", desc: "Integração real com modelos GPT para atendimento." },
   { title: "Alta performance", desc: "Carregamento instantâneo e UI intuitiva." },
@@ -129,11 +156,14 @@ export const BENEFIT_ITEMS: BenefitItem[] = [
 ];
 
 export const PROCESS_STEPS = [
-  { n: "1", title: "Explique a dor", desc: "Conte o que trava o crescimento da sua empresa hoje." },
-  { n: "2", title: "Diagnóstico", desc: "Analisamos a melhor stack tecnológica para resolver." },
-  { n: "3", title: "Arquitetura", desc: "Desenvolvemos o projeto lógico e visual do seu sistema." },
-  { n: "4", title: "Mão na massa", desc: "Nossa equipe codifica sua solução." },
-  { n: "5", title: "Eficiência", desc: "Entrega, treinamento e colheita de resultados.", highlight: true },
+  { n: "1", title: "Crie seu atendente", desc: "Defina o que ele precisa responder para ajudar seus clientes." },
+  { n: "2", title: "Escolha onde usar", desc: "Conecte no WhatsApp, site, sistema ou operação de loja." },
+  {
+    n: "3",
+    title: "Ele começa a responder",
+    desc: "Seu atendimento ganha velocidade sem depender de resposta manual.",
+    highlight: true,
+  },
 ];
 
 export type NicheItem = {

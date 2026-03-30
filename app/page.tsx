@@ -23,6 +23,7 @@ import {
   NichesSection,
   ProcessSection,
   ServicesSection,
+  UseCasesSection,
 } from "@/app/_components/home/sections";
 
 function HomePageContent() {
@@ -88,10 +89,11 @@ function HomePageContent() {
       ) : null}
 
       <HeroSection onOpenChat={openPreferredChat} />
-      <ServicesSection />
       <DemoSection />
-      <BenefitsSection />
       <ProcessSection />
+      <UseCasesSection />
+      <BenefitsSection />
+      <ServicesSection />
       <NichesSection />
       <ContactSection />
       <FooterSection />

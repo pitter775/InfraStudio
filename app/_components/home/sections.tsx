@@ -11,6 +11,7 @@ import {
   PROCESS_STEPS,
   SERVICE_ITEMS,
   TECH_STACK,
+  USE_CASE_ITEMS,
   WHATSAPP_NUMBER,
 } from "@/app/_components/home/data";
 import { PremiumHomeChatDemo } from "@/app/_components/home/chat-demo-premium";
@@ -82,8 +83,8 @@ export function HeroSection({ onOpenChat }: { onOpenChat: () => void }) {
           transition={{ delay: 0.1 }}
           className="mb-8 text-4xl font-extrabold leading-[1.1] tracking-tight text-white md:text-7xl"
         >
-          Sistemas, automações e IA <br className="hidden md:block" /> para sua empresa{" "}
-          <span className="text-gradient">vender mais</span>
+          Crie um atendente com IA <br className="hidden md:block" /> e coloque ele{" "}
+          <span className="text-gradient">onde quiser</span>
         </motion.h1>
 
         <motion.p
@@ -92,8 +93,7 @@ export function HeroSection({ onOpenChat }: { onOpenChat: () => void }) {
           transition={{ delay: 0.2 }}
           className="mx-auto mb-12 max-w-3xl text-lg leading-relaxed text-slate-400 md:text-xl"
         >
-          Desenvolvemos software sob medida, integrações de APIs e automações inteligentes para WhatsApp e Instagram.
-          Menos esforço manual, mais resultados escaláveis.
+          Responda clientes automaticamente no WhatsApp, site ou sistema.
         </motion.p>
 
         <motion.div
@@ -110,13 +110,13 @@ export function HeroSection({ onOpenChat }: { onOpenChat: () => void }) {
             }}
             className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-8 py-4 font-bold text-white shadow-xl shadow-blue-600/20 transition-all hover:-translate-y-1 hover:from-blue-500 hover:to-blue-400 sm:w-auto"
           >
-            Solicitar orçamento grátis
+            Criar meu atendente
           </a>
           <a
             href="#demonstracao"
             className="w-full rounded-xl border border-white/10 bg-white/5 px-8 py-4 font-bold text-white transition-all hover:bg-white/10 sm:w-auto"
           >
-            Ver demonstração
+            Ver funcionando
           </a>
         </motion.div>
 
@@ -149,8 +149,10 @@ export function ServicesSection() {
     <section id="servicos" className="bg-slate-900/30 py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-20 text-center">
-          <h2 className="mb-4 text-3xl font-bold text-white md:text-4xl">Soluções para a era da eficiência</h2>
-          <p className="text-slate-400">Tudo o que você precisa para digitalizar e escalar sua operação.</p>
+          <h2 className="mb-4 text-3xl font-bold text-white md:text-4xl">Soluções técnicas</h2>
+          <p className="text-slate-400">
+            Para conectar, automatizar e expandir a operação quando você precisar ir além do atendimento.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
@@ -170,11 +172,11 @@ export function DemoSection() {
         <div className="flex flex-col items-center gap-20 lg:flex-row">
           <div className="lg:w-1/2">
             <h2 className="mb-8 text-3xl font-extrabold leading-tight text-white md:text-5xl">
-              A experiência é a nossa maior prova.
+              Veja um atendente funcionando
             </h2>
             <p className="mb-10 text-lg leading-relaxed text-slate-400">
-              Não apenas falamos sobre tecnologia, nós a vivemos. Esta página e nossos sistemas são construídos com a
-              mesma excelência que entregamos aos nossos clientes.
+              Veja na prática como o atendimento pode responder com rapidez, manter contexto e continuar a conversa nos
+              canais certos.
             </p>
 
             <div className="space-y-6">
@@ -229,13 +231,13 @@ export function ProcessSection() {
     <section id="como-funciona" className="bg-slate-900/20 py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-20 text-center">
-          <h2 className="text-3xl font-bold text-white md:text-4xl">Do problema à eficiência em 5 passos</h2>
+          <h2 className="text-3xl font-bold text-white md:text-4xl">Como funciona</h2>
         </div>
 
         <div className="relative">
           <div className="absolute left-0 top-1/2 hidden h-px w-full -translate-y-1/2 bg-gradient-to-r from-transparent via-blue-500/30 to-transparent lg:block" />
 
-          <div className="relative z-10 grid grid-cols-1 gap-8 md:grid-cols-3 lg:grid-cols-5">
+          <div className="relative z-10 grid grid-cols-1 gap-8 md:grid-cols-3 lg:grid-cols-3">
             {PROCESS_STEPS.map((step) => (
               <div
                 key={step.n}
@@ -254,6 +256,27 @@ export function ProcessSection() {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function UseCasesSection() {
+  return (
+    <section id="onde-usar" className="py-24">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-20 text-center">
+          <h2 className="mb-4 text-3xl font-bold text-white md:text-4xl">Onde você pode usar</h2>
+          <p className="text-slate-400">
+            O mesmo atendente pode trabalhar em canais diferentes sem mudar a experiência visual da sua operação.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
+          {USE_CASE_ITEMS.map((item) => (
+            <ServiceCard key={item.title} {...item} />
+          ))}
         </div>
       </div>
     </section>
