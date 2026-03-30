@@ -6047,6 +6047,16 @@ export default function AdminProjetoDetalhePage() {
                 const activeAgentConnectors = agentConnectors.filter((connector) => connector.ativo);
                 const diagnostic = agentDiagnosticsById[agente.id];
                 const latestDiagnostic = latestAgentDiagnosticById[agente.id];
+                const miniSummaryParts = [
+                  linkedApis.length ? `${linkedApis.length} API${linkedApis.length > 1 ? "s" : ""}` : null,
+                  requiredParameters.length ? `${requiredParameters.length} contexto${requiredParameters.length > 1 ? "s" : ""}` : null,
+                  agentWhatsAppChannels.length ? `${agentWhatsAppChannels.length} WhatsApp` : null,
+                  agentConnectors.length ? `${agentConnectors.length} loja${agentConnectors.length > 1 ? "s" : ""}` : null,
+                  agentWidgets.length ? `${agentWidgets.length} widget${agentWidgets.length > 1 ? "s" : ""}` : null,
+                ].filter(Boolean);
+                const miniSummary = miniSummaryParts.length
+                  ? `Configurado com ${miniSummaryParts.join(", ")}.`
+                  : "Ainda sem canais, APIs ou integrações vinculadas.";
                 const agentOptions = [
                   {
                     key: "apis",
@@ -6096,10 +6106,14 @@ export default function AdminProjetoDetalhePage() {
                 ] as const;
 
                 return (
-                  <article key={agente.id} className={`relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.024),rgba(255,255,255,0.012))] p-4 shadow-[0_16px_34px_rgba(2,8,23,0.2)] ${premiumTransitionClass}`}>
+                  <article key={agente.id} className={`relative flex h-full flex-col overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),rgba(255,255,255,0.03)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.24),0_0_0_1px_rgba(34,211,238,0.04)] ${premiumTransitionClass}`}>
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute right-4 top-4 text-cyan-200/14"
+                      className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/35 to-transparent"
+                    />
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute right-4 top-4 text-cyan-200/16"
                     >
                       <Bot size={34} strokeWidth={1.6} />
                     </div>
@@ -6116,28 +6130,17 @@ export default function AdminProjetoDetalhePage() {
                       </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-3 gap-2">
-                      <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                        <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">APIs</p>
-                        <p className="mt-1 text-lg font-black text-white">{linkedApis.length}</p>
-                      </div>
-                      <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                        <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Contexto</p>
-                        <p className="mt-1 text-lg font-black text-white">{requiredParameters.length}</p>
-                      </div>
-                      <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                        <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Inativas</p>
-                        <p className="mt-1 text-lg font-black text-white">{inactiveApis.length}</p>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 space-y-2 text-xs text-slate-300">
-                      <p className="line-clamp-2">
-                        APIs: <span className="text-cyan-200/85">{linkedApis.length ? linkedApis.map((api) => api.nome).join(", ") : "nenhuma"}</span>
-                      </p>
+                    <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/35 px-3.5 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Resumo rapido</p>
+                      <p className="mt-2 text-sm leading-relaxed text-slate-200">{miniSummary}</p>
                       {requiredParameters.length ? (
-                        <p className="line-clamp-2 text-cyan-100/80">
-                          Contexto obrigatório: {requiredParameters.map((parametro) => parametro.nome).join(", ")}
+                        <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-cyan-100/80">
+                          Contexto obrigatorio: {requiredParameters.map((parametro) => parametro.nome).join(", ")}
+                        </p>
+                      ) : null}
+                      {inactiveApis.length ? (
+                        <p className="mt-2 text-xs text-amber-200/80">
+                          {inactiveApis.length} API{inactiveApis.length > 1 ? "s" : ""} vinculada{inactiveApis.length > 1 ? "s" : ""} estao inativas.
                         </p>
                       ) : null}
                     </div>
