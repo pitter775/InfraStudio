@@ -1,5 +1,5 @@
 import { getAgenteById, getAgenteByIdentifier, type AgenteRecord } from "@/lib/agentes";
-import { appendChatRequestLog } from "@/lib/chat-logs";
+import { appendChatRequestLog, appendSystemLog } from "@/lib/chat-logs";
 import { enrichLeadContext, generateSalesReply, shouldRefreshSummary, summarizeConversation } from "@/lib/chat-orchestrator";
 import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetByProjetoAgente, getChatWidgetBySlug } from "@/lib/chat-widgets";
 import { appendMessage, createChat, findActiveChatByChannel, getChatById, getChatContext, listChatMessages, type ChatChannelKind, updateChatContext, updateChatStats } from "@/lib/chats";
@@ -71,6 +71,27 @@ function buildSilentChatResult(chatId?: string | null) {
     assets: [],
     whatsapp: null,
   };
+}
+
+async function appendChatFailureLog(input: {
+  projetoId?: string | null;
+  agenteId?: string | null;
+  chatId?: string | null;
+  origem: string;
+  descricao: string;
+  payload?: Record<string, unknown> | null;
+}) {
+  await appendSystemLog({
+    projetoId: input.projetoId ?? null,
+    tipo: "chat_failure",
+    origem: input.origem,
+    descricao: input.descricao,
+    payload: {
+      chatId: input.chatId ?? null,
+      agenteId: input.agenteId ?? null,
+      ...(input.payload ?? {}),
+    },
+  });
 }
 
 function normalizeChannelKind(body: ChatRequestBody) {
@@ -272,6 +293,11 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
         message: "Canal WhatsApp nao encontrado ou sem projeto.",
         payload: { whatsappChannelId: body.whatsappChannelId },
       });
+      await appendChatFailureLog({
+        origem: "chat_service.whatsapp_guardrail",
+        descricao: "Canal WhatsApp nao encontrado ou sem projeto.",
+        payload: { whatsappChannelId: body.whatsappChannelId },
+      });
       return buildSilentChatResult(body.chatId);
     }
 
@@ -283,6 +309,13 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
         agenteId: officialChannel.agenteId,
         payload: { whatsappChannelId: officialChannel.id, status: officialChannel.status },
       });
+      await appendChatFailureLog({
+        projetoId: officialChannel.projetoId,
+        agenteId: officialChannel.agenteId,
+        origem: "chat_service.whatsapp_guardrail",
+        descricao: "Canal WhatsApp inativo bloqueado.",
+        payload: { whatsappChannelId: officialChannel.id, status: officialChannel.status },
+      });
       return buildSilentChatResult(body.chatId);
     }
 
@@ -291,6 +324,12 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
         source: "chat_service.whatsapp_guardrail",
         message: "Canal WhatsApp sem agente vinculado.",
         projetoId: officialChannel.projetoId,
+        payload: { whatsappChannelId: officialChannel.id },
+      });
+      await appendChatFailureLog({
+        projetoId: officialChannel.projetoId,
+        origem: "chat_service.whatsapp_guardrail",
+        descricao: "Canal WhatsApp sem agente vinculado.",
         payload: { whatsappChannelId: officialChannel.id },
       });
       return buildSilentChatResult(body.chatId);
@@ -305,6 +344,17 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
         projetoId: officialChannel.projetoId,
         agenteId: officialChannel.agenteId,
         payload: { whatsappChannelId: officialChannel.id, agenteProjetoId: officialAgent?.projetoId ?? null, agenteAtivo: officialAgent?.ativo ?? null },
+      });
+      await appendChatFailureLog({
+        projetoId: officialChannel.projetoId,
+        agenteId: officialChannel.agenteId,
+        origem: "chat_service.whatsapp_guardrail",
+        descricao: "Agente do canal WhatsApp invalido, inativo ou fora do projeto.",
+        payload: {
+          whatsappChannelId: officialChannel.id,
+          agenteProjetoId: officialAgent?.projetoId ?? null,
+          agenteAtivo: officialAgent?.ativo ?? null,
+        },
       });
       return buildSilentChatResult(body.chatId);
     }
@@ -347,6 +397,17 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
       source: "chat_service.channel_resolution",
       message: "Canal travado a agente invalido ou inativo.",
       projetoId: resolved.projeto.id,
+      payload: {
+        projeto: effectiveBody.projeto ?? null,
+        agente: effectiveBody.agente ?? null,
+        widgetSlug: effectiveBody.widgetSlug ?? null,
+        channelKind,
+      },
+    });
+    await appendChatFailureLog({
+      projetoId: resolved.projeto.id,
+      origem: "chat_service.channel_resolution",
+      descricao: "Canal travado a agente invalido ou inativo.",
       payload: {
         projeto: effectiveBody.projeto ?? null,
         agente: effectiveBody.agente ?? null,
@@ -461,6 +522,19 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
           agentAtivo: currentAgent?.ativo ?? null,
         },
       });
+      await appendChatFailureLog({
+        projetoId: chat.projetoId,
+        agenteId: currentAgentId,
+        chatId: chat.id,
+        origem: "chat_service.chat_guardrail",
+        descricao: "Chat bloqueado por agente invalido, inativo ou fora do projeto.",
+        payload: {
+          channelKind,
+          lockedAgentFromContext,
+          agentProjetoId: currentAgent?.projetoId ?? null,
+          agentAtivo: currentAgent?.ativo ?? null,
+        },
+      });
       return buildSilentChatResult(chat.id);
     }
 
@@ -541,6 +615,37 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     })),
     nextContext as Parameters<typeof generateSalesReply>[1],
   );
+
+  if (!String(ai.reply ?? "").trim()) {
+    await appendChatFailureLog({
+      projetoId: chat.projetoId,
+      agenteId: authoritativeAgent?.id ?? chat.agenteId,
+      chatId: chat.id,
+      origem: "chat_service.reply_guardrail",
+      descricao: "Resposta bloqueada ou vazia no fluxo do agente.",
+      payload: {
+        channelKind,
+        provider: typeof ai.metadata?.provider === "string" ? ai.metadata.provider : null,
+        model: typeof ai.metadata?.model === "string" ? ai.metadata.model : null,
+      },
+    });
+  }
+
+  if (typeof ai.metadata?.provider === "string" && ai.metadata.provider === "guardrail_fallback") {
+    await appendSystemLog({
+      projetoId: chat.projetoId,
+      tipo: "chat_fallback",
+      origem: "chat_service.reply_fallback",
+      descricao: "Resposta entregue em modo de contingencia.",
+      payload: {
+        chatId: chat.id,
+        agenteId: authoritativeAgent?.id ?? chat.agenteId ?? null,
+        channelKind,
+        provider: ai.metadata.provider,
+        model: typeof ai.metadata?.model === "string" ? ai.metadata.model : null,
+      },
+    });
+  }
 
   const aiResolvedAgentId = typeof ai.metadata?.agenteId === "string" ? ai.metadata.agenteId : null;
   const aiResolvedAgentName = typeof ai.metadata?.agenteNome === "string" ? ai.metadata.agenteNome : null;

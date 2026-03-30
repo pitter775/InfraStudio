@@ -1,8 +1,9 @@
 import "server-only";
 
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { listRecentRuntimeErrorLogs } from "@/lib/runtime-error-log";
 
-type ChatLogRow = {
+type LogRow = {
   id: string;
   projeto_id: string | null;
   tipo: string | null;
@@ -12,7 +13,7 @@ type ChatLogRow = {
   created_at: string | null;
 };
 
-export type ChatRequestLog = {
+export type SystemLogEntry = {
   id: string;
   projetoId: string | null;
   tipo: string;
@@ -20,17 +21,51 @@ export type ChatRequestLog = {
   descricao: string;
   payload: Record<string, unknown> | null;
   createdAt: string;
+  level: "info" | "error";
 };
 
-function mapLog(row: ChatLogRow): ChatRequestLog {
+function detectLevel(value: { tipo?: string | null; origem?: string | null; descricao?: string | null }) {
+  const joined = [value.tipo, value.origem, value.descricao]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return /\berro\b|\berror\b|\bfailed\b|\bfailure\b|\bexception\b|\bfatal\b/.test(joined) ? "error" : "info";
+}
+
+function sanitizePayload(payload: Record<string, unknown> | null) {
+  if (!payload) {
+    return null;
+  }
+
+  const entries = Object.entries(payload).filter(([key]) => {
+    const normalizedKey = key.toLowerCase();
+    return ![
+      "summary",
+      "latestusermessage",
+      "replypreview",
+      "requestdebug",
+      "requestpayload",
+      "messages",
+      "history",
+      "conteudo",
+      "content",
+    ].includes(normalizedKey);
+  });
+
+  return entries.length ? Object.fromEntries(entries) : null;
+}
+
+function mapLog(row: LogRow): SystemLogEntry {
   return {
     id: row.id,
     projetoId: row.projeto_id,
-    tipo: row.tipo?.trim() || "chat_request",
-    origem: row.origem?.trim() || "api_chat",
-    descricao: row.descricao?.trim() || "Log de requisicao do chat",
-    payload: row.payload,
+    tipo: row.tipo?.trim() || "log",
+    origem: row.origem?.trim() || "sistema",
+    descricao: row.descricao?.trim() || "Log do sistema",
+    payload: sanitizePayload(row.payload),
     createdAt: row.created_at ?? new Date().toISOString(),
+    level: detectLevel(row),
   };
 }
 
@@ -54,12 +89,33 @@ export async function appendChatRequestLog(input: {
   }
 }
 
-export async function listRecentChatLogs(projetoId?: string | null, limit = 60) {
+export async function appendSystemLog(input: {
+  projetoId?: string | null;
+  tipo?: string;
+  origem?: string;
+  descricao: string;
+  payload?: Record<string, unknown> | null;
+}) {
+  try {
+    const supabase = getSupabaseAdminClient();
+    await supabase.from("logs").insert({
+      projeto_id: input.projetoId ?? null,
+      tipo: input.tipo?.trim() || "system_event",
+      origem: input.origem?.trim() || "system",
+      descricao: input.descricao.trim(),
+      payload: input.payload ?? null,
+      created_at: new Date().toISOString(),
+    } as never);
+  } catch (error) {
+    console.error("[chat-logs] failed to append system log", error);
+  }
+}
+
+async function listDatabaseLogs(projetoId?: string | null, limit = 120) {
   const supabase = getSupabaseAdminClient();
   let query = supabase
     .from("logs")
     .select("id, projeto_id, tipo, origem, descricao, payload, created_at")
-    .eq("tipo", "chat_request")
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -74,5 +130,31 @@ export async function listRecentChatLogs(projetoId?: string | null, limit = 60) 
     return [];
   }
 
-  return (data as ChatLogRow[]).map(mapLog);
+  return (data as LogRow[]).map(mapLog);
+}
+
+export async function listRecentSystemLogs(projetoId?: string | null, limit = 120): Promise<SystemLogEntry[]> {
+  const [databaseLogs, runtimeLogs] = await Promise.all([
+    listDatabaseLogs(projetoId, limit),
+    listRecentRuntimeErrorLogs(limit),
+  ]);
+
+  const filteredRuntimeLogs = projetoId
+    ? runtimeLogs.filter((entry) => entry.projetoId === projetoId)
+    : runtimeLogs;
+
+  const runtimeEntries: SystemLogEntry[] = filteredRuntimeLogs.map((entry) => ({
+    id: entry.id,
+    projetoId: entry.projetoId,
+    tipo: "runtime_error",
+    origem: entry.source,
+    descricao: entry.message,
+    payload: sanitizePayload(entry.payload),
+    createdAt: entry.createdAt,
+    level: "error",
+  }));
+
+  return [...databaseLogs, ...runtimeEntries]
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, limit);
 }

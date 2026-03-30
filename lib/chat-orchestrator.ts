@@ -121,6 +121,22 @@ function heuristicReply(message: string, context?: ConversationContext) {
   ].join("\n");
 }
 
+function buildGuardrailFallbackReply(message: string, context?: ConversationContext, reason?: string | null) {
+  const baseReply = formatHeuristicReply(heuristicReply(message, context), context);
+
+  if (isWhatsAppChannel(context)) {
+    return baseReply;
+  }
+
+  const normalizedReason = normalizeText(reason ?? "");
+  const suffix =
+    normalizedReason.includes("api key") || normalizedReason.includes("openai")
+      ? "Se quiser, tente novamente em instantes ou me diga seu objetivo em uma frase que eu sigo por um caminho mais direto."
+      : "Se quiser, reformule em uma frase curta que eu continuo por aqui.";
+
+  return `${baseReply}\n\n${suffix}`.trim();
+}
+
 function isWhatsAppChannel(context?: ConversationContext) {
   return (context?.channel?.kind ?? "").trim().toLowerCase() === "whatsapp";
 }
@@ -1464,11 +1480,11 @@ export async function generateSalesReply(history: ConversationMessage[], context
       ...traceBase,
     });
     return {
-      reply: "",
+      reply: buildGuardrailFallbackReply(latestUserMessage, context, "inactive_or_invalid_agent"),
       assets: [],
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
-        provider: "guardrail",
+        provider: "guardrail_fallback",
         model: "inactive_or_invalid_agent",
         agenteId: null,
         agenteNome: null,
@@ -1548,10 +1564,10 @@ export async function generateSalesReply(history: ConversationMessage[], context
       payload: { ...traceBase.payload, ...resourceTrace, mode: "fail_closed_no_openai_key" },
     });
     return {
-      reply: "",
+      reply: buildGuardrailFallbackReply(latestUserMessage, context, "fail_closed_no_openai_key"),
       assets: [],
       usage: { inputTokens: 0, outputTokens: 0 },
-      metadata: { provider: "guardrail", model: "fail_closed_no_openai_key", agenteId: agent?.id ?? null, agenteNome: agent?.nome ?? null },
+      metadata: { provider: "guardrail_fallback", model: "fail_closed_no_openai_key", agenteId: agent?.id ?? null, agenteNome: agent?.nome ?? null },
     };
   }
 
@@ -1607,11 +1623,11 @@ export async function generateSalesReply(history: ConversationMessage[], context
         },
       });
       return {
-        reply: "",
+        reply: buildGuardrailFallbackReply(latestUserMessage, context, payload.error?.message ?? "fail_closed_after_openai_error"),
         assets: [],
         usage: { inputTokens: 0, outputTokens: 0 },
         metadata: {
-          provider: "guardrail",
+          provider: "guardrail_fallback",
           model: "fail_closed_after_openai_error",
           agenteId: agent?.id ?? null,
           agenteNome: agent?.nome ?? null,
@@ -1656,11 +1672,11 @@ export async function generateSalesReply(history: ConversationMessage[], context
       },
     });
     return {
-      reply: "",
+      reply: buildGuardrailFallbackReply(latestUserMessage, context, error instanceof Error ? error.message : "fail_closed_after_exception"),
       assets: [],
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
-        provider: "guardrail",
+        provider: "guardrail_fallback",
         model: "fail_closed_after_exception",
         agenteId: agent?.id ?? null,
         agenteNome: agent?.nome ?? null,

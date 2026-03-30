@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { getCurrentProjectUser } from "@/lib/auth";
 import { canAccessGlobalAdmin } from "@/lib/access";
 
-type ChatLog = {
+type SystemLog = {
   id: string;
   projetoId: string | null;
   tipo: string;
@@ -14,19 +14,11 @@ type ChatLog = {
   descricao: string;
   payload: Record<string, unknown> | null;
   createdAt: string;
+  level: "info" | "error";
 };
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("pt-BR");
-}
-
-function formatInteger(value: number) {
-  return value.toLocaleString("pt-BR");
-}
-
-function readPayloadObject(payload: Record<string, unknown> | null, key: string) {
-  const value = payload?.[key];
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
 function CenterLoader() {
@@ -41,9 +33,59 @@ function CenterLoader() {
   );
 }
 
+function buildCompactDetails(log: SystemLog) {
+  const details: string[] = [];
+  const payload = log.payload ?? {};
+
+  if (log.projetoId) {
+    details.push(`projeto=${log.projetoId}`);
+  }
+
+  const provider = typeof payload.provider === "string" ? payload.provider : null;
+  const model = typeof payload.model === "string" ? payload.model : null;
+  const estimatedCostUsd = payload.estimatedCostUsd;
+  const messageCount = payload.messageCount;
+  const tokens =
+    payload.tokens && typeof payload.tokens === "object" && !Array.isArray(payload.tokens)
+      ? (payload.tokens as Record<string, unknown>)
+      : null;
+
+  if (provider) {
+    details.push(`provider=${provider}`);
+  }
+
+  if (model) {
+    details.push(`model=${model}`);
+  }
+
+  if (typeof messageCount === "number") {
+    details.push(`mensagens=${messageCount}`);
+  }
+
+  if (tokens) {
+    if (typeof tokens.input === "number") {
+      details.push(`in=${tokens.input.toLocaleString("pt-BR")}`);
+    }
+    if (typeof tokens.output === "number") {
+      details.push(`out=${tokens.output.toLocaleString("pt-BR")}`);
+    }
+  }
+
+  if (typeof estimatedCostUsd === "number") {
+    details.push(`usd=${estimatedCostUsd.toFixed(4)}`);
+  }
+
+  const payloadKeys = Object.keys(payload).filter((key) => !["provider", "model", "estimatedCostUsd", "messageCount", "tokens"].includes(key));
+  if (payloadKeys.length) {
+    details.push(`campos=${payloadKeys.slice(0, 5).join(",")}`);
+  }
+
+  return details.join(" | ");
+}
+
 export default function AdminChatLogsPage() {
   const router = useRouter();
-  const [logs, setLogs] = useState<ChatLog[]>([]);
+  const [logs, setLogs] = useState<SystemLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -55,7 +97,7 @@ export default function AdminChatLogsPage() {
       }
 
       const response = await fetch("/api/admin/chat-logs", { cache: "no-store" });
-      const payload = (await response.json()) as { logs?: ChatLog[] };
+      const payload = (await response.json()) as { logs?: SystemLog[] };
       setLogs(payload.logs ?? []);
       setLoading(false);
     };
@@ -67,9 +109,9 @@ export default function AdminChatLogsPage() {
     <main className="space-y-5">
       <section className="rounded-[24px] border border-white/10 bg-white/[0.05] px-5 py-5">
         <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Observabilidade</p>
-        <h1 className="mt-2 text-[2rem] font-extrabold text-white">Logs de Chat</h1>
+        <h1 className="mt-2 text-[2rem] font-extrabold text-white">Logs</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-          Aqui voce consegue inspecionar o snapshot do que foi enviado ao modelo: resumo atual, payload montado, quantidade de mensagens no contexto, tokens e custo estimado.
+          Lista geral dos eventos mais recentes do sistema. A visualizacao foi reduzida para leitura rapida, sem expor todo o conteudo dos chats.
         </p>
       </section>
 
@@ -79,88 +121,38 @@ export default function AdminChatLogsPage() {
         </section>
       ) : null}
 
-      <section className="space-y-4">
+      <section className="space-y-2">
         {logs.map((log) => {
-          const tokens = readPayloadObject(log.payload, "tokens");
-          const requestDebug = readPayloadObject(log.payload, "requestDebug");
-          const requestPayload = readPayloadObject(requestDebug, "requestPayload");
-          const input = Array.isArray(requestPayload?.input) ? requestPayload.input : [];
+          const compactDetails = buildCompactDetails(log);
+          const lineClass =
+            log.level === "error"
+              ? "border-red-500/20 bg-red-500/[0.07] text-red-200"
+              : "border-white/8 bg-white/[0.03] text-slate-300";
 
           return (
-            <article key={log.id} className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold text-white">{log.descricao}</p>
-                  <p className="mt-1 text-xs text-slate-400">{formatDateTime(log.createdAt)}</p>
-                </div>
-                <div className="flex flex-wrap gap-2 text-[11px]">
-                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-slate-300">
-                    In {formatInteger(Number(tokens?.input ?? 0))}
-                  </span>
-                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-slate-300">
-                    Out {formatInteger(Number(tokens?.output ?? 0))}
-                  </span>
-                  <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-cyan-200">
-                    contexto {formatInteger(input.length)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-4 xl:grid-cols-3">
-                <div className="rounded-[18px] border border-white/8 bg-slate-950/30 p-3">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Resumo atual</p>
-                  <pre className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-200">
-                    {String(log.payload?.summary ?? "Sem resumo salvo")}
-                  </pre>
-                </div>
-
-                <div className="rounded-[18px] border border-white/8 bg-slate-950/30 p-3">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Ultima mensagem</p>
-                  <pre className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-200">
-                    {String(log.payload?.latestUserMessage ?? "Sem mensagem")}
-                  </pre>
-                </div>
-
-                <div className="rounded-[18px] border border-white/8 bg-slate-950/30 p-3">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Resposta gerada</p>
-                  <pre className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-200">
-                    {String(log.payload?.replyPreview ?? "Sem resposta")}
-                  </pre>
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                <div className="rounded-[18px] border border-white/8 bg-slate-950/30 p-3">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Payload enviado</p>
-                  <pre className="mt-2 max-h-[360px] overflow-auto whitespace-pre-wrap break-words text-[11px] leading-5 text-slate-200 [scrollbar-width:thin]">
-                    {JSON.stringify(requestPayload ?? {}, null, 2)}
-                  </pre>
-                </div>
-
-                <div className="rounded-[18px] border border-white/8 bg-slate-950/30 p-3">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Metadados do request</p>
-                  <pre className="mt-2 max-h-[360px] overflow-auto whitespace-pre-wrap break-words text-[11px] leading-5 text-slate-200 [scrollbar-width:thin]">
-                    {JSON.stringify(
-                      {
-                        provider: log.payload?.provider ?? null,
-                        model: log.payload?.model ?? null,
-                        estimatedCostUsd: log.payload?.estimatedCostUsd ?? null,
-                        messageCount: log.payload?.messageCount ?? null,
-                        requestDebug,
-                      },
-                      null,
-                      2,
-                    )}
-                  </pre>
-                </div>
-              </div>
+            <article key={log.id} className={`overflow-x-auto rounded-2xl border px-3 py-2 ${lineClass}`}>
+              <p className="whitespace-nowrap text-[11px] leading-5">
+                <span className="text-slate-500">{formatDateTime(log.createdAt)}</span>
+                <span className="px-2 text-slate-600">|</span>
+                <span className={log.level === "error" ? "text-red-200" : "text-slate-200"}>{log.tipo}</span>
+                <span className="px-2 text-slate-600">|</span>
+                <span>{log.origem}</span>
+                <span className="px-2 text-slate-600">|</span>
+                <span className={log.level === "error" ? "font-semibold text-red-200" : "text-slate-100"}>{log.descricao}</span>
+                {compactDetails ? (
+                  <>
+                    <span className="px-2 text-slate-600">|</span>
+                    <span className={log.level === "error" ? "text-red-100/90" : "text-slate-400"}>{compactDetails}</span>
+                  </>
+                ) : null}
+              </p>
             </article>
           );
         })}
 
         {!loading && !logs.length ? (
           <section className="rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-5 text-sm text-slate-400">
-            Ainda nao ha logs de requisicao do chat para mostrar.
+            Ainda nao ha logs do sistema para mostrar.
           </section>
         ) : null}
       </section>

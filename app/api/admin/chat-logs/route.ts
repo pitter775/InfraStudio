@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { canAccessGlobalAdmin } from "@/lib/access";
-import { listRecentChatLogs } from "@/lib/chat-logs";
+import { listRecentSystemLogs } from "@/lib/chat-logs";
 import { getSessionUser } from "@/lib/session";
 
 export async function GET() {
@@ -10,6 +10,6 @@ export async function GET() {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
-  const logs = await listRecentChatLogs(null, 80);
+  const logs = await listRecentSystemLogs(null, 160);
   return NextResponse.json({ logs }, { status: 200 });
 }

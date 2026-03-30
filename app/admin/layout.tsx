@@ -33,7 +33,7 @@ const adminLinks = [
   { href: "/admin/projetos", label: "Projetos", icon: BriefcaseBusiness },
   { href: "/admin/me", label: "Meu Perfil", icon: Settings },
   { href: "/admin/usage", label: "Uso de Tokens", icon: Coins },
-  { href: "/admin/chat-logs", label: "Logs de Chat", icon: ActivitySquare },
+  { href: "/admin/chat-logs", label: "Logs", icon: ActivitySquare },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
 ];
 
