@@ -268,8 +268,6 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
   const [loadingHref, setLoadingHref] = useState<string | null>(null);
-  const [contentTransitionKey, setContentTransitionKey] = useState(pathname);
-  const [contentVisible, setContentVisible] = useState(true);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -288,16 +286,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
 
   useEffect(() => {
     setMobileOpen(false);
-    if (pathname !== contentTransitionKey) {
-      setContentVisible(false);
-      const frame = window.setTimeout(() => {
-        setContentTransitionKey(pathname);
-        setLoadingHref(null);
-        setContentVisible(true);
-      }, 160);
-
-      return () => window.clearTimeout(frame);
-    }
+    setLoadingHref(null);
   }, [pathname]);
 
   useEffect(() => {
@@ -386,9 +375,9 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
           <div className="relative flex-1 overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
-                key={contentTransitionKey}
+                key={pathname}
                 initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: contentVisible ? 1 : 0, y: contentVisible ? 0 : 10 }}
+                animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.26, ease: "easeOut" }}
               >
