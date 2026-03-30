@@ -1,5 +1,6 @@
 import "server-only";
 
+import { appendSystemLog } from "@/lib/chat-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type PlanoRow = {
@@ -72,6 +73,20 @@ function mapPlano(row: PlanoRow): PlanoRecord {
   };
 }
 
+function getDatabaseHostLabel() {
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+
+  if (!rawUrl) {
+    return "database_url_missing";
+  }
+
+  try {
+    return new URL(rawUrl).host;
+  } catch {
+    return rawUrl;
+  }
+}
+
 export async function listPlanos() {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
@@ -82,7 +97,33 @@ export async function listPlanos() {
 
   if (error || !data) {
     console.error("[planos] failed to list plans", error);
+    await appendSystemLog({
+      tipo: "admin_planos_error",
+      origem: "api_admin_planos",
+      descricao: "Falha ao consultar planos na tabela public.planos.",
+      payload: {
+        stage: "list",
+        databaseHost: getDatabaseHostLabel(),
+        code: error?.code ?? null,
+        message: error?.message ?? null,
+        details: error?.details ?? null,
+        hint: error?.hint ?? null,
+      },
+    });
     return [];
+  }
+
+  if (!data.length) {
+    await appendSystemLog({
+      tipo: "admin_planos_empty",
+      origem: "api_admin_planos",
+      descricao: "Consulta de planos executada sem retornar registros.",
+      payload: {
+        stage: "list",
+        databaseHost: getDatabaseHostLabel(),
+        table: "public.planos",
+      },
+    });
   }
 
   return (data as PlanoRow[]).map(mapPlano);

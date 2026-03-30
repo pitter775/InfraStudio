@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { canAccessGlobalAdmin } from "@/lib/access";
+import { appendSystemLog } from "@/lib/chat-logs";
 import { createPlano, listPlanos } from "@/lib/planos";
 import { getSessionUser } from "@/lib/session";
 
@@ -7,6 +8,16 @@ export async function GET() {
   const user = await getSessionUser();
 
   if (!canAccessGlobalAdmin(user)) {
+    await appendSystemLog({
+      tipo: "admin_planos_forbidden",
+      origem: "api_admin_planos",
+      descricao: "Acesso negado ao carregar a listagem de planos.",
+      payload: {
+        email: user?.email ?? null,
+        userId: user?.id ?? null,
+        isMaster: user?.isMaster ?? false,
+      },
+    });
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
