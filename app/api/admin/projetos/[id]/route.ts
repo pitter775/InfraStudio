@@ -3,6 +3,7 @@ import { canAccessAdmin, canAccessProject, canManageProject } from "@/lib/access
 import { listAgentes } from "@/lib/agentes";
 import { listApis } from "@/lib/apis";
 import { getProjetoBillingOverview, updateProjetoPlanoBilling } from "@/lib/billing";
+import { appendSystemLog } from "@/lib/chat-logs";
 import { listChatWidgets } from "@/lib/chat-widgets";
 import { listChats } from "@/lib/chats";
 import { listConectores } from "@/lib/conectores";
@@ -139,8 +140,27 @@ export async function DELETE(_request: Request, context: RouteContext) {
   }
 
   const deleted = await deleteProjeto(id);
-  if (!deleted) {
-    return NextResponse.json({ error: "Nao foi possivel excluir o projeto." }, { status: 500 });
+  if (!deleted.ok) {
+    await appendSystemLog({
+      projetoId: id,
+      tipo: "project_delete_failure",
+      origem: "api.admin.projetos.delete",
+      descricao: "Exclusao de projeto falhou.",
+      payload: {
+        step: deleted.step ?? null,
+        message: deleted.error ?? null,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        error: deleted.step
+          ? `Nao foi possivel excluir o projeto. Falha em: ${deleted.step}.`
+          : "Nao foi possivel excluir o projeto.",
+        detail: deleted.error ?? null,
+      },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ success: true }, { status: 200 });

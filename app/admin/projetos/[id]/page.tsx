@@ -3620,6 +3620,7 @@ export default function AdminProjetoDetalhePage() {
   const [deletingWidgetId, setDeletingWidgetId] = useState<string | null>(null);
   const [deletingWhatsAppChannelId, setDeletingWhatsAppChannelId] = useState<string | null>(null);
   const [deletingProject, setDeletingProject] = useState(false);
+  const [deletingProjectRedirecting, setDeletingProjectRedirecting] = useState(false);
   const [deleteProjectModalOpen, setDeleteProjectModalOpen] = useState(false);
   const [deleteProjectConfirmation, setDeleteProjectConfirmation] = useState("");
   const [deleteAgenteModalOpen, setDeleteAgenteModalOpen] = useState(false);
@@ -5236,23 +5237,28 @@ export default function AdminProjetoDetalhePage() {
 
     setDeletingProject(true);
     setFeedbackWhatsApp(null);
+    let redirecting = false;
 
     try {
       const response = await fetch(`/api/admin/projetos/${params.id}`, {
         method: "DELETE",
       });
 
-      const payload = (await response.json()) as { error?: string };
+      const payload = (await response.json()) as { error?: string; detail?: string | null };
       if (!response.ok) {
-        setFeedbackWhatsApp(payload.error ?? "Nao foi possivel excluir o projeto.");
+        setFeedbackWhatsApp(payload.detail ? `${payload.error ?? "Nao foi possivel excluir o projeto."} ${payload.detail}` : payload.error ?? "Nao foi possivel excluir o projeto.");
         return;
       }
 
+      redirecting = true;
+      setDeletingProjectRedirecting(true);
       setDeleteProjectModalOpen(false);
       setDeleteProjectConfirmation("");
-      router.push("/admin/projetos");
+      router.replace("/admin/projetos");
     } finally {
-      setDeletingProject(false);
+      if (!redirecting) {
+        setDeletingProject(false);
+      }
     }
   };
 
@@ -5463,6 +5469,16 @@ export default function AdminProjetoDetalhePage() {
     setFeedbackConnector(null);
     setConnectorModalOpen(true);
   }, [data, params.id, searchParams]);
+
+  if (deletingProjectRedirecting) {
+    return (
+      <main className="space-y-6">
+        <section className="px-1 py-2">
+          <PremiumLoader />
+        </section>
+      </main>
+    );
+  }
 
   if (!data) {
     return (

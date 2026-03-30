@@ -272,6 +272,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
   const [loadingHref, setLoadingHref] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -304,9 +305,12 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   }, [collapsed]);
 
   const handleLogout = async () => {
-    await signOutProjectAuth();
+    setLoggingOut(true);
     setCurrentUser(null);
-    window.location.href = "/";
+    setAuthResolved(false);
+    setMobileOpen(false);
+    await signOutProjectAuth();
+    router.replace("/");
   };
 
   const handleNavigate = (href: string) => {
@@ -319,7 +323,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
     router.push(href);
   };
 
-  if (!authResolved) {
+  if (!authResolved || loggingOut) {
     return (
       <div className="infra-premium-bg flex min-h-screen items-center justify-center px-6 text-slate-200">
         <div className="infra-premium-panel rounded-[28px] px-8 py-7 text-center">
@@ -328,8 +332,8 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
             <div className="absolute h-14 w-14 rounded-full bg-cyan-400/15 blur-xl animate-pulse" />
             <Image src="/logo.png" alt="InfraStudio" width={38} height={38} className="relative h-10 w-10 object-contain" />
           </div>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Validando acesso</p>
-          <p className="mt-3 text-lg text-white">Carregando ambiente...</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">{loggingOut ? "Encerrando sessao" : "Validando acesso"}</p>
+          <p className="mt-3 text-lg text-white">{loggingOut ? "Saindo do painel..." : "Carregando ambiente..."}</p>
         </div>
       </div>
     );
