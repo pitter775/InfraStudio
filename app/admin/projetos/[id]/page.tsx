@@ -5495,33 +5495,35 @@ export default function AdminProjetoDetalhePage() {
           </section>
         ) : null}
 
-        <section className="mt-12 flex flex-wrap items-center justify-center gap-2">
-          {projectTabs.map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.key;
+        <section className="sticky top-3 z-30 mt-12">
+          <div className="mx-auto flex w-full max-w-max flex-wrap items-center justify-center gap-2 rounded-[26px] border border-white/8 bg-[#07111f]/82 px-3 py-3 shadow-[0_18px_38px_rgba(2,8,23,0.34)] backdrop-blur-md">
+            {projectTabs.map((tab) => {
+              const Icon = tab.icon;
+              const active = activeTab === tab.key;
 
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => {
-                  setActiveTab(tab.key);
-                  replaceProjectUrl((nextParams) => {
-                    nextParams.set("tab", tab.key);
-                    nextParams.delete("fonte");
-                  });
-                }}
-                className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-3.5 py-2 text-sm font-semibold ${premiumInteractiveClass} ${
-                  active
-                    ? "border-cyan-400/30 bg-cyan-400/14 text-cyan-50 shadow-[0_10px_25px_rgba(34,211,238,0.12)]"
-                    : "border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.07]"
-                }`}
-              >
-                <Icon size={15} />
-                {tab.label}
-              </button>
-            );
-          })}
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(tab.key);
+                    replaceProjectUrl((nextParams) => {
+                      nextParams.set("tab", tab.key);
+                      nextParams.delete("fonte");
+                    });
+                  }}
+                  className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-3.5 py-2 text-sm font-semibold ${premiumInteractiveClass} ${
+                    active
+                      ? "border-cyan-400/30 bg-cyan-400/14 text-cyan-50 shadow-[0_10px_25px_rgba(34,211,238,0.12)]"
+                      : "border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.07]"
+                  }`}
+                >
+                  <Icon size={15} />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
         </section>
 
         <section className={`${renderedTab === "agentes" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
