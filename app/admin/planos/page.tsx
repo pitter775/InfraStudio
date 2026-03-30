@@ -55,9 +55,18 @@ export default function AdminPlanosPage() {
 
   const loadPlanos = async () => {
     setLoading(true);
+    setFeedback(null);
     const response = await fetch("/api/admin/planos", { cache: "no-store" });
-    const payload = (await response.json()) as { planos?: Plano[] };
-    setPlanos(payload.planos ?? []);
+    const payload = (await response.json().catch(() => null)) as { planos?: Plano[]; error?: string } | null;
+
+    if (!response.ok) {
+      setPlanos([]);
+      setFeedback(payload?.error ?? "Nao foi possivel carregar os planos.");
+      setLoading(false);
+      return;
+    }
+
+    setPlanos(payload?.planos ?? []);
     setLoading(false);
   };
 
