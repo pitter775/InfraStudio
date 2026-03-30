@@ -908,6 +908,8 @@ function buildFocusedApiContext(message: string, apiContexts: ApiRuntimeContext[
     return { instructions: "", fields: [] as ScoredApiField[] };
   }
 
+  const explicitApiIntent = /codigo|status|consulta|buscar|verifica|api|integr/i.test(normalizeText(message));
+
   const matches = findMatchingApiFields(availableApis, message)
     .sort((left, right) => right.score - left.score || left.nome.localeCompare(right.nome))
     .slice(0, 6);
@@ -929,15 +931,20 @@ function buildFocusedApiContext(message: string, apiContexts: ApiRuntimeContext[
     ),
   );
 
-  const fallbackFields = baselineFields.length
-    ? baselineFields.slice(0, 5)
-    : availableApis.flatMap((api) =>
-        api.campos.slice(0, 5).map((campo) => ({
-          ...campo,
-          apiNome: api.nome,
-          score: 1,
-        })),
-      ).slice(0, 5);
+  const fallbackFields =
+    explicitApiIntent
+      ? baselineFields.length
+        ? baselineFields.slice(0, 5)
+        : availableApis
+            .flatMap((api) =>
+              api.campos.slice(0, 5).map((campo) => ({
+                ...campo,
+                apiNome: api.nome,
+                score: 1,
+              })),
+            )
+            .slice(0, 5)
+      : [];
 
   const selectedFields = matches.length ? matches : fallbackFields;
   const fieldLines = selectedFields.map(
@@ -945,6 +952,10 @@ function buildFocusedApiContext(message: string, apiContexts: ApiRuntimeContext[
   );
   const failedLines = failedApis.map((api) => `- API indisponivel: ${api.nome}. Motivo: ${api.erro}`);
   const analytical = isAnalyticalQuery(message);
+
+  if (!selectedFields.length && !failedLines.length) {
+    return { instructions: "", fields: [] as ScoredApiField[] };
+  }
 
   return {
     fields: selectedFields,
@@ -1023,11 +1034,6 @@ function buildAgentScopedRecoveryReply(input: {
   agent: AgenteRecord | null;
   apiContexts: ApiRuntimeContext[];
 }) {
-  const apiReply = buildApiFallbackReply(input.message, input.apiContexts);
-  if (apiReply) {
-    return formatHeuristicReply(apiReply, input.context);
-  }
-
   const runtime = normalizeAgentRuntimeConfig(input.agent?.configuracoes?.runtime);
   const objective =
     runtime?.overview.objetivo?.trim() ||
@@ -1037,16 +1043,28 @@ function buildAgentScopedRecoveryReply(input: {
     "este atendimento";
 
   if (isWhatsAppChannel(input.context)) {
-    return [
+    const baseReply = [
       `Sigo por aqui no contexto de ${input.agent?.nome ?? "atendimento"}.`,
       `Me diga o ponto exato que voce quer validar em ${objective}: risco, valor, status, documentos ou detalhes.`,
     ].join("\n\n");
+
+    const apiReply = /codigo|status|consulta|buscar|verifica|api|integr/i.test(normalizeText(input.message))
+      ? buildApiFallbackReply(input.message, input.apiContexts)
+      : null;
+
+    return apiReply ? formatHeuristicReply(apiReply, input.context) : baseReply;
   }
 
-  return [
+  const baseReply = [
     `Sigo por aqui no contexto de ${input.agent?.nome ?? "atendimento"}.`,
     `Me diga o ponto exato que voce quer validar em ${objective}: risco, valor, status, documentos ou detalhes.`,
   ].join("\n\n");
+
+  const apiReply = /codigo|status|consulta|buscar|verifica|api|integr/i.test(normalizeText(input.message))
+    ? buildApiFallbackReply(input.message, input.apiContexts)
+    : null;
+
+  return apiReply ? formatHeuristicReply(apiReply, input.context) : baseReply;
 }
 
 function buildSystemPrompt(agent: AgenteRecord | null, context?: ConversationContext) {
