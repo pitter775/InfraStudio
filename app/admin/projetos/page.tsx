@@ -249,7 +249,7 @@ export default function AdminProjetosPage() {
           <h2 className="text-xl font-bold text-slate-50">Meus projetos</h2>
           <p className="mt-2 text-sm text-slate-400">Escolha um projeto para continuar de onde voce parou.</p>
         </div>
-        <div className="p-6">
+        <div className="px-1 py-4">
           {loading ? <CenterLoader /> : null}
           {!loading && !projetos.length ? <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/30 p-5 text-sm text-slate-400">Nenhum projeto vinculado ainda.</div> : null}
           {projetos.length ? (
