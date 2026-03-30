@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { canAccessGlobalAdmin } from "@/lib/access";
-import { setPlanoAtivo, updatePlano } from "@/lib/planos";
+import { deletePlano, setPlanoAtivo, updatePlano } from "@/lib/planos";
 import { getSessionUser } from "@/lib/session";
 
 type RouteContext = {
@@ -63,4 +63,29 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   return NextResponse.json({ plano }, { status: 200 });
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  const user = await getSessionUser();
+
+  if (!canAccessGlobalAdmin(user)) {
+    return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+  }
+
+  const { id } = await context.params;
+  const result = await deletePlano(id);
+
+  if (!result.ok) {
+    if (result.reason === "not_found") {
+      return NextResponse.json({ error: "Plano nao encontrado." }, { status: 404 });
+    }
+
+    if (result.reason === "in_use") {
+      return NextResponse.json({ error: "Nao e possivel excluir um plano vinculado a assinaturas." }, { status: 409 });
+    }
+
+    return NextResponse.json({ error: "Nao foi possivel excluir o plano." }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true }, { status: 200 });
 }

@@ -19,6 +19,7 @@ type Projeto = {
   criadorNome?: string | null;
   criadorEmail?: string | null;
   billing?: {
+    planoId?: string | null;
     planoAtual: string;
     usoPercentual: number | null;
     bloqueado: boolean;
@@ -39,6 +40,12 @@ type ProjetoFormState = {
   descricao: string;
   status: string;
   modoCobranca: "plano" | "manual" | "ilimitado";
+};
+
+type PlanoOption = {
+  id: string;
+  nome: string;
+  ativo: boolean;
 };
 
 const emptyProjetoForm: ProjetoFormState = {
@@ -75,31 +82,43 @@ function CenterLoader() {
 export default function AdminProjetosPage() {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [projetos, setProjetos] = useState<Projeto[]>([]);
+  const [planos, setPlanos] = useState<PlanoOption[]>([]);
   const [form, setForm] = useState<ProjetoFormState>(emptyProjetoForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [updatingPlanoProjetoId, setUpdatingPlanoProjetoId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
   const loadProjetos = async () => {
-    const [projetosResponse, usoResponse] = await Promise.all([
+    const [projetosResponse, usoResponse, planosResponse] = await Promise.all([
       fetch("/api/admin/projetos", { cache: "no-store" }).then((response) => response.json()),
       fetch("/api/admin/uso", { cache: "no-store" }).then((response) => response.json()).catch(() => ({ uso: [] })),
+      fetch("/api/admin/planos", { cache: "no-store" }).then((response) => response.json()).catch(() => ({ planos: [] })),
     ]);
     const billingMap = new Map(
       ((usoResponse.uso ?? []) as Array<{
         projetoId: string;
         plano: { nomePlano: string; bloqueado: boolean };
+        assinaturaAtual?: { planoId?: string | null } | null;
         percentualUso: number | null;
         status: "ativo" | "bloqueado";
       }>).map((item) => [
         item.projetoId,
         {
+          planoId: item.assinaturaAtual?.planoId ?? null,
           planoAtual: item.plano.nomePlano,
           usoPercentual: item.percentualUso,
           bloqueado: item.status === "bloqueado" || item.plano.bloqueado,
         },
       ]),
+    );
+    setPlanos(
+      ((planosResponse.planos ?? []) as PlanoOption[]).map((plano) => ({
+        id: plano.id,
+        nome: plano.nome,
+        ativo: plano.ativo,
+      })),
     );
 
     const payload = projetosResponse as { projetos?: Projeto[] };
@@ -193,6 +212,36 @@ export default function AdminProjetosPage() {
       ),
     );
     setFeedback("Modo de cobranca atualizado.");
+  };
+
+  const handlePlanoChange = async (projeto: Projeto, planoId: string) => {
+    if (!planoId) {
+      return;
+    }
+
+    setUpdatingPlanoProjetoId(projeto.id);
+    setFeedback(null);
+
+    const response = await fetch("/api/admin/assinaturas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projetoId: projeto.id,
+        planoId,
+        trocarPlano: true,
+      }),
+    });
+    const payload = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      setFeedback(payload.error ?? "Nao foi possivel trocar o plano do projeto.");
+      setUpdatingPlanoProjetoId(null);
+      return;
+    }
+
+    await loadProjetos();
+    setUpdatingPlanoProjetoId(null);
+    setFeedback(`Plano de ${projeto.nome} atualizado.`);
   };
 
   if (loading && !currentUser) {
@@ -336,7 +385,25 @@ export default function AdminProjetosPage() {
                         <div className="mt-4 grid gap-3 md:grid-cols-3">
                           <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-4 py-3">
                             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Plano atual</p>
-                            <p className="mt-2 text-sm font-semibold text-white">{projeto.billing?.planoAtual ?? "Sem plano"}</p>
+                            {currentUser?.isMaster && projeto.modoCobranca === "plano" ? (
+                              <select
+                                value={projeto.billing?.planoId ?? ""}
+                                onChange={(event) => void handlePlanoChange(projeto, event.target.value)}
+                                disabled={updatingPlanoProjetoId === projeto.id || !planos.filter((plano) => plano.ativo).length}
+                                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                <option value="">{projeto.billing?.planoAtual ?? "Selecione um plano"}</option>
+                                {planos
+                                  .filter((plano) => plano.ativo)
+                                  .map((plano) => (
+                                    <option key={plano.id} value={plano.id}>
+                                      {plano.nome}
+                                    </option>
+                                  ))}
+                              </select>
+                            ) : (
+                              <p className="mt-2 text-sm font-semibold text-white">{projeto.billing?.planoAtual ?? "Sem plano"}</p>
+                            )}
                           </div>
                           <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-4 py-3">
                             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Uso atual</p>

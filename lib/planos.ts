@@ -194,3 +194,38 @@ export async function updatePlano(input: {
 export async function setPlanoAtivo(id: string, ativo: boolean) {
   return updatePlano({ id, ativo });
 }
+
+export type DeletePlanoResult =
+  | { ok: true }
+  | { ok: false; reason: "in_use" | "not_found" | "delete_failed" };
+
+export async function deletePlano(id: string): Promise<DeletePlanoResult> {
+  const supabase = getSupabaseAdminClient();
+
+  const current = await getPlanoById(id);
+  if (!current) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  const { count, error: usageError } = await supabase
+    .from("projetos_assinaturas")
+    .select("id", { count: "exact", head: true })
+    .eq("plano_id", id);
+
+  if (usageError) {
+    console.error("[planos] failed to verify plan usage", usageError);
+    return { ok: false, reason: "delete_failed" };
+  }
+
+  if ((count ?? 0) > 0) {
+    return { ok: false, reason: "in_use" };
+  }
+
+  const { error } = await supabase.from("planos").delete().eq("id", id);
+  if (error) {
+    console.error("[planos] failed to delete plan", error);
+    return { ok: false, reason: "delete_failed" };
+  }
+
+  return { ok: true };
+}

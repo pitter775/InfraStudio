@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Coins, LoaderCircle, PencilLine, Plus, Power } from "lucide-react";
+import { Coins, LoaderCircle, PencilLine, Plus, Power, Trash2 } from "lucide-react";
 
 type Plano = {
   id: string;
@@ -50,6 +50,7 @@ export default function AdminPlanosPage() {
   const [form, setForm] = useState<PlanoForm>(emptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingPlanoId, setDeletingPlanoId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const loadPlanos = async () => {
@@ -105,6 +106,34 @@ export default function AdminPlanosPage() {
     }
   };
 
+  const handleDeletePlano = async (plano: Plano) => {
+    const confirmed = window.confirm(`Excluir o plano "${plano.nome}"? Essa acao nao pode ser desfeita.`);
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingPlanoId(plano.id);
+    setFeedback(null);
+
+    const response = await fetch(`/api/admin/planos/${plano.id}`, {
+      method: "DELETE",
+    });
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+
+    if (!response.ok) {
+      setFeedback(payload?.error ?? "Nao foi possivel excluir o plano.");
+      setDeletingPlanoId(null);
+      return;
+    }
+
+    await loadPlanos();
+    if (form.id === plano.id) {
+      resetForm();
+    }
+    setDeletingPlanoId(null);
+    setFeedback("Plano excluido.");
+  };
+
   return (
     <main className="space-y-6">
       <section className="px-1 py-2">
@@ -117,6 +146,26 @@ export default function AdminPlanosPage() {
       </section>
 
       {feedback ? <section className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</section> : null}
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <article className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Planos cadastrados</p>
+          <p className="mt-3 text-4xl font-black text-white">{planos.length}</p>
+          <p className="mt-2 text-sm text-slate-400">Quantidade total de planos disponiveis no cadastro SaaS.</p>
+        </article>
+        <article className="rounded-3xl border border-emerald-400/15 bg-emerald-500/10 p-5">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100/80">Planos ativos</p>
+          <p className="mt-3 text-4xl font-black text-white">{planos.filter((plano) => plano.ativo).length}</p>
+          <p className="mt-2 text-sm text-emerald-50/80">Esses planos podem ser aplicados imediatamente nas assinaturas.</p>
+        </article>
+        <article className="rounded-3xl border border-cyan-400/15 bg-cyan-500/10 p-5">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-100/80">Lista rapida</p>
+          <p className="mt-3 text-sm font-semibold text-white">
+            {planos.length ? planos.map((plano) => plano.nome).join(" • ") : "Nenhum plano carregado ainda."}
+          </p>
+          <p className="mt-2 text-sm text-cyan-50/80">Os cards abaixo mostram preco, limites e capacidade por plano.</p>
+        </article>
+      </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
@@ -218,6 +267,15 @@ export default function AdminPlanosPage() {
                     >
                       <Power size={16} />
                       {plano.ativo ? "Desativar" : "Ativar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeletePlano(plano)}
+                      disabled={deletingPlanoId === plano.id}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {deletingPlanoId === plano.id ? <LoaderCircle size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                      Excluir
                     </button>
                   </div>
                 </div>
