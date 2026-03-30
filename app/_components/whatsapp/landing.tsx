@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, LayoutTemplate, MessageSquareQuote, Route, Sparkles } from "lucide-react";
 import { FooterSection } from "@/app/_components/home/sections";
 import {
   BeyondWhatsappSection,
@@ -14,10 +14,10 @@ import {
 import { WhatsappTestModal } from "@/app/_components/whatsapp/modal";
 
 const navItems = [
-  { href: "#valor", label: "Valor" },
-  { href: "#prova", label: "Prova" },
-  { href: "#como-funciona", label: "Como funciona" },
-  { href: "#alem-do-whatsapp", label: "Site + WhatsApp" },
+  { href: "#valor", label: "Valor", icon: Sparkles },
+  { href: "#prova", label: "Prova", icon: MessageSquareQuote },
+  { href: "#como-funciona", label: "Como funciona", icon: Route },
+  { href: "#alem-do-whatsapp", label: "Site + WhatsApp", icon: LayoutTemplate },
 ] as const;
 
 type NavHref = (typeof navItems)[number]["href"];
@@ -90,12 +90,13 @@ export function WhatsappLandingPage() {
                 <a
                   key={item.href}
                   href={item.href}
-                  className={`rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ease-in-out hover:scale-[1.02] hover:bg-white/5 hover:text-white ${
+                  className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ease-in-out hover:scale-[1.02] hover:bg-white/5 hover:text-white ${
                     activeSection === item.href
                       ? "bg-white/8 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
                       : "text-slate-300"
                   }`}
                 >
+                  <item.icon size={15} className={activeSection === item.href ? "text-cyan-200" : "text-slate-500"} />
                   {item.label}
                 </a>
               ))}
@@ -117,12 +118,13 @@ export function WhatsappLandingPage() {
               <a
                 key={item.href}
                 href={item.href}
-                className={`shrink-0 rounded-xl px-3 py-2 text-xs font-medium transition-all duration-200 ease-in-out ${
+                className={`infra-click-pulse shrink-0 inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition-all duration-200 ease-in-out ${
                   activeSection === item.href
-                    ? "bg-white/8 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
-                    : "bg-white/[0.03] text-slate-300"
+                    ? "border-cyan-400/20 bg-white/8 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
+                    : "border-white/10 bg-white/[0.04] text-slate-300"
                 }`}
               >
+                <item.icon size={14} className={activeSection === item.href ? "text-cyan-200" : "text-slate-500"} />
                 {item.label}
               </a>
             ))}

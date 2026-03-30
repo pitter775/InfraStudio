@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BriefcaseBusiness, Cable, LoaderCircle, Lock, MessageSquareText, Plus, Shield, Bot } from "lucide-react";
+import { BriefcaseBusiness, Cable, LoaderCircle, Lock, MessageSquareText, Plus, Shield, Bot, X } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -309,11 +309,11 @@ export default function AdminProjetosPage() {
                             <div className={`pointer-events-none absolute right-4 top-4 ${item.tone} opacity-16`}>
                               <Icon size={28} />
                             </div>
-                            <div className="relative flex items-start gap-4">
-                              <p className="min-w-[42px] text-4xl font-black leading-none text-slate-100">{item.value}</p>
+                            <div className="relative flex flex-col items-start gap-3">
+                              <p className="text-4xl font-black leading-none text-slate-100">{item.value}</p>
                               <div className="min-w-0">
-                                <p className="truncate text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">{item.label}</p>
-                                <p className="mt-2 text-xs text-slate-400">{item.description}</p>
+                                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">{item.label}</p>
+                                <p className="mt-2 text-xs leading-relaxed text-slate-400">{item.description}</p>
                               </div>
                             </div>
                           </div>
@@ -330,9 +330,17 @@ export default function AdminProjetosPage() {
 
       {modalOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-brand-dark p-6 shadow-2xl">
-            <h2 className="text-2xl font-extrabold text-white">Criar projeto</h2>
-            <div className="mt-6 grid gap-4">
+          <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+              <div>
+                <h2 className="text-2xl font-extrabold text-white">Criar projeto</h2>
+              </div>
+              <button type="button" onClick={() => setModalOpen(false)} className={`${neutralActionButtonClass} px-3`} aria-label="Fechar modal">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-6">
+            <div className="grid gap-4">
               <input value={form.nome} onChange={(event) => setForm((current) => ({ ...current, nome: event.target.value }))} placeholder="Nome" className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
               <input value={form.slug} onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))} placeholder="Slug" className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
               <input value={form.tipo} onChange={(event) => setForm((current) => ({ ...current, tipo: event.target.value }))} placeholder="Tipo" className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
@@ -344,6 +352,7 @@ export default function AdminProjetosPage() {
                 {saving ? <BusyIcon /> : <Plus size={16} />}
                 Criar
               </button>
+            </div>
             </div>
           </div>
         </div>

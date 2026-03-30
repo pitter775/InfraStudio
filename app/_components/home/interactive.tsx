@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, Lock, LogOut, Menu, MessageCircle, Send, UserRound, X } from "lucide-react";
+import { ArrowRight, BookOpenText, BriefcaseBusiness, Lock, LogOut, Menu, MessageCircle, Send, Sparkles, UserRound, X } from "lucide-react";
 import type { AppUser } from "@/lib/app-user";
 import { HOME_CHAT_WIDGET_SLUG, WHATSAPP_NUMBER } from "@/app/_components/home/data";
 import { isAdminUser } from "@/lib/access";
@@ -213,6 +213,12 @@ type NavbarProps = {
   onOpenChat: () => void;
 };
 
+const siteNavItems = [
+  { href: "#servicos", label: "Servicos", icon: Sparkles },
+  { href: "#como-funciona", label: "Como funciona", icon: BriefcaseBusiness },
+  { href: "/docs/chat-widget-host-control", label: "Documentacao", icon: BookOpenText },
+] as const;
+
 export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -263,9 +269,14 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
               className="fixed left-4 right-4 top-20 z-[60] rounded-[28px] border border-white/10 bg-slate-950/95 p-5 shadow-2xl backdrop-blur-xl md:hidden"
             >
               <div className="mb-4 flex items-center justify-between">
-                <div>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] p-2 shadow-[0_10px_30px_rgba(15,23,42,0.18)]">
+                    <img src="/logo.png" alt="InfraStudio" className="h-7 w-7 object-contain" />
+                  </div>
+                  <div>
                   <p className="text-lg font-bold text-white">Menu</p>
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">InfraStudio</p>
+                </div>
                 </div>
                 <button
                   type="button"
@@ -281,23 +292,26 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
                 <a
                   href="#servicos"
                   onClick={closeMobileMenu}
-                  className="block rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.06]"
+                  className="infra-click-pulse flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/[0.08]"
                 >
+                  <Sparkles size={16} className="text-cyan-200" />
                   Serviços
                 </a>
                 <a
                   href="#como-funciona"
                   onClick={closeMobileMenu}
-                  className="block rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.06]"
+                  className="infra-click-pulse flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/[0.08]"
                 >
+                  <BriefcaseBusiness size={16} className="text-cyan-200" />
                   Como funciona
                 </a>
                 <Link
                   href="/docs/chat-widget-host-control"
                   onClick={closeMobileMenu}
-                  className="block rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.06]"
+                  className="infra-click-pulse flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/[0.08]"
                 >
-                  Documentacao
+                  <BookOpenText size={16} className="text-cyan-200" />
+                  Documentação
                 </Link>
                 <a
                   href="#"
@@ -306,8 +320,9 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
                     closeMobileMenu();
                     onOpenChat();
                   }}
-                  className="block rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.06]"
+                  className="infra-click-pulse flex items-center gap-3 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14"
                 >
+                  <MessageCircle size={16} />
                   Solicitar orçamento
                 </a>
               </div>
@@ -318,8 +333,9 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
                     <Link
                       href={adminHomeHref}
                       onClick={closeMobileMenu}
-                      className="block rounded-2xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-100"
+                      className="infra-click-pulse flex items-center gap-3 rounded-2xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-100"
                     >
+                      <Lock size={16} />
                       {adminHomeLabel}
                     </Link>
                     <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/10 px-4 py-3">
@@ -376,15 +392,18 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
             </div>
           </div>
 
-          <div className="hidden items-center space-x-8 md:flex">
-            <a href="#servicos" className="text-sm font-medium text-slate-300 transition-colors hover:text-blue-400">
+          <div className="hidden items-center space-x-3 md:flex">
+            <a href="#servicos" className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
+              <Sparkles size={15} className="text-slate-500" />
               Serviços
             </a>
-            <a href="#como-funciona" className="text-sm font-medium text-slate-300 transition-colors hover:text-blue-400">
+            <a href="#como-funciona" className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
+              <BriefcaseBusiness size={15} className="text-slate-500" />
               Como funciona
             </a>
-            <Link href="/docs/chat-widget-host-control" className="text-sm font-medium text-slate-300 transition-colors hover:text-blue-400">
-              Documentacao
+            <Link href="/docs/chat-widget-host-control" className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
+              <BookOpenText size={15} className="text-slate-500" />
+              Documentação
             </Link>
             <a
               href="#"
@@ -392,8 +411,9 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
                 event.preventDefault();
                 onOpenChat();
               }}
-              className="rounded-full bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:from-blue-500 hover:to-blue-400"
+              className="infra-click-pulse inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:from-blue-500 hover:to-blue-400"
             >
+              <MessageCircle size={15} />
               Solicitar orçamento
             </a>
           </div>
