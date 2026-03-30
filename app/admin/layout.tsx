@@ -162,7 +162,7 @@ function Sidebar({
                   onCloseMobile();
                 }}
                 className={cn(
-                  "group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition-all duration-200",
+                  "infra-click-pulse group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition-all duration-200",
                   active
                     ? "infra-premium-pill text-white shadow-[0_20px_44px_rgba(37,99,235,0.22)]"
                     : "text-slate-300 hover:bg-white/[0.04] hover:text-white",
@@ -210,7 +210,7 @@ function Sidebar({
                 <div className="grid grid-cols-2 gap-2">
                   <Link
                     href="/"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                    className="infra-click-pulse inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
                     title="Site"
                   >
                     <Globe size={16} />
@@ -222,7 +222,7 @@ function Sidebar({
                     onClick={() => {
                       void onLogout();
                     }}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                    className="infra-click-pulse inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
                     title="Sair"
                   >
                     <LogOut size={16} />
@@ -234,7 +234,7 @@ function Sidebar({
               <>
                 <Link
                   href="/"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                  className="infra-click-pulse inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
                   title="Site"
                 >
                   <Globe size={16} />
@@ -245,7 +245,7 @@ function Sidebar({
                   onClick={() => {
                     void onLogout();
                   }}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                  className="infra-click-pulse inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
                   title="Sair"
                 >
                   <LogOut size={16} />
