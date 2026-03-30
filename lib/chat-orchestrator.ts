@@ -1034,6 +1034,11 @@ function buildAgentScopedRecoveryReply(input: {
   agent: AgenteRecord | null;
   apiContexts: ApiRuntimeContext[];
 }) {
+  const commercialFallback = heuristicReply(input.message, input.context);
+  if (commercialFallback?.trim()) {
+    return formatHeuristicReply(commercialFallback, input.context);
+  }
+
   const runtime = normalizeAgentRuntimeConfig(input.agent?.configuracoes?.runtime);
   const objective =
     runtime?.overview.objetivo?.trim() ||
@@ -1173,9 +1178,9 @@ function buildLegacyAgentPrompt(agent: AgenteRecord | null) {
   const handoff = config.handoff ? `Regras de handoff: ${JSON.stringify(config.handoff)}` : "";
 
   return [
+    agent.promptBase ? `Prompt base do agente:\n${agent.promptBase}` : "",
     agent.nome ? `Nome do agente: ${agent.nome}` : "",
     agent.descricao ? `Descricao: ${agent.descricao}` : "",
-    agent.promptBase ? `Prompt base: ${agent.promptBase}` : "",
     capabilities ? `Capacidades principais: ${capabilities}` : "",
     qualifying ? `Perguntas de qualificacao sugeridas: ${qualifying}` : "",
     pricingRules,
@@ -1588,7 +1593,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const systemPrompt = buildSystemPrompt(agent, context);
   const channelReplyInstruction = buildChannelReplyInstruction(context);
   const runtimePrompt = buildRuntimePrompt(agent, latestUserMessage, context, apiContexts);
-  const legacyAgentPrompt = runtimePrompt ? "" : buildLegacyAgentPrompt(agent);
+  const legacyAgentPrompt = buildLegacyAgentPrompt(agent);
   const structuredReplyInstruction = buildStructuredReplyInstruction(context);
   const analyticalReplyInstruction = buildAnalyticalReplyInstruction(latestUserMessage);
   const agentAssetInstruction = buildAgentAssetInstruction(runtimeAssets, latestUserMessage);
