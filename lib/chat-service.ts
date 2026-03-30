@@ -631,12 +631,24 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     });
   }
 
-  if (typeof ai.metadata?.provider === "string" && ai.metadata.provider === "guardrail_fallback") {
+  if (typeof ai.metadata?.provider === "string" && ai.metadata.provider === "agent_scoped_recovery") {
+    await appendChatFailureLog({
+      projetoId: chat.projetoId,
+      agenteId: authoritativeAgent?.id ?? chat.agenteId,
+      chatId: chat.id,
+      origem: "chat_service.agent_scoped_recovery",
+      descricao: "IA principal falhou e a conversa seguiu com recuperacao contextual do agente.",
+      payload: {
+        channelKind,
+        provider: ai.metadata.provider,
+        model: typeof ai.metadata?.model === "string" ? ai.metadata.model : null,
+      },
+    });
     await appendSystemLog({
       projetoId: chat.projetoId,
-      tipo: "chat_fallback",
-      origem: "chat_service.reply_fallback",
-      descricao: "Resposta entregue em modo de contingencia.",
+      tipo: "chat_recovery",
+      origem: "chat_service.agent_scoped_recovery",
+      descricao: "Recuperacao contextual aplicada no agente travado.",
       payload: {
         chatId: chat.id,
         agenteId: authoritativeAgent?.id ?? chat.agenteId ?? null,
@@ -659,6 +671,19 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
       agenteId: lockedAgent.id,
       payload: {
         chatId: chat.id,
+        lockedAgentId: lockedAgent.id,
+        aiResolvedAgentId,
+        aiResolvedAgentName,
+        channelKind,
+      },
+    });
+    await appendChatFailureLog({
+      projetoId: chat.projetoId,
+      agenteId: lockedAgent.id,
+      chatId: chat.id,
+      origem: "chat_service.agent_drift_guardrail",
+      descricao: "Resposta tentou sobrescrever o agente travado do chat.",
+      payload: {
         lockedAgentId: lockedAgent.id,
         aiResolvedAgentId,
         aiResolvedAgentName,

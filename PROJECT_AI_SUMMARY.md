@@ -40,8 +40,8 @@ Padrao geral: rotas em `app/api/*` sao finas; a logica fica em `lib/*`.
 ### Rotas publicas
 - `POST /api/chat`: entrada principal do chat web
   - controller real: `lib/chat-service.ts`
-- `GET /api/chat/config`: resolve configuracao visual do widget
-  - controller real: `lib/chat-widgets.ts`
+- `GET /api/chat/config`: resolve configuracao visual do widget e valida projeto/agente travado do embed
+  - controller real: `app/api/chat/config/route.ts`
 - `POST /api/whatsapp/webhook`: entrada do bridge WhatsApp
   - controller real: `lib/chat-service.ts` + `lib/whatsapp-channels.ts`
 - `GET /api/whatsapp/session`: status de sessao/canal
@@ -59,7 +59,7 @@ Padrao geral: rotas em `app/api/*` sao finas; a logica fica em `lib/*`.
 - `app/api/admin/agentes/*` -> `lib/agentes.ts`
 - `app/api/admin/usuarios/*` -> `lib/usuarios.ts`
 - `app/api/admin/chats/*` -> `lib/chats.ts`
-- `app/api/admin/chat-logs/*` -> `lib/chat-logs.ts`
+- `app/api/admin/chat-logs/*` -> `lib/chat-logs.ts` + `lib/runtime-error-log.ts`
 - `app/api/admin/chat-widgets/*` -> `lib/chat-widgets.ts`
 - `app/api/admin/conectores/*` -> `lib/conectores.ts`
 - `app/api/admin/whatsapp-canais/*` -> `lib/whatsapp-channels.ts`
@@ -102,13 +102,15 @@ Modelos principais identificados no schema:
 ## 6. Fluxos principais do sistema
 ### Chat do site
 1. Front/widget chama `POST /api/chat`
-2. `lib/chat-service.ts` resolve projeto/agente/widget
+2. `lib/chat-service.ts` resolve projeto/agente/widget e trava o contexto no agente do projeto/widget
 3. Cria ou reutiliza `chat`
 4. Salva mensagem do usuario em `mensagens`
 5. Enriquece contexto (`lead`, `qualificacao`, `resumo`)
 6. `lib/chat-orchestrator.ts` monta prompt/runtime
 7. Consulta OpenAI e APIs/conectores do agente
-8. Salva resposta, tokens, custo e logs
+8. Se a IA principal falhar, tenta recuperacao contextual do proprio agente travado usando dados de API/conector ou resposta curta ainda no contexto do projeto
+9. Salva resposta, tokens, custo e logs
+10. Registra erros, drift de agente e recuperacoes no modulo de logs
 9. Opcionalmente gera CTA de WhatsApp
 
 ### Chat via WhatsApp
@@ -116,7 +118,8 @@ Modelos principais identificados no schema:
 2. Canal WhatsApp e validado
 3. Projeto/agente ficam travados pelo canal
 4. Fluxo segue pelo mesmo `lib/chat-service.ts`
-5. Atualiza sessao/status do canal
+5. Se canal/agente estiver invalido, o fluxo falha com log explicito e sem trocar de agente
+6. Atualiza sessao/status do canal
 
 ### Admin
 1. Usuario autentica em `/api/auth/login`
@@ -132,6 +135,13 @@ Modelos principais identificados no schema:
 4. Extrai campos primitivos relevantes
 5. Injeta resumo/campos no runtime do agente
 
+### Observabilidade e logs
+1. Eventos estruturados vao para a tabela `logs` via `lib/chat-logs.ts`
+2. Erros locais de runtime tambem sao gravados em `logs/runtime-errors.log` via `lib/runtime-error-log.ts`
+3. A tela admin `Logs` consolida banco + runtime em uma lista unica
+4. `chat_failure`, `chat_recovery` e `runtime_error` devem aparecer com destaque de erro
+5. O modulo de logs nao despeja mais payload completo nem conteudo integral do chat; ele mostra eventos compactos
+
 ## 7. Convencoes do projeto
 - App Router do Next: paginas em `app/`, APIs em `app/api/`
 - Regra de negocio centralizada em `lib/*`
@@ -142,7 +152,11 @@ Modelos principais identificados no schema:
 - Handlers HTTP retornam JSON simples e objetivos
 - Acesso/admin controlado por `lib/access.ts`
 - Sessao em JWT, nao em NextAuth
-- Chat e fail-closed: se agente/config/OpenAI estiver invalido, bloqueia resposta silenciosamente ou retorna erro controlado
+- Chat sempre deve respeitar agente travado por projeto/widget/canal
+- Nao pode existir fallback generico de agente entre projetos
+- Se OpenAI falhar, o sistema tenta recuperacao contextual do proprio agente travado antes de cair em resposta vazia
+- Se nao houver como recuperar sem risco de drift, o fluxo falha e registra erro explicito no modulo de logs
+- Drift de agente e falhas do guardrail devem gerar evento em `logs`
 - Um agente ativo por projeto e incentivado no fluxo de criacao/edicao
 - `database/geral-schema.sql` e documentacao/snapshot, nao fonte automatica de migracao
 
@@ -155,11 +169,18 @@ Modelos principais identificados no schema:
 - Priorizar estes arquivos ao entender comportamento:
   - `lib/chat-service.ts`
   - `lib/chat-orchestrator.ts`
+  - `lib/chat-logs.ts`
+  - `lib/runtime-error-log.ts`
   - `lib/agentes.ts`
   - `lib/projetos.ts`
   - `lib/apis.ts`
   - `lib/usuarios.ts`
   - `lib/session.ts`
+- Ao investigar problema de conversa saindo do contexto:
+  - verificar se `context.agente.locked` esta verdadeiro
+  - verificar se `resolved.lockedToAgent` continua verdadeiro em `lib/chat-service.ts`
+  - verificar eventos `chat_failure`, `chat_recovery` e `agent_drift_guardrail`
+  - nunca aceitar resposta generica de outro projeto como comportamento valido
 - Em banco:
   - nunca editar automaticamente `database/geral-schema.sql`
   - criar alteracoes reais em `database/seeder/*.sql`
@@ -172,12 +193,16 @@ Modelos principais identificados no schema:
 - `C:\Projetos\infrastudio\package.json`
 - `C:\Projetos\infrastudio\README.md`
 - `C:\Projetos\infrastudio\app\api\chat\route.ts`
+- `C:\Projetos\infrastudio\app\api\chat\config\route.ts`
 - `C:\Projetos\infrastudio\app\api\whatsapp\webhook\route.ts`
 - `C:\Projetos\infrastudio\app\api\auth\login\route.ts`
 - `C:\Projetos\infrastudio\app\api\admin\agentes\route.ts`
 - `C:\Projetos\infrastudio\app\api\admin\projetos\route.ts`
+- `C:\Projetos\infrastudio\app\admin\chat-logs\page.tsx`
 - `C:\Projetos\infrastudio\lib\chat-service.ts`
 - `C:\Projetos\infrastudio\lib\chat-orchestrator.ts`
+- `C:\Projetos\infrastudio\lib\chat-logs.ts`
+- `C:\Projetos\infrastudio\lib\runtime-error-log.ts`
 - `C:\Projetos\infrastudio\lib\agentes.ts`
 - `C:\Projetos\infrastudio\lib\projetos.ts`
 - `C:\Projetos\infrastudio\lib\apis.ts`

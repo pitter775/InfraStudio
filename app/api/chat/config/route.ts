@@ -49,7 +49,7 @@ export async function GET(request: Request) {
         source: "api_chat_config",
         message: explicitAgentRequested
           ? "Agente explicito invalido, inativo ou fora do projeto."
-          : "Chat config sem agente valido. Fallback automatico bloqueado.",
+          : "Chat config sem agente valido para o projeto.",
         projetoId: projeto.id,
         payload: {
           projetoIdentifier,

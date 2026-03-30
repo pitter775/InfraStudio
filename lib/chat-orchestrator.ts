@@ -121,22 +121,6 @@ function heuristicReply(message: string, context?: ConversationContext) {
   ].join("\n");
 }
 
-function buildGuardrailFallbackReply(message: string, context?: ConversationContext, reason?: string | null) {
-  const baseReply = formatHeuristicReply(heuristicReply(message, context), context);
-
-  if (isWhatsAppChannel(context)) {
-    return baseReply;
-  }
-
-  const normalizedReason = normalizeText(reason ?? "");
-  const suffix =
-    normalizedReason.includes("api key") || normalizedReason.includes("openai")
-      ? "Se quiser, tente novamente em instantes ou me diga seu objetivo em uma frase que eu sigo por um caminho mais direto."
-      : "Se quiser, reformule em uma frase curta que eu continuo por aqui.";
-
-  return `${baseReply}\n\n${suffix}`.trim();
-}
-
 function isWhatsAppChannel(context?: ConversationContext) {
   return (context?.channel?.kind ?? "").trim().toLowerCase() === "whatsapp";
 }
@@ -1032,6 +1016,38 @@ function buildApiFallbackReply(message: string, apiContexts: ApiRuntimeContext[]
   return null;
 }
 
+function buildAgentScopedRecoveryReply(input: {
+  message: string;
+  context?: ConversationContext;
+  agent: AgenteRecord | null;
+  apiContexts: ApiRuntimeContext[];
+}) {
+  const apiReply = buildApiFallbackReply(input.message, input.apiContexts);
+  if (apiReply) {
+    return formatHeuristicReply(apiReply, input.context);
+  }
+
+  const runtime = normalizeAgentRuntimeConfig(input.agent?.configuracoes?.runtime);
+  const objective =
+    runtime?.overview.objetivo?.trim() ||
+    input.context?.qualificacao?.objetivo?.trim() ||
+    input.agent?.descricao?.trim() ||
+    input.context?.projeto?.nome?.trim() ||
+    "este atendimento";
+
+  if (isWhatsAppChannel(input.context)) {
+    return [
+      `Sigo por aqui no contexto de ${input.agent?.nome ?? "atendimento"}.`,
+      `Me diga o ponto exato que voce quer validar em ${objective}: risco, valor, status, documentos ou detalhes.`,
+    ].join("\n\n");
+  }
+
+  return [
+    `Sigo por aqui no contexto de ${input.agent?.nome ?? "atendimento"}.`,
+    `Me diga o ponto exato que voce quer validar em ${objective}: risco, valor, status, documentos ou detalhes.`,
+  ].join("\n\n");
+}
+
 function buildSystemPrompt(agent: AgenteRecord | null, context?: ConversationContext) {
   const defaultPrompt = [
     "Voce e o agente comercial inicial da InfraStudio.",
@@ -1480,11 +1496,11 @@ export async function generateSalesReply(history: ConversationMessage[], context
       ...traceBase,
     });
     return {
-      reply: buildGuardrailFallbackReply(latestUserMessage, context, "inactive_or_invalid_agent"),
+      reply: "",
       assets: [],
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
-        provider: "guardrail_fallback",
+        provider: "guardrail",
         model: "inactive_or_invalid_agent",
         agenteId: null,
         agenteNome: null,
@@ -1511,6 +1527,12 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const analyticalReplyInstruction = buildAnalyticalReplyInstruction(latestUserMessage);
   const agentAssetInstruction = buildAgentAssetInstruction(runtimeAssets, latestUserMessage);
   const focusedApiContext = buildFocusedApiContext(latestUserMessage, apiContexts);
+  const scopedRecoveryReply = buildAgentScopedRecoveryReply({
+    message: latestUserMessage,
+    context,
+    agent,
+    apiContexts,
+  });
   const mercadoLivrePromptContext = buildMercadoLivrePromptContext(mercadoLivreProducts);
   const directMercadoLivreReply = buildMercadoLivreReply(mercadoLivreProducts, context);
   const mercadoLivreNoResultsReply =
@@ -1564,10 +1586,10 @@ export async function generateSalesReply(history: ConversationMessage[], context
       payload: { ...traceBase.payload, ...resourceTrace, mode: "fail_closed_no_openai_key" },
     });
     return {
-      reply: buildGuardrailFallbackReply(latestUserMessage, context, "fail_closed_no_openai_key"),
+      reply: scopedRecoveryReply,
       assets: [],
       usage: { inputTokens: 0, outputTokens: 0 },
-      metadata: { provider: "guardrail_fallback", model: "fail_closed_no_openai_key", agenteId: agent?.id ?? null, agenteNome: agent?.nome ?? null },
+      metadata: { provider: "agent_scoped_recovery", model: "fail_closed_no_openai_key", agenteId: agent?.id ?? null, agenteNome: agent?.nome ?? null },
     };
   }
 
@@ -1623,11 +1645,11 @@ export async function generateSalesReply(history: ConversationMessage[], context
         },
       });
       return {
-        reply: buildGuardrailFallbackReply(latestUserMessage, context, payload.error?.message ?? "fail_closed_after_openai_error"),
+        reply: scopedRecoveryReply,
         assets: [],
         usage: { inputTokens: 0, outputTokens: 0 },
         metadata: {
-          provider: "guardrail_fallback",
+          provider: "agent_scoped_recovery",
           model: "fail_closed_after_openai_error",
           agenteId: agent?.id ?? null,
           agenteNome: agent?.nome ?? null,
@@ -1672,11 +1694,11 @@ export async function generateSalesReply(history: ConversationMessage[], context
       },
     });
     return {
-      reply: buildGuardrailFallbackReply(latestUserMessage, context, error instanceof Error ? error.message : "fail_closed_after_exception"),
+      reply: scopedRecoveryReply,
       assets: [],
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
-        provider: "guardrail_fallback",
+        provider: "agent_scoped_recovery",
         model: "fail_closed_after_exception",
         agenteId: agent?.id ?? null,
         agenteNome: agent?.nome ?? null,
