@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BriefcaseBusiness, LoaderCircle, MessageCircleMore, RefreshCcw, SendHorizonal } from "lucide-react";
+import { BriefcaseBusiness, Clock3, LoaderCircle, MessageCircleMore, PhoneCall, RefreshCcw, SendHorizonal, Sparkles, SplitSquareVertical } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -22,6 +22,11 @@ type ChatRecord = {
   canal: string;
   identificadorExterno: string | null;
   ultimaMensagem: string | null;
+  contexto?: {
+    lead?: {
+      nome?: string | null;
+    } | null;
+  } | null;
 };
 
 type ChatMessageRecord = {
@@ -31,10 +36,45 @@ type ChatMessageRecord = {
   createdAt: string;
 };
 
+type IndicativoSummary = {
+  code: string;
+  label: string;
+  total: number;
+};
+
+const compactButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-all sm:text-sm";
+
+const dddLabels: Record<string, string> = {
+  "11": "Sao Paulo capital",
+  "21": "Rio de Janeiro",
+  "27": "Espirito Santo",
+  "31": "Belo Horizonte",
+  "41": "Curitiba",
+  "47": "Santa Catarina",
+  "48": "Florianopolis",
+  "51": "Porto Alegre",
+  "61": "Brasilia",
+  "62": "Goias",
+  "71": "Salvador",
+  "81": "Recife",
+  "85": "Fortaleza",
+};
+
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatFullDateTime(value: string) {
+  return new Date(value).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -51,7 +91,25 @@ function getChatChannelTone(canal: string) {
 }
 
 function getChatTitle(chat: ChatRecord) {
-  return chat.identificadorExterno?.trim() || chat.titulo?.trim() || "Conversa sem identificacao";
+  return chat.contexto?.lead?.nome?.trim() || chat.identificadorExterno?.trim() || chat.titulo?.trim() || "Conversa sem identificacao";
+}
+
+function extractIndicativo(rawValue: string | null | undefined) {
+  const digits = (rawValue ?? "").replace(/\D/g, "");
+  if (!digits) {
+    return null;
+  }
+
+  const normalized = digits.startsWith("55") && digits.length >= 12 ? digits.slice(2) : digits;
+  if (normalized.length < 10) {
+    return null;
+  }
+
+  const ddd = normalized.slice(0, 2);
+  return {
+    code: ddd,
+    label: dddLabels[ddd] ?? `DDD ${ddd}`,
+  };
 }
 
 function CenterLoader() {
@@ -88,6 +146,49 @@ export default function AdminAtendimentoPage() {
   );
 
   const selectedMessages = selectedChatId ? (messagesByChatId[selectedChatId] ?? []) : [];
+  const dashboard = useMemo(() => {
+    const whatsappChats = chats.filter((chat) => chat.canal === "whatsapp");
+    const siteChats = chats.filter((chat) => chat.canal !== "whatsapp");
+    const latestChat = chats[0] ?? null;
+    const activeToday = chats.filter((chat) => {
+      const updatedDate = new Date(chat.updatedAt);
+      const now = new Date();
+      return updatedDate.toDateString() === now.toDateString();
+    }).length;
+
+    const indicativoMap = new Map<string, IndicativoSummary>();
+    whatsappChats.forEach((chat) => {
+      const indicativo = extractIndicativo(chat.identificadorExterno);
+      if (!indicativo) {
+        return;
+      }
+
+      const current = indicativoMap.get(indicativo.code);
+      indicativoMap.set(indicativo.code, {
+        code: indicativo.code,
+        label: indicativo.label,
+        total: (current?.total ?? 0) + 1,
+      });
+    });
+
+    const topIndicativos = [...indicativoMap.values()]
+      .sort((left, right) => right.total - left.total)
+      .slice(0, 3);
+
+    const practicalSummary = latestChat
+      ? `${getChatChannelLabel(latestChat.canal)} puxando o ritmo mais recente com atualizacao em ${formatDateTime(latestChat.updatedAt)}.`
+      : "Ainda nao existem conversas suficientes para gerar leitura do atendimento.";
+
+    return {
+      totalChats: chats.length,
+      whatsappChats: whatsappChats.length,
+      siteChats: siteChats.length,
+      activeToday,
+      latestChat,
+      topIndicativos,
+      practicalSummary,
+    };
+  }, [chats]);
 
   const loadProjects = async () => {
     setLoadingProjects(true);
@@ -319,14 +420,14 @@ export default function AdminAtendimentoPage() {
 
   if (!activeProjectId) {
     return (
-      <main className="space-y-6">
+      <main className="space-y-5">
         <section className="px-1 py-2">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">
             <MessageCircleMore size={14} />
             Atendimento
           </div>
-          <h1 className="text-4xl font-extrabold text-slate-50">Selecione um projeto para abrir as conversas</h1>
-          <p className="mt-4 max-w-3xl text-slate-400">A inbox unificada usa o projeto ativo para juntar chat do site e WhatsApp no mesmo lugar.</p>
+          <h1 className="text-2xl font-extrabold text-slate-50 sm:text-3xl">Selecione um projeto para abrir as conversas</h1>
+          <p className="mt-3 max-w-3xl text-sm text-slate-400 sm:text-base">A inbox unificada usa o projeto ativo para juntar chat do site e WhatsApp no mesmo lugar.</p>
         </section>
 
         {feedback ? <section className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{feedback}</section> : null}
@@ -368,20 +469,20 @@ export default function AdminAtendimentoPage() {
   }
 
   return (
-    <main className="space-y-6">
+    <main className="space-y-5">
       <section className="px-1 py-2">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">
           <MessageCircleMore size={14} />
           Atendimento
         </div>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-4xl font-extrabold text-slate-50">Conversas</h1>
-            <p className="mt-4 max-w-3xl text-slate-400">
+            <h1 className="text-2xl font-extrabold text-slate-50 sm:text-3xl">Conversas</h1>
+            <p className="mt-2 max-w-3xl text-sm text-slate-400 sm:text-base">
               Projeto ativo: <span className="font-semibold text-white">{projectName || activeProjectId}</span>
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => {
@@ -394,17 +495,17 @@ export default function AdminAtendimentoPage() {
                 setMessagesByChatId({});
                 void loadProjects();
               }}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-100 transition-all hover:border-white/20 hover:bg-white/10"
+              className={`${compactButtonClass} border-white/10 bg-white/5 text-slate-100 hover:border-white/20 hover:bg-white/10`}
             >
-              <BriefcaseBusiness size={16} />
+              <BriefcaseBusiness size={15} />
               Trocar projeto
             </button>
             <button
               type="button"
               onClick={() => void handleRefresh()}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 transition-all hover:border-sky-300/30 hover:bg-sky-400/14"
+              className={`${compactButtonClass} border-sky-400/20 bg-sky-400/10 text-sky-50 hover:border-sky-300/30 hover:bg-sky-400/14`}
             >
-              <RefreshCcw size={16} />
+              <RefreshCcw size={15} />
               Atualizar
             </button>
           </div>
@@ -413,14 +514,102 @@ export default function AdminAtendimentoPage() {
 
       {feedback ? <section className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{feedback}</section> : null}
 
-      <section className="grid min-h-[72vh] gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <div className="overflow-hidden rounded-[24px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)]">
-          <div className="border-b border-white/10 px-4 py-4">
-            <p className="text-lg font-bold text-white">Conversas do projeto</p>
-            <p className="mt-1 text-sm text-slate-400">Site e WhatsApp no mesmo feed.</p>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          {
+            label: "Inbox total",
+            value: dashboard.totalChats,
+            detail: `${dashboard.activeToday} com atividade hoje`,
+            icon: MessageCircleMore,
+            tone: "text-cyan-200",
+          },
+          {
+            label: "WhatsApp",
+            value: dashboard.whatsappChats,
+            detail: `${dashboard.siteChats} no site`,
+            icon: PhoneCall,
+            tone: "text-emerald-200",
+          },
+          {
+            label: "Ritmo atual",
+            value: dashboard.latestChat ? formatDateTime(dashboard.latestChat.updatedAt) : "--",
+            detail: dashboard.latestChat ? getChatChannelLabel(dashboard.latestChat.canal) : "Sem atividade recente",
+            icon: Clock3,
+            tone: "text-amber-200",
+          },
+          {
+            label: "Indicativos",
+            value: dashboard.topIndicativos[0]?.code ?? "--",
+            detail: dashboard.topIndicativos[0] ? `${dashboard.topIndicativos[0].label} lidera` : "Sem telefone identificado",
+            icon: SplitSquareVertical,
+            tone: "text-violet-200",
+          },
+        ].map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="rounded-2xl border border-white/8 bg-white/[0.02] p-4 shadow-[0_16px_34px_rgba(2,8,23,0.18)]">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
+                  <p className="mt-2 text-2xl font-black text-white sm:text-3xl">{item.value}</p>
+                  <p className="mt-2 text-xs text-slate-400">{item.detail}</p>
+                </div>
+                <Icon size={20} className={item.tone} />
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
+      <section className="grid gap-3 xl:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.9fr)]">
+        <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-4 shadow-[0_16px_34px_rgba(2,8,23,0.18)]">
+          <div className="flex items-center gap-2 text-cyan-200">
+            <Sparkles size={16} />
+            <p className="text-sm font-bold text-white">Resumo pratico do atendimento</p>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-slate-300">{dashboard.practicalSummary}</p>
+          <p className="mt-2 text-xs text-slate-500">
+            {dashboard.whatsappChats > dashboard.siteChats
+              ? "O WhatsApp esta puxando mais volume que o site neste projeto."
+              : dashboard.siteChats > dashboard.whatsappChats
+                ? "O site esta com mais conversas que o WhatsApp neste momento."
+                : "Os canais estao equilibrados neste momento."}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-4 shadow-[0_16px_34px_rgba(2,8,23,0.18)]">
+          <div className="flex items-center gap-2 text-violet-200">
+            <PhoneCall size={16} />
+            <p className="text-sm font-bold text-white">Indicativos detectados</p>
+          </div>
+          {dashboard.topIndicativos.length ? (
+            <div className="mt-3 space-y-2">
+              {dashboard.topIndicativos.map((indicativo) => (
+                <div key={indicativo.code} className="flex items-center justify-between rounded-xl border border-white/8 bg-slate-950/30 px-3 py-2">
+                  <div>
+                    <p className="text-sm font-semibold text-white">DDD {indicativo.code}</p>
+                    <p className="text-xs text-slate-400">{indicativo.label}</p>
+                  </div>
+                  <span className="rounded-full bg-violet-500/10 px-2.5 py-1 text-[11px] font-bold text-violet-200">
+                    {indicativo.total} conversa{indicativo.total > 1 ? "s" : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-slate-400">Ainda nao foi possivel identificar telefones suficientes nas conversas de WhatsApp.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="grid min-h-[calc(100vh-22rem)] gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)]">
+          <div className="border-b border-white/10 px-4 py-3">
+            <p className="text-base font-bold text-white">Conversas do projeto</p>
+            <p className="mt-1 text-xs text-slate-400">Site e WhatsApp no mesmo feed.</p>
           </div>
 
-          <div className="max-h-[72vh] overflow-y-auto p-3">
+          <div className="max-h-[calc(100vh-24rem)] overflow-y-auto p-3 xl:max-h-[calc(100vh-22rem)]">
             {loadingChats ? <CenterLoader /> : null}
 
             {!loadingChats && !chats.length ? (
@@ -439,7 +628,7 @@ export default function AdminAtendimentoPage() {
                       key={chat.id}
                       type="button"
                       onClick={() => setSelectedChatId(chat.id)}
-                      className={`block w-full rounded-2xl border px-4 py-4 text-left transition-all ${
+                      className={`block w-full rounded-xl border px-3 py-3 text-left transition-all ${
                         active
                           ? "border-cyan-400/30 bg-cyan-500/10"
                           : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10"
@@ -448,7 +637,7 @@ export default function AdminAtendimentoPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-white">{getChatTitle(chat)}</p>
-                          <p className="mt-2 line-clamp-2 text-sm text-slate-400">{chat.ultimaMensagem || "Sem mensagens ainda."}</p>
+                          <p className="mt-1.5 line-clamp-2 text-xs text-slate-400 sm:text-sm">{chat.ultimaMensagem || "Sem mensagens ainda."}</p>
                         </div>
                         <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(chat.canal)}`}>
                           {getChatChannelLabel(chat.canal)}
@@ -463,22 +652,22 @@ export default function AdminAtendimentoPage() {
           </div>
         </div>
 
-        <div className="flex min-h-[72vh] flex-col overflow-hidden rounded-[24px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)]">
+        <div className="flex min-h-[calc(100vh-22rem)] flex-col overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)]">
           {selectedChat ? (
             <>
-              <div className="border-b border-white/10 px-5 py-4">
+              <div className="border-b border-white/10 px-4 py-3 sm:px-5">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate text-lg font-bold text-white">{getChatTitle(selectedChat)}</p>
+                      <p className="truncate text-base font-bold text-white sm:text-lg">{getChatTitle(selectedChat)}</p>
                       <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(selectedChat.canal)}`}>
                         {getChatChannelLabel(selectedChat.canal)}
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-slate-400">Ultima atividade em {formatDateTime(selectedChat.updatedAt)}</p>
+                    <p className="mt-1 text-xs text-slate-400 sm:text-sm">Ultima atividade em {formatFullDateTime(selectedChat.updatedAt)}</p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className={`rounded-full px-3 py-1 text-xs font-bold ${manualAssumedByChat[selectedChat.id] ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}`}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${manualAssumedByChat[selectedChat.id] ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}`}>
                       {manualAssumedByChat[selectedChat.id] ? "Voce esta atendendo" : "IA atendendo"}
                     </span>
                     {!manualAssumedByChat[selectedChat.id] ? (
@@ -490,7 +679,7 @@ export default function AdminAtendimentoPage() {
                             [selectedChat.id]: true,
                           }))
                         }
-                        className="inline-flex items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100 transition-all hover:border-emerald-400/30 hover:bg-emerald-500/15"
+                        className={`${compactButtonClass} border-emerald-500/20 bg-emerald-500/10 text-emerald-100 hover:border-emerald-400/30 hover:bg-emerald-500/15`}
                       >
                         Assumir atendimento
                       </button>
@@ -499,7 +688,7 @@ export default function AdminAtendimentoPage() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-5 py-5">
+              <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
                 {loadingConversation ? <CenterLoader /> : null}
 
                 {!loadingConversation && !selectedMessages.length ? (
@@ -509,16 +698,16 @@ export default function AdminAtendimentoPage() {
                 ) : null}
 
                 {!loadingConversation ? (
-                  <div className="space-y-3">
+                  <div className="space-y-3 pb-28">
                     {selectedMessages.map((message) => {
                       const fromUser = message.role === "user";
 
                       return (
                         <div key={message.id} className={`flex ${fromUser ? "justify-start" : "justify-end"}`}>
                           <div
-                            className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-[0_12px_24px_rgba(2,8,23,0.16)] ${
+                            className={`max-w-[92%] rounded-2xl px-3.5 py-3 shadow-[0_12px_24px_rgba(2,8,23,0.16)] sm:max-w-[85%] ${
                               fromUser
-                                ? "border border-white/10 bg-white/6 text-slate-100"
+                                ? "border border-white/10 bg-white/5 text-slate-100"
                                 : "border border-cyan-400/20 bg-cyan-500/10 text-cyan-50"
                             }`}
                           >
@@ -535,20 +724,20 @@ export default function AdminAtendimentoPage() {
                 ) : null}
               </div>
 
-              <div className="border-t border-white/10 px-5 py-4">
-                <div className="flex flex-col gap-3 md:flex-row">
+              <div className="sticky bottom-0 border-t border-white/10 bg-[#07111f]/96 px-4 py-3 backdrop-blur-xl sm:px-5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                   <textarea
                     value={replyText}
                     onChange={(event) => setReplyText(event.target.value)}
                     placeholder="Digite sua resposta manual..."
-                    rows={3}
-                    className="min-h-[92px] flex-1 rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-500 focus:border-cyan-400/30"
+                    rows={2}
+                    className="min-h-[72px] flex-1 rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-500 focus:border-cyan-400/30"
                   />
                   <button
                     type="button"
                     onClick={() => void handleSendMessage()}
                     disabled={sendingMessage || !replyText.trim()}
-                    className="inline-flex min-w-[150px] items-center justify-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 transition-all hover:border-sky-300/30 hover:bg-sky-400/14 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex min-w-[120px] items-center justify-center gap-2 rounded-xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 transition-all hover:border-sky-300/30 hover:bg-sky-400/14 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {sendingMessage ? <LoaderCircle size={16} className="animate-spin" /> : <SendHorizonal size={16} />}
                     Enviar

@@ -1079,6 +1079,7 @@ function buildSystemPrompt(agent: AgenteRecord | null, context?: ConversationCon
     "Foque em automacao, IA, integracoes, sistemas sob medida, atendimento e vendas.",
     "Seja consultivo, direto e convincente sem soar robotico.",
     "Nao invente funcionalidades. Quando faltar contexto, faca uma pergunta curta de qualificacao.",
+    !context?.lead?.nome ? "Nos primeiros momentos do atendimento, priorize descobrir e confirmar o primeiro nome da pessoa com naturalidade antes de aprofundar a qualificacao." : "",
     "Nunca diga ou sugira que leu edital, matricula, contrato ou documento inteiro se voce recebeu apenas resumo, campos extraidos ou contexto parcial.",
     "Quando responder com base parcial, use formulacoes honestas como 'com base nos dados enviados' ou 'pelo resumo atual'.",
     isWhatsAppChannel(context) ? "No WhatsApp, mantenha respostas curtas, normalmente entre 2 e 4 linhas." : "Mantenha respostas curtas, normalmente entre 3 e 6 linhas.",
@@ -1518,16 +1519,23 @@ function buildCatalogPricingReply(history: ConversationMessage[], context?: Conv
 
 function maybeAskForLeadIdentification(context: ConversationContext, history: ConversationMessage[], latestUserMessage: string) {
   const count = context.memoria?.mensagem_count ?? 0;
+  const hasName = Boolean(context.lead?.nome?.trim());
   const identified = Boolean(context.lead?.identificado);
   const ready = Boolean(context.qualificacao?.pronto_para_whatsapp);
   const normalized = normalizeText(latestUserMessage);
 
-  if (identified) {
+  if (hasName || identified) {
     return null;
   }
 
   if (!isOutOfScopeForCatalog(history)) {
     return null;
+  }
+
+  if (count <= 2) {
+    return isWhatsAppChannel(context)
+      ? "Perfeito. Antes de seguir, qual e o seu nome?"
+      : "Antes de eu te orientar melhor, como posso te chamar?";
   }
 
   if (ready || count >= 4 || normalized.includes("orcamento") || normalized.includes("whatsapp")) {
@@ -1610,6 +1618,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     apiContexts,
   });
   const catalogPricingReply = buildCatalogPricingReply(history, context);
+  const leadIdentificationReply = channelPolicy.allowLeadGate ? maybeAskForLeadIdentification(context ?? {}, history, latestUserMessage) : null;
   const mercadoLivrePromptContext = buildMercadoLivrePromptContext(mercadoLivreProducts);
   const directMercadoLivreReply = buildMercadoLivreReply(mercadoLivreProducts, context);
   const mercadoLivreNoResultsReply =
@@ -1671,6 +1680,26 @@ export async function generateSalesReply(history: ConversationMessage[], context
       metadata: {
         provider: "heuristic",
         model: "catalog_pricing",
+        agenteId: agent?.id ?? null,
+        agenteNome: agent?.nome ?? null,
+      },
+    };
+  }
+
+  if (leadIdentificationReply) {
+    await appendRuntimeErrorLog({
+      source: "chat_orchestrator.trace",
+      message: "Resposta heuristica para identificar nome do lead acionada.",
+      ...traceBase,
+      payload: { ...traceBase.payload, ...resourceTrace, mode: "lead_identification" },
+    });
+    return {
+      reply: formatHeuristicReply(leadIdentificationReply, context),
+      assets: [],
+      usage: { inputTokens: 0, outputTokens: 0 },
+      metadata: {
+        provider: "heuristic",
+        model: "lead_identification",
         agenteId: agent?.id ?? null,
         agenteNome: agent?.nome ?? null,
       },
@@ -1815,6 +1844,53 @@ function extractName(message: string) {
   const match = message.match(/(?:meu nome(?: e| eh)?|sou o|sou a)\s+([a-zà-ú ]{3,})/i);
   if (match?.[1]?.trim()) {
     return match[1].trim();
+  }
+
+  const normalizedOnlyText = message
+    .replace(/\+?\d[\d\s().-]{7,}\d/g, " ")
+    .replace(/[^\p{L}\s'-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (normalizedOnlyText) {
+    const lower = normalizeText(normalizedOnlyText);
+    const blocked = new Set([
+      "quero",
+      "preciso",
+      "orcamento",
+      "site",
+      "whatsapp",
+      "agenda",
+      "sistema",
+      "atendimento",
+      "integracao",
+      "crm",
+      "bom dia",
+      "boa tarde",
+      "boa noite",
+      "oi",
+      "ola",
+      "opa",
+      "sim",
+      "nao",
+    ]);
+    const words = normalizedOnlyText.split(/\s+/).filter(Boolean);
+
+    if (
+      words.length >= 1 &&
+      words.length <= 3 &&
+      words.every((word) => word.length >= 2) &&
+      !blocked.has(lower) &&
+      /^[\p{L}][\p{L}\s'-]+$/u.test(normalizedOnlyText)
+    ) {
+      const formattedName = words
+        .map((word) => `${word.slice(0, 1).toUpperCase()}${word.slice(1).toLowerCase()}`)
+        .join(" ");
+
+      if (formattedName.length >= 3) {
+        return formattedName;
+      }
+    }
   }
 
   if (!extractPhone(message)) {
