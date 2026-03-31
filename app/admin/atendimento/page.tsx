@@ -171,6 +171,21 @@ export default function AdminAtendimentoPage() {
   const [emojiTrayOpen, setEmojiTrayOpen] = useState(false);
   const [manualAssumedByChat, setManualAssumedByChat] = useState<Record<string, boolean>>({});
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const availableProjects = useMemo(() => {
+    if (projects.length) {
+      return projects;
+    }
+
+    return (currentUser?.memberships ?? [])
+      .filter((membership) => Boolean(membership.projetoId))
+      .map((membership) => ({
+        id: membership.projetoId ?? "",
+        nome: membership.projetoNome?.trim() || "Projeto sem nome",
+        descricao: "",
+        status: "ativo",
+      }))
+      .filter((project) => project.id);
+  }, [currentUser?.memberships, projects]);
 
   const selectedChat = useMemo(
     () => chats.find((chat) => chat.id === selectedChatId) ?? null,
@@ -178,7 +193,11 @@ export default function AdminAtendimentoPage() {
   );
   const currentUserFirstName = useMemo(() => getFirstName(currentUser?.name), [currentUser?.name]);
   const resolvedProjectName = useMemo(() => {
-    const fromLoadedProjects = projects.find((project) => project.id === activeProjectId)?.nome?.trim();
+    if (!activeProjectId && availableProjects.length === 1) {
+      return availableProjects[0].nome;
+    }
+
+    const fromLoadedProjects = availableProjects.find((project) => project.id === activeProjectId)?.nome?.trim();
     if (fromLoadedProjects) {
       return fromLoadedProjects;
     }
@@ -189,7 +208,7 @@ export default function AdminAtendimentoPage() {
     }
 
     return projectName.trim() || "Projeto selecionado";
-  }, [activeProjectId, currentUser?.memberships, projectName, projects]);
+  }, [activeProjectId, availableProjects, currentUser?.memberships, projectName]);
 
   const selectedMessages = selectedChatId ? (messagesByChatId[selectedChatId] ?? []) : [];
   const dashboard = useMemo(() => {
@@ -338,7 +357,6 @@ export default function AdminAtendimentoPage() {
 
       if (storedProjectId) {
         setActiveProjectId(storedProjectId);
-        return;
       }
 
       await loadProjects();
@@ -352,7 +370,7 @@ export default function AdminAtendimentoPage() {
       return;
     }
 
-    const matchedProject = projects.find((project) => project.id === activeProjectId);
+    const matchedProject = availableProjects.find((project) => project.id === activeProjectId);
     if (matchedProject) {
       setProjectName(matchedProject.nome);
     } else {
@@ -363,7 +381,21 @@ export default function AdminAtendimentoPage() {
     }
 
     void loadChats(activeProjectId);
-  }, [activeProjectId, currentUser?.memberships, projects]);
+  }, [activeProjectId, availableProjects, currentUser?.memberships]);
+
+  useEffect(() => {
+    if (!availableProjects.length) {
+      return;
+    }
+
+    if (activeProjectId && availableProjects.some((project) => project.id === activeProjectId)) {
+      return;
+    }
+
+    if (availableProjects.length === 1) {
+      void handleProjectSelect(availableProjects[0]);
+    }
+  }, [activeProjectId, availableProjects]);
 
   useEffect(() => {
     if (!selectedChatId || messagesByChatId[selectedChatId]) {
@@ -477,7 +509,7 @@ export default function AdminAtendimentoPage() {
     );
   }
 
-  if (!activeProjectId) {
+  if (!activeProjectId && availableProjects.length !== 1) {
     return (
       <main className="space-y-5">
         <section className="px-1 py-2">
@@ -500,9 +532,9 @@ export default function AdminAtendimentoPage() {
             </div>
           ) : null}
 
-          {!loadingProjects && projects.length ? (
+          {!loadingProjects && availableProjects.length ? (
             <div className="grid gap-3">
-              {projects.map((project) => (
+              {availableProjects.map((project) => (
                 <button
                   key={project.id}
                   type="button"
@@ -528,7 +560,7 @@ export default function AdminAtendimentoPage() {
   }
 
   return (
-    <main className="flex h-[calc(100vh-6.15rem)] flex-col gap-3 overflow-hidden">
+    <main className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <section className="px-1 pt-1">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">
           <MessageCircleMore size={14} />
@@ -537,28 +569,56 @@ export default function AdminAtendimentoPage() {
         <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-xl font-extrabold text-slate-50 sm:text-2xl">Conversas</h1>
-            <p className="mt-1 max-w-3xl text-xs text-slate-400 sm:text-sm">
-              Projeto ativo: <span className="font-semibold text-white">{resolvedProjectName}</span>
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400 sm:text-sm">
+              <span>Projeto ativo:</span>
+              {availableProjects.length > 1 ? (
+                <label className="relative inline-flex min-w-[220px] items-center">
+                  <select
+                    value={activeProjectId ?? ""}
+                    onChange={(event) => {
+                      const nextProject = availableProjects.find((project) => project.id === event.target.value);
+                      if (nextProject) {
+                        void handleProjectSelect(nextProject);
+                      }
+                    }}
+                    className="w-full appearance-none rounded-xl border border-white/10 bg-white/5 px-3 py-2 pr-9 text-xs font-semibold text-white outline-none transition-colors hover:border-white/20 focus:border-cyan-400/30 sm:text-sm"
+                  >
+                    <option value="" disabled>
+                      Selecionar projeto
+                    </option>
+                    {availableProjects.map((project) => (
+                      <option key={project.id} value={project.id} className="bg-slate-950 text-white">
+                        {project.nome}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="pointer-events-none absolute right-3 text-slate-400" />
+                </label>
+              ) : (
+                <span className="font-semibold text-white">{resolvedProjectName}</span>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                if (typeof window !== "undefined") {
-                  window.localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
-                }
-                setActiveProjectId(null);
-                setChats([]);
-                setSelectedChatId(null);
-                setMessagesByChatId({});
-                void loadProjects();
-              }}
-              className={`${compactButtonClass} border-white/10 bg-white/5 text-slate-100 hover:border-white/20 hover:bg-white/10`}
-            >
-              <BriefcaseBusiness size={15} />
-              Trocar projeto
-            </button>
+            {availableProjects.length <= 1 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    window.localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
+                  }
+                  setActiveProjectId(null);
+                  setChats([]);
+                  setSelectedChatId(null);
+                  setMessagesByChatId({});
+                  void loadProjects();
+                }}
+                className={`${compactButtonClass} border-white/10 bg-white/5 text-slate-100 hover:border-white/20 hover:bg-white/10`}
+              >
+                <BriefcaseBusiness size={15} />
+                Trocar projeto
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => void handleRefresh()}

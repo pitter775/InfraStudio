@@ -319,6 +319,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   const [projectPickerProjects, setProjectPickerProjects] = useState<Array<{ id: string; nome: string; descricao: string; status: string }>>([]);
   const [projectPickerFeedback, setProjectPickerFeedback] = useState<string | null>(null);
   const currentProjectTab = searchParams.get("tab");
+  const isAtendimentoRoute = pathname.startsWith("/admin/atendimento");
 
   useEffect(() => {
     const loadUser = async () => {
@@ -486,7 +487,12 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         </div>
 
          <div className="flex min-h-screen flex-col">
-          <div className="relative flex-1 overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
+          <div
+            className={cn(
+              "relative flex-1 overflow-hidden px-4 sm:px-6 lg:px-8",
+              isAtendimentoRoute ? "h-[calc(100dvh-4.5rem)] py-3 lg:h-[100dvh] lg:py-4" : "py-6",
+            )}
+          >
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={pathname}
@@ -494,12 +500,13 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.26, ease: "easeOut" }}
+                className={cn(isAtendimentoRoute ? "h-full min-h-0" : "")}
               >
                 {children}
               </motion.div>
             </AnimatePresence>
           </div>
-          {pathname.startsWith("/admin/atendimento") ? null : <FooterSection />}
+          {isAtendimentoRoute ? null : <FooterSection />}
          </div>
       </div>
 
