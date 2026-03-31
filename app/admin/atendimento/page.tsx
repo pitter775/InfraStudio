@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BriefcaseBusiness, Clock3, LoaderCircle, MessageCircleMore, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, X } from "lucide-react";
+import { BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, LoaderCircle, MessageCircleMore, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, X } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -35,6 +35,8 @@ type ChatMessageRecord = {
   conteudo: string;
   createdAt: string;
   metadata?: {
+    sentByHuman?: boolean;
+    senderName?: string;
     attachments?: Array<{
       name?: string;
       type?: string;
@@ -103,6 +105,15 @@ function getChatTitle(chat: ChatRecord) {
   return chat.contexto?.lead?.nome?.trim() || chat.identificadorExterno?.trim() || chat.titulo?.trim() || "Conversa sem identificacao";
 }
 
+function getFirstName(name: string | null | undefined) {
+  const normalized = name?.trim();
+  if (!normalized) {
+    return "Equipe";
+  }
+
+  return normalized.split(/\s+/)[0] || "Equipe";
+}
+
 function extractIndicativo(rawValue: string | null | undefined) {
   const digits = (rawValue ?? "").replace(/\D/g, "");
   if (!digits) {
@@ -151,11 +162,26 @@ export default function AdminAtendimentoPage() {
   const [selectedAttachments, setSelectedAttachments] = useState<Array<{ name: string; type: string; size: number }>>([]);
   const [emojiTrayOpen, setEmojiTrayOpen] = useState(false);
   const [manualAssumedByChat, setManualAssumedByChat] = useState<Record<string, boolean>>({});
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
 
   const selectedChat = useMemo(
     () => chats.find((chat) => chat.id === selectedChatId) ?? null,
     [chats, selectedChatId],
   );
+  const currentUserFirstName = useMemo(() => getFirstName(currentUser?.name), [currentUser?.name]);
+  const resolvedProjectName = useMemo(() => {
+    const fromLoadedProjects = projects.find((project) => project.id === activeProjectId)?.nome?.trim();
+    if (fromLoadedProjects) {
+      return fromLoadedProjects;
+    }
+
+    const fromMemberships = currentUser?.memberships?.find((membership) => membership.projetoId === activeProjectId)?.projetoNome?.trim();
+    if (fromMemberships) {
+      return fromMemberships;
+    }
+
+    return projectName.trim() || "Projeto selecionado";
+  }, [activeProjectId, currentUser?.memberships, projectName, projects]);
 
   const selectedMessages = selectedChatId ? (messagesByChatId[selectedChatId] ?? []) : [];
   const dashboard = useMemo(() => {
@@ -321,10 +347,15 @@ export default function AdminAtendimentoPage() {
     const matchedProject = projects.find((project) => project.id === activeProjectId);
     if (matchedProject) {
       setProjectName(matchedProject.nome);
+    } else {
+      const membershipProject = currentUser?.memberships?.find((membership) => membership.projetoId === activeProjectId)?.projetoNome?.trim();
+      if (membershipProject) {
+        setProjectName(membershipProject);
+      }
     }
 
     void loadChats(activeProjectId);
-  }, [activeProjectId]);
+  }, [activeProjectId, currentUser?.memberships, projects]);
 
   useEffect(() => {
     if (!selectedChatId || messagesByChatId[selectedChatId]) {
@@ -373,6 +404,8 @@ export default function AdminAtendimentoPage() {
         body: JSON.stringify({
           conteudo: replyText,
           attachments: selectedAttachments,
+          sentByHuman: true,
+          senderName: currentUserFirstName,
         }),
       });
 
@@ -486,17 +519,17 @@ export default function AdminAtendimentoPage() {
   }
 
   return (
-    <main className="flex h-[calc(100vh-7.5rem)] flex-col gap-5 overflow-hidden">
-      <section className="px-1 py-2">
+    <main className="flex h-[calc(100vh-6.15rem)] flex-col gap-3 overflow-hidden">
+      <section className="px-1 pt-1">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">
           <MessageCircleMore size={14} />
           Atendimento
         </div>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-50 sm:text-3xl">Conversas</h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-400 sm:text-base">
-              Projeto ativo: <span className="font-semibold text-white">{projectName || activeProjectId}</span>
+            <h1 className="text-xl font-extrabold text-slate-50 sm:text-2xl">Conversas</h1>
+            <p className="mt-1 max-w-3xl text-xs text-slate-400 sm:text-sm">
+              Projeto ativo: <span className="font-semibold text-white">{resolvedProjectName}</span>
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -531,102 +564,124 @@ export default function AdminAtendimentoPage() {
 
       {feedback ? <section className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{feedback}</section> : null}
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          {
-            label: "Inbox total",
-            value: dashboard.totalChats,
-            detail: `${dashboard.activeToday} com atividade hoje`,
-            icon: MessageCircleMore,
-            tone: "text-cyan-200",
-          },
-          {
-            label: "WhatsApp",
-            value: dashboard.whatsappChats,
-            detail: `${dashboard.siteChats} no site`,
-            icon: PhoneCall,
-            tone: "text-emerald-200",
-          },
-          {
-            label: "Ritmo atual",
-            value: dashboard.latestChat ? formatDateTime(dashboard.latestChat.updatedAt) : "--",
-            detail: dashboard.latestChat ? getChatChannelLabel(dashboard.latestChat.canal) : "Sem atividade recente",
-            icon: Clock3,
-            tone: "text-amber-200",
-          },
-          {
-            label: "Indicativos",
-            value: dashboard.topIndicativos[0]?.code ?? "--",
-            detail: dashboard.topIndicativos[0] ? `${dashboard.topIndicativos[0].label} lidera` : "Sem telefone identificado",
-            icon: SplitSquareVertical,
-            tone: "text-violet-200",
-          },
-        ].map((item) => {
-          const Icon = item.icon;
-          return (
-            <div key={item.label} className="rounded-2xl border border-white/8 bg-white/[0.02] p-4 shadow-[0_16px_34px_rgba(2,8,23,0.18)]">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
-                  <p className="mt-2 text-2xl font-black text-white sm:text-3xl">{item.value}</p>
-                  <p className="mt-2 text-xs text-slate-400">{item.detail}</p>
-                </div>
-                <Icon size={20} className={item.tone} />
-              </div>
+      <section className="rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-2 shadow-[0_16px_34px_rgba(2,8,23,0.18)]">
+        <button
+          type="button"
+          onClick={() => setSummaryExpanded((current) => !current)}
+          className="flex w-full items-center justify-between gap-3 text-left"
+        >
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-cyan-200">
+              <Sparkles size={14} />
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-white">Resumo do atendimento</p>
             </div>
-          );
-        })}
-      </section>
-
-      <section className="grid gap-3 xl:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.9fr)]">
-        <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-4 shadow-[0_16px_34px_rgba(2,8,23,0.18)]">
-          <div className="flex items-center gap-2 text-cyan-200">
-            <Sparkles size={16} />
-            <p className="text-sm font-bold text-white">Resumo pratico do atendimento</p>
+            <p className="mt-1 truncate text-[11px] text-slate-400">
+              {dashboard.practicalSummary} {dashboard.topIndicativos[0] ? `DDD em destaque: ${dashboard.topIndicativos[0].code}.` : "Sem indicativos em destaque."}
+            </p>
           </div>
-          <p className="mt-3 text-sm leading-6 text-slate-300">{dashboard.practicalSummary}</p>
-          <p className="mt-2 text-xs text-slate-500">
-            {dashboard.whatsappChats > dashboard.siteChats
-              ? "O WhatsApp esta puxando mais volume que o site neste projeto."
-              : dashboard.siteChats > dashboard.whatsappChats
-                ? "O site esta com mais conversas que o WhatsApp neste momento."
-                : "Os canais estao equilibrados neste momento."}
-          </p>
-        </div>
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200">
+            {summaryExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </span>
+        </button>
 
-        <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-4 shadow-[0_16px_34px_rgba(2,8,23,0.18)]">
-          <div className="flex items-center gap-2 text-violet-200">
-            <PhoneCall size={16} />
-            <p className="text-sm font-bold text-white">Indicativos detectados</p>
-          </div>
-          {dashboard.topIndicativos.length ? (
-            <div className="mt-3 space-y-2">
-              {dashboard.topIndicativos.map((indicativo) => (
-                <div key={indicativo.code} className="flex items-center justify-between rounded-xl border border-white/8 bg-slate-950/30 px-3 py-2">
-                  <div>
-                    <p className="text-sm font-semibold text-white">DDD {indicativo.code}</p>
-                    <p className="text-xs text-slate-400">{indicativo.label}</p>
+        {summaryExpanded ? (
+          <div className="mt-3 grid gap-3 border-t border-white/8 pt-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(240px,0.9fr)]">
+            <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                {
+                  label: "Inbox total",
+                  value: dashboard.totalChats,
+                  detail: `${dashboard.activeToday} com atividade hoje`,
+                  icon: MessageCircleMore,
+                  tone: "text-cyan-200",
+                },
+                {
+                  label: "WhatsApp",
+                  value: dashboard.whatsappChats,
+                  detail: `${dashboard.siteChats} no site`,
+                  icon: PhoneCall,
+                  tone: "text-emerald-200",
+                },
+                {
+                  label: "Ritmo atual",
+                  value: dashboard.latestChat ? formatDateTime(dashboard.latestChat.updatedAt) : "--",
+                  detail: dashboard.latestChat ? getChatChannelLabel(dashboard.latestChat.canal) : "Sem atividade recente",
+                  icon: Clock3,
+                  tone: "text-amber-200",
+                },
+                {
+                  label: "Indicativos",
+                  value: dashboard.topIndicativos[0]?.code ?? "--",
+                  detail: dashboard.topIndicativos[0] ? `${dashboard.topIndicativos[0].label} lidera` : "Sem telefone identificado",
+                  icon: SplitSquareVertical,
+                  tone: "text-violet-200",
+                },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.label} className="rounded-xl border border-white/8 bg-slate-950/30 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
+                        <p className="mt-1.5 text-lg font-black text-white sm:text-xl">{item.value}</p>
+                        <p className="mt-1 text-[11px] text-slate-400">{item.detail}</p>
+                      </div>
+                      <Icon size={16} className={item.tone} />
+                    </div>
                   </div>
-                  <span className="rounded-full bg-violet-500/10 px-2.5 py-1 text-[11px] font-bold text-violet-200">
-                    {indicativo.total} conversa{indicativo.total > 1 ? "s" : ""}
-                  </span>
+                );
+              })}
+            </section>
+
+            <section className="grid gap-3">
+              <div className="rounded-xl border border-white/8 bg-slate-950/30 p-3">
+                <p className="text-xs font-bold text-white">Resumo pratico</p>
+                <p className="mt-2 text-xs leading-5 text-slate-300">{dashboard.practicalSummary}</p>
+                <p className="mt-2 text-[11px] text-slate-500">
+                  {dashboard.whatsappChats > dashboard.siteChats
+                    ? "O WhatsApp esta puxando mais volume que o site neste projeto."
+                    : dashboard.siteChats > dashboard.whatsappChats
+                      ? "O site esta com mais conversas que o WhatsApp neste momento."
+                      : "Os canais estao equilibrados neste momento."}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-white/8 bg-slate-950/30 p-3">
+                <div className="flex items-center gap-2 text-violet-200">
+                  <PhoneCall size={14} />
+                  <p className="text-xs font-bold text-white">Indicativos detectados</p>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-slate-400">Ainda nao foi possivel identificar telefones suficientes nas conversas de WhatsApp.</p>
-          )}
-        </div>
+                {dashboard.topIndicativos.length ? (
+                  <div className="mt-2 space-y-2">
+                    {dashboard.topIndicativos.map((indicativo) => (
+                      <div key={indicativo.code} className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.02] px-2.5 py-2">
+                        <div>
+                          <p className="text-xs font-semibold text-white">DDD {indicativo.code}</p>
+                          <p className="text-[11px] text-slate-400">{indicativo.label}</p>
+                        </div>
+                        <span className="rounded-full bg-violet-500/10 px-2 py-1 text-[10px] font-bold text-violet-200">
+                          {indicativo.total} conversa{indicativo.total > 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-slate-400">Ainda nao foi possivel identificar telefones suficientes nas conversas de WhatsApp.</p>
+                )}
+              </div>
+            </section>
+          </div>
+        ) : null}
       </section>
 
-      <section className="grid min-h-0 flex-1 gap-4 overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)]">
+      <section className="grid min-h-0 flex-1 gap-3 overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)]">
         <div className="overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)]">
-          <div className="border-b border-white/10 px-4 py-3">
-            <p className="text-base font-bold text-white">Conversas do projeto</p>
-            <p className="mt-1 text-xs text-slate-400">Site e WhatsApp no mesmo feed.</p>
+          <div className="border-b border-white/10 px-3 py-2.5">
+            <p className="text-sm font-bold text-white">Conversas do projeto</p>
+            <p className="mt-1 text-[11px] text-slate-400">Site e WhatsApp no mesmo feed.</p>
           </div>
 
-          <div className="h-full overflow-y-auto p-3">
+          <div className="h-full overflow-y-auto p-2.5">
             {loadingChats ? <CenterLoader /> : null}
 
             {!loadingChats && !chats.length ? (
@@ -645,7 +700,7 @@ export default function AdminAtendimentoPage() {
                       key={chat.id}
                       type="button"
                       onClick={() => setSelectedChatId(chat.id)}
-                      className={`block w-full rounded-xl border px-3 py-3 text-left transition-all ${
+                      className={`block w-full rounded-xl border px-2.5 py-2.5 text-left transition-all ${
                         active
                           ? "border-cyan-400/30 bg-cyan-500/10"
                           : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10"
@@ -653,14 +708,14 @@ export default function AdminAtendimentoPage() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-white">{getChatTitle(chat)}</p>
-                          <p className="mt-1.5 line-clamp-2 text-xs text-slate-400 sm:text-sm">{chat.ultimaMensagem || "Sem mensagens ainda."}</p>
+                          <p className="truncate text-xs font-semibold text-white">{getChatTitle(chat)}</p>
+                          <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400">{chat.ultimaMensagem || "Sem mensagens ainda."}</p>
                         </div>
-                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(chat.canal)}`}>
+                        <span className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(chat.canal)}`}>
                           {getChatChannelLabel(chat.canal)}
                         </span>
                       </div>
-                      <p className="mt-3 text-xs text-slate-500">{formatDateTime(chat.updatedAt)}</p>
+                      <p className="mt-2 text-[10px] text-slate-500">{formatDateTime(chat.updatedAt)}</p>
                     </button>
                   );
                 })}
@@ -672,19 +727,19 @@ export default function AdminAtendimentoPage() {
         <div className="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)]">
           {selectedChat ? (
             <>
-              <div className="border-b border-white/10 px-4 py-3 sm:px-5">
+              <div className="border-b border-white/10 px-3 py-2.5 sm:px-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate text-base font-bold text-white sm:text-lg">{getChatTitle(selectedChat)}</p>
-                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(selectedChat.canal)}`}>
+                      <p className="truncate text-sm font-bold text-white sm:text-base">{getChatTitle(selectedChat)}</p>
+                      <span className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(selectedChat.canal)}`}>
                         {getChatChannelLabel(selectedChat.canal)}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-slate-400 sm:text-sm">Ultima atividade em {formatFullDateTime(selectedChat.updatedAt)}</p>
+                    <p className="mt-1 text-[11px] text-slate-400 sm:text-xs">Ultima atividade em {formatFullDateTime(selectedChat.updatedAt)}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${manualAssumedByChat[selectedChat.id] ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}`}>
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${manualAssumedByChat[selectedChat.id] ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}`}>
                       {manualAssumedByChat[selectedChat.id] ? "Voce esta atendendo" : "IA atendendo"}
                     </span>
                     {!manualAssumedByChat[selectedChat.id] ? (
@@ -705,7 +760,7 @@ export default function AdminAtendimentoPage() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+              <div className="flex-1 overflow-y-auto px-3 py-3 sm:px-4">
                 {loadingConversation ? <CenterLoader /> : null}
 
                 {!loadingConversation && !selectedMessages.length ? (
@@ -715,23 +770,27 @@ export default function AdminAtendimentoPage() {
                 ) : null}
 
                 {!loadingConversation ? (
-                  <div className="space-y-3 pb-28">
+                  <div className="space-y-2.5 pb-28">
                     {selectedMessages.map((message) => {
                       const fromUser = message.role === "user";
+                      const sentByHuman = message.metadata?.sentByHuman === true;
+                      const senderName = message.metadata?.senderName?.trim() || currentUserFirstName;
 
                       return (
                         <div key={message.id} className={`flex ${fromUser ? "justify-start" : "justify-end"}`}>
                           <div
-                            className={`max-w-[92%] rounded-2xl px-3.5 py-3 shadow-[0_12px_24px_rgba(2,8,23,0.16)] sm:max-w-[85%] ${
+                            className={`max-w-[92%] rounded-2xl px-3 py-2.5 shadow-[0_12px_24px_rgba(2,8,23,0.16)] sm:max-w-[84%] ${
                               fromUser
                                 ? "border border-white/10 bg-white/5 text-slate-100"
-                                : "border border-cyan-400/20 bg-cyan-500/10 text-cyan-50"
+                                : sentByHuman
+                                  ? "border border-amber-400/20 bg-amber-500/10 text-amber-50"
+                                  : "border border-cyan-400/20 bg-cyan-500/10 text-cyan-50"
                             }`}
                           >
                             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                              {fromUser ? "user" : "assistant"}
+                              {fromUser ? "USER" : sentByHuman ? senderName : "ASSISTANT"}
                             </p>
-                            <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{message.conteudo}</p>
+                            <p className="mt-1.5 whitespace-pre-wrap text-xs leading-5 sm:text-[13px]">{message.conteudo}</p>
                             {message.metadata?.attachments?.length ? (
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {message.metadata.attachments.map((attachment, index) => (
@@ -754,7 +813,7 @@ export default function AdminAtendimentoPage() {
                 ) : null}
               </div>
 
-              <div className="sticky bottom-0 border-t border-white/10 bg-[#07111f]/96 px-4 py-3 backdrop-blur-xl sm:px-5">
+              <div className="sticky bottom-0 border-t border-white/10 bg-[#07111f]/96 px-3 py-2.5 backdrop-blur-xl sm:px-4">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -817,7 +876,7 @@ export default function AdminAtendimentoPage() {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
                       aria-label="Selecionar anexo"
                     >
                       <Paperclip size={16} />
@@ -825,7 +884,7 @@ export default function AdminAtendimentoPage() {
                     <button
                       type="button"
                       onClick={() => setEmojiTrayOpen((current) => !current)}
-                      className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
                       aria-label="Abrir emojis"
                     >
                       <SmilePlus size={16} />
@@ -836,13 +895,13 @@ export default function AdminAtendimentoPage() {
                     onChange={(event) => setReplyText(event.target.value)}
                     placeholder="Digite sua resposta manual..."
                     rows={2}
-                    className="max-h-40 min-h-[72px] flex-1 overflow-y-auto rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-500 focus:border-cyan-400/30"
+                    className="max-h-32 min-h-[60px] flex-1 overflow-y-auto rounded-2xl border border-white/10 bg-slate-950/50 px-3.5 py-2.5 text-xs text-white outline-none transition-colors placeholder:text-slate-500 focus:border-cyan-400/30 sm:text-sm"
                   />
                   <button
                     type="button"
                     onClick={() => void handleSendMessage()}
                     disabled={sendingMessage || (!replyText.trim() && !selectedAttachments.length)}
-                    className="inline-flex min-w-[120px] items-center justify-center gap-2 rounded-xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 transition-all hover:border-sky-300/30 hover:bg-sky-400/14 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex min-w-[110px] items-center justify-center gap-2 rounded-xl border border-sky-400/20 bg-sky-400/10 px-4 py-2.5 text-xs font-semibold text-sky-50 transition-all hover:border-sky-300/30 hover:bg-sky-400/14 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
                   >
                     {sendingMessage ? <LoaderCircle size={16} className="animate-spin" /> : <SendHorizonal size={16} />}
                     Enviar

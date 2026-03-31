@@ -51,6 +51,8 @@ export async function POST(request: Request, context: RouteContext) {
 
   const body = (await request.json()) as {
     conteudo?: string;
+    sentByHuman?: boolean;
+    senderName?: string;
     attachments?: Array<{
       name?: string;
       type?: string;
@@ -67,6 +69,8 @@ export async function POST(request: Request, context: RouteContext) {
         }))
         .slice(0, 5)
     : [];
+  const senderName = body.senderName?.trim() || null;
+  const sentByHuman = body.sentByHuman === true;
 
   if (!conteudo && !attachments.length) {
     return NextResponse.json({ error: "Digite uma mensagem ou selecione um anexo." }, { status: 400 });
@@ -78,7 +82,13 @@ export async function POST(request: Request, context: RouteContext) {
     conteudo: conteudo || "Anexo enviado.",
     canal: chat.canal,
     identificadorExterno: chat.identificadorExterno,
-    metadata: attachments.length ? { attachments } : null,
+    metadata: attachments.length || sentByHuman || senderName
+      ? {
+          ...(attachments.length ? { attachments } : {}),
+          ...(sentByHuman ? { sentByHuman: true } : {}),
+          ...(senderName ? { senderName } : {}),
+        }
+      : null,
   });
 
   if (!message) {
