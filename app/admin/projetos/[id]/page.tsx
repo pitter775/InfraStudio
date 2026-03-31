@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Activity, ArrowLeft, Bold, Bot, Boxes, Cable, CheckCircle2, ChevronDown, Coins, Copy, Cpu, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, LoaderCircle, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, ShieldAlert, Sparkles, TestTube2, Trash2, Waypoints, X } from "lucide-react";
+import { Activity, ArrowLeft, Bold, Bot, Boxes, Cable, CheckCircle2, ChevronDown, Coins, Copy, Cpu, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, LoaderCircle, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, Power, ShieldAlert, Sparkles, TestTube2, Trash2, Waypoints, X } from "lucide-react";
 import { getAgentRuntimeBlockEntries, normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
 
 type Projeto = {
@@ -2669,26 +2669,6 @@ function AgenteModal({
           </div>
 
           <div className="min-w-0 border-t border-white/10 bg-white/[0.03] p-6 pb-8 lg:border-l lg:border-t-0">
-            <div className="sticky top-0 z-10 mb-5 rounded-2xl border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.16),rgba(6,95,70,0.1))] p-4 backdrop-blur-xl">
-              <label className="flex cursor-pointer items-start gap-3">
-                <input
-                  type="checkbox"
-                  checked={form.ativo}
-                  onChange={(event) => onChange({ ativo: event.target.checked })}
-                  className="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950/60 text-emerald-400"
-                />
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-white">Agente ativo para este projeto</span>
-                  <span className="mt-1 block text-xs leading-relaxed text-emerald-50/85">
-                    Quando ativo, este agente fica em destaque no projeto e vira a referencia principal do chat.
-                  </span>
-                  <span className="mt-2 block text-xs leading-relaxed text-emerald-100/65">
-                    Conversas em andamento continuam no agente que iniciou o atendimento. Trocas valem apenas para novos chats.
-                  </span>
-                </span>
-              </label>
-            </div>
-
             <div className="hidden mb-5 rounded-2xl border border-cyan-500/15 bg-cyan-500/10 p-5">
               <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950/20 text-cyan-100">
                 <Bot size={22} />
@@ -2888,6 +2868,19 @@ function AgenteModal({
           </div>
         </div>
           <ModalStickyFooter feedback={feedback}>
+            <button
+              type="button"
+              onClick={() => onChange({ ativo: !form.ativo })}
+              disabled={saving}
+              className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold ${
+                form.ativo
+                  ? "border-amber-400/20 bg-amber-500/10 text-amber-50 hover:border-amber-300/30 hover:bg-amber-500/14"
+                  : "border-emerald-400/20 bg-emerald-500/10 text-emerald-50 hover:border-emerald-300/30 hover:bg-emerald-500/14"
+              } disabled:cursor-not-allowed disabled:opacity-60`}
+            >
+              <Power size={16} />
+              {form.ativo ? "Desativar agente" : "Ativar agente"}
+            </button>
             <button type="button" onClick={onSubmit} disabled={saving} className={`${primaryActionButtonClass} flex-1`}>
               {saving ? <BusyIcon /> : form.id ? <Pencil size={16} /> : <Plus size={16} />}
               {form.id ? "Salvar" : "Criar"}
@@ -6839,18 +6832,19 @@ export default function AdminProjetoDetalhePage() {
               </button>
             </div>
             {renderCollapsedTabSummary("mercado", "Resumo do Mercado Livre", "Aqui ficam as lojas do Mercado Livre vinculadas ao projeto, com agente responsavel, Seller ID, estado do OAuth e atalhos de teste, edicao e remocao.")}
-            <div className="space-y-3 pt-2">
-              {data.conectores.length ? (
-                data.conectores.map((connector) => {
-                  const agente = connector.agenteId ? data.agentes.find((item) => item.id === connector.agenteId) ?? null : null;
-                  const canTestConnectorStore = Boolean(agente);
-                  return (
-                    <article key={connector.id} className={`relative overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),rgba(255,255,255,0.025)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.2),0_0_0_1px_rgba(34,211,238,0.03)] ${premiumTransitionClass}`}>
-                      <div
-                        aria-hidden="true"
-                        className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/30 to-transparent"
-                      />
-                      <div className="min-w-0">
+            <div className="grid gap-5 pt-2 xl:grid-cols-[minmax(0,560px)_minmax(280px,360px)] xl:items-start xl:justify-between">
+              <div className="space-y-3">
+                {data.conectores.length ? (
+                  data.conectores.map((connector) => {
+                    const agente = connector.agenteId ? data.agentes.find((item) => item.id === connector.agenteId) ?? null : null;
+                    const canTestConnectorStore = Boolean(agente);
+                    return (
+                      <article key={connector.id} className={`relative overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),rgba(255,255,255,0.025)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.2),0_0_0_1px_rgba(34,211,238,0.03)] ${premiumTransitionClass}`}>
+                        <div
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/30 to-transparent"
+                        />
+                        <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-3">
                             <h4 className="text-base font-bold text-white">{connector.nome}</h4>
                             <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200">{connector.tipo}</span>
@@ -6858,64 +6852,114 @@ export default function AdminProjetoDetalhePage() {
                               {connector.ativo ? "ativo" : "inativo"}
                             </span>
                           </div>
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                          <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Agente</p>
-                            <p className="mt-2 text-sm font-semibold text-white">{agente?.nome ?? "nao vinculado"}</p>
+                          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                            <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Agente</p>
+                              <p className="mt-2 text-sm font-semibold text-white">{agente?.nome ?? "nao vinculado"}</p>
+                            </div>
+                            <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Seller ID</p>
+                              <p className="mt-2 text-sm font-semibold text-white">{connector.configuracoes?.seller_id ?? "nao informado"}</p>
+                            </div>
+                            <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Nickname</p>
+                              <p className="mt-2 text-sm font-semibold text-white">{connector.configuracoes?.nickname ?? "nao informado"}</p>
+                            </div>
+                            <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">OAuth</p>
+                              <p className="mt-2 text-sm font-semibold text-white">
+                                {connector.configuracoes?.refresh_token ? "conectado" : connector.configuracoes?.access_token ? "token manual" : "nao conectado"}
+                              </p>
+                            </div>
                           </div>
-                          <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Seller ID</p>
-                            <p className="mt-2 text-sm font-semibold text-white">{connector.configuracoes?.seller_id ?? "nao informado"}</p>
-                          </div>
-                          <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Nickname</p>
-                            <p className="mt-2 text-sm font-semibold text-white">{connector.configuracoes?.nickname ?? "nao informado"}</p>
-                          </div>
-                          <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">OAuth</p>
-                            <p className="mt-2 text-sm font-semibold text-white">
-                              {connector.configuracoes?.refresh_token ? "conectado" : connector.configuracoes?.access_token ? "token manual" : "nao conectado"}
-                            </p>
+                          <p className="mt-3 truncate text-xs text-cyan-200/80">{connector.endpointBase}</p>
+                        </div>
+                        <div className="mt-5 border-t border-white/10 bg-slate-950/20 px-1 pt-4">
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (agente) {
+                                  handleOpenAgentStoreSearchModal(agente);
+                                }
+                              }}
+                              disabled={!canTestConnectorStore}
+                              className={successActionButtonClass}
+                            >
+                              <TestTube2 size={14} />
+                              {canTestConnectorStore ? "Testar loja" : "Vincule um agente"}
+                            </button>
+                            <button type="button" onClick={() => handleEditConnector(connector)} className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${editButtonClass}`}>
+                              <Pencil size={14} />
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteConnector(connector)}
+                              disabled={deletingConnectorId === connector.id}
+                              className={dangerActionButtonClass}
+                            >
+                              <Trash2 size={14} />
+                              {deletingConnectorId === connector.id ? "Removendo..." : "Remover completamente"}
+                            </button>
                           </div>
                         </div>
-                        <p className="mt-3 truncate text-xs text-cyan-200/80">{connector.endpointBase}</p>
-                      </div>
-                      <div className="mt-5 border-t border-white/10 bg-slate-950/20 px-1 pt-4">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (agente) {
-                                handleOpenAgentStoreSearchModal(agente);
-                              }
-                            }}
-                            disabled={!canTestConnectorStore}
-                            className={successActionButtonClass}
-                          >
-                            <TestTube2 size={14} />
-                            {canTestConnectorStore ? "Testar loja" : "Vincule um agente"}
-                          </button>
-                          <button type="button" onClick={() => handleEditConnector(connector)} className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${editButtonClass}`}>
-                            <Pencil size={14} />
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleDeleteConnector(connector)}
-                            disabled={deletingConnectorId === connector.id}
-                            className={dangerActionButtonClass}
-                          >
-                            <Trash2 size={14} />
-                            {deletingConnectorId === connector.id ? "Removendo..." : "Remover completamente"}
-                          </button>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })
-              ) : (
-                <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhuma loja do Mercado Livre cadastrada para este projeto ainda.</div>
-              )}
+                      </article>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhuma loja do Mercado Livre cadastrada para este projeto ainda.</div>
+                )}
+              </div>
+
+              <aside className="rounded-2xl border border-amber-400/14 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(15,23,42,0.22))] p-4 shadow-[0_18px_36px_rgba(2,8,23,0.18)] xl:sticky xl:top-6">
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-100/85">Tutorial rapido</p>
+                <h4 className="mt-2 text-lg font-bold text-white">Como conectar o Mercado Livre</h4>
+                <p className="mt-2 text-sm leading-relaxed text-slate-300">Como agora fica uma loja por projeto, deixei aqui o passo a passo rapido com os links principais para o usuario concluir o app e o OAuth.</p>
+
+                <div className="mt-4 space-y-3">
+                  <a
+                    href="https://developers.mercadolivre.com.br/apps"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/35 px-3.5 py-3 text-sm font-semibold text-white transition-colors hover:border-amber-300/25 hover:bg-slate-950/50"
+                  >
+                    Painel de apps do Mercado Livre
+                    <ExternalLink size={15} />
+                  </a>
+                  <a
+                    href="https://infrastudio.vercel.app/api/admin/conectores/mercado-livre/callback"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/35 px-3.5 py-3 text-sm font-semibold text-white transition-colors hover:border-amber-300/25 hover:bg-slate-950/50"
+                  >
+                    URL de retorno OAuth
+                    <ExternalLink size={15} />
+                  </a>
+                  <a
+                    href="https://infrastudio.vercel.app/api/mercado-livre/webhook"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/35 px-3.5 py-3 text-sm font-semibold text-white transition-colors hover:border-amber-300/25 hover:bg-slate-950/50"
+                  >
+                    URL de webhook
+                    <ExternalLink size={15} />
+                  </a>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4 text-sm text-slate-300">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Checklist</p>
+                  <p className="mt-3">1. Criar aplicacao do tipo `Web`.</p>
+                  <p className="mt-2">2. Ativar `Authorization Code`, `Refresh Token` e `PKCE`.</p>
+                  <p className="mt-2">3. Liberar `Usuarios`, `Publicacao e sincronizacao` e `Metricas do negocio`.</p>
+                  <p className="mt-2">4. Copiar `APP ID` e `CLIENT SECRET` para o cadastro da loja.</p>
+                  <p className="mt-2">5. Salvar a integracao e depois concluir a autorizacao OAuth.</p>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-emerald-500/18 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-50/90">
+                  Depois de salvar a loja, o proximo passo recomendado e usar `Editar` para revisar credenciais e concluir a conexao da conta.
+                </div>
+              </aside>
             </div>
           </section>
         </div>
