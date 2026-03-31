@@ -65,6 +65,18 @@ function getSidebarLinkTone(item: (typeof adminLinks)[number], active: boolean) 
       : "default";
 
   if (!active) {
+    if (tone === "whatsapp") {
+      return "border border-emerald-500/18 bg-emerald-500/8 text-emerald-100 shadow-[0_0_0_1px_rgba(52,211,153,0.08)] hover:border-emerald-400/34 hover:bg-emerald-500/14 hover:text-white hover:shadow-[0_0_0_1px_rgba(52,211,153,0.18),0_0_22px_rgba(16,185,129,0.18),0_12px_30px_rgba(16,185,129,0.14)]";
+    }
+
+    if (tone === "mercado") {
+      return "border border-amber-400/18 bg-amber-400/8 text-amber-100 shadow-[0_0_0_1px_rgba(252,211,77,0.08)] hover:border-amber-300/34 hover:bg-amber-400/14 hover:text-white hover:shadow-[0_0_0_1px_rgba(252,211,77,0.18),0_0_22px_rgba(245,158,11,0.18),0_12px_30px_rgba(245,158,11,0.14)]";
+    }
+
+    if (tone === "atendimento") {
+      return "border border-cyan-400/18 bg-cyan-400/8 text-cyan-100 shadow-[0_0_0_1px_rgba(34,211,238,0.08)] hover:border-cyan-300/34 hover:bg-cyan-400/14 hover:text-white hover:shadow-[0_0_0_1px_rgba(103,232,249,0.18),0_0_24px_rgba(34,211,238,0.18),0_12px_30px_rgba(14,165,233,0.14)]";
+    }
+
     return "text-slate-300 hover:bg-white/[0.04] hover:text-white";
   }
 
