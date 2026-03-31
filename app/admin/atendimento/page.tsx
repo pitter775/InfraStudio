@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, LoaderCircle, MessageCircleMore, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, UserRound, X } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, LoaderCircle, MessageCircleMore, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, UserRound, X } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -171,6 +171,7 @@ export default function AdminAtendimentoPage() {
   const [emojiTrayOpen, setEmojiTrayOpen] = useState(false);
   const [manualAssumedByChat, setManualAssumedByChat] = useState<Record<string, boolean>>({});
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
   const availableProjects = useMemo(() => {
     if (projects.length) {
       return projects;
@@ -405,6 +406,24 @@ export default function AdminAtendimentoPage() {
     void loadConversation(selectedChatId);
   }, [messagesByChatId, selectedChatId]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(min-width: 1280px)");
+    const syncDesktopState = (event?: MediaQueryListEvent) => {
+      const matchesDesktop = event?.matches ?? mediaQuery.matches;
+      if (matchesDesktop) {
+        setMobileConversationOpen(false);
+      }
+    };
+
+    syncDesktopState();
+    mediaQuery.addEventListener("change", syncDesktopState);
+    return () => mediaQuery.removeEventListener("change", syncDesktopState);
+  }, []);
+
   const handleProjectSelect = async (project: Projeto) => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, project.id);
@@ -424,6 +443,14 @@ export default function AdminAtendimentoPage() {
     await loadChats(activeProjectId);
     if (selectedChatId) {
       await loadConversation(selectedChatId);
+    }
+  };
+
+  const handleSelectChat = (chatId: string) => {
+    setSelectedChatId(chatId);
+
+    if (typeof window !== "undefined" && window.innerWidth < 1280) {
+      setMobileConversationOpen(true);
     }
   };
 
@@ -744,7 +771,7 @@ export default function AdminAtendimentoPage() {
       </section>
 
       <section className="grid min-h-0 flex-1 gap-3 overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)]">
-        <div className="overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)]">
+        <div className={`overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)] ${mobileConversationOpen ? "hidden xl:block" : ""}`}>
           <div className="border-b border-white/10 px-3 py-2.5">
             <p className="text-sm font-bold text-white">Conversas do projeto</p>
             <p className="mt-1 text-[11px] text-slate-400">Site e WhatsApp no mesmo feed.</p>
@@ -768,7 +795,7 @@ export default function AdminAtendimentoPage() {
                     <button
                       key={chat.id}
                       type="button"
-                      onClick={() => setSelectedChatId(chat.id)}
+                      onClick={() => handleSelectChat(chat.id)}
                       className={`block w-full rounded-xl border px-2.5 py-2.5 text-left transition-all ${
                         active
                           ? "border-cyan-400/30 bg-cyan-500/10"
@@ -811,13 +838,21 @@ export default function AdminAtendimentoPage() {
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)]">
+        <div className={`flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)] ${mobileConversationOpen ? "flex xl:flex" : "hidden xl:flex"}`}>
           {selectedChat ? (
             <>
               <div className="border-b border-white/10 px-3 py-2.5 sm:px-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setMobileConversationOpen(false)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white xl:hidden"
+                        aria-label="Voltar para conversas"
+                      >
+                        <ArrowLeft size={14} />
+                      </button>
                       <p className="truncate text-sm font-bold text-white sm:text-base">{getChatTitle(selectedChat)}</p>
                       <span className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(selectedChat.canal)}`}>
                         {getChatChannelLabel(selectedChat.canal)}
@@ -997,7 +1032,7 @@ export default function AdminAtendimentoPage() {
               </div>
             </>
           ) : (
-            <div className="flex flex-1 items-center justify-center px-6 text-center text-slate-400">
+            <div className="hidden flex-1 items-center justify-center px-6 text-center text-slate-400 xl:flex">
               <div>
                 <p className="text-xl font-bold text-white">Selecione uma conversa</p>
                 <p className="mt-3 text-sm">Escolha um chat na coluna da esquerda para abrir o historico completo.</p>
