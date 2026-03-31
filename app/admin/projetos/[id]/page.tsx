@@ -2208,8 +2208,13 @@ function AgenteModal({
   open,
   form,
   apis,
+  agentes,
+  widgets,
+  whatsappChannels,
+  connectors,
   pendingArquivos,
   saving,
+  connectionSavingKey,
   feedback,
   onClose,
   onChange,
@@ -2217,13 +2222,21 @@ function AgenteModal({
   onRemovePendingFile,
   onRemoveUploadedFile,
   onValidateSummary,
+  onAssignWidget,
+  onAssignWhatsApp,
+  onAssignConnector,
   onSubmit,
 }: {
   open: boolean;
   form: AgenteFormState;
   apis: Api[];
+  agentes: Agente[];
+  widgets: ChatWidget[];
+  whatsappChannels: WhatsAppChannel[];
+  connectors: Connector[];
   pendingArquivos: PendingAgenteArquivo[];
   saving: boolean;
+  connectionSavingKey: string | null;
   feedback: string | null;
   onClose: () => void;
   onChange: (next: Partial<AgenteFormState>) => void;
@@ -2231,10 +2244,14 @@ function AgenteModal({
   onRemovePendingFile: (id: string) => void;
   onRemoveUploadedFile: (id: string) => void;
   onValidateSummary: () => void;
+  onAssignWidget: (widgetId: string) => void;
+  onAssignWhatsApp: (channelId: string) => void;
+  onAssignConnector: (connectorId: string) => void;
   onSubmit: () => void;
 }) {
   const [showRawConfig, setShowRawConfig] = useState(false);
   const [promptExpanded, setPromptExpanded] = useState(false);
+  const [apisExpanded, setApisExpanded] = useState(false);
   const promptRef = useRef<HTMLDivElement | null>(null);
   const lastPromptSyncRef = useRef("");
 
@@ -2242,6 +2259,7 @@ function AgenteModal({
     if (open) {
       setShowRawConfig(false);
       setPromptExpanded(false);
+      setApisExpanded(false);
     }
   }, [open]);
 
@@ -2267,6 +2285,140 @@ function AgenteModal({
   if (!open) {
     return null;
   }
+
+  const selectedAgentId = form.id ?? null;
+  const selectedAgentName = form.nome.trim() || "este agente";
+  const selectedApiCount = form.apiIds.length;
+  const selectedApiInactiveCount = apis.filter((api) => form.apiIds.includes(api.id) && !api.ativo).length;
+  const selectedApiRequiredParams = apis
+    .filter((api) => form.apiIds.includes(api.id))
+    .flatMap((api) => api.parametros.filter((parametro) => parametro.obrigatorio))
+    .filter((parametro, index, array) => array.findIndex((item) => item.nome.toLowerCase() === parametro.nome.toLowerCase()) === index);
+  const canManageConnections = Boolean(selectedAgentId);
+  const findAgentName = (agenteId: string | null | undefined) =>
+    agentes.find((agente) => agente.id === agenteId)?.nome ?? "Agente nao encontrado";
+
+  const widgetEntries = widgets.map((widget) => {
+    const assignedToCurrent = Boolean(selectedAgentId) && widget.agenteId === selectedAgentId;
+    const assignedElsewhere = Boolean(widget.agenteId) && widget.agenteId !== selectedAgentId;
+    const savingKey = `widget:${widget.id ?? widget.slug}`;
+    return {
+      id: widget.id ?? widget.slug,
+      title: widget.nome,
+      subtitle: widget.dominio || widget.slug,
+      assignedToCurrent,
+      assignedElsewhere,
+      assignedAgentName: widget.agenteId ? findAgentName(widget.agenteId) : null,
+      saving: connectionSavingKey === savingKey,
+      onAssign: widget.id ? () => onAssignWidget(widget.id!) : null,
+      actionLabel: assignedToCurrent ? "Vinculado a este agente" : assignedElsewhere ? "Trazer para este agente" : "Vincular a este agente",
+    };
+  });
+
+  const whatsappEntries = whatsappChannels.map((channel) => {
+    const assignedToCurrent = Boolean(selectedAgentId) && channel.agenteId === selectedAgentId;
+    const assignedElsewhere = Boolean(channel.agenteId) && channel.agenteId !== selectedAgentId;
+    const savingKey = `whatsapp:${channel.id}`;
+    return {
+      id: channel.id,
+      title: formatWhatsAppPhone(channel.numero),
+      subtitle: `${channel.status} | ${channel.sessionData?.connectionStatus ?? "offline"}`,
+      assignedToCurrent,
+      assignedElsewhere,
+      assignedAgentName: channel.agenteId ? findAgentName(channel.agenteId) : null,
+      saving: connectionSavingKey === savingKey,
+      onAssign: () => onAssignWhatsApp(channel.id),
+      actionLabel: assignedToCurrent ? "Ativo neste agente" : assignedElsewhere ? "Mover para este agente" : "Ativar neste agente",
+    };
+  });
+
+  const connectorEntries = connectors
+    .filter((connector) => connector.tipo === "mercado_livre")
+    .map((connector) => {
+      const assignedToCurrent = Boolean(selectedAgentId) && connector.agenteId === selectedAgentId;
+      const assignedElsewhere = Boolean(connector.agenteId) && connector.agenteId !== selectedAgentId;
+      const savingKey = `connector:${connector.id ?? connector.nome}`;
+      return {
+        id: connector.id ?? connector.nome,
+        title: connector.nome,
+        subtitle: connector.configuracoes?.nickname || connector.configuracoes?.seller_id || connector.endpointBase,
+        assignedToCurrent,
+        assignedElsewhere,
+        assignedAgentName: connector.agenteId ? findAgentName(connector.agenteId) : null,
+        saving: connectionSavingKey === savingKey,
+        onAssign: connector.id ? () => onAssignConnector(connector.id!) : null,
+        actionLabel: assignedToCurrent ? "Ativo neste agente" : assignedElsewhere ? "Mover para este agente" : "Ativar neste agente",
+      };
+    });
+
+  const renderConnectionCard = (
+    icon: ReactNode,
+    title: string,
+    description: string,
+    entries: Array<{
+      id: string;
+      title: string;
+      subtitle: string;
+      assignedToCurrent: boolean;
+      assignedElsewhere: boolean;
+      assignedAgentName: string | null;
+      saving: boolean;
+      onAssign: (() => void) | null;
+      actionLabel: string;
+    }>,
+    emptyMessage: string,
+  ) => (
+    <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-cyan-100">
+          {icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-white">{title}</p>
+          <p className="mt-1 text-xs text-slate-400">{description}</p>
+        </div>
+      </div>
+
+      {!canManageConnections ? (
+        <div className="mt-4 rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-3 text-sm text-slate-400">
+          Salve o agente primeiro para vincular conexoes.
+        </div>
+      ) : entries.length ? (
+        <div className="mt-4 space-y-2">
+          {entries.map((entry) => (
+            <div key={entry.id} className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-white">{entry.title}</p>
+                  <p className="mt-1 text-xs text-slate-400">{entry.subtitle}</p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {entry.assignedToCurrent
+                      ? `Vinculado a ${selectedAgentName}.`
+                      : entry.assignedElsewhere
+                        ? `Hoje vinculado a ${entry.assignedAgentName}.`
+                        : "Ainda sem agente vinculado."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => entry.onAssign?.()}
+                  disabled={!entry.onAssign || entry.assignedToCurrent || entry.saving || saving}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {entry.saving ? <BusyIcon /> : <Cable size={14} />}
+                  {entry.actionLabel}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-3 text-sm text-slate-400">
+          {emptyMessage}
+        </div>
+      )}
+    </div>
+  );
 
   const updatePromptBase = (nextHtml: string) => {
     const nextPrompt = richTextToStructuredText(nextHtml);
@@ -2530,6 +2682,9 @@ function AgenteModal({
                   <span className="mt-1 block text-xs leading-relaxed text-emerald-50/85">
                     Quando ativo, este agente fica em destaque no projeto e vira a referencia principal do chat.
                   </span>
+                  <span className="mt-2 block text-xs leading-relaxed text-emerald-100/65">
+                    Conversas em andamento continuam no agente que iniciou o atendimento. Trocas valem apenas para novos chats.
+                  </span>
                 </span>
               </label>
             </div>
@@ -2542,29 +2697,77 @@ function AgenteModal({
               <p className="mt-2 text-sm leading-relaxed text-cyan-50">{form.descricao || "Defina o papel comercial e o comportamento desse agente para o projeto selecionado."}</p>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
-              <p className="text-sm font-semibold text-white">APIs disponiveis para este agente</p>
-              <div className="mt-3 space-y-2">
-                {apis.length ? (
-                  apis.map((api) => (
-                    <label key={api.id} className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
-                      <input type="checkbox" checked={form.apiIds.includes(api.id)} onChange={(event) => onChange({ apiIds: event.target.checked ? [...form.apiIds, api.id] : form.apiIds.filter((item) => item !== api.id) })} />
-                      <span className="font-semibold text-white">{api.nome}</span>
-                      <span className="text-slate-500">{api.metodo}</span>
-                      <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${api.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-200"}`}>
-                        {api.ativo ? "ativa" : "inativa"}
-                      </span>
-                      {api.parametros.some((parametro) => parametro.obrigatorio) ? (
-                        <span className="text-[11px] text-amber-200/80">
-                          exige: {api.parametros.filter((parametro) => parametro.obrigatorio).map((parametro) => parametro.nome).join(", ")}
+            {renderConnectionCard(
+              <PanelsTopLeft size={18} />,
+              "Chat widget",
+              "Se o widget ja existir, voce pode trazer o atendimento para este agente. Se ele estiver em outro agente, a troca remove o vinculo anterior.",
+              widgetEntries,
+              "Nenhum widget cadastrado neste projeto.",
+            )}
+
+            <div className="mt-4">
+              {renderConnectionCard(
+                <MessageSquare size={18} />,
+                "WhatsApp",
+                "O canal WhatsApp do projeto pode ser ativado neste agente. Se hoje estiver em outro agente, o sistema transfere o vinculo.",
+                whatsappEntries,
+                "Nenhum canal WhatsApp cadastrado neste projeto.",
+              )}
+            </div>
+
+            <div className="mt-4">
+              {renderConnectionCard(
+                <Boxes size={18} />,
+                "Mercado Livre",
+                "A integracao do Mercado Livre pode ficar visivel neste agente. Quando ja estiver em outro agente, a mudanca transfere o acesso.",
+                connectorEntries,
+                "Nenhuma integracao Mercado Livre cadastrada neste projeto.",
+              )}
+            </div>
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/30 p-4">
+              <button
+                type="button"
+                onClick={() => setApisExpanded((current) => !current)}
+                className="flex w-full items-center justify-between gap-3 text-left"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-white">APIs disponiveis para este agente</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {selectedApiCount
+                      ? `${selectedApiCount} API(s) selecionada(s) para este agente.`
+                      : "Escolha quais APIs este agente pode usar no atendimento."}
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-200">
+                  {apisExpanded ? "Recolher" : "Expandir"}
+                  <ChevronDown size={14} className={`transition-transform ${apisExpanded ? "rotate-180" : ""}`} />
+                </span>
+              </button>
+
+              {apisExpanded ? (
+                <div className="mt-4 space-y-2">
+                  {apis.length ? (
+                    apis.map((api) => (
+                      <label key={api.id} className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+                        <input type="checkbox" checked={form.apiIds.includes(api.id)} onChange={(event) => onChange({ apiIds: event.target.checked ? [...form.apiIds, api.id] : form.apiIds.filter((item) => item !== api.id) })} />
+                        <span className="font-semibold text-white">{api.nome}</span>
+                        <span className="text-slate-500">{api.metodo}</span>
+                        <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${api.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-200"}`}>
+                          {api.ativo ? "ativa" : "inativa"}
                         </span>
-                      ) : null}
-                    </label>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-400">Cadastre uma API neste projeto para vincular ao agente.</p>
-                )}
-              </div>
+                        {api.parametros.some((parametro) => parametro.obrigatorio) ? (
+                          <span className="text-[11px] text-amber-200/80">
+                            exige: {api.parametros.filter((parametro) => parametro.obrigatorio).map((parametro) => parametro.nome).join(", ")}
+                          </span>
+                        ) : null}
+                      </label>
+                    ))
+                  ) : (
+                    <p className="text-sm text-slate-400">Cadastre uma API neste projeto para vincular ao agente.</p>
+                  )}
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/30 p-4">
@@ -2660,9 +2863,9 @@ function AgenteModal({
               ) : null}
             </div>
 
-            {form.apiIds.length ? (
+            {selectedApiCount ? (
               <div className="mt-4 space-y-3">
-                {apis.filter((api) => form.apiIds.includes(api.id) && !api.ativo).length ? (
+                {selectedApiInactiveCount ? (
                   <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
                     APIs inativas vinculadas:{" "}
                     {apis
@@ -2672,18 +2875,10 @@ function AgenteModal({
                     . O agente so consulta APIs marcadas como ativas.
                   </div>
                 ) : null}
-                {apis.some((api) => form.apiIds.includes(api.id) && api.parametros.some((parametro) => parametro.obrigatorio)) ? (
+                {selectedApiRequiredParams.length ? (
                   <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
                     Para o agente consultar essas APIs no chat, envie no contexto:{" "}
-                    {apis
-                      .filter((api) => form.apiIds.includes(api.id))
-                      .flatMap((api) => api.parametros.filter((parametro) => parametro.obrigatorio))
-                      .filter(
-                        (parametro, index, array) =>
-                          array.findIndex((item) => item.nome.toLowerCase() === parametro.nome.toLowerCase()) === index,
-                      )
-                      .map((parametro) => parametro.nome)
-                      .join(", ")}
+                    {selectedApiRequiredParams.map((parametro) => parametro.nome).join(", ")}
                     .
                   </div>
                 ) : null}
@@ -3011,7 +3206,7 @@ function WidgetModal({
               onChange={(event) => onChange({ agenteId: event.target.value || null })}
               className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
             >
-              <option value="">Usar o agente ativo do projeto</option>
+              <option value="">Selecione um agente</option>
               {agentes.map((agente) => (
                 <option key={agente.id} value={agente.id}>
                   {agente.nome}
@@ -3586,7 +3781,7 @@ function WhatsAppChannelModal({
                 onChange={(event) => onChange({ agenteId: event.target.value || null })}
                 className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
               >
-                <option value="">Agente ativo do projeto</option>
+                <option value="">Selecione um agente</option>
                 {agentes.map((agente) => (
                   <option key={agente.id} value={agente.id}>
                     {agente.nome}
@@ -3752,6 +3947,7 @@ export default function AdminProjetoDetalhePage() {
   const [connectorModalOpen, setConnectorModalOpen] = useState(false);
   const [widgetModalOpen, setWidgetModalOpen] = useState(false);
   const [whatsAppChannelModalOpen, setWhatsAppChannelModalOpen] = useState(false);
+  const [agentConnectionSavingKey, setAgentConnectionSavingKey] = useState<string | null>(null);
   const [chatHistoryOpen, setChatHistoryOpen] = useState(false);
   const [chatHistoryLoading, setChatHistoryLoading] = useState(false);
   const [chatHistoryError, setChatHistoryError] = useState<string | null>(null);
@@ -4589,6 +4785,166 @@ export default function AdminProjetoDetalhePage() {
     setSavingAgente(false);
     setAgenteModalOpen(false);
     setFeedbackAgente(message);
+  };
+
+  const handleAssignWidgetToAgent = async (widgetId: string) => {
+    if (!data || !agenteForm.id) {
+      setFeedbackAgente("Salve o agente antes de vincular um widget.");
+      return;
+    }
+
+    const widget = data.widgets.find((item) => item.id === widgetId);
+    if (!widget) {
+      setFeedbackAgente("Widget nao encontrado.");
+      return;
+    }
+
+    if (widget.agenteId && widget.agenteId !== agenteForm.id) {
+      const currentAgentName = data.agentes.find((agente) => agente.id === widget.agenteId)?.nome ?? "outro agente";
+      const accepted = window.confirm(`O widget "${widget.nome}" esta vinculado a ${currentAgentName}. Deseja trocar para ${agenteForm.nome || "este agente"}?`);
+      if (!accepted) {
+        return;
+      }
+    }
+
+    setAgentConnectionSavingKey(`widget:${widget.id}`);
+    setFeedbackAgente(null);
+
+    try {
+      const response = await fetch("/api/admin/chat-widgets", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...widget,
+          projetoId: params.id,
+          agenteId: agenteForm.id,
+        }),
+      });
+
+      const payload = (await response.json()) as { error?: string; widget?: ChatWidget };
+      if (!response.ok || !payload.widget) {
+        throw new Error(payload.error ?? "Nao foi possivel vincular o widget ao agente.");
+      }
+
+      updateProjetoData((current) => ({
+        ...current,
+        widgets: upsertById(current.widgets, payload.widget!),
+      }));
+      setFeedbackAgente(`Widget "${payload.widget.nome}" vinculado a "${agenteForm.nome}".`);
+    } catch (error) {
+      setFeedbackAgente(error instanceof Error ? error.message : "Nao foi possivel vincular o widget.");
+    } finally {
+      setAgentConnectionSavingKey(null);
+    }
+  };
+
+  const handleAssignWhatsAppToAgent = async (channelId: string) => {
+    if (!data || !agenteForm.id) {
+      setFeedbackAgente("Salve o agente antes de ativar o WhatsApp nele.");
+      return;
+    }
+
+    const channel = data.whatsappChannels.find((item) => item.id === channelId);
+    if (!channel) {
+      setFeedbackAgente("Canal WhatsApp nao encontrado.");
+      return;
+    }
+
+    if (channel.agenteId && channel.agenteId !== agenteForm.id) {
+      const currentAgentName = data.agentes.find((agente) => agente.id === channel.agenteId)?.nome ?? "outro agente";
+      const accepted = window.confirm(`O WhatsApp ${formatWhatsAppPhone(channel.numero)} esta vinculado a ${currentAgentName}. Deseja trocar para ${agenteForm.nome || "este agente"}?`);
+      if (!accepted) {
+        return;
+      }
+    }
+
+    setAgentConnectionSavingKey(`whatsapp:${channel.id}`);
+    setFeedbackAgente(null);
+
+    try {
+      const response = await fetch("/api/admin/whatsapp-canais", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: channel.id,
+          projetoId: params.id,
+          agenteId: agenteForm.id,
+          numero: sanitizePhoneDigits(channel.numero),
+          status: channel.status,
+        }),
+      });
+
+      const payload = (await response.json()) as { error?: string; channel?: WhatsAppChannel };
+      if (!response.ok || !payload.channel) {
+        throw new Error(payload.error ?? "Nao foi possivel ativar o WhatsApp neste agente.");
+      }
+
+      updateProjetoData((current) => ({
+        ...current,
+        whatsappChannels: upsertById(current.whatsappChannels, payload.channel!),
+      }));
+      setFeedbackAgente(`WhatsApp ${formatWhatsAppPhone(payload.channel.numero)} vinculado a "${agenteForm.nome}".`);
+    } catch (error) {
+      setFeedbackAgente(error instanceof Error ? error.message : "Nao foi possivel ativar o WhatsApp neste agente.");
+    } finally {
+      setAgentConnectionSavingKey(null);
+    }
+  };
+
+  const handleAssignConnectorToAgent = async (connectorId: string) => {
+    if (!data || !agenteForm.id) {
+      setFeedbackAgente("Salve o agente antes de ativar o Mercado Livre nele.");
+      return;
+    }
+
+    const connector = data.conectores.find((item) => item.id === connectorId);
+    if (!connector) {
+      setFeedbackAgente("Integracao Mercado Livre nao encontrada.");
+      return;
+    }
+
+    if (connector.agenteId && connector.agenteId !== agenteForm.id) {
+      const currentAgentName = data.agentes.find((agente) => agente.id === connector.agenteId)?.nome ?? "outro agente";
+      const accepted = window.confirm(`A integracao "${connector.nome}" esta vinculada a ${currentAgentName}. Deseja trocar para ${agenteForm.nome || "este agente"}?`);
+      if (!accepted) {
+        return;
+      }
+    }
+
+    setAgentConnectionSavingKey(`connector:${connector.id}`);
+    setFeedbackAgente(null);
+
+    try {
+      const response = await fetch("/api/admin/conectores", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: connector.id,
+          nome: connector.nome,
+          tipo: connector.tipo,
+          projetoId: params.id,
+          agenteId: agenteForm.id,
+          endpointBase: connector.endpointBase,
+          configuracoes: connector.configuracoes,
+          ativo: connector.ativo,
+        }),
+      });
+
+      const payload = (await response.json()) as { error?: string; conector?: Connector };
+      if (!response.ok || !payload.conector) {
+        throw new Error(payload.error ?? "Nao foi possivel ativar o Mercado Livre neste agente.");
+      }
+
+      updateProjetoData((current) => ({
+        ...current,
+        conectores: upsertById(current.conectores, payload.conector!),
+      }));
+      setFeedbackAgente(`Integracao "${payload.conector.nome}" vinculada a "${agenteForm.nome}".`);
+    } catch (error) {
+      setFeedbackAgente(error instanceof Error ? error.message : "Nao foi possivel ativar o Mercado Livre neste agente.");
+    } finally {
+      setAgentConnectionSavingKey(null);
+    }
   };
 
   const handleEditAgente = (agente: Agente) => {
@@ -6101,6 +6457,14 @@ export default function AdminProjetoDetalhePage() {
                 const miniSummary = miniSummaryParts.length
                   ? `Configurado com ${miniSummaryParts.join(", ")}.`
                   : "Ainda sem canais, APIs ou integrações vinculadas.";
+                const agentCardPreview = (() => {
+                  const source = normalizeAgentText(agente.promptBase || agente.descricao || "");
+                  if (!source) {
+                    return "Sem texto principal cadastrado ainda.";
+                  }
+
+                  return `${source.slice(0, 180)}${source.length > 180 ? "..." : ""}`;
+                })();
                 const agentOptions = [
                   {
                     key: "apis",
@@ -6108,8 +6472,8 @@ export default function AdminProjetoDetalhePage() {
                     icon: Activity,
                     active: linkedApis.length > 0,
                     detail: linkedApis.length,
-                    activeClass: "border-sky-400/25 bg-sky-400/12 text-sky-100",
-                    inactiveClass: "border-white/8 bg-white/[0.02] text-slate-500",
+                    activeClass: "text-sky-100",
+                    inactiveClass: "text-slate-500",
                   },
                   {
                     key: "whatsapp",
@@ -6117,8 +6481,8 @@ export default function AdminProjetoDetalhePage() {
                     icon: Waypoints,
                     active: agentWhatsAppChannels.length > 0,
                     detail: onlineAgentWhatsAppChannels.length > 0 ? onlineAgentWhatsAppChannels.length : agentWhatsAppChannels.length,
-                    activeClass: "border-emerald-400/25 bg-emerald-400/12 text-emerald-100",
-                    inactiveClass: "border-white/8 bg-white/[0.02] text-slate-500",
+                    activeClass: "text-emerald-100",
+                    inactiveClass: "text-slate-500",
                   },
                   {
                     key: "mercado",
@@ -6126,8 +6490,8 @@ export default function AdminProjetoDetalhePage() {
                     icon: Cable,
                     active: agentConnectors.length > 0,
                     detail: activeAgentConnectors.length > 0 ? activeAgentConnectors.length : agentConnectors.length,
-                    activeClass: "border-amber-400/25 bg-amber-400/12 text-amber-100",
-                    inactiveClass: "border-white/8 bg-white/[0.02] text-slate-500",
+                    activeClass: "text-amber-100",
+                    inactiveClass: "text-slate-500",
                   },
                   {
                     key: "widgets",
@@ -6135,8 +6499,8 @@ export default function AdminProjetoDetalhePage() {
                     icon: PanelsTopLeft,
                     active: agentWidgets.length > 0,
                     detail: activeAgentWidgets.length > 0 ? activeAgentWidgets.length : agentWidgets.length,
-                    activeClass: "border-violet-400/25 bg-violet-400/12 text-violet-100",
-                    inactiveClass: "border-white/8 bg-white/[0.02] text-slate-500",
+                    activeClass: "text-violet-100",
+                    inactiveClass: "text-slate-500",
                   },
                   {
                     key: "chats",
@@ -6144,8 +6508,8 @@ export default function AdminProjetoDetalhePage() {
                     icon: MessageSquareText,
                     active: (diagnostic?.summary.chats ?? 0) > 0,
                     detail: diagnostic?.summary.chats ?? 0,
-                    activeClass: "border-rose-400/25 bg-rose-400/12 text-rose-100",
-                    inactiveClass: "border-white/8 bg-white/[0.02] text-slate-500",
+                    activeClass: "text-rose-100",
+                    inactiveClass: "text-slate-500",
                   },
                 ] as const;
 
@@ -6175,8 +6539,8 @@ export default function AdminProjetoDetalhePage() {
                     </div>
 
                     <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/35 px-3.5 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Resumo rapido</p>
-                      <p className="mt-2 text-sm leading-relaxed text-slate-200">{miniSummary}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Trecho do agente</p>
+                      <p className="mt-2 line-clamp-4 text-sm leading-relaxed text-slate-200">{agentCardPreview}</p>
                       {requiredParameters.length ? (
                         <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-cyan-100/80">
                           {requiredParameters.map((parametro) => parametro.nome).join(", ")}
@@ -6196,7 +6560,7 @@ export default function AdminProjetoDetalhePage() {
                         return (
                           <span
                             key={option.key}
-                            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                            className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
                               option.active ? option.activeClass : option.inactiveClass
                             }`}
                           >
@@ -6259,12 +6623,14 @@ export default function AdminProjetoDetalhePage() {
                       </div>
                     ) : null}
 
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="mt-5 border-t border-white/10 pt-4">
+                      <div className="rounded-2xl border border-white/8 bg-slate-950/45 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                       <button
                         type="button"
                         onClick={() => void handleRunAgentDiagnostic(agente)}
                         disabled={runningAgentDiagnosticId === agente.id}
-                        className={primaryActionButtonClass}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-400/20 bg-sky-400/10 px-3 py-2 text-xs font-semibold text-sky-50 transition-all hover:border-sky-300/30 hover:bg-sky-400/14 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {runningAgentDiagnosticId === agente.id ? <BusyIcon /> : <TestTube2 size={14} />}
                         Validar
@@ -6272,12 +6638,12 @@ export default function AdminProjetoDetalhePage() {
                       <button
                         type="button"
                         onClick={() => handleOpenAgentStoreSearchModal(agente)}
-                        className={successActionButtonClass}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-50 transition-all hover:border-emerald-300/30 hover:bg-emerald-500/14 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <TestTube2 size={14} />
                         Testar
                       </button>
-                      <button type="button" onClick={() => handleEditAgente(agente)} className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold ${editButtonClass}`}>
+                      <button type="button" onClick={() => handleEditAgente(agente)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-50 transition-all hover:border-amber-300/30 hover:bg-amber-500/14 disabled:cursor-not-allowed disabled:opacity-60">
                         <Pencil size={14} />
                         Editar
                       </button>
@@ -6285,11 +6651,13 @@ export default function AdminProjetoDetalhePage() {
                         type="button"
                         onClick={() => void handleDeleteAgente(agente)}
                         disabled={deletingAgenteId === agente.id}
-                        className={dangerActionButtonClass}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-50 transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <Trash2 size={14} />
                         {deletingAgenteId === agente.id ? "Removendo..." : "Remover"}
                       </button>
+                        </div>
+                      </div>
                     </div>
                   </article>
                 );
@@ -7459,8 +7827,13 @@ export default function AdminProjetoDetalhePage() {
         open={agenteModalOpen}
         form={agenteForm}
         apis={data.apis}
+        agentes={data.agentes}
+        widgets={data.widgets}
+        whatsappChannels={data.whatsappChannels}
+        connectors={data.conectores}
         pendingArquivos={pendingAgenteArquivos}
         saving={savingAgente}
+        connectionSavingKey={agentConnectionSavingKey}
         feedback={feedbackAgente}
         onClose={() => {
           setAgenteModalOpen(false);
@@ -7471,6 +7844,9 @@ export default function AdminProjetoDetalhePage() {
         onRemovePendingFile={handleRemovePendingAgenteFile}
         onRemoveUploadedFile={handleRemoveUploadedAgenteFile}
         onValidateSummary={handleValidateAgenteSummary}
+        onAssignWidget={(widgetId) => void handleAssignWidgetToAgent(widgetId)}
+        onAssignWhatsApp={(channelId) => void handleAssignWhatsAppToAgent(channelId)}
+        onAssignConnector={(connectorId) => void handleAssignConnectorToAgent(connectorId)}
         onSubmit={() => void handleAgenteSubmit()}
       />
       <AgentStoreSearchModal

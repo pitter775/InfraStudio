@@ -37,6 +37,14 @@ type ChatContextValidationResult = {
   authoritativeAgent: AgenteRecord | null;
 };
 
+function getLockedAgentIdFromChatContext(chat: NonNullable<Awaited<ReturnType<typeof getChatById>>>) {
+  const context = getChatContext(chat) as Record<string, unknown>;
+  const agente = isPlainObject(context.agente) ? context.agente : null;
+  const locked = agente?.locked === true;
+  const agenteId = typeof agente?.id === "string" && agente.id.trim() ? agente.id.trim() : null;
+  return locked && agenteId ? agenteId : null;
+}
+
 function sanitizePhone(phone: string | null | undefined) {
   return String(phone || "").replace(/\D/g, "");
 }
@@ -163,8 +171,10 @@ async function validateChatAgainstResolvedChannel(input: {
     return null;
   }
 
-  const expectedAgentId = resolved.agente?.id ?? null;
-  if (resolved.lockedToAgent && chat.agenteId !== expectedAgentId) {
+  const lockedAgentIdFromContext = getLockedAgentIdFromChatContext(chat);
+  const expectedAgentId = lockedAgentIdFromContext ?? chat.agenteId ?? resolved.agente?.id ?? null;
+
+  if (expectedAgentId && chat.agenteId !== expectedAgentId) {
     await appendRuntimeErrorLog({
       source: "chat_service.chat_id_guardrail",
       message: "ChatId recebido com agente divergente do canal travado.",
@@ -195,15 +205,17 @@ async function validateChatAgainstResolvedChannel(input: {
   }
 
   const authoritativeAgent =
-    lockedWhatsAppAgent ?? (chat.agenteId ? await getAgenteById(chat.agenteId) : null);
+    (expectedAgentId ? await getAgenteById(expectedAgentId) : null) ??
+    lockedWhatsAppAgent ??
+    (chat.agenteId ? await getAgenteById(chat.agenteId) : null);
 
-  if (resolved.lockedToAgent) {
+  if (resolved.lockedToAgent || lockedAgentIdFromContext) {
     if (!authoritativeAgent || !authoritativeAgent.ativo || authoritativeAgent.projetoId !== chat.projetoId) {
       await appendRuntimeErrorLog({
         source: "chat_service.chat_guardrail",
         message: "Chat bloqueado por agente invalido, inativo ou fora do projeto.",
         projetoId: chat.projetoId,
-        agenteId: chat.agenteId,
+        agenteId: expectedAgentId ?? chat.agenteId,
         payload: {
           chatId: chat.id,
           channelKind,
@@ -452,13 +464,23 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
 
   if (!chat) {
     if (normalizedExternalIdentifier) {
+      const preferredAgentId = resolved.agente?.id ?? null;
       chat = await findActiveChatByChannel({
         projetoId: resolved.projeto.id,
-        agenteId: resolved.agente?.id ?? null,
+        agenteId: preferredAgentId,
         canal: channelKind,
         identificadorExterno: normalizedExternalIdentifier,
         channelScopeId: channelKind === "whatsapp" ? body.whatsappChannelId ?? null : null,
       });
+
+      if (!chat && resolved.lockedToAgent) {
+        chat = await findActiveChatByChannel({
+          projetoId: resolved.projeto.id,
+          canal: channelKind,
+          identificadorExterno: normalizedExternalIdentifier,
+          channelScopeId: channelKind === "whatsapp" ? body.whatsappChannelId ?? null : null,
+        });
+      }
     }
 
     if (!chat) {
@@ -514,9 +536,10 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
   const chatContext = getChatContext(chat) as Record<string, unknown>;
   const lockedAgentFromContext =
     isPlainObject(chatContext.agente) && chatContext.agente.locked === true ? true : false;
+  const lockedAgentIdFromContext = getLockedAgentIdFromChatContext(chat);
 
   if (channelKind === "whatsapp" || lockedAgentFromContext) {
-    const currentAgentId = chat.agenteId ?? effectiveBody.agente ?? null;
+    const currentAgentId = lockedAgentIdFromContext ?? chat.agenteId ?? effectiveBody.agente ?? null;
     const currentAgent = authoritativeAgent ?? (currentAgentId ? await getAgenteById(currentAgentId) : null);
 
     if (!currentAgent || !currentAgent.ativo || currentAgent.projetoId !== chat.projetoId) {
@@ -723,7 +746,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
   }
 
   nextContext.agente = {
-    id: lockedAgent?.id ?? chat.agenteId ?? null,
+    id: lockedAgent?.id ?? lockedAgentIdFromContext ?? chat.agenteId ?? null,
     nome: lockedAgent?.nome ?? aiResolvedAgentName ?? null,
     locked: resolved.lockedToAgent || channelKind === "whatsapp" || lockedAgentFromContext,
   };

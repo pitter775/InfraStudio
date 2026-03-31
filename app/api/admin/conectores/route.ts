@@ -5,6 +5,7 @@ import {
   createConector,
   deleteConector,
   getConectorById,
+  getConectorByProjetoTipo,
   listConectores,
   MERCADO_LIVRE_CONNECTOR_TYPE,
   updateConector,
@@ -58,6 +59,20 @@ async function validateAgentProject(projetoId: string, agenteId: string | null |
   return null;
 }
 
+async function validateMercadoLivreProjectRule(projetoId: string, currentId?: string) {
+  const existing = await getConectorByProjetoTipo({
+    projetoId,
+    tipo: MERCADO_LIVRE_CONNECTOR_TYPE,
+    excludeId: currentId ?? null,
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  return `Este projeto ja possui a integracao "${existing.nome}" do Mercado Livre. Edite a integracao atual para trocar o agente vinculado.`;
+}
+
 export async function GET(request: Request) {
   const user = await getSessionUser();
 
@@ -100,6 +115,11 @@ export async function POST(request: Request) {
   const agentError = await validateAgentProject(body.projetoId, body.agenteId);
   if (agentError) {
     return NextResponse.json({ error: agentError }, { status: 400 });
+  }
+
+  const projectRuleError = await validateMercadoLivreProjectRule(body.projetoId);
+  if (projectRuleError) {
+    return NextResponse.json({ error: projectRuleError }, { status: 409 });
   }
 
   const configuracoes = normalizeMercadoLivreConfig(body.configuracoes);
@@ -149,6 +169,11 @@ export async function PUT(request: Request) {
   const agentError = await validateAgentProject(body.projetoId, body.agenteId);
   if (agentError) {
     return NextResponse.json({ error: agentError }, { status: 400 });
+  }
+
+  const projectRuleError = await validateMercadoLivreProjectRule(body.projetoId, body.id);
+  if (projectRuleError) {
+    return NextResponse.json({ error: projectRuleError }, { status: 409 });
   }
 
   const configuracoes = {

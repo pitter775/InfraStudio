@@ -158,6 +158,35 @@ export async function getChatWidgetByProjetoAgente(input: {
   return mapChatWidget(data as ChatWidgetRow);
 }
 
+export async function getChatWidgetByProjectAgentBinding(input: {
+  projetoId: string;
+  agenteId: string;
+  excludeId?: string | null;
+}) {
+  const supabase = getSupabaseAdminClient();
+  let query = supabase
+    .from("chat_widgets")
+    .select("id, nome, slug, projeto_id, agente_id, dominio, whatsapp_celular, tema, cor_primaria, fundo_transparente, ativo, created_at, updated_at")
+    .eq("projeto_id", input.projetoId)
+    .eq("agente_id", input.agenteId)
+    .limit(1);
+
+  if (input.excludeId) {
+    query = query.neq("id", input.excludeId);
+  }
+
+  const { data, error } = await query.maybeSingle();
+
+  if (error || !data) {
+    if (error) {
+      console.error("[chat-widgets] failed to load widget by project/agent binding", error);
+    }
+    return null;
+  }
+
+  return mapChatWidget(data as ChatWidgetRow);
+}
+
 export async function createChatWidget(input: {
   nome: string;
   slug: string;

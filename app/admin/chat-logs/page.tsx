@@ -104,6 +104,8 @@ export default function AdminChatLogsPage() {
   const router = useRouter();
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clearing, setClearing] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -122,14 +124,59 @@ export default function AdminChatLogsPage() {
     void load();
   }, [router]);
 
+  const handleClearLogs = async () => {
+    const confirmed = window.confirm("Remover todos os logs do sistema e de runtime?");
+    if (!confirmed) {
+      return;
+    }
+
+    setClearing(true);
+    setFeedback(null);
+
+    try {
+      const response = await fetch("/api/admin/chat-logs", {
+        method: "DELETE",
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Nao foi possivel remover todos os logs.");
+      }
+
+      setLogs([]);
+      setFeedback("Todos os logs foram removidos.");
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "Nao foi possivel remover todos os logs.");
+    } finally {
+      setClearing(false);
+    }
+  };
+
   return (
     <main className="space-y-5">
       <section className="rounded-[24px] border border-white/10 bg-white/[0.05] px-5 py-5">
-        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Observabilidade</p>
-        <h1 className="mt-2 text-[2rem] font-extrabold text-white">Logs</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-          Lista geral dos eventos mais recentes do sistema. A visualizacao foi reduzida para leitura rapida, sem expor todo o conteudo dos chats.
-        </p>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Observabilidade</p>
+            <h1 className="mt-2 text-[2rem] font-extrabold text-white">Logs</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
+              Lista geral dos eventos de erro mais recentes do sistema. Eventos informativos deixam de ser registrados aqui para reduzir ruido.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleClearLogs()}
+            disabled={loading || clearing}
+            className="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-50 transition-colors hover:bg-rose-500/16 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {clearing ? "Removendo logs..." : "Remover todos os logs"}
+          </button>
+        </div>
+        {feedback ? (
+          <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${feedback.includes("removidos") ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-100" : "border-rose-500/20 bg-rose-500/10 text-rose-100"}`}>
+            {feedback}
+          </div>
+        ) : null}
       </section>
 
       {loading ? (
@@ -151,9 +198,9 @@ export default function AdminChatLogsPage() {
               <p className="whitespace-nowrap text-[11px] leading-5">
                 <span className="text-slate-500">{formatDateTime(log.createdAt)}</span>
                 <span className="px-2 text-slate-600">|</span>
-                <span className={log.level === "error" ? "text-red-200" : "text-slate-200"}>{log.tipo}</span>
+                <span className={log.level === "error" ? "font-semibold text-red-200" : "text-slate-200"}>{log.tipo}</span>
                 <span className="px-2 text-slate-600">|</span>
-                <span>{log.origem}</span>
+                <span className={log.level === "error" ? "text-red-100" : ""}>{log.origem}</span>
                 <span className="px-2 text-slate-600">|</span>
                 <span className={log.level === "error" ? "font-semibold text-red-200" : "text-slate-100"}>{log.descricao}</span>
                 {compactDetails ? (
@@ -169,7 +216,7 @@ export default function AdminChatLogsPage() {
 
         {!loading && !logs.length ? (
           <section className="rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-5 text-sm text-slate-400">
-            Ainda nao ha logs do sistema para mostrar.
+            Ainda nao ha logs de erro para mostrar.
           </section>
         ) : null}
       </section>

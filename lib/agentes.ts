@@ -209,6 +209,23 @@ async function disableOtherAgents(exceptId: string, projetoId: string | null) {
   }
 }
 
+async function disableAllProjectAgents(projetoId: string | null) {
+  if (!projetoId) {
+    return;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("agentes")
+    .update({ ativo: false } as never)
+    .eq("projeto_id", projetoId)
+    .eq("ativo", true);
+
+  if (error) {
+    console.error("[agentes] failed to disable active project agents before save", error);
+  }
+}
+
 export async function createAgente(input: {
   projetoId: string;
   slug?: string | null;
@@ -221,6 +238,12 @@ export async function createAgente(input: {
 }) {
   const supabase = getSupabaseAdminClient();
   const now = new Date().toISOString();
+  const shouldActivate = input.ativo ?? true;
+
+  if (shouldActivate) {
+    await disableAllProjectAgents(input.projetoId);
+  }
+
   const { data, error } = await supabase
     .from("agentes")
     .insert({
@@ -230,7 +253,7 @@ export async function createAgente(input: {
       descricao: input.descricao?.trim() || null,
       prompt_base: input.promptBase?.trim() || null,
       configuracoes: input.configuracoes ?? null,
-      ativo: input.ativo ?? true,
+      ativo: shouldActivate,
       created_at: now,
       updated_at: now,
     } as never)
@@ -264,16 +287,24 @@ export async function updateAgente(input: {
   apiIds?: string[];
 }) {
   const supabase = getSupabaseAdminClient();
+  const current = await getAgenteById(input.id);
+  const nextProjectId = input.projetoId ?? current?.projetoId ?? null;
+  const shouldActivate = input.ativo ?? false;
+
+  if (shouldActivate) {
+    await disableAllProjectAgents(nextProjectId);
+  }
+
   const { data, error } = await supabase
     .from("agentes")
     .update({
-      projeto_id: input.projetoId ?? undefined,
+      projeto_id: nextProjectId ?? undefined,
       slug: input.slug?.trim() || null,
       nome: input.nome.trim(),
       descricao: input.descricao?.trim() || null,
       prompt_base: input.promptBase?.trim() || null,
       configuracoes: input.configuracoes ?? null,
-      ativo: input.ativo ?? false,
+      ativo: shouldActivate,
       updated_at: new Date().toISOString(),
     } as never)
     .eq("id", input.id)

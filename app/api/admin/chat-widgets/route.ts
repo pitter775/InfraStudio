@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { canAccessAdmin } from "@/lib/access";
 import { getAgenteById, listAgentes } from "@/lib/agentes";
 import { listApis } from "@/lib/apis";
-import { createChatWidget, deleteChatWidget, getChatWidgetById, listChatWidgets, updateChatWidget } from "@/lib/chat-widgets";
+import { createChatWidget, deleteChatWidget, getChatWidgetById, getChatWidgetByProjectAgentBinding, listChatWidgets, updateChatWidget } from "@/lib/chat-widgets";
 import { listProjetos } from "@/lib/projetos";
 import { getSessionUser } from "@/lib/session";
 
@@ -41,7 +41,7 @@ export async function GET() {
 
 async function validateAgentProject(projetoId: string | null | undefined, agenteId: string | null | undefined) {
   if (!agenteId) {
-    return null;
+    return "Selecione um agente para o widget.";
   }
 
   const agente = await getAgenteById(agenteId);
@@ -50,6 +50,20 @@ async function validateAgentProject(projetoId: string | null | undefined, agente
   }
 
   return null;
+}
+
+async function validateWidgetBinding(projetoId: string, agenteId: string, currentId?: string) {
+  const existing = await getChatWidgetByProjectAgentBinding({
+    projetoId,
+    agenteId,
+    excludeId: currentId ?? null,
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  return `O agente selecionado ja esta vinculado ao widget "${existing.nome}". Troque o agente do widget atual em vez de manter dois ao mesmo tempo.`;
 }
 
 export async function POST(request: Request) {
@@ -72,6 +86,11 @@ export async function POST(request: Request) {
   const agentError = await validateAgentProject(body.projetoId, body.agenteId);
   if (agentError) {
     return NextResponse.json({ error: agentError }, { status: 400 });
+  }
+
+  const bindingError = await validateWidgetBinding(body.projetoId, body.agenteId!);
+  if (bindingError) {
+    return NextResponse.json({ error: bindingError }, { status: 409 });
   }
 
   const widget = await createChatWidget({
@@ -114,6 +133,11 @@ export async function PUT(request: Request) {
   const agentError = await validateAgentProject(body.projetoId, body.agenteId);
   if (agentError) {
     return NextResponse.json({ error: agentError }, { status: 400 });
+  }
+
+  const bindingError = await validateWidgetBinding(body.projetoId, body.agenteId!, body.id);
+  if (bindingError) {
+    return NextResponse.json({ error: bindingError }, { status: 409 });
   }
 
   const widget = await updateChatWidget({

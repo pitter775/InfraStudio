@@ -222,7 +222,9 @@ function Sidebar({
                 type="button"
                 onClick={() => {
                   if ("projectTab" in item) {
-                    onProjectTabNavigate(item.projectTab);
+                    if (!active) {
+                      onProjectTabNavigate(item.projectTab);
+                    }
                   } else if (pathname !== item.href) {
                     onNavigate(item.href);
                   }
@@ -339,7 +341,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   useEffect(() => {
     setMobileOpen(false);
     setLoadingHref(null);
-  }, [pathname]);
+  }, [pathname, currentProjectTab]);
 
   useEffect(() => {
     adminLinks.forEach((item) => {
@@ -404,6 +406,11 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
     const activeProjectId = typeof window === "undefined"
       ? null
       : window.localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY)?.trim() || null;
+
+    if (pathname.startsWith("/admin/projetos") && currentProjectTab === tab) {
+      setLoadingHref(null);
+      return;
+    }
 
     if (activeProjectId) {
       setLoadingHref(loadingKey);

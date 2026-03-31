@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { listRecentRuntimeErrorLogs } from "@/lib/runtime-error-log";
+import { clearRuntimeErrorLogs, listRecentRuntimeErrorLogs } from "@/lib/runtime-error-log";
 
 type LogRow = {
   id: string;
@@ -31,6 +31,10 @@ function detectLevel(value: { tipo?: string | null; origem?: string | null; desc
     .toLowerCase();
 
   return /\berro\b|\berror\b|\bfailed\b|\bfailure\b|\bexception\b|\bfatal\b/.test(joined) ? "error" : "info";
+}
+
+function isErrorLogLike(value: { tipo?: string | null; origem?: string | null; descricao?: string | null }) {
+  return detectLevel(value) === "error";
 }
 
 function sanitizePayload(payload: Record<string, unknown> | null) {
@@ -74,19 +78,7 @@ export async function appendChatRequestLog(input: {
   descricao?: string;
   payload?: Record<string, unknown> | null;
 }) {
-  try {
-    const supabase = getSupabaseAdminClient();
-    await supabase.from("logs").insert({
-      projeto_id: input.projetoId ?? null,
-      tipo: "chat_request",
-      origem: "api_chat",
-      descricao: input.descricao?.trim() || "Snapshot da requisicao do chat",
-      payload: input.payload ?? null,
-      created_at: new Date().toISOString(),
-    } as never);
-  } catch (error) {
-    console.error("[chat-logs] failed to append chat request log", error);
-  }
+  void input;
 }
 
 export async function appendSystemLog(input: {
@@ -96,13 +88,23 @@ export async function appendSystemLog(input: {
   descricao: string;
   payload?: Record<string, unknown> | null;
 }) {
+  const normalized = {
+    tipo: input.tipo?.trim() || "system_event",
+    origem: input.origem?.trim() || "system",
+    descricao: input.descricao.trim(),
+  };
+
+  if (!isErrorLogLike(normalized)) {
+    return;
+  }
+
   try {
     const supabase = getSupabaseAdminClient();
     await supabase.from("logs").insert({
       projeto_id: input.projetoId ?? null,
-      tipo: input.tipo?.trim() || "system_event",
-      origem: input.origem?.trim() || "system",
-      descricao: input.descricao.trim(),
+      tipo: normalized.tipo,
+      origem: normalized.origem,
+      descricao: normalized.descricao,
       payload: input.payload ?? null,
       created_at: new Date().toISOString(),
     } as never);
@@ -157,4 +159,19 @@ export async function listRecentSystemLogs(projetoId?: string | null, limit = 12
   return [...databaseLogs, ...runtimeEntries]
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, limit);
+}
+
+export async function clearAllSystemLogs() {
+  const supabase = getSupabaseAdminClient();
+  const [databaseResult, runtimeResult] = await Promise.all([
+    supabase.from("logs").delete().not("id", "is", null),
+    clearRuntimeErrorLogs(),
+  ]);
+
+  if (databaseResult.error) {
+    console.error("[chat-logs] failed to clear database logs", databaseResult.error);
+    return false;
+  }
+
+  return runtimeResult;
 }

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 type RuntimeErrorLogInput = {
@@ -81,5 +81,16 @@ export async function listRecentRuntimeErrorLogs(limit = 120): Promise<RuntimeEr
     });
   } catch {
     return [];
+  }
+}
+
+export async function clearRuntimeErrorLogs() {
+  try {
+    await mkdir(LOG_DIR, { recursive: true });
+    await writeFile(LOG_FILE, "", "utf8");
+    return true;
+  } catch (error) {
+    console.error("[runtime-error-log] failed to clear logs", error);
+    return false;
   }
 }

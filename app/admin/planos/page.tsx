@@ -209,18 +209,18 @@ export default function AdminPlanosPage() {
               <span className="text-sm font-semibold text-slate-200">Limite de custo mensal</span>
               <input value={form.limiteCustoMensal} onChange={(event) => setForm((current) => ({ ...current, limiteCustoMensal: event.target.value }))} placeholder="Limite de custo mensal" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
             </label>
-            <div className="grid gap-4 md:grid-cols-3">
-              <label className="grid gap-2">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <label className="grid min-w-0 gap-2">
                 <span className="text-sm font-semibold text-slate-200">Max agentes</span>
-                <input value={form.maxAgentes} onChange={(event) => setForm((current) => ({ ...current, maxAgentes: event.target.value }))} placeholder="Max agentes" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
+                <input value={form.maxAgentes} onChange={(event) => setForm((current) => ({ ...current, maxAgentes: event.target.value }))} placeholder="Max agentes" className="min-w-0 w-full rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
               </label>
-              <label className="grid gap-2">
+              <label className="grid min-w-0 gap-2">
                 <span className="text-sm font-semibold text-slate-200">Max APIs</span>
-                <input value={form.maxApis} onChange={(event) => setForm((current) => ({ ...current, maxApis: event.target.value }))} placeholder="Max APIs" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
+                <input value={form.maxApis} onChange={(event) => setForm((current) => ({ ...current, maxApis: event.target.value }))} placeholder="Max APIs" className="min-w-0 w-full rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
               </label>
-              <label className="grid gap-2">
+              <label className="grid min-w-0 gap-2">
                 <span className="text-sm font-semibold text-slate-200">Max WhatsApp</span>
-                <input value={form.maxWhatsapp} onChange={(event) => setForm((current) => ({ ...current, maxWhatsapp: event.target.value }))} placeholder="Max WhatsApp" className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
+                <input value={form.maxWhatsapp} onChange={(event) => setForm((current) => ({ ...current, maxWhatsapp: event.target.value }))} placeholder="Max WhatsApp" className="min-w-0 w-full rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" />
               </label>
             </div>
             <label className="inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm text-slate-200">

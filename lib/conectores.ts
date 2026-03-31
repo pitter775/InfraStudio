@@ -181,6 +181,36 @@ export async function listConectoresByAgente(agenteId: string, tipo?: string) {
   return data.map((row) => mapConnector(row as ConnectorRow));
 }
 
+export async function getConectorByProjetoTipo(input: {
+  projetoId: string;
+  tipo: string;
+  excludeId?: string | null;
+}) {
+  const supabase = getSupabaseAdminClient();
+  let query = supabase
+    .from("conectores")
+    .select("id, projeto_id, agente_id, nome, tipo, endpoint_base, configuracoes, ativo, created_at, updated_at")
+    .eq("projeto_id", input.projetoId)
+    .eq("tipo", input.tipo)
+    .order("created_at", { ascending: true })
+    .limit(1);
+
+  if (input.excludeId) {
+    query = query.neq("id", input.excludeId);
+  }
+
+  const { data, error } = await query.maybeSingle();
+
+  if (error || !data) {
+    if (error) {
+      console.error("[conectores] failed to load connector by project/type", error);
+    }
+    return null;
+  }
+
+  return mapConnector(data as ConnectorRow);
+}
+
 export async function createConector(input: {
   projetoId: string;
   agenteId?: string | null;

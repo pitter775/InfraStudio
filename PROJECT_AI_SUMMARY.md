@@ -99,27 +99,37 @@ Modelos principais identificados no schema:
 - `chats` 1:N `mensagens`
 - `usuarios` N:N `projetos` via `usuarios_projetos`
 
+### Regras atuais de vinculo por recurso
+- `projetos` podem ter varios `agentes`
+- `apis` do projeto podem ser compartilhadas por varios agentes ao mesmo tempo via `agente_api`
+- `canais_whatsapp`: no maximo 1 canal por projeto; pode trocar o agente vinculado, mas nunca manter dois canais ativos do mesmo projeto ao mesmo tempo
+- `conectores` do tipo Mercado Livre: no maximo 1 integracao por projeto; pode trocar o agente vinculado, mas nunca manter duas integracoes Mercado Livre simultaneas no mesmo projeto
+- `chat_widgets`: no maximo 1 widget por agente dentro do projeto; se precisar mudar, troca o agente do widget existente
+
 ## 6. Fluxos principais do sistema
 ### Chat do site
 1. Front/widget chama `POST /api/chat`
 2. `lib/chat-service.ts` resolve projeto/agente/widget e trava o contexto no agente do projeto/widget
 3. Cria ou reutiliza `chat`
-4. Salva mensagem do usuario em `mensagens`
-5. Enriquece contexto (`lead`, `qualificacao`, `resumo`)
-6. `lib/chat-orchestrator.ts` monta prompt/runtime
-7. Consulta OpenAI e APIs/conectores do agente
-8. Se a IA principal falhar, tenta recuperacao contextual do proprio agente travado usando dados de API/conector ou resposta curta ainda no contexto do projeto
-9. Salva resposta, tokens, custo e logs
-10. Registra erros, drift de agente e recuperacoes no modulo de logs
-9. Opcionalmente gera CTA de WhatsApp
+4. Se o chat ja existir, o agente salvo no proprio chat continua sendo a autoridade durante todo o atendimento
+5. Mudancas administrativas de agente em widget/canal valem apenas para conversas novas; nunca para uma conversa em andamento
+6. Salva mensagem do usuario em `mensagens`
+7. Enriquece contexto (`lead`, `qualificacao`, `resumo`)
+8. `lib/chat-orchestrator.ts` monta prompt/runtime
+9. Consulta OpenAI e APIs/conectores do agente
+10. Se a IA principal falhar, tenta recuperacao contextual do proprio agente travado usando dados de API/conector ou resposta curta ainda no contexto do projeto
+11. Salva resposta, tokens, custo e logs
+12. Registra erros, drift de agente e recuperacoes no modulo de logs
+13. Opcionalmente gera CTA de WhatsApp
 
 ### Chat via WhatsApp
 1. Bridge envia `POST /api/whatsapp/webhook`
 2. Canal WhatsApp e validado
 3. Projeto/agente ficam travados pelo canal
-4. Fluxo segue pelo mesmo `lib/chat-service.ts`
-5. Se canal/agente estiver invalido, o fluxo falha com log explicito e sem trocar de agente
-6. Atualiza sessao/status do canal
+4. Se ja existir chat aberto daquele contato/canal, o agente salvo no chat continua travado ate o fim do atendimento
+5. Fluxo segue pelo mesmo `lib/chat-service.ts`
+6. Se canal/agente estiver invalido, o fluxo falha com log explicito e sem trocar para outro agente
+7. Atualiza sessao/status do canal
 
 ### Admin
 1. Usuario autentica em `/api/auth/login`
@@ -153,11 +163,13 @@ Modelos principais identificados no schema:
 - Acesso/admin controlado por `lib/access.ts`
 - Sessao em JWT, nao em NextAuth
 - Chat sempre deve respeitar agente travado por projeto/widget/canal
+- Chat em andamento nunca deve trocar de agente no meio do atendimento, mesmo se o vinculo administrativo do canal mudar depois
 - Nao pode existir fallback generico de agente entre projetos
+- Nunca permitir andamento de conversa com agente de outro projeto
 - Se OpenAI falhar, o sistema tenta recuperacao contextual do proprio agente travado antes de cair em resposta vazia
 - Se nao houver como recuperar sem risco de drift, o fluxo falha e registra erro explicito no modulo de logs
 - Drift de agente e falhas do guardrail devem gerar evento em `logs`
-- Um agente ativo por projeto e incentivado no fluxo de criacao/edicao
+- Um agente ativo por projeto e incentivado no fluxo de criacao/edicao, mas o projeto pode ter varios agentes cadastrados
 - `database/geral-schema.sql` e documentacao/snapshot, nao fonte automatica de migracao
 
 ## 8. Regras para IA trabalhar neste projeto

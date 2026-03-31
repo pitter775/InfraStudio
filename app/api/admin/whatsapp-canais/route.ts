@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { canAccessAdmin, canManageProject, resolveCurrentProjectId } from "@/lib/access";
 import { getAgenteById } from "@/lib/agentes";
 import { getSessionUser } from "@/lib/session";
-import { createWhatsAppChannel, deleteWhatsAppChannel, getWhatsAppChannelById, listWhatsAppChannels, updateWhatsAppChannel, WhatsAppChannelError } from "@/lib/whatsapp-channels";
+import { createWhatsAppChannel, deleteWhatsAppChannel, getWhatsAppChannelById, getWhatsAppChannelByProject, listWhatsAppChannels, updateWhatsAppChannel, WhatsAppChannelError } from "@/lib/whatsapp-channels";
 
 type WhatsAppChannelBody = {
   id?: string;
@@ -49,6 +49,19 @@ async function validateAgentProject(projetoId: string, agenteId: string | null |
   return null;
 }
 
+async function validateWhatsAppProjectRule(projetoId: string, currentId?: string) {
+  const existing = await getWhatsAppChannelByProject({
+    projetoId,
+    excludeId: currentId ?? null,
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  return `Este projeto ja possui um canal WhatsApp (${existing.numero}). Edite o canal existente para trocar o agente, sem manter dois ao mesmo tempo.`;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const projetoId = searchParams.get("projetoId");
@@ -75,6 +88,11 @@ export async function POST(request: Request) {
   const agentError = await validateAgentProject(access.projetoId!, body.agenteId);
   if (agentError) {
     return NextResponse.json({ error: agentError }, { status: 400 });
+  }
+
+  const projectRuleError = await validateWhatsAppProjectRule(access.projetoId!);
+  if (projectRuleError) {
+    return NextResponse.json({ error: projectRuleError }, { status: 409 });
   }
 
   try {
@@ -111,6 +129,11 @@ export async function PUT(request: Request) {
   const agentError = await validateAgentProject(access.projetoId!, body.agenteId);
   if (agentError) {
     return NextResponse.json({ error: agentError }, { status: 400 });
+  }
+
+  const projectRuleError = await validateWhatsAppProjectRule(access.projetoId!, body.id);
+  if (projectRuleError) {
+    return NextResponse.json({ error: projectRuleError }, { status: 409 });
   }
 
   try {
