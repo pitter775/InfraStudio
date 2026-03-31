@@ -2,6 +2,7 @@ import "server-only";
 
 import { randomUUID } from "crypto";
 import { SignJWT, jwtVerify } from "jose";
+import { appendSystemLog } from "@/lib/chat-logs";
 import {
   getConectorById,
   getMercadoLivreConnectorConfig,
@@ -155,6 +156,21 @@ async function exchangeCodeForTokens(code: string, connector: ConnectorRecord, o
     throw new Error("OAuth do Mercado Livre nao esta configurado no servidor.");
   }
 
+  await appendSystemLog({
+    projetoId: connector.projetoId ?? null,
+    tipo: "mercado_livre_oauth_exchange_start",
+    origem: "mercado_livre_oauth",
+    descricao: "Iniciando troca do code por token no Mercado Livre.",
+    payload: {
+      connectorId: connector.id,
+      connectorName: connector.nome,
+      redirectUri: credentials.redirectUri,
+      hasCode: Boolean(code),
+      hasAppId: Boolean(credentials.appId),
+      hasClientSecret: Boolean(credentials.clientSecret),
+    },
+  });
+
   const response = await fetch(MERCADO_LIVRE_TOKEN_URL, {
     method: "POST",
     headers: {
@@ -173,10 +189,39 @@ async function exchangeCodeForTokens(code: string, connector: ConnectorRecord, o
 
   if (!response.ok) {
     const payload = await response.text();
+    await appendSystemLog({
+      projetoId: connector.projetoId ?? null,
+      tipo: "mercado_livre_oauth_exchange_error",
+      origem: "mercado_livre_oauth",
+      descricao: "Mercado Livre recusou a troca do code por token.",
+      payload: {
+        connectorId: connector.id,
+        connectorName: connector.nome,
+        status: response.status,
+        responseText: payload || null,
+        redirectUri: credentials.redirectUri,
+      },
+    });
     throw new Error(`Mercado Livre retornou ${response.status} ao trocar o code por token. ${payload}`.trim());
   }
 
-  return (await response.json()) as MercadoLivreTokenResponse;
+  const tokenPayload = (await response.json()) as MercadoLivreTokenResponse;
+  await appendSystemLog({
+    projetoId: connector.projetoId ?? null,
+    tipo: "mercado_livre_oauth_exchange_success",
+    origem: "mercado_livre_oauth",
+    descricao: "Mercado Livre retornou tokens para o conector.",
+    payload: {
+      connectorId: connector.id,
+      connectorName: connector.nome,
+      hasAccessToken: Boolean(tokenPayload.access_token),
+      hasRefreshToken: Boolean(tokenPayload.refresh_token),
+      hasUserId: Boolean(tokenPayload.user_id),
+      expiresIn: tokenPayload.expires_in ?? null,
+    },
+  });
+
+  return tokenPayload;
 }
 
 async function refreshMercadoLivreTokens(refreshToken: string, connector: ConnectorRecord) {
