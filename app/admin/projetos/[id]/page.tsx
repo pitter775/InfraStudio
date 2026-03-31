@@ -3977,6 +3977,7 @@ export default function AdminProjetoDetalhePage() {
   const [tabsPinned, setTabsPinned] = useState(false);
   const [tabsBarHeight, setTabsBarHeight] = useState(0);
   const [projectDetailsExpanded, setProjectDetailsExpanded] = useState(false);
+  const [tabSummaryExpanded, setTabSummaryExpanded] = useState<Record<string, boolean>>({});
   const pendingAgentDiagnosticsRef = useRef<Record<string, boolean>>({});
   const tabSwitchTimeoutRef = useRef<number | null>(null);
   const tabRevealTimeoutRef = useRef<number | null>(null);
@@ -6115,6 +6116,39 @@ export default function AdminProjetoDetalhePage() {
     data.billing?.pricingModels.find((item) => item.id === data.billing?.plan.modeloReferencia) ??
     null;
   const tabContentTransitionClass = `transform-gpu transition-all duration-200 ease-out ${tabContentVisible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"}`;
+  const renderCollapsedTabSummary = (tabKey: ProjectTab, title: string, summary: string) => {
+    const expanded = tabSummaryExpanded[tabKey] === true;
+
+    return (
+      <section className="mb-3 rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-2.5 shadow-[0_10px_24px_rgba(2,8,23,0.1)]">
+        <button
+          type="button"
+          onClick={() => setTabSummaryExpanded((current) => ({ ...current, [tabKey]: !current[tabKey] }))}
+          aria-expanded={expanded}
+          className="flex w-full items-center justify-between gap-3 text-left"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-200">{title}</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">Resumo recolhido por padrao para manter a tela mais limpa.</p>
+          </div>
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold text-slate-300">
+            {expanded ? "Ocultar" : "Expandir"}
+            <ChevronDown size={14} className={`transition-transform duration-300 ${expanded ? "rotate-180" : "rotate-0"}`} />
+          </span>
+        </button>
+
+        <div
+          className={`grid overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            expanded ? "mt-3 grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0"
+          }`}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <p className="text-xs leading-relaxed text-slate-400">{summary}</p>
+          </div>
+        </div>
+      </section>
+    );
+  };
 
   return (
     <main className="space-y-6">
@@ -6149,20 +6183,6 @@ export default function AdminProjetoDetalhePage() {
                   <p className="max-w-2xl text-sm leading-relaxed text-slate-300 sm:text-[15px]">
                     {data.projeto.descricao || "Sem descricao cadastrada."}
                   </p>
-                </div>
-                <div className="flex flex-wrap gap-2.5">
-                  <div className="relative inline-flex min-w-[220px] items-start gap-3 overflow-hidden rounded-2xl border border-cyan-400/18 bg-cyan-500/[0.06] px-3 py-2.5 shadow-[0_16px_34px_rgba(8,47,73,0.18)]">
-                    <div className="pointer-events-none absolute right-4 top-3 text-cyan-100/18">
-                      <Bot size={28} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-100/75">Agente ativo</p>
-                      <p className="mt-1 truncate text-sm font-semibold text-white">{agenteAtivo?.nome ?? "Nenhum ativo"}</p>
-                      <p className="mt-1 text-xs leading-relaxed text-cyan-50/75">
-                        {agenteAtivo ? "Responsavel principal pelos canais conectados deste projeto." : "Defina um agente para centralizar o atendimento."}
-                      </p>
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -6429,6 +6449,7 @@ export default function AdminProjetoDetalhePage() {
               Novo agente
             </button>
           </div>
+          {renderCollapsedTabSummary("agentes", "Resumo dos agentes", "Aqui voce ve os agentes do projeto, com o ativo em destaque, seus vinculos principais e os atalhos para validar, testar, editar ou remover.")}
           <div className="pt-2">
             {data.agentes.length ? (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -6677,7 +6698,7 @@ export default function AdminProjetoDetalhePage() {
               <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhum agente cadastrado para este projeto ainda.</div>
             )}
           </div>
-          <section className="mt-6 rounded-2xl border border-white/8 bg-white/[0.025] px-4 py-4 shadow-[0_12px_30px_rgba(2,8,23,0.12)] sm:px-5">
+          <section className="mt-5 rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-3 shadow-[0_10px_24px_rgba(2,8,23,0.1)] sm:px-4">
             <button
               type="button"
               onClick={() => setProjectDetailsExpanded((current) => !current)}
@@ -6686,11 +6707,11 @@ export default function AdminProjetoDetalhePage() {
             >
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-200">Detalhes do projeto</p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                  Informacoes auxiliares do projeto para consulta rapida, com menos destaque visual que os agentes.
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                  Painel auxiliar recolhido por padrao.
                 </p>
               </div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold text-slate-300">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] font-semibold text-slate-300">
                 {projectDetailsExpanded ? "Ocultar" : "Mostrar"}
                 <ChevronDown
                   size={14}
@@ -6701,18 +6722,18 @@ export default function AdminProjetoDetalhePage() {
 
             <div
               className={`grid overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                projectDetailsExpanded ? "mt-4 grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0"
+                projectDetailsExpanded ? "mt-3 grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0"
               }`}
             >
               <div className="min-h-0 overflow-hidden">
-                <div className="grid gap-2.5 pt-1 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-2 pt-1 sm:grid-cols-2 xl:grid-cols-3">
                   {overviewStats.map((item) => {
                     const Icon = item.icon;
 
                     return (
                       <div
                         key={item.key}
-                        className="relative overflow-hidden rounded-xl border border-white/8 bg-slate-950/25 px-3.5 py-3 shadow-[0_10px_24px_rgba(2,8,23,0.12)]"
+                        className="relative overflow-hidden rounded-xl border border-white/8 bg-slate-950/25 px-3 py-2.5 shadow-[0_8px_18px_rgba(2,8,23,0.1)]"
                       >
                         <div className={`pointer-events-none absolute right-3 top-3 ${item.tone} opacity-20`}>
                           <Icon size={18} />
@@ -6739,6 +6760,7 @@ export default function AdminProjetoDetalhePage() {
               Nova API
             </button>
           </div>
+          {renderCollapsedTabSummary("apis", "Resumo das APIs", "Esta aba centraliza as APIs do projeto, com endpoint, parametros, status e acoes de edicao ou exclusao. O conteudo detalhado fica expandivel apenas quando necessario.")}
           <div className="space-y-3 pt-2">
             {data.apis.length ? (
               data.apis.map((api) => (
@@ -6816,6 +6838,7 @@ export default function AdminProjetoDetalhePage() {
                 Nova loja
               </button>
             </div>
+            {renderCollapsedTabSummary("mercado", "Resumo do Mercado Livre", "Aqui ficam as lojas do Mercado Livre vinculadas ao projeto, com agente responsavel, Seller ID, estado do OAuth e atalhos de teste, edicao e remocao.")}
             <div className="space-y-3 pt-2">
               {data.conectores.length ? (
                 data.conectores.map((connector) => {
@@ -6908,6 +6931,7 @@ export default function AdminProjetoDetalhePage() {
                 <p className="mt-3 text-xs text-amber-200/90">A conexao do WhatsApp ainda nao esta disponivel neste ambiente.</p>
               ) : null}
             </div>
+            {renderCollapsedTabSummary("whatsapp", "Resumo do WhatsApp", "Esta area fica focada no numero principal do projeto, com status da sessao, QR para conexao e configuracoes rapidas do canal ativo.")}
             <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1.35fr),minmax(340px,0.92fr)] xl:items-start">
               {primaryWhatsAppChannel ? (() => {
                 const channel = primaryWhatsAppChannel;
@@ -7217,6 +7241,7 @@ export default function AdminProjetoDetalhePage() {
                 </button>
               </div>
             </div>
+            {renderCollapsedTabSummary("chats", "Resumo dos chats", "A aba de chats concentra widgets, snippets e o historico de conversas do projeto. Mantive o resumo recolhido para a tela abrir mais leve.")}
             <div className="space-y-4 p-6">
               <div className="hidden grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.9fr)]">
                 <div className="rounded-2xl border border-cyan-500/20 bg-slate-950/35 p-4">
