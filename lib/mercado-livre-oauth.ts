@@ -1,6 +1,6 @@
 import "server-only";
 
-import { randomUUID } from "crypto";
+import { createHash, randomBytes, randomUUID } from "crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { appendSystemLog } from "@/lib/chat-logs";
 import {
@@ -18,6 +18,7 @@ type MercadoLivreOAuthState = {
   nonce: string;
   connectorId: string;
   projetoId: string;
+  codeVerifier: string;
 };
 
 type MercadoLivreTokenResponse = {
@@ -52,6 +53,7 @@ async function signMercadoLivreOAuthState(payload: MercadoLivreOAuthState) {
     connectorId: payload.connectorId,
     projetoId: payload.projetoId,
     nonce: payload.nonce,
+    codeVerifier: payload.codeVerifier,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -66,7 +68,16 @@ async function verifyMercadoLivreOAuthState(token: string) {
     connectorId: String(payload.connectorId ?? "").trim(),
     projetoId: String(payload.projetoId ?? "").trim(),
     nonce: String(payload.nonce ?? "").trim(),
+    codeVerifier: String(payload.codeVerifier ?? "").trim(),
   } satisfies MercadoLivreOAuthState;
+}
+
+function buildMercadoLivreCodeVerifier() {
+  return randomBytes(32).toString("base64url");
+}
+
+function buildMercadoLivreCodeChallenge(codeVerifier: string) {
+  return createHash("sha256").update(codeVerifier).digest("base64url");
 }
 
 function normalizeBaseUrl(value: string | null | undefined) {
@@ -137,6 +148,7 @@ export async function buildMercadoLivreAuthorizationUrl(input: {
     nonce: randomUUID(),
     connectorId: input.connector.id,
     projetoId: input.connector.projetoId ?? "",
+    codeVerifier: buildMercadoLivreCodeVerifier(),
   };
   const state = await signMercadoLivreOAuthState(payload);
 
@@ -146,11 +158,18 @@ export async function buildMercadoLivreAuthorizationUrl(input: {
   url.searchParams.set("redirect_uri", credentials.redirectUri);
   url.searchParams.set("state", state);
   url.searchParams.set("scope", "offline_access read");
+  url.searchParams.set("code_challenge", buildMercadoLivreCodeChallenge(payload.codeVerifier));
+  url.searchParams.set("code_challenge_method", "S256");
 
   return url.toString();
 }
 
-async function exchangeCodeForTokens(code: string, connector: ConnectorRecord, origin?: string | null) {
+async function exchangeCodeForTokens(
+  code: string,
+  codeVerifier: string,
+  connector: ConnectorRecord,
+  origin?: string | null,
+) {
   const credentials = getMercadoLivreOAuthCredentials(connector, origin);
   if (!credentials.appId || !credentials.clientSecret || !credentials.redirectUri) {
     throw new Error("OAuth do Mercado Livre nao esta configurado no servidor.");
@@ -166,6 +185,7 @@ async function exchangeCodeForTokens(code: string, connector: ConnectorRecord, o
       connectorName: connector.nome,
       redirectUri: credentials.redirectUri,
       hasCode: Boolean(code),
+      hasCodeVerifier: Boolean(codeVerifier),
       hasAppId: Boolean(credentials.appId),
       hasClientSecret: Boolean(credentials.clientSecret),
     },
@@ -182,6 +202,7 @@ async function exchangeCodeForTokens(code: string, connector: ConnectorRecord, o
       client_id: credentials.appId,
       client_secret: credentials.clientSecret,
       code,
+      code_verifier: codeVerifier,
       redirect_uri: credentials.redirectUri,
     }).toString(),
     cache: "no-store",
@@ -200,6 +221,7 @@ async function exchangeCodeForTokens(code: string, connector: ConnectorRecord, o
         status: response.status,
         responseText: payload || null,
         redirectUri: credentials.redirectUri,
+        hasCodeVerifier: Boolean(codeVerifier),
       },
     });
     throw new Error(`Mercado Livre retornou ${response.status} ao trocar o code por token. ${payload}`.trim());
@@ -336,7 +358,7 @@ export async function completeMercadoLivreOAuthCallback(searchParams: URLSearchP
     throw new Error("Conector do Mercado Livre nao encontrado para concluir a autorizacao.");
   }
 
-  const tokenPayload = await exchangeCodeForTokens(code, connector, origin);
+  const tokenPayload = await exchangeCodeForTokens(code, parsed.codeVerifier, connector, origin);
   const updatedConnector = await persistMercadoLivreTokens(connector, tokenPayload);
 
   return {
