@@ -23,7 +23,7 @@ export async function DELETE() {
 
   const cleared = await clearAllSystemLogs();
   if (!cleared) {
-    return NextResponse.json({ error: "Nao foi possivel remover todos os logs." }, { status: 500 });
+    return NextResponse.json({ error: "Nao foi possivel remover todos os logs. Verifique permissao da tabela logs e tente novamente." }, { status: 500 });
   }
 
   return NextResponse.json({ success: true }, { status: 200 });

@@ -163,15 +163,42 @@ export async function listRecentSystemLogs(projetoId?: string | null, limit = 12
 
 export async function clearAllSystemLogs() {
   const supabase = getSupabaseAdminClient();
+  const clearDatabaseLogs = async () => {
+    const { data, error } = await supabase
+      .from("logs")
+      .select("id");
+
+    if (error) {
+      console.error("[chat-logs] failed to list logs before clear", error);
+      return false;
+    }
+
+    const ids = ((data ?? []) as Array<{ id: string | null }>).map((row) => row.id).filter((id): id is string => Boolean(id));
+    if (!ids.length) {
+      return true;
+    }
+
+    const chunkSize = 500;
+    for (let index = 0; index < ids.length; index += chunkSize) {
+      const batch = ids.slice(index, index + chunkSize);
+      const { error: deleteError } = await supabase
+        .from("logs")
+        .delete()
+        .in("id", batch);
+
+      if (deleteError) {
+        console.error("[chat-logs] failed to clear database logs", deleteError);
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   const [databaseResult, runtimeResult] = await Promise.all([
-    supabase.from("logs").delete().not("id", "is", null),
+    clearDatabaseLogs(),
     clearRuntimeErrorLogs(),
   ]);
 
-  if (databaseResult.error) {
-    console.error("[chat-logs] failed to clear database logs", databaseResult.error);
-    return false;
-  }
-
-  return runtimeResult;
+  return databaseResult && runtimeResult;
 }

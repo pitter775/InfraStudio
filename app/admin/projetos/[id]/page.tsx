@@ -2251,6 +2251,7 @@ function AgenteModal({
 }) {
   const [showRawConfig, setShowRawConfig] = useState(false);
   const [promptExpanded, setPromptExpanded] = useState(true);
+  const [connectionsExpanded, setConnectionsExpanded] = useState(false);
   const [apisExpanded, setApisExpanded] = useState(false);
   const promptRef = useRef<HTMLDivElement | null>(null);
   const lastPromptSyncRef = useRef("");
@@ -2259,6 +2260,7 @@ function AgenteModal({
     if (open) {
       setShowRawConfig(false);
       setPromptExpanded(true);
+      setConnectionsExpanded(false);
       setApisExpanded(false);
     }
   }, [open]);
@@ -2477,7 +2479,7 @@ function AgenteModal({
         </div>
 
         <div className="flex max-h-[calc(92vh-88px)] flex-col">
-          <div className="grid flex-1 gap-0 overflow-x-hidden overflow-y-auto lg:grid-cols-[1.05fr_0.95fr]">
+          <div className={`grid flex-1 gap-0 overflow-x-hidden overflow-y-auto ${connectionsExpanded ? "lg:grid-cols-[1.05fr_0.95fr]" : "lg:grid-cols-[minmax(0,1fr)_112px]"}`}>
           <div className="min-w-0 space-y-4 p-6 pb-8">
             <div>
               <FormLabel>Nome do agente</FormLabel>
@@ -2672,7 +2674,31 @@ function AgenteModal({
             </div>
           </div>
 
-          <div className="min-w-0 border-t border-white/10 bg-white/[0.03] p-6 pb-8 lg:border-l lg:border-t-0">
+          <div className={`min-w-0 border-t border-white/10 bg-white/[0.03] transition-all duration-300 lg:border-t-0 ${connectionsExpanded ? "p-6 pb-8 lg:border-l" : "p-4 lg:border-l lg:px-3 lg:py-4"}`}>
+            <div className={`flex gap-3 ${connectionsExpanded ? "items-start justify-between" : "justify-end"}`}>
+              {connectionsExpanded ? (
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Conexoes do agente</p>
+                  <p className="mt-1 text-xs text-slate-400">Expanda so quando quiser revisar os vinculos, APIs e arquivos deste agente.</p>
+                </div>
+              ) : null}
+              <div className="flex items-center gap-2">
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${form.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
+                  {form.ativo ? "ativo" : "inativo"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setConnectionsExpanded((current) => !current)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  {connectionsExpanded ? <Minimize2 size={14} /> : <Expand size={14} />}
+                  <span className={connectionsExpanded ? "inline" : "hidden lg:inline"}>{connectionsExpanded ? "Recolher" : "Expandir"}</span>
+                </button>
+              </div>
+            </div>
+
+            {connectionsExpanded ? (
+              <div className="mt-4">
             <div className="hidden mb-5 rounded-2xl border border-cyan-500/15 bg-cyan-500/10 p-5">
               <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950/20 text-cyan-100">
                 <Bot size={22} />
@@ -2868,7 +2894,16 @@ function AgenteModal({
                 ) : null}
               </div>
             ) : null}
-
+              </div>
+            ) : (
+              <div className="flex min-h-[72px] items-start justify-end lg:min-h-[640px]">
+                <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-3 py-3 shadow-[0_10px_24px_rgba(2,8,23,0.12)]">
+                  <p className="text-right text-[11px] font-semibold leading-relaxed text-slate-400">
+                    Conexoes recolhidas.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
           <ModalStickyFooter feedback={feedback}>
@@ -3974,7 +4009,6 @@ export default function AdminProjetoDetalhePage() {
   const [tabsPinned, setTabsPinned] = useState(false);
   const [tabsBarHeight, setTabsBarHeight] = useState(0);
   const [projectDetailsExpanded, setProjectDetailsExpanded] = useState(false);
-  const [tabSummaryExpanded, setTabSummaryExpanded] = useState<Record<string, boolean>>({});
   const pendingAgentDiagnosticsRef = useRef<Record<string, boolean>>({});
   const tabSwitchTimeoutRef = useRef<number | null>(null);
   const tabRevealTimeoutRef = useRef<number | null>(null);
@@ -6154,39 +6188,6 @@ export default function AdminProjetoDetalhePage() {
     data.billing?.pricingModels.find((item) => item.id === data.billing?.plan.modeloReferencia) ??
     null;
   const tabContentTransitionClass = `transform-gpu transition-all duration-200 ease-out ${tabContentVisible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"}`;
-  const renderCollapsedTabSummary = (tabKey: ProjectTab, title: string, summary: string) => {
-    const expanded = tabSummaryExpanded[tabKey] === true;
-
-    return (
-      <section className="mb-3 rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-2.5 shadow-[0_10px_24px_rgba(2,8,23,0.1)]">
-        <button
-          type="button"
-          onClick={() => setTabSummaryExpanded((current) => ({ ...current, [tabKey]: !current[tabKey] }))}
-          aria-expanded={expanded}
-          className="flex w-full items-center justify-between gap-3 text-left"
-        >
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-200">{title}</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">Resumo recolhido por padrao para manter a tela mais limpa.</p>
-          </div>
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold text-slate-300">
-            {expanded ? "Ocultar" : "Expandir"}
-            <ChevronDown size={14} className={`transition-transform duration-300 ${expanded ? "rotate-180" : "rotate-0"}`} />
-          </span>
-        </button>
-
-        <div
-          className={`grid overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-            expanded ? "mt-3 grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0"
-          }`}
-        >
-          <div className="min-h-0 overflow-hidden">
-            <p className="text-xs leading-relaxed text-slate-400">{summary}</p>
-          </div>
-        </div>
-      </section>
-    );
-  };
 
   return (
     <main className="space-y-6">
@@ -6438,7 +6439,57 @@ export default function AdminProjetoDetalhePage() {
           </section>
         ) : null}
 
-        <div ref={tabsAnchorRef} className="mt-12" style={{ minHeight: tabsBarHeight ? `${tabsBarHeight}px` : undefined }}>
+        <section className="mt-8 rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-3 shadow-[0_10px_24px_rgba(2,8,23,0.1)] sm:px-4">
+          <button
+            type="button"
+            onClick={() => setProjectDetailsExpanded((current) => !current)}
+            aria-expanded={projectDetailsExpanded}
+            className="flex w-full items-center justify-between gap-3 rounded-2xl text-left transition-colors hover:text-white"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-200">Detalhes do projeto</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                Painel auxiliar recolhido por padrao.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] font-semibold text-slate-300">
+              {projectDetailsExpanded ? "Ocultar" : "Mostrar"}
+              <ChevronDown
+                size={14}
+                className={`transition-transform duration-300 ${projectDetailsExpanded ? "rotate-180" : "rotate-0"}`}
+              />
+            </span>
+          </button>
+
+          <div
+            className={`grid overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              projectDetailsExpanded ? "mt-3 grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0"
+            }`}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <div className="grid gap-2 pt-1 sm:grid-cols-2 xl:grid-cols-3">
+                {overviewStats.map((item) => {
+                  const Icon = item.icon;
+
+                  return (
+                    <div
+                      key={item.key}
+                      className="relative overflow-hidden rounded-xl border border-white/8 bg-slate-950/25 px-3 py-2.5 shadow-[0_8px_18px_rgba(2,8,23,0.1)]"
+                    >
+                      <div className={`pointer-events-none absolute right-3 top-3 ${item.tone} opacity-20`}>
+                        <Icon size={18} />
+                      </div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
+                      <p className="mt-2 text-2xl font-black leading-none text-slate-100">{item.value}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div ref={tabsAnchorRef} className="mt-8" style={{ minHeight: tabsBarHeight ? `${tabsBarHeight}px` : undefined }}>
           <section
             ref={tabsBarRef}
             className={`${tabsPinned ? "fixed left-1/2 top-3 z-40 -translate-x-1/2" : "relative"} flex w-max max-w-[calc(100vw-1.5rem)] flex-wrap items-center justify-center gap-2 rounded-[26px] px-3 py-3 transition-all duration-200 ${tabsPinned ? "bg-[#07111f]/82 shadow-[0_18px_38px_rgba(2,8,23,0.34)] backdrop-blur-md" : "bg-transparent shadow-none backdrop-blur-0"}`}
@@ -6487,7 +6538,6 @@ export default function AdminProjetoDetalhePage() {
               Novo agente
             </button>
           </div>
-          {renderCollapsedTabSummary("agentes", "Resumo dos agentes", "Aqui voce ve os agentes do projeto, com o ativo em destaque, seus vinculos principais e os atalhos para validar, testar, editar ou remover.")}
           <div className="pt-2">
             {data.agentes.length ? (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -6736,55 +6786,6 @@ export default function AdminProjetoDetalhePage() {
               <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhum agente cadastrado para este projeto ainda.</div>
             )}
           </div>
-          <section className="mt-5 rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-3 shadow-[0_10px_24px_rgba(2,8,23,0.1)] sm:px-4">
-            <button
-              type="button"
-              onClick={() => setProjectDetailsExpanded((current) => !current)}
-              aria-expanded={projectDetailsExpanded}
-              className="flex w-full items-center justify-between gap-3 rounded-2xl text-left transition-colors hover:text-white"
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-200">Detalhes do projeto</p>
-                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                  Painel auxiliar recolhido por padrao.
-                </p>
-              </div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] font-semibold text-slate-300">
-                {projectDetailsExpanded ? "Ocultar" : "Mostrar"}
-                <ChevronDown
-                  size={14}
-                  className={`transition-transform duration-300 ${projectDetailsExpanded ? "rotate-180" : "rotate-0"}`}
-                />
-              </span>
-            </button>
-
-            <div
-              className={`grid overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                projectDetailsExpanded ? "mt-3 grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0"
-              }`}
-            >
-              <div className="min-h-0 overflow-hidden">
-                <div className="grid gap-2 pt-1 sm:grid-cols-2 xl:grid-cols-3">
-                  {overviewStats.map((item) => {
-                    const Icon = item.icon;
-
-                    return (
-                      <div
-                        key={item.key}
-                        className="relative overflow-hidden rounded-xl border border-white/8 bg-slate-950/25 px-3 py-2.5 shadow-[0_8px_18px_rgba(2,8,23,0.1)]"
-                      >
-                        <div className={`pointer-events-none absolute right-3 top-3 ${item.tone} opacity-20`}>
-                          <Icon size={18} />
-                        </div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
-                        <p className="mt-2 text-2xl font-black leading-none text-slate-100">{item.value}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </section>
         </section>
 
         <section className={`${renderedTab === "apis" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
@@ -6798,7 +6799,6 @@ export default function AdminProjetoDetalhePage() {
               Nova API
             </button>
           </div>
-          {renderCollapsedTabSummary("apis", "Resumo das APIs", "Esta aba centraliza as APIs do projeto, com endpoint, parametros, status e acoes de edicao ou exclusao. O conteudo detalhado fica expandivel apenas quando necessario.")}
           <div className="space-y-3 pt-2">
             {data.apis.length ? (
               data.apis.map((api) => (
@@ -6876,8 +6876,7 @@ export default function AdminProjetoDetalhePage() {
                 Nova loja
               </button>
             </div>
-            {renderCollapsedTabSummary("mercado", "Resumo do Mercado Livre", "Aqui ficam as lojas do Mercado Livre vinculadas ao projeto, com agente responsavel, Seller ID, estado do OAuth e atalhos de teste, edicao e remocao.")}
-            <div className="grid gap-5 pt-2 xl:grid-cols-[minmax(0,560px)_minmax(280px,360px)] xl:items-start xl:justify-between">
+            <div className="grid gap-5 pt-2 xl:grid-cols-[minmax(0,560px)_minmax(560px,680px)] xl:items-start xl:justify-between">
               <div className="space-y-3">
                 {data.conectores.length ? (
                   data.conectores.map((connector) => {
@@ -6957,12 +6956,12 @@ export default function AdminProjetoDetalhePage() {
                 )}
               </div>
 
-              <aside className="rounded-2xl border border-amber-400/14 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(15,23,42,0.22))] p-4 shadow-[0_18px_36px_rgba(2,8,23,0.18)] xl:sticky xl:top-6">
+              <aside className="rounded-2xl border border-amber-400/14 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(15,23,42,0.22))] p-5 shadow-[0_18px_36px_rgba(2,8,23,0.18)] xl:sticky xl:top-6">
                 <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-100/85">Tutorial rapido</p>
                 <h4 className="mt-2 text-lg font-bold text-white">Como conectar o Mercado Livre</h4>
-                <p className="mt-2 text-sm leading-relaxed text-slate-300">Como agora fica uma loja por projeto, deixei aqui o passo a passo rapido com os links principais para o usuario concluir o app e o OAuth.</p>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">Como agora fica uma loja por projeto, deixei aqui o passo a passo rapido com os dados principais para o usuario concluir o app e o OAuth sem precisar sair copiando link quebrado.</p>
 
-                <div className="mt-4 space-y-3">
+                <div className="mt-4 grid gap-3 lg:grid-cols-2">
                   <a
                     href="https://developers.mercadolivre.com.br/apps"
                     target="_blank"
@@ -6972,24 +6971,38 @@ export default function AdminProjetoDetalhePage() {
                     Painel de apps do Mercado Livre
                     <ExternalLink size={15} />
                   </a>
-                  <a
-                    href="https://infrastudio.vercel.app/api/admin/conectores/mercado-livre/callback"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/35 px-3.5 py-3 text-sm font-semibold text-white transition-colors hover:border-amber-300/25 hover:bg-slate-950/50"
-                  >
-                    URL de retorno OAuth
-                    <ExternalLink size={15} />
-                  </a>
-                  <a
-                    href="https://infrastudio.vercel.app/api/mercado-livre/webhook"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/35 px-3.5 py-3 text-sm font-semibold text-white transition-colors hover:border-amber-300/25 hover:bg-slate-950/50"
-                  >
-                    URL de webhook
-                    <ExternalLink size={15} />
-                  </a>
+                  <div className="rounded-xl border border-white/10 bg-slate-950/35 px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-100/80">URL de retorno OAuth</p>
+                        <p className="mt-2 break-all font-mono text-xs text-white">https://infrastudio.vercel.app/api/admin/conectores/mercado-livre/callback</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleCopySnippet("mercado-livre-callback-url", "https://infrastudio.vercel.app/api/admin/conectores/mercado-livre/callback")}
+                        className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/20"
+                      >
+                        {copiedSnippetKey === "mercado-livre-callback-url" ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                        {copiedSnippetKey === "mercado-livre-callback-url" ? "Copiado" : "Copiar"}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-slate-950/35 px-4 py-3 lg:col-span-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-100/80">URL de webhook</p>
+                        <p className="mt-2 break-all font-mono text-xs text-white">https://infrastudio.vercel.app/api/mercado-livre/webhook</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleCopySnippet("mercado-livre-webhook-url", "https://infrastudio.vercel.app/api/mercado-livre/webhook")}
+                        className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/20"
+                      >
+                        {copiedSnippetKey === "mercado-livre-webhook-url" ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                        {copiedSnippetKey === "mercado-livre-webhook-url" ? "Copiado" : "Copiar"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4 text-sm text-slate-300">
@@ -7020,7 +7033,6 @@ export default function AdminProjetoDetalhePage() {
                 <p className="mt-3 text-xs text-amber-200/90">A conexao do WhatsApp ainda nao esta disponivel neste ambiente.</p>
               ) : null}
             </div>
-            {renderCollapsedTabSummary("whatsapp", "Resumo do WhatsApp", "Esta area fica focada no numero principal do projeto, com status da sessao, QR para conexao e configuracoes rapidas do canal ativo.")}
             <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1.35fr),minmax(340px,0.92fr)] xl:items-start">
               {primaryWhatsAppChannel ? (() => {
                 const channel = primaryWhatsAppChannel;
@@ -7330,7 +7342,6 @@ export default function AdminProjetoDetalhePage() {
                 </button>
               </div>
             </div>
-            {renderCollapsedTabSummary("chats", "Resumo dos chats", "A aba de chats concentra widgets, snippets e o historico de conversas do projeto. Mantive o resumo recolhido para a tela abrir mais leve.")}
             <div className="space-y-4 p-6">
               <div className="hidden grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.9fr)]">
                 <div className="rounded-2xl border border-cyan-500/20 bg-slate-950/35 p-4">

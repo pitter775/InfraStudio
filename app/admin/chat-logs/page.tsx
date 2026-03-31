@@ -190,23 +190,25 @@ export default function AdminChatLogsPage() {
           const compactDetails = buildCompactDetails(log);
           const lineClass =
             log.level === "error"
-              ? "border-red-500/20 bg-red-500/[0.07] text-red-200"
+              ? "border-red-500/35 bg-[linear-gradient(90deg,rgba(239,68,68,0.2),rgba(127,29,29,0.16))] text-red-100 shadow-[inset_3px_0_0_rgba(248,113,113,0.85)]"
               : "border-white/8 bg-white/[0.03] text-slate-300";
+          const subtleTextClass = log.level === "error" ? "text-red-200/80" : "text-slate-500";
+          const separatorClass = log.level === "error" ? "text-red-300/35" : "text-slate-600";
 
           return (
             <article key={log.id} className={`overflow-x-auto rounded-2xl border px-3 py-2 ${lineClass}`}>
               <p className="whitespace-nowrap text-[11px] leading-5">
-                <span className="text-slate-500">{formatDateTime(log.createdAt)}</span>
-                <span className="px-2 text-slate-600">|</span>
-                <span className={log.level === "error" ? "font-semibold text-red-200" : "text-slate-200"}>{log.tipo}</span>
-                <span className="px-2 text-slate-600">|</span>
-                <span className={log.level === "error" ? "text-red-100" : ""}>{log.origem}</span>
-                <span className="px-2 text-slate-600">|</span>
-                <span className={log.level === "error" ? "font-semibold text-red-200" : "text-slate-100"}>{log.descricao}</span>
+                <span className={subtleTextClass}>{formatDateTime(log.createdAt)}</span>
+                <span className={`px-2 ${separatorClass}`}>|</span>
+                <span className={log.level === "error" ? "font-bold text-red-50" : "text-slate-200"}>{log.tipo}</span>
+                <span className={`px-2 ${separatorClass}`}>|</span>
+                <span className={log.level === "error" ? "font-medium text-red-100" : ""}>{log.origem}</span>
+                <span className={`px-2 ${separatorClass}`}>|</span>
+                <span className={log.level === "error" ? "font-bold text-red-50" : "text-slate-100"}>{log.descricao}</span>
                 {compactDetails ? (
                   <>
-                    <span className="px-2 text-slate-600">|</span>
-                    <span className={log.level === "error" ? "text-red-100/90" : "text-slate-400"}>{compactDetails}</span>
+                    <span className={`px-2 ${separatorClass}`}>|</span>
+                    <span className={log.level === "error" ? "text-red-100/95" : "text-slate-400"}>{compactDetails}</span>
                   </>
                 ) : null}
               </p>
