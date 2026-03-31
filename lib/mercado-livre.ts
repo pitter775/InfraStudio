@@ -108,7 +108,11 @@ function truncateText(value: string, max = 280) {
 
 function buildMercadoLivreFriendlyError(message: string) {
   if (/PA_UNAUTHORIZED_RESULT_FROM_POLICIES|PolicyAgent/i.test(message)) {
-    return "Conta conectada com sucesso, mas o Mercado Livre bloqueou a leitura dos anuncios dessa loja para este app. O OAuth esta funcionando; falta liberar essa permissao/politica na conta ou no app do Mercado Livre.";
+    if (/listar itens do seller|carregar detalhes dos itens|\/items/i.test(message)) {
+      return "Conta conectada com sucesso, mas o Mercado Livre bloqueou a leitura dos anuncios dessa loja para este app. O OAuth esta funcionando; no app do Mercado Livre, ative a permissao Publicacao e sincronizacao e reautorize a conta.";
+    }
+
+    return "Conta conectada com sucesso, mas o Mercado Livre bloqueou este recurso para o app. O OAuth esta funcionando; revise as permissoes funcionais do app e reautorize a conta.";
   }
 
   return message;

@@ -3231,6 +3231,16 @@ function ConnectorModal({
                 <p className="font-semibold text-white">https://infrastudio.vercel.app/api/admin/conectores/mercado-livre/callback</p>
                 <p className="mt-3">Callback URL Notifications / webhook:</p>
                 <p className="font-semibold text-white">https://infrastudio.vercel.app/api/mercado-livre/webhook</p>
+                <p className="mt-3">Fluxos OAuth:</p>
+                <p>Authorization Code: ativo</p>
+                <p>Refresh Token: ativo</p>
+                <p>PKCE necessario: ativo</p>
+                <p className="mt-3">Permissoes do app:</p>
+                <p>Usuarios: Leitura e escrita</p>
+                <p>Publicacao e sincronizacao: Leitura e escrita</p>
+                <p>Metricas do negocio: Leitura</p>
+                <p className="mt-3">Negocio liberado:</p>
+                <p>Mercado Livre: marcado</p>
                 <p className="mt-3">Depois de criar, vao aparecer 2 codigos na tela:</p>
                 <p>APP ID</p>
                 <p>CLIENT SECRET</p>
@@ -3241,6 +3251,8 @@ function ConnectorModal({
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100">Obrigatorio agora</p>
                     <p className="mt-2">Tipo do app: Web</p>
                     <p>URL de retorno OAuth configurada</p>
+                    <p>PKCE ativo</p>
+                    <p>Publicacao e sincronizacao: Leitura e escrita</p>
                     <p>APP ID</p>
                     <p>CLIENT SECRET</p>
                   </div>
@@ -3256,7 +3268,8 @@ function ConnectorModal({
                   <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Permissoes e marcacoes</p>
                   <p className="mt-2">Permita a autorizacao da conta quando o Mercado Livre pedir o consentimento.</p>
                   <p>Se houver secao de notificacoes ou Callback URL Notifications, cole a URL de webhook acima.</p>
-                  <p>Para a integracao atual do InfraStudio, o essencial e concluir o OAuth e informar APP ID + CLIENT SECRET.</p>
+                  <p>Se mudar as permissoes do app depois, desvincule a autorizacao anterior e conecte novamente no InfraStudio.</p>
+                  <p>Para a integracao atual do InfraStudio, o essencial e concluir o OAuth, ativar Publicacao e sincronizacao e informar APP ID + CLIENT SECRET.</p>
                 </div>
               </div> : null}
             </div>
@@ -7526,10 +7539,24 @@ export default function AdminProjetoDetalhePage() {
               "Callback URL Notifications / webhook:",
               "https://infrastudio.vercel.app/api/mercado-livre/webhook",
               "",
+              "Fluxos OAuth:",
+              "- Authorization Code: ativo",
+              "- Refresh Token: ativo",
+              "- PKCE necessario: ativo",
+              "",
+              "Permissoes do app:",
+              "- Usuarios: Leitura e escrita",
+              "- Publicacao e sincronizacao: Leitura e escrita",
+              "- Metricas do negocio: Leitura",
+              "",
+              "Negocio liberado:",
+              "- Mercado Livre: marcado",
+              "",
               "Permissoes e marcacoes:",
               "- Permita a autorizacao da conta quando o Mercado Livre pedir",
               "- Se houver secao de notificacoes ou Callback URL Notifications, cole a URL de webhook acima",
-              "- Para a integracao atual do InfraStudio, o essencial e concluir o OAuth e pegar APP ID + CLIENT SECRET",
+              "- Se mudar as permissoes do app depois, desvincule a autorizacao anterior e conecte novamente no InfraStudio",
+              "- Para a integracao atual do InfraStudio, o essencial e concluir o OAuth, ativar Publicacao e sincronizacao e pegar APP ID + CLIENT SECRET",
               "",
               "Depois de criar, vao aparecer 2 codigos na tela:",
               "APP ID",
