@@ -6871,16 +6871,16 @@ export default function AdminProjetoDetalhePage() {
       </section>
 
       <section className={`${renderedTab === "whatsapp" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
-        <div className="space-y-6">
-          <section className="overflow-hidden rounded-2xl border border-cyan-500/20 bg-cyan-500/10">
-            <div className="px-6 py-5">
+        <div className="space-y-4">
+          <section>
+            <div className="px-1 py-1">
               <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Waypoints size={18} className="text-cyan-100" />WhatsApp do projeto</h3>
               <p className="mt-2 max-w-3xl text-sm text-cyan-50/80">Conecte, acompanhe e ajuste o numero principal que atende seus clientes.</p>
               {!process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL ? (
                 <p className="mt-3 text-xs text-amber-200/90">A conexao do WhatsApp ainda nao esta disponivel neste ambiente.</p>
               ) : null}
             </div>
-            <div className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1.35fr),minmax(340px,0.92fr)] xl:items-start">
+            <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1.35fr),minmax(340px,0.92fr)] xl:items-start">
               {primaryWhatsAppChannel ? (() => {
                 const channel = primaryWhatsAppChannel;
                 const agente = channel.agenteId ? data.agentes.find((item) => item.id === channel.agenteId) ?? null : agenteAtivo;
@@ -7153,182 +7153,6 @@ export default function AdminProjetoDetalhePage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">Botao simples para site</p>
-                <h3 className="mt-2 text-xl font-bold text-white">Botao do site que abre o WhatsApp</h3>
-                <p className="mt-2 max-w-3xl text-sm text-emerald-50/80">
-                  Esta opcao cria aquele botao flutuante que aparece no canto do site. Quando a pessoa clica, ela vai direto para o WhatsApp da sua empresa para iniciar a conversa.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={openNewWidgetModal}
-                className={`${headerActionButtonClass} w-full self-start lg:w-auto lg:shrink-0`}
-              >
-                <Plus size={16} />
-                Novo canal WhatsApp
-              </button>
-            </div>
-          </section>
-
-          <section>
-            <div className="px-2 py-2">
-              <h3 className="text-xl font-bold text-white">Canais configurados</h3>
-              <p className="mt-1 text-sm text-slate-400">Cada widget pode virar um botao free de WhatsApp com copia pronta em JS.</p>
-            </div>
-            <div className="space-y-4 p-6">
-              {data.widgets.length ? (
-                data.widgets.map((widget) => {
-                  const agente = getResolvedWidgetAgent(widget);
-                  const hasWhatsapp = Boolean(sanitizePhoneDigits(widget.whatsappCelular));
-                  const whatsappSnippetKey = `whatsapp:${widget.slug}`;
-                  const widgetSnippetKey = `widget:${widget.slug}`;
-                  const widgetSnippetExpanded = expandedSnippetKeys[widgetSnippetKey] === true;
-                  const whatsappSnippetExpanded = expandedSnippetKeys[whatsappSnippetKey] === true;
-
-                  return (
-                    <div key={`whatsapp-${widget.id ?? widget.slug}`} className="rounded-xl border border-white/10 bg-slate-950/30 p-5">
-                      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-3">
-                            <h4 className="text-lg font-bold text-white">{widget.nome}</h4>
-                            <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${widget.ativo ? "bg-emerald-500/10 text-emerald-200" : "bg-slate-800 text-slate-400"}`}>
-                              {widget.ativo ? "ativo" : "inativo"}
-                            </span>
-                            <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${hasWhatsapp ? "bg-cyan-500/10 text-cyan-100" : "bg-amber-500/10 text-amber-100"}`}>
-                              {hasWhatsapp ? "pronto para whatsapp" : "faltando numero"}
-                            </span>
-                          </div>
-                          <p className="mt-3 text-sm text-slate-300">Agente: {agente?.nome ?? "agente ativo do projeto"}</p>
-                          <p className="mt-1 text-sm text-slate-400">Dominio/contexto: {widget.dominio || "nao informado"}</p>
-                          <p className="mt-1 text-sm text-slate-400">WhatsApp: {widget.whatsappCelular || "nao informado"}</p>
-                          <p className="mt-1 text-sm text-slate-400">Cor do botao: {widget.corPrimaria}</p>
-
-                          <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/60 p-3">
-                            <div className="mb-4 rounded-xl border border-white/10 bg-[#07111f] p-3">
-                              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                                <div>
-                                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Widget do site</p>
-                                  <p className="mt-1 text-xs text-slate-400">Snippet atual do chat/widget para embed controlado.</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <a
-                                    href="/docs/chat-widget-host-control"
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
-                                  >
-                                    <ExternalLink size={13} />
-                                    Documentacao
-                                  </a>
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleSnippetExpanded(widgetSnippetKey)}
-                                    className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
-                                  >
-                                    {widgetSnippetExpanded ? <Minimize2 size={13} /> : <Expand size={13} />}
-                                    {widgetSnippetExpanded ? "Recolher" : "Expandir"}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleCopySnippet(widgetSnippetKey, buildWidgetSnippet(widget))}
-                                    className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
-                                  >
-                                    {copiedSnippetKey === widgetSnippetKey ? <CheckCircle2 size={13} /> : <Copy size={13} />}
-                                    {copiedSnippetKey === widgetSnippetKey ? "Copiado" : "Copiar widget"}
-                                  </button>
-                                </div>
-                              </div>
-                              {widgetSnippetExpanded ? (
-                                <div className="w-full overflow-x-auto rounded-lg border border-white/10 bg-[#07111f]">
-                                  <pre className="min-h-[170px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
-                                    {buildWidgetSnippet(widget)
-                                      .split("\n")
-                                      .map((line, index) => (
-                                        <div key={`${widget.slug}-widget-line-${index}`}>{renderSnippetLine(line)}</div>
-                                      ))}
-                                  </pre>
-                                </div>
-                              ) : (
-                                <div className="rounded-lg border border-dashed border-white/10 bg-slate-950/40 px-4 py-4 text-xs text-slate-400">
-                                  Codigo do widget oculto para manter a tela compacta. Clique em "Expandir" para visualizar.
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                              <div>
-                                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Snippet JS free</p>
-                                <p className="mt-1 text-xs text-slate-400">Cole antes do fechamento de `&lt;/body&gt;` no site do cliente.</p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => toggleSnippetExpanded(whatsappSnippetKey)}
-                                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
-                                >
-                                  {whatsappSnippetExpanded ? <Minimize2 size={13} /> : <Expand size={13} />}
-                                  {whatsappSnippetExpanded ? "Recolher" : "Expandir"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void handleCopySnippet(whatsappSnippetKey, buildWhatsappSnippet(widget))}
-                                  className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/15 hover:text-white"
-                                >
-                                  {copiedSnippetKey === whatsappSnippetKey ? <CheckCircle2 size={13} /> : <Copy size={13} />}
-                                  {copiedSnippetKey === whatsappSnippetKey ? "Copiado" : "Copiar JS"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleEditWidget(widget)}
-                                  className={`rounded-full px-3 py-1.5 text-[11px] font-semibold ${editButtonClass}`}
-                                >
-                                  Editar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void handleDeleteWidget(widget)}
-                                  disabled={deletingWidgetId === widget.id}
-                                  className={dangerActionButtonClass}
-                                >
-                                  <Trash2 size={13} />
-                                  {deletingWidgetId === widget.id ? "Removendo..." : "Remover"}
-                                </button>
-                              </div>
-                            </div>
-                            {whatsappSnippetExpanded ? (
-                              <div className="w-full overflow-x-auto rounded-lg border border-white/10 bg-[#07111f]">
-                                <pre className="min-h-[170px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
-                                  {buildWhatsappSnippet(widget)
-                                    .split("\n")
-                                    .map((line, index) => (
-                                      <div key={`${widget.slug}-whatsapp-line-${index}`}>{renderSnippetLine(line)}</div>
-                                    ))}
-                                </pre>
-                              </div>
-                            ) : (
-                              <div className="rounded-lg border border-dashed border-white/10 bg-slate-950/40 px-4 py-4 text-xs text-slate-400">
-                                Codigo JS oculto para manter a tela compacta. Clique em "Expandir" para visualizar.
-                              </div>
-                            )}
-                            {!hasWhatsapp ? (
-                              <p className="mt-3 text-xs text-amber-200/80">Preencha um numero de WhatsApp para gerar o link final com o telefone correto.</p>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">
-                  Nenhum canal WhatsApp configurado para este projeto ainda.
-                </div>
-              )}
-            </div>
-          </section>
         </div>
       </section>
 
