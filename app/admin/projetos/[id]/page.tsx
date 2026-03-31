@@ -3400,7 +3400,15 @@ function AgentStoreSearchModal({
                   <div className="mt-4 space-y-3">
                     {latestResult.produtos.map((produto) => (
                       <div key={produto.link} className="rounded-xl border border-white/10 bg-slate-950/45 p-4">
-                        <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-4">
+                          {produto.imagem ? (
+                            <img
+                              src={produto.imagem}
+                              alt={produto.nome}
+                              className="h-20 w-20 rounded-xl border border-white/10 object-cover bg-slate-900/60"
+                              loading="lazy"
+                            />
+                          ) : null}
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-semibold text-white">{produto.nome}</p>
                             <p className="mt-1 text-xs text-slate-300">
@@ -3473,7 +3481,15 @@ function AgentStoreSearchModal({
                 <div className="mt-4 space-y-3">
                   {searchResult.produtos.map((produto) => (
                     <div key={produto.link} className="rounded-xl border border-white/10 bg-slate-950/45 p-4">
-                      <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        {produto.imagem ? (
+                          <img
+                            src={produto.imagem}
+                            alt={produto.nome}
+                            className="h-20 w-20 rounded-xl border border-white/10 object-cover bg-slate-900/60"
+                            loading="lazy"
+                          />
+                        ) : null}
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-white">{produto.nome}</p>
                           <p className="mt-1 text-xs text-slate-300">
