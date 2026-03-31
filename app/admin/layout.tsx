@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { type ReactNode, Suspense, useEffect, useState } from "react";
 import {
   ActivitySquare,
   BriefcaseBusiness,
@@ -259,7 +259,7 @@ function Sidebar({
   );
 }
 
-export default function AdminLayout({ children }: LayoutProps<"/admin">) {
+function AdminLayoutContent({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -530,6 +530,28 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function AdminLayout({ children }: { children: ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="infra-premium-bg flex min-h-screen items-center justify-center px-6 text-slate-200">
+          <div className="infra-premium-panel rounded-[28px] px-8 py-7 text-center">
+            <div className="relative mx-auto flex h-20 w-20 items-center justify-center">
+              <div className="absolute h-20 w-20 rounded-full bg-sky-500/20 blur-2xl animate-pulse" />
+              <div className="absolute h-14 w-14 rounded-full bg-cyan-400/15 blur-xl animate-pulse" />
+              <Image src="/logo.png" alt="InfraStudio" width={38} height={38} className="relative h-10 w-10 object-contain" />
+            </div>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Carregando ambiente</p>
+            <p className="mt-3 text-lg text-white">Preparando painel...</p>
+          </div>
+        </div>
+      }
+    >
+      <AdminLayoutContent>{children}</AdminLayoutContent>
+    </Suspense>
   );
 }
 
