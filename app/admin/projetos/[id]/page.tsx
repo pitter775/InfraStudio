@@ -6432,7 +6432,13 @@ export default function AdminProjetoDetalhePage() {
           <div className="pt-2">
             {data.agentes.length ? (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {data.agentes.map((agente) => {
+                {[...data.agentes].sort((left, right) => {
+                  if (left.ativo !== right.ativo) {
+                    return left.ativo ? -1 : 1;
+                  }
+
+                  return left.nome.localeCompare(right.nome, "pt-BR");
+                }).map((agente) => {
                 const linkedApis = getAgentLinkedApis(agente);
                 const inactiveApis = getAgentInactiveApis(agente);
                 const requiredParameters = getAgentRequiredParameters(agente);
@@ -6521,7 +6527,11 @@ export default function AdminProjetoDetalhePage() {
                     />
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute right-4 top-4 text-cyan-200/16 animate-pulse"
+                      className={`pointer-events-none absolute right-4 top-4 ${
+                        agente.ativo
+                          ? "text-cyan-300/40 animate-pulse drop-shadow-[0_0_18px_rgba(34,211,238,0.35)]"
+                          : "text-slate-500/28"
+                      }`}
                     >
                       <Bot size={34} strokeWidth={1.6} />
                     </div>
