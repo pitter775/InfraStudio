@@ -1,5 +1,6 @@
 import "server-only";
 
+import { appendSystemLog } from "@/lib/chat-logs";
 import {
   getMercadoLivreConnectorConfig,
   listConectoresByAgente,
@@ -94,6 +95,15 @@ function dedupeProdutos(produtos: ProdutoPadronizado[]) {
     seen.add(key);
     return true;
   });
+}
+
+function truncateText(value: string, max = 280) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= max) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, max)}...`;
 }
 
 async function fetchMercadoLivreProducts(input: {
@@ -221,6 +231,7 @@ async function fetchMercadoLivreLatestProducts(input: {
   sellerId: string;
   accessToken?: string;
   limit?: number;
+  connector?: ConnectorRecord | null;
 }) {
   const searchEndpoint = new URL(`/users/${input.sellerId}/items/search`, input.endpointBase);
   searchEndpoint.searchParams.set("limit", String(input.limit ?? 5));
@@ -235,7 +246,23 @@ async function fetchMercadoLivreLatestProducts(input: {
   });
 
   if (!searchResponse.ok) {
-    throw new Error(`Mercado Livre retornou ${searchResponse.status} ao listar itens do seller.`);
+    const responseText = truncateText(await searchResponse.text().catch(() => ""));
+    await appendSystemLog({
+      tipo: "mercado_livre_latest_products_error",
+      origem: "mercado_livre",
+      descricao: "Mercado Livre recusou a listagem dos itens do seller.",
+      payload: {
+        stage: "seller_items_search",
+        connectorId: input.connector?.id ?? null,
+        connectorName: input.connector?.nome ?? null,
+        sellerId: input.sellerId,
+        endpoint: searchEndpoint.toString(),
+        status: searchResponse.status,
+        hasAccessToken: Boolean(input.accessToken),
+        responseText: responseText || null,
+      },
+    });
+    throw new Error(`Mercado Livre retornou ${searchResponse.status} ao listar itens do seller. ${responseText}`.trim());
   }
 
   const searchPayload = (await searchResponse.json()) as { results?: string[] };
@@ -257,7 +284,24 @@ async function fetchMercadoLivreLatestProducts(input: {
   });
 
   if (!detailsResponse.ok) {
-    throw new Error(`Mercado Livre retornou ${detailsResponse.status} ao carregar detalhes dos itens.`);
+    const responseText = truncateText(await detailsResponse.text().catch(() => ""));
+    await appendSystemLog({
+      tipo: "mercado_livre_latest_products_error",
+      origem: "mercado_livre",
+      descricao: "Mercado Livre recusou os detalhes dos itens do seller.",
+      payload: {
+        stage: "items_details",
+        connectorId: input.connector?.id ?? null,
+        connectorName: input.connector?.nome ?? null,
+        sellerId: input.sellerId,
+        endpoint: detailsEndpoint.toString(),
+        status: detailsResponse.status,
+        itemIds,
+        hasAccessToken: Boolean(input.accessToken),
+        responseText: responseText || null,
+      },
+    });
+    throw new Error(`Mercado Livre retornou ${detailsResponse.status} ao carregar detalhes dos itens. ${responseText}`.trim());
   }
 
   const detailsPayload = (await detailsResponse.json()) as MercadoLivreItemDetailsResponse;
@@ -274,11 +318,62 @@ export async function buscarProdutosMercadoLivrePorAgente(agenteId: string, term
 
   const conectores = await listConectoresByAgente(agenteId, MERCADO_LIVRE_CONNECTOR_TYPE);
   if (!conectores.length) {
+    await appendSystemLog({
+      tipo: "mercado_livre_search_empty_connector",
+      origem: "api_produtos",
+      descricao: "Busca de produtos sem conector Mercado Livre ativo para o agente.",
+      payload: {
+        agenteId,
+        termo: termoNormalizado,
+      },
+    });
     return [];
   }
 
-  const resultados = await Promise.all(conectores.map((connector) => searchConnectorProducts(connector, termoNormalizado)));
-  return dedupeProdutos(resultados.flat()).slice(0, 3);
+  await appendSystemLog({
+    tipo: "mercado_livre_search_start",
+    origem: "api_produtos",
+    descricao: "Busca de produtos do Mercado Livre iniciada.",
+    payload: {
+      agenteId,
+      termo: termoNormalizado,
+      connectorIds: conectores.map((connector) => connector.id),
+    },
+  });
+
+  try {
+    const resultados = await Promise.all(conectores.map((connector) => searchConnectorProducts(connector, termoNormalizado)));
+    const produtos = dedupeProdutos(resultados.flat()).slice(0, 3);
+
+    await appendSystemLog({
+      tipo: "mercado_livre_search_result",
+      origem: "api_produtos",
+      descricao: produtos.length
+        ? "Busca de produtos do Mercado Livre retornou resultados."
+        : "Busca de produtos do Mercado Livre terminou sem resultados.",
+      payload: {
+        agenteId,
+        termo: termoNormalizado,
+        totalProdutos: produtos.length,
+        connectorIds: conectores.map((connector) => connector.id),
+      },
+    });
+
+    return produtos;
+  } catch (error) {
+    await appendSystemLog({
+      tipo: "mercado_livre_search_error",
+      origem: "api_produtos",
+      descricao: "Falha ao buscar produtos do Mercado Livre por agente.",
+      payload: {
+        agenteId,
+        termo: termoNormalizado,
+        connectorIds: conectores.map((connector) => connector.id),
+        message: error instanceof Error ? error.message : "Erro desconhecido.",
+      },
+    });
+    throw error;
+  }
 }
 
 export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: string): Promise<MercadoLivreStoreSnapshot> {
@@ -308,7 +403,37 @@ export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: stri
   const sellerId = config?.seller_id?.replace(/\D/g, "").trim() || "";
   const accessToken = await ensureMercadoLivreAccessToken(connector);
 
+  await appendSystemLog({
+    tipo: "mercado_livre_latest_products_start",
+    origem: "api_admin_agente_loja_teste",
+    descricao: "Teste da loja Mercado Livre iniciado para o agente.",
+    payload: {
+      agenteId,
+      connectorId: connector.id,
+      connectorName: connector.nome,
+      endpointBase,
+      sellerId: sellerId || null,
+      nickname: config?.nickname ?? null,
+      oauthUserId: config?.user_id ?? null,
+      hasAccessToken: Boolean(accessToken),
+      hasRefreshToken: Boolean(config?.refresh_token),
+      tokenExpiresAt: config?.token_expires_at ?? null,
+    },
+  });
+
   if (!sellerId) {
+    await appendSystemLog({
+      tipo: "mercado_livre_latest_products_error",
+      origem: "api_admin_agente_loja_teste",
+      descricao: "Teste da loja bloqueado porque o conector nao tem seller_id.",
+      payload: {
+        agenteId,
+        connectorId: connector.id,
+        connectorName: connector.nome,
+        nickname: config?.nickname ?? null,
+        oauthUserId: config?.user_id ?? null,
+      },
+    });
     return {
       ok: false,
       connector: {
@@ -328,6 +453,23 @@ export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: stri
       sellerId,
       accessToken,
       limit: 5,
+      connector,
+    });
+
+    await appendSystemLog({
+      tipo: "mercado_livre_latest_products_result",
+      origem: "api_admin_agente_loja_teste",
+      descricao: produtos.length
+        ? "Teste da loja retornou produtos recentes."
+        : "Teste da loja concluiu sem produtos recentes visiveis.",
+      payload: {
+        agenteId,
+        connectorId: connector.id,
+        connectorName: connector.nome,
+        sellerId,
+        totalProdutos: produtos.length,
+        hasAccessToken: Boolean(accessToken),
+      },
     });
 
     return {
@@ -342,6 +484,24 @@ export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: stri
       error: produtos.length ? null : "A loja respondeu, mas nenhum produto publico recente foi retornado.",
     };
   } catch (error) {
+    await appendSystemLog({
+      tipo: "mercado_livre_latest_products_error",
+      origem: "api_admin_agente_loja_teste",
+      descricao: "Teste da loja falhou ao consultar produtos recentes.",
+      payload: {
+        agenteId,
+        connectorId: connector.id,
+        connectorName: connector.nome,
+        endpointBase,
+        sellerId,
+        nickname: config?.nickname ?? null,
+        oauthUserId: config?.user_id ?? null,
+        hasAccessToken: Boolean(accessToken),
+        hasRefreshToken: Boolean(config?.refresh_token),
+        tokenExpiresAt: config?.token_expires_at ?? null,
+        message: error instanceof Error ? error.message : "Erro desconhecido ao consultar a loja.",
+      },
+    });
     return {
       ok: false,
       connector: {

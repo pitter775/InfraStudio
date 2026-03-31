@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { appendSystemLog } from "@/lib/chat-logs";
 import { buscarProdutosMercadoLivrePorAgente } from "@/lib/mercado-livre";
 
 export async function GET(request: Request) {
@@ -15,6 +16,16 @@ export async function GET(request: Request) {
     return NextResponse.json(produtos, { status: 200 });
   } catch (error) {
     console.error("[api/produtos] failed to fetch products", error);
+    await appendSystemLog({
+      tipo: "mercado_livre_search_route_error",
+      origem: "api_produtos",
+      descricao: "A rota publica de produtos falhou ao consultar o Mercado Livre.",
+      payload: {
+        agenteId,
+        termo,
+        message: error instanceof Error ? error.message : "Erro desconhecido.",
+      },
+    });
     return NextResponse.json([], { status: 200 });
   }
 }

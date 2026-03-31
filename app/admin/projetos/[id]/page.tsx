@@ -6113,7 +6113,7 @@ export default function AdminProjetoDetalhePage() {
                     />
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute right-4 top-4 text-cyan-200/16"
+                      className="pointer-events-none absolute right-4 top-4 text-cyan-200/16 animate-pulse"
                     >
                       <Bot size={34} strokeWidth={1.6} />
                     </div>
@@ -6135,7 +6135,7 @@ export default function AdminProjetoDetalhePage() {
                       <p className="mt-2 text-sm leading-relaxed text-slate-200">{miniSummary}</p>
                       {requiredParameters.length ? (
                         <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-cyan-100/80">
-                          Contexto obrigatorio: {requiredParameters.map((parametro) => parametro.nome).join(", ")}
+                          {requiredParameters.map((parametro) => parametro.nome).join(", ")}
                         </p>
                       ) : null}
                       {inactiveApis.length ? (
@@ -6398,6 +6398,7 @@ export default function AdminProjetoDetalhePage() {
               {data.conectores.length ? (
                 data.conectores.map((connector) => {
                   const agente = connector.agenteId ? data.agentes.find((item) => item.id === connector.agenteId) ?? null : null;
+                  const canTestConnectorStore = Boolean(agente);
                   return (
                     <div key={connector.id} className={`rounded-xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
                       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -6418,6 +6419,19 @@ export default function AdminProjetoDetalhePage() {
                           <p className="mt-1 truncate text-xs text-cyan-200/80">{connector.endpointBase}</p>
                         </div>
                         <div className="flex flex-col gap-2 sm:flex-row md:flex-col md:items-stretch">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (agente) {
+                                handleOpenAgentStoreSearchModal(agente);
+                              }
+                            }}
+                            disabled={!canTestConnectorStore}
+                            className={successActionButtonClass}
+                          >
+                            <TestTube2 size={14} />
+                            {canTestConnectorStore ? "Testar loja" : "Vincule um agente"}
+                          </button>
                           <button type="button" onClick={() => handleEditConnector(connector)} className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${editButtonClass}`}>
                             <Pencil size={14} />
                             Editar
@@ -6730,10 +6744,10 @@ export default function AdminProjetoDetalhePage() {
           <section className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">Modo free com JS</p>
-                <h3 className="mt-2 text-xl font-bold text-white">Canal rapido de WhatsApp sem API oficial</h3>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">Botao simples para site</p>
+                <h3 className="mt-2 text-xl font-bold text-white">Botao do site que abre o WhatsApp</h3>
                 <p className="mt-2 max-w-3xl text-sm text-emerald-50/80">
-                  Esta aba entrega um botao flutuante em JavaScript puro para qualquer site. E o caminho mais leve para abrir conversa no WhatsApp sem depender de integracao paga.
+                  Esta opcao cria aquele botao flutuante que aparece no canto do site. Quando a pessoa clica, ela vai direto para o WhatsApp da sua empresa para iniciar a conversa.
                 </p>
               </div>
               <button
