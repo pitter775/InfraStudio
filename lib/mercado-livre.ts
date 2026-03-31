@@ -106,6 +106,14 @@ function truncateText(value: string, max = 280) {
   return `${normalized.slice(0, max)}...`;
 }
 
+function buildMercadoLivreFriendlyError(message: string) {
+  if (/PA_UNAUTHORIZED_RESULT_FROM_POLICIES|PolicyAgent/i.test(message)) {
+    return "Conta conectada com sucesso, mas o Mercado Livre bloqueou a leitura dos anuncios dessa loja para este app. O OAuth esta funcionando; falta liberar essa permissao/politica na conta ou no app do Mercado Livre.";
+  }
+
+  return message;
+}
+
 async function fetchMercadoLivreProducts(input: {
   endpointBase: string;
   termo: string;
@@ -552,7 +560,10 @@ export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: stri
         nickname: config?.nickname ?? null,
       },
       produtos: [],
-      error: error instanceof Error ? error.message : "Nao foi possivel consultar a loja no Mercado Livre.",
+      error:
+        error instanceof Error
+          ? buildMercadoLivreFriendlyError(error.message)
+          : "Nao foi possivel consultar a loja no Mercado Livre.",
     };
   }
 }
