@@ -445,7 +445,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="infra-premium-bg min-h-screen text-slate-200">
+    <div className={cn("infra-premium-bg text-slate-200", isAtendimentoRoute ? "h-screen overflow-hidden" : "min-h-screen")}>
       <Sidebar
         currentUser={currentUser}
         collapsed={collapsed}
@@ -460,7 +460,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         onLogout={handleLogout}
       />
 
-        <div className={cn("transition-all duration-300", collapsed ? "lg:pl-[92px]" : "lg:pl-[280px]")}>
+        <div className={cn("transition-all duration-300", collapsed ? "lg:pl-[92px]" : "lg:pl-[280px]", isAtendimentoRoute ? "h-screen overflow-hidden" : "")}>
          <div className="sticky top-0 z-30 border-b border-white/8 bg-[#050814]/78 px-4 py-4 backdrop-blur-xl lg:hidden">
           <div className="flex items-center justify-between">
             <button
@@ -486,7 +486,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-         <div className="flex min-h-screen flex-col">
+         <div className={cn("flex flex-col", isAtendimentoRoute ? "h-screen overflow-hidden" : "min-h-screen")}>
           <div
             className={cn(
               "relative flex-1 overflow-hidden px-4 sm:px-6 lg:px-8",

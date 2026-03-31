@@ -770,14 +770,14 @@ export default function AdminAtendimentoPage() {
         ) : null}
       </section>
 
-      <section className="grid min-h-0 flex-1 gap-3 overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)]">
-        <div className={`overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)] ${mobileConversationOpen ? "hidden xl:block" : ""}`}>
-          <div className="border-b border-white/10 px-3 py-2.5">
+      <section className="grid min-h-0 flex-1 items-stretch gap-3 overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)]">
+        <div className={`flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)] ${mobileConversationOpen ? "hidden xl:flex" : ""}`}>
+          <div className="shrink-0 border-b border-white/10 px-3 py-2.5">
             <p className="text-sm font-bold text-white">Conversas do projeto</p>
             <p className="mt-1 text-[11px] text-slate-400">Site e WhatsApp no mesmo feed.</p>
           </div>
 
-          <div className="h-full overflow-y-auto p-2.5">
+          <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
             {loadingChats ? <CenterLoader /> : null}
 
             {!loadingChats && !chats.length ? (
@@ -838,10 +838,10 @@ export default function AdminAtendimentoPage() {
           </div>
         </div>
 
-        <div className={`flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)] ${mobileConversationOpen ? "flex xl:flex" : "hidden xl:flex"}`}>
+        <div className={`grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)] ${mobileConversationOpen ? "grid xl:grid" : "hidden xl:grid"}`}>
           {selectedChat ? (
             <>
-              <div className="border-b border-white/10 px-3 py-2.5 sm:px-4">
+              <div className="shrink-0 border-b border-white/10 px-3 py-2.5 sm:px-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -882,7 +882,7 @@ export default function AdminAtendimentoPage() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-3 py-3 sm:px-4">
+              <div className="min-h-0 overflow-y-auto px-3 py-3 sm:px-4">
                 {loadingConversation ? <CenterLoader /> : null}
 
                 {!loadingConversation && !selectedMessages.length ? (
@@ -935,7 +935,7 @@ export default function AdminAtendimentoPage() {
                 ) : null}
               </div>
 
-              <div className="sticky bottom-0 border-t border-white/10 bg-[#07111f]/96 px-3 py-2.5 backdrop-blur-xl sm:px-4">
+              <div className="shrink-0 border-t border-white/10 bg-[#07111f]/96 px-3 py-2.5 backdrop-blur-xl sm:px-4">
                 <input
                   ref={fileInputRef}
                   type="file"
