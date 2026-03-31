@@ -2250,7 +2250,7 @@ function AgenteModal({
   onSubmit: () => void;
 }) {
   const [showRawConfig, setShowRawConfig] = useState(false);
-  const [promptExpanded, setPromptExpanded] = useState(false);
+  const [promptExpanded, setPromptExpanded] = useState(true);
   const [apisExpanded, setApisExpanded] = useState(false);
   const promptRef = useRef<HTMLDivElement | null>(null);
   const lastPromptSyncRef = useRef("");
@@ -2258,7 +2258,7 @@ function AgenteModal({
   useEffect(() => {
     if (open) {
       setShowRawConfig(false);
-      setPromptExpanded(false);
+      setPromptExpanded(true);
       setApisExpanded(false);
     }
   }, [open]);
@@ -2311,7 +2311,7 @@ function AgenteModal({
       assignedAgentName: widget.agenteId ? findAgentName(widget.agenteId) : null,
       saving: connectionSavingKey === savingKey,
       onAssign: widget.id ? () => onAssignWidget(widget.id!) : null,
-      actionLabel: assignedToCurrent ? "Vinculado a este agente" : assignedElsewhere ? "Trazer para este agente" : "Vincular a este agente",
+      actionLabel: assignedToCurrent ? "Desativar chat" : assignedElsewhere ? "Trazer para este agente" : "Selecionar chat",
     };
   });
 
@@ -2328,7 +2328,7 @@ function AgenteModal({
       assignedAgentName: channel.agenteId ? findAgentName(channel.agenteId) : null,
       saving: connectionSavingKey === savingKey,
       onAssign: () => onAssignWhatsApp(channel.id),
-      actionLabel: assignedToCurrent ? "Ativo neste agente" : assignedElsewhere ? "Mover para este agente" : "Ativar neste agente",
+      actionLabel: assignedToCurrent ? "Desativar neste agente" : assignedElsewhere ? "Mover para este agente" : "Ativar neste agente",
     };
   });
 
@@ -2347,7 +2347,7 @@ function AgenteModal({
         assignedAgentName: connector.agenteId ? findAgentName(connector.agenteId) : null,
         saving: connectionSavingKey === savingKey,
         onAssign: connector.id ? () => onAssignConnector(connector.id!) : null,
-        actionLabel: assignedToCurrent ? "Ativo neste agente" : assignedElsewhere ? "Mover para este agente" : "Ativar neste agente",
+        actionLabel: assignedToCurrent ? "Desativar neste agente" : assignedElsewhere ? "Mover para este agente" : "Ativar neste agente",
       };
     });
 
@@ -2402,8 +2402,12 @@ function AgenteModal({
                 <button
                   type="button"
                   onClick={() => entry.onAssign?.()}
-                  disabled={!entry.onAssign || entry.assignedToCurrent || entry.saving || saving}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={!entry.onAssign || entry.saving || saving}
+                  className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                    entry.assignedToCurrent
+                      ? "border-rose-500/20 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20"
+                      : "border-cyan-500/20 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20"
+                  }`}
                 >
                   {entry.saving ? <BusyIcon /> : <Cable size={14} />}
                   {entry.actionLabel}
@@ -4793,6 +4797,8 @@ export default function AdminProjetoDetalhePage() {
       return;
     }
 
+    const assignedToCurrent = widget.agenteId === agenteForm.id;
+
     if (widget.agenteId && widget.agenteId !== agenteForm.id) {
       const currentAgentName = data.agentes.find((agente) => agente.id === widget.agenteId)?.nome ?? "outro agente";
       const accepted = window.confirm(`O widget "${widget.nome}" esta vinculado a ${currentAgentName}. Deseja trocar para ${agenteForm.nome || "este agente"}?`);
@@ -4805,26 +4811,53 @@ export default function AdminProjetoDetalhePage() {
     setFeedbackAgente(null);
 
     try {
-      const response = await fetch("/api/admin/chat-widgets", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...widget,
-          projetoId: params.id,
-          agenteId: agenteForm.id,
-        }),
-      });
+      const updateWidgetAssignment = async (targetWidget: ChatWidget, nextAgentId: string | null) => {
+        const response = await fetch("/api/admin/chat-widgets", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...targetWidget,
+            projetoId: params.id,
+            agenteId: nextAgentId,
+          }),
+        });
 
-      const payload = (await response.json()) as { error?: string; widget?: ChatWidget };
-      if (!response.ok || !payload.widget) {
-        throw new Error(payload.error ?? "Nao foi possivel vincular o widget ao agente.");
+        const payload = (await response.json()) as { error?: string; widget?: ChatWidget };
+        if (!response.ok || !payload.widget) {
+          throw new Error(payload.error ?? "Nao foi possivel atualizar o widget.");
+        }
+
+        return payload.widget;
+      };
+
+      const widgetsToUpdate = data.widgets.filter((item) => item.agenteId === agenteForm.id && item.id !== widget.id);
+      const updatedWidgets: ChatWidget[] = [];
+
+      if (!assignedToCurrent) {
+        for (const currentWidget of widgetsToUpdate) {
+          updatedWidgets.push(await updateWidgetAssignment(currentWidget, null));
+        }
       }
 
-      updateProjetoData((current) => ({
-        ...current,
-        widgets: upsertById(current.widgets, payload.widget!),
-      }));
-      setFeedbackAgente(`Widget "${payload.widget.nome}" vinculado a "${agenteForm.nome}".`);
+      const mainWidget = await updateWidgetAssignment(widget, assignedToCurrent ? null : agenteForm.id);
+      updatedWidgets.push(mainWidget);
+
+      updateProjetoData((current) => {
+        let nextWidgets = current.widgets;
+        for (const updatedWidget of updatedWidgets) {
+          nextWidgets = upsertById(nextWidgets, updatedWidget);
+        }
+
+        return {
+          ...current,
+          widgets: nextWidgets,
+        };
+      });
+      setFeedbackAgente(
+        assignedToCurrent
+          ? `Chat widget "${mainWidget.nome}" desativado deste agente.`
+          : `Chat widget "${mainWidget.nome}" vinculado a "${agenteForm.nome}".`,
+      );
     } catch (error) {
       setFeedbackAgente(error instanceof Error ? error.message : "Nao foi possivel vincular o widget.");
     } finally {
@@ -4844,6 +4877,8 @@ export default function AdminProjetoDetalhePage() {
       return;
     }
 
+    const assignedToCurrent = channel.agenteId === agenteForm.id;
+
     if (channel.agenteId && channel.agenteId !== agenteForm.id) {
       const currentAgentName = data.agentes.find((agente) => agente.id === channel.agenteId)?.nome ?? "outro agente";
       const accepted = window.confirm(`O WhatsApp ${formatWhatsAppPhone(channel.numero)} esta vinculado a ${currentAgentName}. Deseja trocar para ${agenteForm.nome || "este agente"}?`);
@@ -4862,7 +4897,7 @@ export default function AdminProjetoDetalhePage() {
         body: JSON.stringify({
           id: channel.id,
           projetoId: params.id,
-          agenteId: agenteForm.id,
+          agenteId: assignedToCurrent ? null : agenteForm.id,
           numero: sanitizePhoneDigits(channel.numero),
           status: channel.status,
         }),
@@ -4877,7 +4912,11 @@ export default function AdminProjetoDetalhePage() {
         ...current,
         whatsappChannels: upsertById(current.whatsappChannels, payload.channel!),
       }));
-      setFeedbackAgente(`WhatsApp ${formatWhatsAppPhone(payload.channel.numero)} vinculado a "${agenteForm.nome}".`);
+      setFeedbackAgente(
+        assignedToCurrent
+          ? `WhatsApp ${formatWhatsAppPhone(payload.channel.numero)} desativado deste agente.`
+          : `WhatsApp ${formatWhatsAppPhone(payload.channel.numero)} vinculado a "${agenteForm.nome}".`,
+      );
     } catch (error) {
       setFeedbackAgente(error instanceof Error ? error.message : "Nao foi possivel ativar o WhatsApp neste agente.");
     } finally {
@@ -4896,6 +4935,8 @@ export default function AdminProjetoDetalhePage() {
       setFeedbackAgente("Integracao Mercado Livre nao encontrada.");
       return;
     }
+
+    const assignedToCurrent = connector.agenteId === agenteForm.id;
 
     if (connector.agenteId && connector.agenteId !== agenteForm.id) {
       const currentAgentName = data.agentes.find((agente) => agente.id === connector.agenteId)?.nome ?? "outro agente";
@@ -4917,7 +4958,7 @@ export default function AdminProjetoDetalhePage() {
           nome: connector.nome,
           tipo: connector.tipo,
           projetoId: params.id,
-          agenteId: agenteForm.id,
+          agenteId: assignedToCurrent ? null : agenteForm.id,
           endpointBase: connector.endpointBase,
           configuracoes: connector.configuracoes,
           ativo: connector.ativo,
@@ -4933,7 +4974,11 @@ export default function AdminProjetoDetalhePage() {
         ...current,
         conectores: upsertById(current.conectores, payload.conector!),
       }));
-      setFeedbackAgente(`Integracao "${payload.conector.nome}" vinculada a "${agenteForm.nome}".`);
+      setFeedbackAgente(
+        assignedToCurrent
+          ? `Integracao "${payload.conector.nome}" desativada deste agente.`
+          : `Integracao "${payload.conector.nome}" vinculada a "${agenteForm.nome}".`,
+      );
     } catch (error) {
       setFeedbackAgente(error instanceof Error ? error.message : "Nao foi possivel ativar o Mercado Livre neste agente.");
     } finally {
