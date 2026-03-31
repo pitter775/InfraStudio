@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { canAccessAdmin, canManageProject } from "@/lib/access";
-import { getChatById, listChatMessages } from "@/lib/chats";
+import { canAccessAdmin, canAccessProject } from "@/lib/access";
+import { appendMessage, getChatById, listChatMessages, touchChatUpdatedAt } from "@/lib/chats";
 import { getSessionUser } from "@/lib/session";
 
 type RouteContext = {
@@ -20,13 +20,54 @@ export async function GET(_request: Request, context: RouteContext) {
   const chat = await getChatById(id);
 
   if (!chat) {
-    return NextResponse.json({ error: "Conversa não encontrada." }, { status: 404 });
+    return NextResponse.json({ error: "Conversa nao encontrada." }, { status: 404 });
   }
 
-  if (!user?.isMaster && !canManageProject(user, chat.projetoId)) {
+  if (!user?.isMaster && !canAccessProject(user, chat.projetoId)) {
     return NextResponse.json({ error: "Acesso negado para esta conversa." }, { status: 403 });
   }
 
   const messages = await listChatMessages(id);
   return NextResponse.json({ chat, messages }, { status: 200 });
+}
+
+export async function POST(request: Request, context: RouteContext) {
+  const user = await getSessionUser();
+
+  if (!canAccessAdmin(user)) {
+    return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+  }
+
+  const { id } = await context.params;
+  const chat = await getChatById(id);
+
+  if (!chat) {
+    return NextResponse.json({ error: "Conversa nao encontrada." }, { status: 404 });
+  }
+
+  if (!user?.isMaster && !canAccessProject(user, chat.projetoId)) {
+    return NextResponse.json({ error: "Acesso negado para esta conversa." }, { status: 403 });
+  }
+
+  const body = (await request.json()) as { conteudo?: string };
+  const conteudo = body.conteudo?.trim() || "";
+
+  if (!conteudo) {
+    return NextResponse.json({ error: "Digite uma mensagem para enviar." }, { status: 400 });
+  }
+
+  const message = await appendMessage({
+    chatId: chat.id,
+    role: "assistant",
+    conteudo,
+    canal: chat.canal,
+    identificadorExterno: chat.identificadorExterno,
+  });
+
+  if (!message) {
+    return NextResponse.json({ error: "Nao foi possivel enviar a mensagem." }, { status: 500 });
+  }
+
+  await touchChatUpdatedAt(chat.id);
+  return NextResponse.json({ message }, { status: 201 });
 }

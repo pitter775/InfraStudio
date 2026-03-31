@@ -257,6 +257,20 @@ export async function updateChatContext(chatId: string, contexto: Record<string,
   }
 }
 
+export async function touchChatUpdatedAt(chatId: string) {
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("chats")
+    .update({
+      updated_at: new Date().toISOString(),
+    } as never)
+    .eq("id", chatId);
+
+  if (error) {
+    console.error("[chats] failed to touch chat updated_at", error);
+  }
+}
+
 export async function getChatById(chatId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase

@@ -16,6 +16,7 @@ import {
   LogOut,
   Menu,
   MessageCircle,
+  MessageCircleMore,
   Globe,
   Layers3,
   Settings,
@@ -36,6 +37,8 @@ const ACTIVE_PROJECT_STORAGE_KEY = "projeto_ativo";
 const adminLinks = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/projetos", label: "Projetos", icon: BriefcaseBusiness },
+  { section: "Atendimento" },
+  { href: "/admin/atendimento", label: "Conversas", icon: MessageCircleMore, indent: true },
   { projectTab: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { projectTab: "mercado", label: "Mercado Livre", icon: Store },
   { href: "/admin/planos", label: "Planos", icon: Coins },
@@ -48,6 +51,10 @@ const adminLinks = [
 ] as const;
 
 function isAdminLinkActive(pathname: string, currentProjectTab: string | null, item: (typeof adminLinks)[number]) {
+  if ("section" in item) {
+    return false;
+  }
+
   if ("projectTab" in item) {
     return pathname.startsWith("/admin/projetos/") && currentProjectTab === item.projectTab;
   }
@@ -102,7 +109,17 @@ function Sidebar({
   onLogout,
 }: SidebarProps) {
   const visibleLinks = currentUser && !canAccessGlobalAdmin(currentUser)
-    ? adminLinks.filter((item) => ("projectTab" in item) || item.href === "/admin/dashboard" || item.href === "/admin/projetos" || item.href === "/admin/me")
+    ? adminLinks.filter((item) => {
+        if ("section" in item) {
+          return item.section === "Atendimento";
+        }
+
+        return ("projectTab" in item)
+          || item.href === "/admin/dashboard"
+          || item.href === "/admin/projetos"
+          || item.href === "/admin/atendimento"
+          || item.href === "/admin/me";
+      })
     : adminLinks;
 
   return (
@@ -165,6 +182,17 @@ function Sidebar({
         </div>
         <nav className="mt-8 flex-1 space-y-2 px-2">
           {visibleLinks.map((item) => {
+            if ("section" in item) {
+              return collapsed ? null : (
+                <p
+                  key={item.section}
+                  className="px-3 pt-3 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500"
+                >
+                  {item.section}
+                </p>
+              );
+            }
+
             const Icon = item.icon;
             const active = isAdminLinkActive(pathname, currentProjectTab, item);
             const targetKey = "projectTab" in item ? `project-tab:${item.projectTab}` : item.href;
@@ -187,6 +215,7 @@ function Sidebar({
                   active
                     ? "infra-premium-pill text-white shadow-[0_20px_44px_rgba(37,99,235,0.22)]"
                     : "text-slate-300 hover:bg-white/[0.04] hover:text-white",
+                  "indent" in item && item.indent && !collapsed ? "ml-3" : "",
                   collapsed ? "justify-center" : "",
                 )}
                 title={collapsed ? item.label : undefined}
