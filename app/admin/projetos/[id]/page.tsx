@@ -6812,9 +6812,12 @@ export default function AdminProjetoDetalhePage() {
                   const agente = connector.agenteId ? data.agentes.find((item) => item.id === connector.agenteId) ?? null : null;
                   const canTestConnectorStore = Boolean(agente);
                   return (
-                    <div key={connector.id} className={`rounded-xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
-                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                        <div className="min-w-0 flex-1">
+                    <article key={connector.id} className={`relative overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),rgba(255,255,255,0.025)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.2),0_0_0_1px_rgba(34,211,238,0.03)] ${premiumTransitionClass}`}>
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/30 to-transparent"
+                      />
+                      <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-3">
                             <h4 className="text-base font-bold text-white">{connector.nome}</h4>
                             <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200">{connector.tipo}</span>
@@ -6822,15 +6825,30 @@ export default function AdminProjetoDetalhePage() {
                               {connector.ativo ? "ativo" : "inativo"}
                             </span>
                           </div>
-                          <p className="mt-2 text-sm text-slate-400">Agente: {agente?.nome ?? "nao vinculado"}</p>
-                          <p className="mt-1 text-sm text-slate-400">Seller ID: {connector.configuracoes?.seller_id ?? "nao informado"}</p>
-                          {connector.configuracoes?.nickname ? <p className="mt-1 text-sm text-slate-400">Nickname: {connector.configuracoes.nickname}</p> : null}
-                          <p className="mt-1 text-sm text-slate-400">
-                            OAuth: {connector.configuracoes?.refresh_token ? "conectado" : connector.configuracoes?.access_token ? "token manual" : "nao conectado"}
-                          </p>
-                          <p className="mt-1 truncate text-xs text-cyan-200/80">{connector.endpointBase}</p>
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Agente</p>
+                            <p className="mt-2 text-sm font-semibold text-white">{agente?.nome ?? "nao vinculado"}</p>
+                          </div>
+                          <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Seller ID</p>
+                            <p className="mt-2 text-sm font-semibold text-white">{connector.configuracoes?.seller_id ?? "nao informado"}</p>
+                          </div>
+                          <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Nickname</p>
+                            <p className="mt-2 text-sm font-semibold text-white">{connector.configuracoes?.nickname ?? "nao informado"}</p>
+                          </div>
+                          <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">OAuth</p>
+                            <p className="mt-2 text-sm font-semibold text-white">
+                              {connector.configuracoes?.refresh_token ? "conectado" : connector.configuracoes?.access_token ? "token manual" : "nao conectado"}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex flex-col gap-2 sm:flex-row md:flex-col md:items-stretch">
+                        <p className="mt-3 truncate text-xs text-cyan-200/80">{connector.endpointBase}</p>
+                      </div>
+                      <div className="mt-5 border-t border-white/10 bg-slate-950/20 px-1 pt-4">
+                        <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
                             onClick={() => {
@@ -6859,7 +6877,7 @@ export default function AdminProjetoDetalhePage() {
                           </button>
                         </div>
                       </div>
-                    </div>
+                    </article>
                   );
                 })
               ) : (
@@ -6916,57 +6934,59 @@ export default function AdminProjetoDetalhePage() {
                         </div>
                       </div>
 
-                      <div className="mt-6 flex flex-wrap gap-3">
-                        <button
-                          type="button"
-                          onClick={() => void handleConnectWhatsAppChannel(channel)}
-                          disabled={connectingWhatsAppChannelId === channel.id}
-                          className={successActionButtonClass}
-                        >
-                          {connectingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
-                          {isConnected ? "Reconectar" : "Conectar"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleDisconnectWhatsAppChannel(channel)}
-                          disabled={disconnectingWhatsAppChannelId === channel.id}
-                          className={dangerActionButtonClass}
-                        >
-                          {disconnectingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
-                          Desconectar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleEditWhatsAppChannel(channel)}
-                          className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold ${editButtonClass}`}
-                        >
-                          <Pencil size={15} />
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleDeleteWhatsAppChannel(channel)}
-                          disabled={deletingWhatsAppChannelId === channel.id}
-                          className={dangerActionButtonClass}
-                        >
-                          {deletingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
-                          Remover
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void refreshWhatsAppRuntime(channel.id)}
-                          className={`inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-slate-200 ${premiumInteractiveClass}`}
-                        >
-                          <Activity size={15} />
-                          Atualizar
-                        </button>
-                      </div>
-
                       {channel.sessionData?.notes ? (
                         <div className="mt-5 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
                           {channel.sessionData.notes}
                         </div>
                       ) : null}
+
+                      <div className="mt-6 border-t border-white/10 bg-slate-950/20 px-1 pt-5">
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            type="button"
+                            onClick={() => void handleConnectWhatsAppChannel(channel)}
+                            disabled={connectingWhatsAppChannelId === channel.id}
+                            className={successActionButtonClass}
+                          >
+                            {connectingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
+                            {isConnected ? "Reconectar" : "Conectar"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDisconnectWhatsAppChannel(channel)}
+                            disabled={disconnectingWhatsAppChannelId === channel.id}
+                            className={dangerActionButtonClass}
+                          >
+                            {disconnectingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
+                            Desconectar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditWhatsAppChannel(channel)}
+                            className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold ${editButtonClass}`}
+                          >
+                            <Pencil size={15} />
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteWhatsAppChannel(channel)}
+                            disabled={deletingWhatsAppChannelId === channel.id}
+                            className={dangerActionButtonClass}
+                          >
+                            {deletingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
+                            Remover
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void refreshWhatsAppRuntime(channel.id)}
+                            className={`inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-slate-200 ${premiumInteractiveClass}`}
+                          >
+                            <Activity size={15} />
+                            Atualizar
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="rounded-[28px] border border-white/10 bg-slate-950/55 p-5">
@@ -7121,32 +7141,34 @@ export default function AdminProjetoDetalhePage() {
                       )}
                     </div>
                   </div>
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleEditWhatsAppChannel(primaryWhatsAppChannel)}
-                      className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 font-semibold ${editButtonClass}`}
-                    >
-                      <Pencil size={16} />
-                      Editar canal
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteWhatsAppChannel(primaryWhatsAppChannel)}
-                      disabled={deletingWhatsAppChannelId === primaryWhatsAppChannel.id}
-                      className={dangerActionButtonClass}
-                    >
-                      <Trash2 size={16} />
-                      {deletingWhatsAppChannelId === primaryWhatsAppChannel.id ? "Removendo..." : "Remover canal"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={openNewWhatsAppChannelModal}
-                      className={headerActionButtonClass}
-                    >
-                      <Plus size={16} />
-                      Novo canal
-                    </button>
+                  <div className="mt-5 border-t border-white/10 bg-slate-950/20 px-1 pt-5">
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleEditWhatsAppChannel(primaryWhatsAppChannel)}
+                        className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 font-semibold ${editButtonClass}`}
+                      >
+                        <Pencil size={16} />
+                        Editar canal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteWhatsAppChannel(primaryWhatsAppChannel)}
+                        disabled={deletingWhatsAppChannelId === primaryWhatsAppChannel.id}
+                        className={dangerActionButtonClass}
+                      >
+                        <Trash2 size={16} />
+                        {deletingWhatsAppChannelId === primaryWhatsAppChannel.id ? "Removendo..." : "Remover canal"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={openNewWhatsAppChannelModal}
+                        className={headerActionButtonClass}
+                      >
+                        <Plus size={16} />
+                        Novo canal
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : null}
