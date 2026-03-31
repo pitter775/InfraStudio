@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -349,6 +349,13 @@ type ChatDetailState = {
   messages: ChatMessage[];
 };
 
+type WidgetCodeModalState = {
+  widget: ChatWidget;
+  variant: "essencial" | "detalhado";
+  essentialCode: string;
+  detailedCode: string;
+};
+
 type WhatsAppChannelFormState = {
   id?: string;
   numero: string;
@@ -489,115 +496,8 @@ function createBillingPlanForm(billing: ProjetoBillingSection | null | undefined
   };
 }
 
-function getChatLeadName(chat: Chat) {
-  const lead = chat.contexto?.lead as { nome?: string | null } | undefined;
-  return lead?.nome?.trim() || "Nao identificado";
-}
-
-function getChatObjective(chat: Chat) {
-  const qualification = chat.contexto?.qualificacao as { objetivo?: string | null } | undefined;
-  return qualification?.objetivo?.trim() || "Objetivo nao identificado";
-}
-
-function getChatSummary(chat: Chat) {
-  const memory = chat.contexto?.memoria as { resumo?: string | null } | undefined;
-  return memory?.resumo?.trim() || null;
-}
-
-function parseChatSummary(rawSummary: string | null | undefined) {
-  const summary = rawSummary?.trim();
-  if (!summary) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(summary) as {
-      objetivo?: string | null;
-      lead?: string | null;
-      restricoes?: string | null;
-      proximo_passo?: string | null;
-    };
-    const parts = [
-      parsed.objetivo ? `Objetivo: ${parsed.objetivo}` : null,
-      parsed.lead ? `Lead: ${parsed.lead}` : null,
-      parsed.restricoes ? `Contexto: ${parsed.restricoes}` : null,
-      parsed.proximo_passo ? `Proximo passo: ${parsed.proximo_passo}` : null,
-    ].filter(Boolean);
-
-    return parts.length ? parts.join(" | ") : summary;
-  } catch {
-    return summary;
-  }
-}
-
-function getChatSessionPreview(chat: Chat) {
-  const parsedSummary = parseChatSummary(getChatSummary(chat));
-  if (parsedSummary) {
-    return parsedSummary;
-  }
-
-  const qualification = chat.contexto?.qualificacao as {
-    objetivo?: string | null;
-    dor_principal?: string | null;
-    segmento?: string | null;
-  } | undefined;
-  const fallbackContext = [
-    qualification?.objetivo ? `Objetivo: ${qualification.objetivo}` : null,
-    qualification?.dor_principal ? `Dor: ${qualification.dor_principal}` : null,
-    qualification?.segmento ? `Segmento: ${qualification.segmento}` : null,
-  ].filter(Boolean);
-
-  if (fallbackContext.length) {
-    return fallbackContext.join(" | ");
-  }
-
-  return chat.ultimaMensagem?.trim() || null;
-}
-
-function formatChatPreview(chat: Chat) {
-  const preview = getChatSessionPreview(chat);
-  if (!preview) {
-    return "Sem resumo consolidado ainda. Clique para abrir a conversa completa.";
-  }
-
-  return preview.replace(/\s+/g, " ").trim();
-}
-
-function getChatPriorityScore(chat: Chat) {
-  const lead = chat.contexto?.lead as { identificado?: boolean } | undefined;
-  const qualification = chat.contexto?.qualificacao as { pronto_para_whatsapp?: boolean } | undefined;
-  let score = 0;
-
-  if (chat.canal === "whatsapp") score += 4;
-  if (lead?.identificado) score += 3;
-  if (qualification?.pronto_para_whatsapp) score += 2;
-  if (chat.totalTokens > 0) score += 1;
-
-  return score;
-}
-
 function isWhatsAppChatChannel(chat: Chat) {
   return chat.canal === "whatsapp";
-}
-
-function isSiteChatChannel(chat: Chat) {
-  return !isWhatsAppChatChannel(chat);
-}
-
-function getChatChannelLabel(chat: Chat) {
-  if (isWhatsAppChatChannel(chat)) {
-    return "WhatsApp";
-  }
-
-  if (chat.canal === "home_chat_widget") {
-    return "Site interno";
-  }
-
-  return "Site";
-}
-
-function getChatChannelTone(chat: Chat) {
-  return isWhatsAppChatChannel(chat) ? "bg-emerald-500/10 text-emerald-200" : "bg-cyan-500/10 text-cyan-100";
 }
 
 function normalizeAgentText(value: string) {
@@ -624,7 +524,7 @@ function stripDecorativeCharacters(value: string) {
   return value
     .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
     .replace(/[\u2600-\u27BF]/gu, "")
-    .replace(/[✓✔✕✖✳⭐🔥💬📌🎯⚙️❓🔁]/gu, "")
+    .replace(/[âœ“âœ”âœ•âœ–âœ³â­ðŸ”¥ðŸ’¬ðŸ“ŒðŸŽ¯âš™ï¸â“ðŸ”]/gu, "")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
@@ -1238,7 +1138,7 @@ function AgentRuntimePreview({ rawConfig }: { rawConfig: string }) {
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
-        className="group w-full rounded-[22px] border border-emerald-500/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(3,105,80,0.1))] px-4 py-4 text-left transition-all duration-300 hover:border-emerald-400/35 hover:bg-[linear-gradient(135deg,rgba(16,185,129,0.22),rgba(5,150,105,0.14))]"
+        className="group w-full rounded-[22px] border border-emerald-500/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(3,105,80,0.1))] px-4 py-4 text-left transition-[background-image,border-color,opacity] duration-200 ease-out hover:border-emerald-400/35 hover:bg-[linear-gradient(135deg,rgba(16,185,129,0.22),rgba(5,150,105,0.14))]"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -1262,7 +1162,7 @@ function AgentRuntimePreview({ rawConfig }: { rawConfig: string }) {
       </button>
 
       <div
-        className={`grid overflow-hidden transition-all duration-300 ${expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+        className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out ${expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
       >
         <div className="min-h-0 space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
@@ -1513,22 +1413,22 @@ function FormLabel({ children }: { children: string }) {
 }
 
 const primaryActionButtonClass =
-  "infra-click-pulse inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14 disabled:cursor-not-allowed disabled:opacity-60";
+  "infra-click-pulse inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_6px_18px_rgba(56,189,248,0.08)] transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:border-sky-300/30 hover:bg-sky-400/14 disabled:cursor-not-allowed disabled:opacity-60";
 
 const headerActionButtonClass =
-  "infra-click-pulse inline-flex items-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14";
+  "infra-click-pulse inline-flex items-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_6px_18px_rgba(56,189,248,0.08)] transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:border-sky-300/30 hover:bg-sky-400/14";
 
 const neutralActionButtonClass =
-  "infra-click-pulse inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60";
+  "infra-click-pulse inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_6px_18px_rgba(15,23,42,0.12)] transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60";
 
 const successActionButtonClass =
-  "infra-click-pulse inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-50 shadow-[0_10px_30px_rgba(16,185,129,0.12)] transition-all hover:border-emerald-300/30 hover:bg-emerald-500/14 disabled:cursor-not-allowed disabled:opacity-60";
+  "infra-click-pulse inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-50 shadow-[0_6px_18px_rgba(16,185,129,0.08)] transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:border-emerald-300/30 hover:bg-emerald-500/14 disabled:cursor-not-allowed disabled:opacity-60";
 
 const dangerActionButtonClass =
-  "infra-click-pulse inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-50 shadow-[0_10px_30px_rgba(244,63,94,0.12)] transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60";
+  "infra-click-pulse inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-50 shadow-[0_6px_18px_rgba(244,63,94,0.08)] transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60";
 
 const warningActionButtonClass =
-  "infra-click-pulse inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-50 shadow-[0_10px_30px_rgba(245,158,11,0.12)] transition-all hover:border-amber-300/30 hover:bg-amber-500/14 disabled:cursor-not-allowed disabled:opacity-60";
+  "infra-click-pulse inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-50 shadow-[0_6px_18px_rgba(245,158,11,0.08)] transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:border-amber-300/30 hover:bg-amber-500/14 disabled:cursor-not-allowed disabled:opacity-60";
 
 function PremiumLoader({
   compact = false,
@@ -2610,7 +2510,7 @@ function AgenteModal({
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{asset.nome}</p>
                           <p className="text-xs text-slate-400">
-                            {asset.arquivoNome} • {formatFileSize(asset.tamanhoBytes)}
+                            {asset.arquivoNome} â€¢ {formatFileSize(asset.tamanhoBytes)}
                           </p>
                           <a
                             href={asset.publicUrl}
@@ -2656,7 +2556,7 @@ function AgenteModal({
                         <AgenteAssetPreview categoria={item.file.type.startsWith("image/") ? "image" : "file"} file={item.file} alt={item.file.name} />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{item.file.name}</p>
-                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} • aguardando upload</p>
+                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} â€¢ aguardando upload</p>
                         </div>
                       </div>
                       <button
@@ -2811,7 +2711,7 @@ function AgenteModal({
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{asset.nome}</p>
                           <p className="text-xs text-slate-400">
-                            {asset.arquivoNome} • {formatFileSize(asset.tamanhoBytes)}
+                            {asset.arquivoNome} â€¢ {formatFileSize(asset.tamanhoBytes)}
                           </p>
                           <a
                             href={asset.publicUrl}
@@ -2856,7 +2756,7 @@ function AgenteModal({
                         <AgenteAssetPreview categoria={item.file.type.startsWith("image/") ? "image" : "file"} file={item.file} alt={item.file.name} />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{item.file.name}</p>
-                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} • aguardando upload</p>
+                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} â€¢ aguardando upload</p>
                         </div>
                       </div>
                       <button
@@ -3452,7 +3352,7 @@ function ConnectorModal({
               {tutorialOpen ? <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4 text-xs leading-6 text-slate-200">
                 <p>Abre esse link:</p>
                 <p className="font-semibold text-white">https://developers.mercadolivre.com.br/apps</p>
-                <p className="mt-3">Clica em “Criar aplicação”</p>
+                <p className="mt-3">Clica em â€œCriar aplicaÃ§Ã£oâ€</p>
                 <p className="mt-3">Preenche assim:</p>
                 <p>Nome: InfraStudio</p>
                 <p>Tipo: Web</p>
@@ -3474,7 +3374,7 @@ function ConnectorModal({
                 <p>APP ID</p>
                 <p>CLIENT SECRET</p>
                 <p className="mt-3">Envie esses dois dados para configurar a integracao da loja.</p>
-                <p className="mt-3">Se aparecer botao de “autorizar” ou “permitir”, pode seguir normalmente.</p>
+                <p className="mt-3">Se aparecer botao de â€œautorizarâ€ ou â€œpermitirâ€, pode seguir normalmente.</p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-3 text-emerald-50">
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100">Obrigatorio agora</p>
@@ -3928,6 +3828,99 @@ function ChatHistoryModal({
   );
 }
 
+function WidgetCodeModal({
+  open,
+  state,
+  copiedKey,
+  onClose,
+  onChangeVariant,
+  onCopy,
+}: {
+  open: boolean;
+  state: WidgetCodeModalState | null;
+  copiedKey: string | null;
+  onClose: () => void;
+  onChangeVariant: (variant: "essencial" | "detalhado") => void;
+  onCopy: (key: string, value: string) => void;
+}) {
+  if (!open || !state) {
+    return null;
+  }
+
+  const modalKey = `widget-code:${state.widget.slug}:${state.variant}`;
+  const code = state.variant === "essencial" ? state.essentialCode : state.detailedCode;
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
+      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Codigo do widget</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{state.widget.nome}</h2>
+            <p className="mt-1 text-sm text-slate-400">Escolha a versao do codigo e copie o snippet pronto para este widget.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`${neutralActionButtonClass} px-3`}
+            aria-label="Fechar modal"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex rounded-2xl border border-white/10 bg-slate-950/40 p-1">
+              {[
+                { key: "essencial" as const, label: "Minimo preenchido" },
+                { key: "detalhado" as const, label: "Completo e detalhado" },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => onChangeVariant(item.key)}
+                  className={`rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${
+                    state.variant === item.key ? "bg-cyan-500/15 text-cyan-100" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => onCopy(modalKey, code)}
+              className="inline-flex items-center gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/20 hover:text-white"
+            >
+              {copiedKey === modalKey ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+              {copiedKey === modalKey ? "Copiado" : "Copiar codigo"}
+            </button>
+          </div>
+
+          <div className={`mt-4 rounded-2xl border p-4 ${state.variant === "essencial" ? "border-cyan-500/20 bg-[#07111f]" : "border-emerald-500/20 bg-[#081611]"}`}>
+            <p className={`text-[11px] font-bold uppercase tracking-[0.16em] ${state.variant === "essencial" ? "text-cyan-100" : "text-emerald-100"}`}>
+              {state.variant === "essencial" ? "Snippet minimo" : "Snippet detalhado host-controlled"}
+            </p>
+            <p className={`mt-1 text-xs ${state.variant === "essencial" ? "text-slate-300" : "text-emerald-50/80"}`}>
+              {state.variant === "essencial"
+                ? "Versao mais direta para instalar rapido com o contexto inicial ja preenchido."
+                : "Versao completa para quando o site controla montagem, atualizacao e destruicao do chat."}
+            </p>
+            <div className={`mt-4 overflow-x-auto rounded-xl border ${state.variant === "essencial" ? "border-cyan-500/20 bg-[#04111d]" : "border-emerald-500/20 bg-[#07110d]"}`}>
+              <pre className="min-h-[320px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
+                {code.split("\n").map((line: string, index: number) => (
+                  <div key={`${modalKey}-${index}`}>{renderSnippetLine(line)}</div>
+                ))}
+              </pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminProjetoDetalhePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -3984,13 +3977,10 @@ export default function AdminProjetoDetalhePage() {
   const [chatHistoryLoading, setChatHistoryLoading] = useState(false);
   const [chatHistoryError, setChatHistoryError] = useState<string | null>(null);
   const [chatDetail, setChatDetail] = useState<ChatDetailState | null>(null);
-  const [chatChannelFilter, setChatChannelFilter] = useState<"todos" | "web" | "whatsapp">("todos");
-  const [chatSortMode, setChatSortMode] = useState<"prioridade" | "recentes" | "tokens">("prioridade");
-  const [chatPage, setChatPage] = useState(1);
   const [pendingAgenteArquivos, setPendingAgenteArquivos] = useState<PendingAgenteArquivo[]>([]);
   const [origin, setOrigin] = useState("");
   const [copiedSnippetKey, setCopiedSnippetKey] = useState<string | null>(null);
-  const [expandedSnippetKeys, setExpandedSnippetKeys] = useState<Record<string, boolean>>({});
+  const [widgetCodeModalState, setWidgetCodeModalState] = useState<WidgetCodeModalState | null>(null);
   const [serviceStatusByChannel, setServiceStatusByChannel] = useState<Record<string, string>>({});
   const [serviceQrByChannel, setServiceQrByChannel] = useState<Record<string, string | null>>({});
   const [agentDiagnosticsById, setAgentDiagnosticsById] = useState<Record<string, AgentDiagnosticsOverview>>({});
@@ -4008,10 +3998,12 @@ export default function AdminProjetoDetalhePage() {
   const [tabContentVisible, setTabContentVisible] = useState(true);
   const [tabsPinned, setTabsPinned] = useState(false);
   const [tabsBarHeight, setTabsBarHeight] = useState(0);
+  const [tabsBarLeft, setTabsBarLeft] = useState(0);
   const [projectDetailsExpanded, setProjectDetailsExpanded] = useState(false);
   const pendingAgentDiagnosticsRef = useRef<Record<string, boolean>>({});
   const tabSwitchTimeoutRef = useRef<number | null>(null);
   const tabRevealTimeoutRef = useRef<number | null>(null);
+  const tabsScrollFrameRef = useRef<number | null>(null);
   const tabsAnchorRef = useRef<HTMLDivElement | null>(null);
   const tabsBarRef = useRef<HTMLDivElement | null>(null);
 
@@ -4100,8 +4092,8 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const removeById = <T extends { id?: string }>(items: T[], id: string) => items.filter((entry) => entry.id !== id);
-  const premiumTransitionClass = "transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]";
-  const premiumInteractiveClass = `${premiumTransitionClass} hover:-translate-y-[1px]`;
+  const premiumTransitionClass = "transition-[background-color,border-color,color,opacity,box-shadow,transform] duration-180 ease-out";
+  const premiumInteractiveClass = premiumTransitionClass;
   const editButtonClass = `${warningActionButtonClass} ${premiumInteractiveClass}`;
   const buildProjectUrl = (mutate?: (nextParams: URLSearchParams) => void) => {
     const nextParams = new URLSearchParams(searchParams.toString());
@@ -4130,14 +4122,28 @@ export default function AdminProjetoDetalhePage() {
 
   useEffect(() => {
     const handleScroll = () => {
-      const anchorElement = tabsAnchorRef.current;
-      const barElement = tabsBarRef.current;
-      if (!anchorElement || !barElement) {
+      if (tabsScrollFrameRef.current !== null) {
         return;
       }
 
-      setTabsPinned(anchorElement.getBoundingClientRect().top <= 12);
-      setTabsBarHeight(barElement.offsetHeight);
+      tabsScrollFrameRef.current = window.requestAnimationFrame(() => {
+        tabsScrollFrameRef.current = null;
+
+        const anchorElement = tabsAnchorRef.current;
+        const barElement = tabsBarRef.current;
+        if (!anchorElement || !barElement) {
+          return;
+        }
+
+        const anchorRect = anchorElement.getBoundingClientRect();
+        const nextPinned = anchorRect.top <= 12;
+        const nextHeight = barElement.offsetHeight;
+        const nextLeft = Math.round(anchorRect.left);
+
+        setTabsPinned((current) => (current === nextPinned ? current : nextPinned));
+        setTabsBarHeight((current) => (current === nextHeight ? current : nextHeight));
+        setTabsBarLeft((current) => (current === nextLeft ? current : nextLeft));
+      });
     };
 
     handleScroll();
@@ -4145,6 +4151,9 @@ export default function AdminProjetoDetalhePage() {
     window.addEventListener("resize", handleScroll);
 
     return () => {
+      if (tabsScrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(tabsScrollFrameRef.current);
+      }
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleScroll);
     };
@@ -4535,13 +4544,6 @@ export default function AdminProjetoDetalhePage() {
     } catch {
       setCopiedSnippetKey(null);
     }
-  };
-
-  const toggleSnippetExpanded = (key: string) => {
-    setExpandedSnippetKeys((current) => ({
-      ...current,
-      [key]: !current[key],
-    }));
   };
 
   const handleAddAgenteFiles = (files: FileList | null) => {
@@ -6091,53 +6093,10 @@ export default function AdminProjetoDetalhePage() {
 
   const agenteAtivo = data.agentes.find((agente) => agente.ativo) ?? null;
   const primaryWhatsAppChannel = data.whatsappChannels[0] ?? null;
-  const siteWidget = data.widgets[0] ?? null;
-  const siteWidgetSnippetKey = siteWidget ? `site-chat-snippet-${siteWidget.id ?? siteWidget.slug}` : null;
-  const siteWidgetSnippet = siteWidget ? buildWidgetSnippet(siteWidget) : "";
   const recentWhatsAppChats = data.chats
     .filter((chat) => isWhatsAppChatChannel(chat))
     .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
     .slice(0, 3);
-  const identifiedChatsCount = data.chats.filter((chat) => {
-    const lead = chat.contexto?.lead as { identificado?: boolean } | undefined;
-    return Boolean(lead?.identificado);
-  }).length;
-  const whatsappChatsCount = data.chats.filter((chat) => isWhatsAppChatChannel(chat)).length;
-  const channelReadyChatsCount = data.chats.filter((chat) => {
-    const qualification = chat.contexto?.qualificacao as { pronto_para_whatsapp?: boolean } | undefined;
-    return Boolean(qualification?.pronto_para_whatsapp);
-  }).length;
-  const totalChatTokens = data.chats.reduce((sum, chat) => sum + (chat.totalTokens || 0), 0);
-  const siteChatsCount = data.chats.filter((chat) => isSiteChatChannel(chat)).length;
-  const filteredChats = data.chats.filter((chat) => {
-    if (chatChannelFilter === "todos") {
-      return true;
-    }
-
-    if (chatChannelFilter === "web") {
-      return isSiteChatChannel(chat);
-    }
-
-    return isWhatsAppChatChannel(chat);
-  });
-  const sortedChats = [...filteredChats].sort((left, right) => {
-    if (chatSortMode === "tokens") {
-      return right.totalTokens - left.totalTokens || new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
-    }
-
-    if (chatSortMode === "recentes") {
-      return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
-    }
-
-    return (
-      getChatPriorityScore(right) - getChatPriorityScore(left) ||
-      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
-    );
-  });
-  const chatsPerPage = 8;
-  const chatTotalPages = Math.max(1, Math.ceil(sortedChats.length / chatsPerPage));
-  const currentChatPage = Math.min(chatPage, chatTotalPages);
-  const paginatedChats = sortedChats.slice((currentChatPage - 1) * chatsPerPage, currentChatPage * chatsPerPage);
   const overviewStats = [
     { key: "agentes", label: "Agentes", value: data.stats.totalAgentes, icon: Bot, tone: "text-cyan-100", glow: "bg-cyan-400/16" },
     { key: "apis", label: "APIs", value: data.stats.totalApis, icon: Activity, tone: "text-sky-100", glow: "bg-sky-400/16" },
@@ -6187,7 +6146,7 @@ export default function AdminProjetoDetalhePage() {
     data.billing?.pricingModels.find((item) => item.id === billingPlanForm.modeloReferencia) ??
     data.billing?.pricingModels.find((item) => item.id === data.billing?.plan.modeloReferencia) ??
     null;
-  const tabContentTransitionClass = `transform-gpu transition-all duration-200 ease-out ${tabContentVisible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"}`;
+  const tabContentTransitionClass = `transition-[opacity] duration-150 ease-out ${tabContentVisible ? "opacity-100" : "pointer-events-none opacity-0"}`;
 
   return (
     <main className="space-y-6">
@@ -6439,7 +6398,7 @@ export default function AdminProjetoDetalhePage() {
           </section>
         ) : null}
 
-        <section className="mt-8 rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-3 shadow-[0_10px_24px_rgba(2,8,23,0.1)] sm:px-4">
+        <section className="mt-8 rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-3 shadow-[0_8px_18px_rgba(2,8,23,0.08)] sm:px-4">
           <button
             type="button"
             onClick={() => setProjectDetailsExpanded((current) => !current)}
@@ -6462,7 +6421,7 @@ export default function AdminProjetoDetalhePage() {
           </button>
 
           <div
-            className={`grid overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            className={`grid overflow-hidden transition-[grid-template-rows,opacity,margin] duration-200 ease-out ${
               projectDetailsExpanded ? "mt-3 grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0"
             }`}
           >
@@ -6492,7 +6451,8 @@ export default function AdminProjetoDetalhePage() {
         <div ref={tabsAnchorRef} className="mt-8" style={{ minHeight: tabsBarHeight ? `${tabsBarHeight}px` : undefined }}>
           <section
             ref={tabsBarRef}
-            className={`${tabsPinned ? "fixed left-1/2 top-3 z-40 -translate-x-1/2" : "relative"} flex w-max max-w-[calc(100vw-1.5rem)] flex-wrap items-center justify-center gap-2 rounded-[26px] px-3 py-3 transition-all duration-200 ${tabsPinned ? "bg-[#07111f]/82 shadow-[0_18px_38px_rgba(2,8,23,0.34)] backdrop-blur-md" : "bg-transparent shadow-none backdrop-blur-0"}`}
+            style={tabsPinned ? { left: `${tabsBarLeft}px` } : undefined}
+            className={`${tabsPinned ? "fixed top-3 z-40" : "relative"} flex w-max max-w-[calc(100vw-1.5rem)] flex-wrap items-center justify-center gap-2 rounded-[26px] px-3 py-3 transition-[background-color,box-shadow,opacity] duration-150 ease-out ${tabsPinned ? "bg-[#07111f]/82 shadow-[0_12px_24px_rgba(2,8,23,0.24)] backdrop-blur-sm" : "bg-transparent shadow-none backdrop-blur-0"}`}
           >
               {projectTabs.map((tab) => {
                 const Icon = tab.icon;
@@ -6571,7 +6531,7 @@ export default function AdminProjetoDetalhePage() {
                 ].filter(Boolean);
                 const miniSummary = miniSummaryParts.length
                   ? `Configurado com ${miniSummaryParts.join(", ")}.`
-                  : "Ainda sem canais, APIs ou integrações vinculadas.";
+                  : "Ainda sem canais, APIs ou integraÃ§Ãµes vinculadas.";
                 const agentCardPreview = (() => {
                   const source = normalizeAgentText(agente.promptBase || agente.descricao || "");
                   if (!source) {
@@ -6653,7 +6613,7 @@ export default function AdminProjetoDetalhePage() {
                             {agente.ativo ? "ativo" : "inativo"}
                           </span>
                         </div>
-                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descrição."}</p>
+                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descriÃ§Ã£o."}</p>
                       </div>
                     </div>
 
@@ -6729,7 +6689,7 @@ export default function AdminProjetoDetalhePage() {
                                   diagnostic.connections.whatsappChannels.length ? `${diagnostic.connections.whatsappChannels.length} WhatsApp` : null,
                                   diagnostic.connections.connectors.length ? `${diagnostic.connections.connectors.length} fonte(s)` : null,
                                   diagnostic.connections.apis.length ? `${diagnostic.connections.apis.length} API(s)` : null,
-                                ].filter(Boolean).join(" | ") || "sem vínculos diretos"}
+                                ].filter(Boolean).join(" | ") || "sem vÃ­nculos diretos"}
                               </span>
                             </p>
                             {diagnostic.warnings.length ? (
@@ -6918,8 +6878,9 @@ export default function AdminProjetoDetalhePage() {
                           </div>
                           <p className="mt-3 truncate text-xs text-cyan-200/80">{connector.endpointBase}</p>
                         </div>
-                        <div className="mt-5 border-t border-white/10 bg-slate-950/20 px-1 pt-4">
-                          <div className="flex flex-wrap gap-2">
+                        <div className="mt-5 border-t border-white/10 pt-4">
+                          <div className="rounded-2xl border border-white/8 bg-slate-950/45 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                             <button
                               type="button"
                               onClick={() => {
@@ -6928,12 +6889,12 @@ export default function AdminProjetoDetalhePage() {
                                 }
                               }}
                               disabled={!canTestConnectorStore}
-                              className={successActionButtonClass}
+                              className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-50 transition-all hover:border-emerald-300/30 hover:bg-emerald-500/14 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               <TestTube2 size={14} />
                               {canTestConnectorStore ? "Testar loja" : "Vincule um agente"}
                             </button>
-                            <button type="button" onClick={() => handleEditConnector(connector)} className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${editButtonClass}`}>
+                            <button type="button" onClick={() => handleEditConnector(connector)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-50 transition-all hover:border-amber-300/30 hover:bg-amber-500/14">
                               <Pencil size={14} />
                               Editar
                             </button>
@@ -6941,11 +6902,12 @@ export default function AdminProjetoDetalhePage() {
                               type="button"
                               onClick={() => void handleDeleteConnector(connector)}
                               disabled={deletingConnectorId === connector.id}
-                              className={dangerActionButtonClass}
+                              className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-50 transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               <Trash2 size={14} />
                               {deletingConnectorId === connector.id ? "Removendo..." : "Remover completamente"}
                             </button>
+                            </div>
                           </div>
                         </div>
                       </article>
@@ -7075,13 +7037,14 @@ export default function AdminProjetoDetalhePage() {
                         </div>
                       ) : null}
 
-                      <div className="mt-6 border-t border-white/10 bg-slate-950/20 px-1 pt-5">
-                        <div className="flex flex-wrap gap-3">
+                      <div className="mt-6 border-t border-white/10 pt-4">
+                        <div className="rounded-2xl border border-white/8 bg-slate-950/45 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
                           <button
                             type="button"
                             onClick={() => void handleConnectWhatsAppChannel(channel)}
                             disabled={connectingWhatsAppChannelId === channel.id}
-                            className={successActionButtonClass}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-50 transition-all hover:border-emerald-300/30 hover:bg-emerald-500/14 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {connectingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
                             {isConnected ? "Reconectar" : "Conectar"}
@@ -7090,7 +7053,7 @@ export default function AdminProjetoDetalhePage() {
                             type="button"
                             onClick={() => void handleDisconnectWhatsAppChannel(channel)}
                             disabled={disconnectingWhatsAppChannelId === channel.id}
-                            className={dangerActionButtonClass}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-50 transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {disconnectingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
                             Desconectar
@@ -7098,7 +7061,7 @@ export default function AdminProjetoDetalhePage() {
                           <button
                             type="button"
                             onClick={() => handleEditWhatsAppChannel(channel)}
-                            className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold ${editButtonClass}`}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-50 transition-all hover:border-amber-300/30 hover:bg-amber-500/14"
                           >
                             <Pencil size={15} />
                             Editar
@@ -7107,7 +7070,7 @@ export default function AdminProjetoDetalhePage() {
                             type="button"
                             onClick={() => void handleDeleteWhatsAppChannel(channel)}
                             disabled={deletingWhatsAppChannelId === channel.id}
-                            className={dangerActionButtonClass}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-50 transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {deletingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
                             Remover
@@ -7115,11 +7078,12 @@ export default function AdminProjetoDetalhePage() {
                           <button
                             type="button"
                             onClick={() => void refreshWhatsAppRuntime(channel.id)}
-                            className={`inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-slate-200 ${premiumInteractiveClass}`}
+                            className={`inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-200 transition-all hover:bg-white/10 hover:text-white ${premiumInteractiveClass}`}
                           >
                             <Activity size={15} />
                             Atualizar
                           </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -7138,12 +7102,12 @@ export default function AdminProjetoDetalhePage() {
                         <div className="mt-4 rounded-[24px] border border-cyan-500/20 bg-cyan-500/[0.07] p-4">
                           <img src={qrImage} alt={`QR do canal ${channel.numero}`} className="mx-auto w-full max-w-[300px] rounded-2xl bg-white p-4 shadow-2xl shadow-cyan-950/40" />
                           <p className="mt-4 text-center text-sm font-semibold text-white">Abra o WhatsApp no celular e escaneie este QR.</p>
-                          <p className="mt-1 text-center text-xs text-slate-400">Se o codigo expirar, clique em “Conectar e gerar QR”.</p>
+                          <p className="mt-1 text-center text-xs text-slate-400">Se o codigo expirar, clique em â€œConectar e gerar QRâ€.</p>
                         </div>
                       ) : (
                         <div className="mt-4 rounded-[24px] border border-dashed border-white/10 bg-slate-950/40 px-5 py-12 text-center">
                           <p className="text-lg font-bold text-white">QR ainda nao disponivel</p>
-                          <p className="mt-2 text-sm text-slate-400">Clique em “Conectar e gerar QR” para iniciar a sessao deste numero.</p>
+                          <p className="mt-2 text-sm text-slate-400">Clique em â€œConectar e gerar QRâ€ para iniciar a sessao deste numero.</p>
                         </div>
                       )}
                     </div>
@@ -7156,7 +7120,7 @@ export default function AdminProjetoDetalhePage() {
                       <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Primeiro passo</p>
                       <h4 className="mt-3 text-3xl font-black text-white">Crie o numero que vai atender no WhatsApp</h4>
                       <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-                        Assim que o canal for criado, esta area passa a mostrar o QR bem grande para escanear ou o estado “WhatsApp conectado”.
+                        Assim que o canal for criado, esta area passa a mostrar o QR bem grande para escanear ou o estado â€œWhatsApp conectadoâ€.
                       </p>
                     </div>
                     <div className="grid gap-4 md:grid-cols-3">
@@ -7199,7 +7163,7 @@ export default function AdminProjetoDetalhePage() {
                     </div>
                     <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-4">
                       <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Depois disso</p>
-                      <p className="mt-2 text-sm text-slate-300">O card principal muda para mostrar o QR em destaque ou o estado “WhatsApp conectado”.</p>
+                      <p className="mt-2 text-sm text-slate-300">O card principal muda para mostrar o QR em destaque ou o estado â€œWhatsApp conectadoâ€.</p>
                     </div>
                   </div>
                 </div>
@@ -7318,492 +7282,161 @@ export default function AdminProjetoDetalhePage() {
           <section>
             <div className="flex flex-col gap-4 px-2 py-2 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><MessageSquareText size={18} className="text-rose-200" />Conversas do projeto</h3>
-                <p className="mt-1 text-sm text-slate-400">Historico recente dos chats do site e dos sistemas para auditoria, contexto e acompanhamento comercial.</p>
+                <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><MessageSquareText size={18} className="text-rose-200" />Chats do projeto</h3>
+                <p className="mt-1 text-sm text-slate-400">Widgets criados para este projeto e os codigos prontos para instalar no site.</p>
               </div>
-              <div className="flex flex-wrap gap-3">
-                {data.widgets[0] ? (
-                  <button
-                    type="button"
-                    onClick={() => handleEditWidget(data.widgets[0])}
-                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 font-semibold ${editButtonClass}`}
-                  >
-                    <Pencil size={16} />
-                    Editar widget do site
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={openNewWidgetModal}
-                  className={`${headerActionButtonClass} ${premiumInteractiveClass}`}
-                >
-                  <Plus size={16} />
-                  Criar widget do site
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={openNewWidgetModal}
+                className={`${headerActionButtonClass} ${premiumInteractiveClass}`}
+              >
+                <Plus size={16} />
+                Criar widget do site
+              </button>
             </div>
-            <div className="space-y-4 p-6">
-              <div className="hidden grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.9fr)]">
-                <div className="rounded-2xl border border-cyan-500/20 bg-slate-950/35 p-4">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-100">Codigo do chat do site</p>
-                      <h4 className="mt-1 text-lg font-bold text-white">{siteWidget?.nome ?? "Configure um widget para este projeto"}</h4>
-                      <p className="mt-1 text-sm text-slate-400">
-                        {siteWidget
-                          ? "Copie o snippet abaixo para instalar o chat. Mantive esse bloco no topo para nao precisar navegar pela aba."
-                          : "Ainda nao existe widget de site configurado para este projeto."}
-                      </p>
-                    </div>
-                    {siteWidget && siteWidgetSnippetKey ? (
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExpandedSnippetKeys((current) => ({
-                              ...current,
-                              [siteWidgetSnippetKey]: !current[siteWidgetSnippetKey],
-                            }))
-                          }
-                          className={neutralActionButtonClass}
-                        >
-                          {expandedSnippetKeys[siteWidgetSnippetKey] ? <Minimize2 size={14} /> : <Expand size={14} />}
-                          {expandedSnippetKeys[siteWidgetSnippetKey] ? "Recolher" : "Expandir codigo"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleCopySnippet(siteWidgetSnippetKey, siteWidgetSnippet)}
-                          className={`${headerActionButtonClass} ${premiumInteractiveClass}`}
-                        >
-                          {copiedSnippetKey === siteWidgetSnippetKey ? <CheckCircle2 size={14} /> : <Copy size={14} />}
-                          {copiedSnippetKey === siteWidgetSnippetKey ? "Copiado" : "Copiar snippet"}
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                  {siteWidget ? (
-                    expandedSnippetKeys[siteWidgetSnippetKey ?? ""] === true ? (
-                      <div className="mt-4 overflow-x-auto rounded-xl border border-white/10 bg-[#07111f]">
-                        <pre className="max-h-[320px] min-h-[180px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
-                          {siteWidgetSnippet.split("\n").map((line, index) => (
-                            <div key={`site-widget-line-${index}`}>{renderSnippetLine(line)}</div>
-                          ))}
-                        </pre>
-                      </div>
-                    ) : (
-                      <div className="mt-4 rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
-                        Snippet pronto para copiar. Clique em <span className="font-semibold text-white">Expandir codigo</span> para revisar antes de usar.
-                      </div>
-                    )
-                  ) : (
-                    <div className="mt-4 rounded-xl border border-dashed border-white/10 bg-slate-950/20 px-4 py-6 text-sm text-slate-400">
-                      Crie um widget do site para gerar aqui o codigo de instalacao.
-                    </div>
-                  )}
-                </div>
 
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  {[
-                    { label: "Chats do site", value: siteChatsCount, tone: "border-cyan-500/20 bg-cyan-500/10 text-cyan-100" },
-                    { label: "Leads identificados", value: identifiedChatsCount, tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100" },
-                    { label: "Prontos para comercial", value: channelReadyChatsCount, tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100" },
-                    { label: "Tokens totais", value: totalChatTokens, tone: "border-white/10 bg-slate-950/40 text-white" },
-                  ].map((item) => (
-                    <div key={item.label} className={`rounded-xl border px-4 py-3 ${item.tone}`}>
-                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] opacity-80">{item.label}</p>
-                      <p className="mt-2 text-2xl font-black">{item.value}</p>
-                    </div>
-                  ))}
+            <div className="space-y-4 p-2 pt-4">
+              <div className="rounded-2xl border border-amber-400/14 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(15,23,42,0.18))] px-4 py-4 shadow-[0_18px_36px_rgba(2,8,23,0.16)]">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-100/85">Documentacao</p>
+                    <p className="mt-2 text-sm text-slate-200">Referencia unica para todos os widgets quando o site precisar controlar criacao, atualizacao e destruicao do chat.</p>
+                  </div>
+                  <a
+                    href="/docs/chat-widget-host-control"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-2xl border border-amber-400/20 bg-white/5 px-4 py-3 text-sm font-semibold text-amber-50 transition-colors hover:bg-white/10 hover:text-white"
+                  >
+                    <ExternalLink size={15} />
+                    Abrir documentacao completa
+                  </a>
                 </div>
               </div>
-              <section className="space-y-4">
-                <div className="flex flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-slate-950/35 p-5">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-100">Widgets do chat</p>
-                      <h4 className="mt-1 text-lg font-bold text-white">Widgets criados para este projeto</h4>
-                      <p className="mt-1 max-w-3xl text-sm text-slate-400">
-                        Cada card abaixo mostra o widget, o agente resolvido e os codigos prontos para instalar no site com modo controlado pelo host.
-                      </p>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                      {[
-                        { label: "Widgets", value: data.widgets.length, tone: "border-cyan-500/20 bg-cyan-500/10 text-cyan-100" },
-                        { label: "Chats do site", value: siteChatsCount, tone: "border-cyan-500/20 bg-cyan-500/10 text-cyan-100" },
-                        { label: "Leads identificados", value: identifiedChatsCount, tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100" },
-                        { label: "Tokens totais", value: totalChatTokens, tone: "border-white/10 bg-slate-950/40 text-white" },
-                      ].map((item) => (
-                        <div key={`chat-widget-metric-${item.label}`} className={`rounded-xl border px-4 py-3 ${item.tone}`}>
-                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] opacity-80">{item.label}</p>
-                          <p className="mt-2 text-2xl font-black">{item.value}</p>
+
+              {data.widgets.length ? (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {data.widgets.map((widget) => {
+                    const agente = getResolvedWidgetAgent(widget);
+
+                    return (
+                      <article key={`chat-widget-card-${widget.id ?? widget.slug}`} className={`relative flex h-full flex-col overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),rgba(255,255,255,0.03)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.24),0_0_0_1px_rgba(34,211,238,0.04)] ${premiumTransitionClass}`}>
+                        <div
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/35 to-transparent"
+                        />
+                        <div
+                          aria-hidden="true"
+                          className={`pointer-events-none absolute right-4 top-4 ${widget.ativo ? "text-cyan-300/40 animate-pulse drop-shadow-[0_0_18px_rgba(34,211,238,0.3)]" : "text-slate-500/28"}`}
+                        >
+                          <PanelsTopLeft size={34} strokeWidth={1.6} />
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
 
-                {data.widgets.length ? (
-                  <div className="space-y-4">
-                    {data.widgets.map((widget) => {
-                      const agente = getResolvedWidgetAgent(widget);
-                      const widgetSnippetKey = `chat-tab-widget:${widget.slug}`;
-                      const hostSnippetKey = `chat-tab-host:${widget.slug}`;
-                      const widgetExpanded = expandedSnippetKeys[widgetSnippetKey] === true;
-                      const hostExpanded = expandedSnippetKeys[hostSnippetKey] === true;
-
-                      return (
-                        <div key={`chat-widget-card-${widget.id ?? widget.slug}`} className="rounded-2xl border border-white/10 bg-slate-950/30 p-5">
-                          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-3">
-                                <h4 className="text-lg font-bold text-white">{widget.nome}</h4>
-                                <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${widget.ativo ? "bg-emerald-500/10 text-emerald-200" : "bg-slate-800 text-slate-400"}`}>
-                                  {widget.ativo ? "ativo" : "inativo"}
-                                </span>
-                                <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-100">
-                                  slug {widget.slug}
-                                </span>
-                              </div>
-                              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                                <div className="rounded-xl border border-white/10 bg-slate-950/40 px-3 py-3">
-                                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Agente</p>
-                                  <p className="mt-1 text-sm font-semibold text-white">{agente?.nome ?? "agente ativo do projeto"}</p>
-                                </div>
-                                <div className="rounded-xl border border-white/10 bg-slate-950/40 px-3 py-3">
-                                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Dominio</p>
-                                  <p className="mt-1 truncate text-sm font-semibold text-white">{widget.dominio || "nao informado"}</p>
-                                </div>
-                                <div className="rounded-xl border border-white/10 bg-slate-950/40 px-3 py-3">
-                                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Tema</p>
-                                  <p className="mt-1 text-sm font-semibold text-white">{widget.tema}</p>
-                                </div>
-                                <div className="rounded-xl border border-white/10 bg-slate-950/40 px-3 py-3">
-                                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Cor principal</p>
-                                  <div className="mt-1 flex items-center gap-2">
-                                    <span className="h-3 w-3 rounded-full border border-white/20" style={{ backgroundColor: widget.corPrimaria }} />
-                                    <p className="text-sm font-semibold text-white">{widget.corPrimaria}</p>
-                                  </div>
-                                </div>
-                              </div>
+                        <div className="relative flex items-start justify-between gap-3 pr-12">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="truncate text-base font-bold text-white">{widget.nome}</h4>
+                              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${widget.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
+                                {widget.ativo ? "ativo" : "inativo"}
+                              </span>
                             </div>
+                            <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">
+                              {widget.dominio || "Widget pronto para instalar no site deste projeto."}
+                            </p>
+                          </div>
+                        </div>
 
-                            <div className="flex flex-wrap gap-2">
+                        <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/35 px-3.5 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Trecho do widget</p>
+                          <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-slate-200">
+                            {agente?.nome ? `Conectado ao agente ${agente.nome}.` : "Sem agente especifico; usa o agente principal do projeto."} Tema {widget.tema} com cor {widget.corPrimaria} e slug {widget.slug}.
+                          </p>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {[
+                            { key: "agente", label: "Agente", value: agente?.nome ?? "Projeto", active: Boolean(agente), activeClass: "text-cyan-100", inactiveClass: "text-slate-500", icon: Bot },
+                            { key: "dominio", label: "Dominio", value: widget.dominio || "Livre", active: Boolean(widget.dominio), activeClass: "text-emerald-100", inactiveClass: "text-slate-500", icon: Cable },
+                            { key: "tema", label: "Tema", value: widget.tema, active: true, activeClass: "text-amber-100", inactiveClass: "text-slate-500", icon: Sparkles },
+                            { key: "slug", label: "Slug", value: widget.slug, active: true, activeClass: "text-violet-100", inactiveClass: "text-slate-500", icon: MessageSquareText },
+                          ].map((item) => {
+                            const Icon = item.icon;
+                            return (
+                              <span
+                                key={`${widget.slug}-${item.key}`}
+                                className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${item.active ? item.activeClass : item.inactiveClass}`}
+                              >
+                                <Icon size={13} />
+                                {item.label}
+                                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${item.active ? "bg-black/15 text-current" : "bg-white/5 text-slate-400"}`}>
+                                  {item.value}
+                                </span>
+                              </span>
+                            );
+                          })}
+                        </div>
+
+                        <div className="mt-5 border-t border-white/10 pt-4">
+                          <div className="rounded-2xl border border-white/8 bg-slate-950/45 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setWidgetCodeModalState({
+                                    widget,
+                                    variant: "essencial",
+                                    essentialCode: buildWidgetSnippet(widget),
+                                    detailedCode: buildHostControlSnippet(widget),
+                                  })
+                                }
+                                className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-400/20 bg-sky-400/10 px-3 py-2 text-xs font-semibold text-sky-50 transition-all hover:border-sky-300/30 hover:bg-sky-400/14"
+                              >
+                                <Expand size={14} />
+                                Ver codigo
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => handleEditWidget(widget)}
-                                className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 font-semibold ${editButtonClass}`}
+                                className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-50 transition-all hover:border-amber-300/30 hover:bg-amber-500/14"
                               >
-                                <Pencil size={16} />
-                                Editar chat
+                                <Pencil size={14} />
+                                Editar
                               </button>
                               <button
                                 type="button"
-                                onClick={() => {
-                                  toggleSnippetExpanded(widgetSnippetKey);
-                                  toggleSnippetExpanded(hostSnippetKey);
-                                }}
-                                className={neutralActionButtonClass}
+                                onClick={() => void handleDeleteWidget(widget)}
+                                disabled={Boolean(widget.id) && deletingWidgetId === widget.id}
+                                className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-50 transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60"
                               >
-                                {widgetExpanded || hostExpanded ? <Minimize2 size={14} /> : <Expand size={14} />}
-                                {widgetExpanded || hostExpanded ? "Ocultar codigos" : "Ver codigos"}
+                                <Trash2 size={14} />
+                                {Boolean(widget.id) && deletingWidgetId === widget.id ? "Removendo..." : "Remover"}
                               </button>
                             </div>
                           </div>
-
-                          <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
-                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-100">Como integrar sem vazar contexto</p>
-                            <div className="mt-2 grid gap-2 text-sm text-amber-50/90 lg:grid-cols-2">
-                              <p>1. O host decide quando o chat pode existir. O widget nao assume autonomia.</p>
-                              <p>2. Ao sair do contexto autorizado, chame `window.InfraChat.destroy()` imediatamente.</p>
-                              <p>3. Ao trocar tenant, usuario, agente, recurso ou rota, invalide o contexto anterior.</p>
-                              <p>4. Carregue o SDK uma vez, mas so monte o chat por comando explicito.</p>
-                            </div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <a
-                                href="/docs/chat-widget-host-control"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-amber-50 transition-colors hover:bg-white/10 hover:text-white"
-                              >
-                                <ExternalLink size={13} />
-                                Abrir documentacao completa
-                              </a>
-                            </div>
-                          </div>
-
-                          {widgetExpanded || hostExpanded ? (
-                            <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                              <div className="rounded-2xl border border-cyan-500/20 bg-[#07111f] p-4">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                  <div>
-                                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-100">Snippet de instalacao</p>
-                                    <p className="mt-1 text-xs text-slate-300">Carrega o SDK e monta o chat com o contexto inicial da pagina.</p>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleCopySnippet(widgetSnippetKey, buildWidgetSnippet(widget))}
-                                    className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15 hover:text-white"
-                                  >
-                                    {copiedSnippetKey === widgetSnippetKey ? <CheckCircle2 size={13} /> : <Copy size={13} />}
-                                    {copiedSnippetKey === widgetSnippetKey ? "Copiado" : "Copiar"}
-                                  </button>
-                                </div>
-                                <div className="mt-4 overflow-x-auto rounded-xl border border-cyan-500/20 bg-[#04111d]">
-                                  <pre className="min-h-[220px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
-                                    {buildWidgetSnippet(widget)
-                                      .split("\n")
-                                      .map((line, index) => (
-                                        <div key={`${widget.slug}-chat-tab-widget-line-${index}`}>{renderSnippetLine(line)}</div>
-                                      ))}
-                                  </pre>
-                                </div>
-                              </div>
-
-                              <div className="rounded-2xl border border-emerald-500/20 bg-[#081611] p-4">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                  <div>
-                                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-100">Exemplo recomendado host-controlled</p>
-                                    <p className="mt-1 text-xs text-emerald-50/80">Use este modelo quando o site precisa decidir quando o chat pode montar, atualizar ou destruir.</p>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleCopySnippet(hostSnippetKey, buildHostControlSnippet(widget))}
-                                    className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/15 hover:text-white"
-                                  >
-                                    {copiedSnippetKey === hostSnippetKey ? <CheckCircle2 size={13} /> : <Copy size={13} />}
-                                    {copiedSnippetKey === hostSnippetKey ? "Copiado" : "Copiar"}
-                                  </button>
-                                </div>
-                                <div className="mt-4 overflow-x-auto rounded-xl border border-emerald-500/20 bg-[#07110d]">
-                                  <pre className="min-h-[220px] w-full whitespace-pre-wrap break-all px-4 py-4 font-mono text-xs leading-6">
-                                    {buildHostControlSnippet(widget)
-                                      .split("\n")
-                                      .map((line, index) => (
-                                        <div key={`${widget.slug}-chat-tab-host-line-${index}`}>{renderSnippetLine(line)}</div>
-                                      ))}
-                                  </pre>
-                                </div>
-                              </div>
-                            </div>
-                          ) : null}
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">
-                    Nenhum widget de chat criado ainda. Crie um widget para exibir aqui os cards com os codigos de integracao.
-                  </div>
-                )}
-              </section>
-
-              <div className="hidden grid gap-4 xl:grid-cols-4">
-                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-200">Potencial comercial</p>
-                  <p className="mt-2 text-2xl font-black text-white">{channelReadyChatsCount}</p>
-                  <p className="mt-2 text-xs text-emerald-50/80">Conversas que ja alcançaram sinal de continuidade comercial.</p>
+                      </article>
+                    );
+                  })}
                 </div>
-                <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-100">Leads identificados</p>
-                  <p className="mt-2 text-2xl font-black text-white">{identifiedChatsCount}</p>
-                  <p className="mt-2 text-xs text-cyan-50/80">Conversas com nome e contato reconhecidos no contexto.</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-slate-950/40 px-4 py-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">WhatsApp</p>
-                  <p className="mt-2 text-2xl font-black text-white">{whatsappChatsCount}</p>
-                  <p className="mt-2 text-xs text-slate-400">Quantidade de conversas que chegaram pelo canal WhatsApp.</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-slate-950/40 px-4 py-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Tokens totais</p>
-                  <p className="mt-2 text-2xl font-black text-white">{totalChatTokens}</p>
-                  <p className="mt-2 text-xs text-slate-400">Uso acumulado para medir profundidade de atendimento.</p>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-slate-950/30 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { key: "todos", label: "Todos" },
-                    { key: "web", label: "Site" },
-                    { key: "whatsapp", label: "WhatsApp" },
-                  ].map((filter) => (
-                    <button
-                      key={filter.key}
-                      type="button"
-                      onClick={() => {
-                        setChatChannelFilter(filter.key as typeof chatChannelFilter);
-                        setChatPage(1);
-                      }}
-                      className={`rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] transition-colors ${
-                        chatChannelFilter === filter.key ? "bg-cyan-500/15 text-cyan-100" : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white"
-                      }`}
-                    >
-                      {filter.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { key: "prioridade", label: "Prioridade" },
-                    { key: "recentes", label: "Mais recentes" },
-                    { key: "tokens", label: "Mais profundos" },
-                  ].map((sort) => (
-                    <button
-                      key={sort.key}
-                      type="button"
-                      onClick={() => {
-                        setChatSortMode(sort.key as typeof chatSortMode);
-                        setChatPage(1);
-                      }}
-                      className={`rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] transition-colors ${
-                        chatSortMode === sort.key ? "bg-emerald-500/15 text-emerald-200" : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white"
-                      }`}
-                    >
-                      {sort.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {data.chats.length ? (
-                <div className="space-y-3">
-                  {paginatedChats.map((chat) => (
-                    <button
-                      key={`compact-${chat.id}`}
-                      type="button"
-                      onClick={() => void handleOpenChatHistory(chat)}
-                      className="block w-full rounded-xl border border-white/10 bg-slate-950/25 px-4 py-3 text-left transition-colors hover:border-cyan-500/30 hover:bg-slate-950/45"
-                    >
-                      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2 text-cyan-200">
-                            <MessageSquare size={14} />
-                            <p className="truncate font-semibold text-white">{chat.titulo}</p>
-                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(chat)}`}>
-                              {getChatChannelLabel(chat)}
-                            </span>
-                            {getChatPriorityScore(chat) >= 5 ? (
-                              <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-200">
-                                potencial
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="mt-1 text-xs text-slate-500">{new Date(chat.updatedAt).toLocaleString("pt-BR")}</p>
-                          <p className="mt-2 line-clamp-2 text-sm text-slate-300">{formatChatPreview(chat)}</p>
-                        </div>
-                        <div className="grid gap-2 sm:grid-cols-4 xl:min-w-[560px] xl:grid-cols-4">
-                          <div className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2.5">
-                            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Lead</p>
-                            <p className="mt-1 truncate text-sm font-semibold text-white">{getChatLeadName(chat)}</p>
-                          </div>
-                          <div className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2.5">
-                            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Objetivo</p>
-                            <p className="mt-1 truncate text-sm font-semibold text-white">{getChatObjective(chat)}</p>
-                          </div>
-                          <div className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2.5">
-                            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Tokens</p>
-                            <p className="mt-1 text-sm font-semibold text-cyan-100">{chat.totalTokens}</p>
-                          </div>
-                          <div className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2.5">
-                            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Score</p>
-                            <p className="mt-1 text-sm font-semibold text-white">{getChatPriorityScore(chat)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-
-              {!data.chats.length ? (
-                <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">
-                  Nenhum chat registrado para este projeto ainda.
-                </div>
-              ) : null}
-
-              <div className="hidden">
-              {data.chats.length ? (
-                paginatedChats.map((chat) => (
-                  <button
-                    key={chat.id}
-                    type="button"
-                    onClick={() => void handleOpenChatHistory(chat)}
-                    className="block w-full rounded-xl border border-white/10 bg-slate-950/30 p-4 text-left transition-colors hover:border-cyan-500/30 hover:bg-slate-950/50"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2 text-cyan-200">
-                          <MessageSquare size={14} />
-                          <p className="truncate font-semibold text-white">{chat.titulo}</p>
-                          <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(chat)}`}>
-                            {getChatChannelLabel(chat)}
-                          </span>
-                          {getChatPriorityScore(chat) >= 5 ? (
-                            <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-200">
-                              potencial
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="mt-2 text-xs text-slate-500">{new Date(chat.updatedAt).toLocaleString("pt-BR")}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Score comercial</p>
-                        <p className="mt-1 text-lg font-black text-white">{getChatPriorityScore(chat)}</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 grid gap-3 md:grid-cols-3">
-                      <div className="rounded-lg border border-white/10 bg-slate-950/40 px-3 py-3">
-                        <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Lead</p>
-                        <p className="mt-1 text-sm font-semibold text-white">{getChatLeadName(chat)}</p>
-                      </div>
-                      <div className="rounded-lg border border-white/10 bg-slate-950/40 px-3 py-3">
-                        <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Objetivo</p>
-                        <p className="mt-1 text-sm font-semibold text-white">{getChatObjective(chat)}</p>
-                      </div>
-                      <div className="rounded-lg border border-white/10 bg-slate-950/40 px-3 py-3">
-                        <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Tokens</p>
-                        <p className="mt-1 text-sm font-semibold text-cyan-100">{chat.totalTokens}</p>
-                      </div>
-                    </div>
-                    <p className="mt-3 line-clamp-2 text-sm text-slate-400">
-                      {getChatSummary(chat) ?? "Sem resumo consolidado ainda. Abra a conversa para ver a progressao completa."}
-                    </p>
-                  </button>
-                ))
               ) : (
-                <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhum chat registrado para este projeto ainda.</div>
-              )}
-              </div>
-              {sortedChats.length > chatsPerPage ? (
-                <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-slate-400">
-                    Pagina {currentChatPage} de {chatTotalPages} • {sortedChats.length} conversas filtradas
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setChatPage((current) => Math.max(1, current - 1))}
-                      disabled={currentChatPage <= 1}
-                      className={neutralActionButtonClass}
-                    >
-                      Anterior
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setChatPage((current) => Math.min(chatTotalPages, current + 1))}
-                      disabled={currentChatPage >= chatTotalPages}
-                      className={neutralActionButtonClass}
-                    >
-                      Proxima
-                    </button>
-                  </div>
+                <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">
+                  Nenhum widget de chat criado ainda. Crie um widget para exibir aqui os cards com os codigos de integracao.
                 </div>
-              ) : null}
+              )}
             </div>
           </section>
         </div>
       </section>
-
+      <WidgetCodeModal
+        open={Boolean(widgetCodeModalState)}
+        state={widgetCodeModalState}
+        copiedKey={copiedSnippetKey}
+        onClose={() => setWidgetCodeModalState(null)}
+        onChangeVariant={(variant) =>
+          setWidgetCodeModalState((current) => (current ? { ...current, variant } : current))
+        }
+        onCopy={(key, value) => void handleCopySnippet(key, value)}
+      />
       <AgenteModal
         open={agenteModalOpen}
         form={agenteForm}
@@ -7914,7 +7547,7 @@ export default function AdminProjetoDetalhePage() {
               "Abre esse link:",
               "https://developers.mercadolivre.com.br/apps",
               "",
-              "Clica em \"Criar aplicação\"",
+              "Clica em \"Criar aplicaÃ§Ã£o\"",
               "",
               "Preenche assim:",
               "Nome: InfraStudio",
@@ -8053,3 +7686,5 @@ export default function AdminProjetoDetalhePage() {
     </main>
   );
 }
+
+
