@@ -20,6 +20,7 @@ export type ChatRecord = {
   identificadorExterno: string | null;
   contexto: Record<string, unknown> | null;
   ultimaMensagem: string | null;
+  totalMensagens: number;
 };
 
 export type ChatMessageRecord = {
@@ -103,6 +104,7 @@ function mapChat(row: ChatRow): ChatRecord {
     identificadorExterno: row.identificador_externo?.trim() || null,
     contexto: row.contexto,
     ultimaMensagem: null,
+    totalMensagens: 0,
   };
 }
 
@@ -383,10 +385,17 @@ export async function listChats(projetoId?: string | null) {
   }
 
   const latestMessageByChatId = new Map<string, string>();
+  const messageCountByChatId = new Map<string, number>();
 
   for (const row of messagesData as Array<{ chat_id: string | null; conteudo: string | null }>) {
     const chatId = row.chat_id ?? "";
-    if (!chatId || latestMessageByChatId.has(chatId)) {
+    if (!chatId) {
+      continue;
+    }
+
+    messageCountByChatId.set(chatId, (messageCountByChatId.get(chatId) ?? 0) + 1);
+
+    if (latestMessageByChatId.has(chatId)) {
       continue;
     }
 
@@ -401,6 +410,7 @@ export async function listChats(projetoId?: string | null) {
   return chats.map((chat) => ({
     ...chat,
     ultimaMensagem: latestMessageByChatId.get(chat.id) ?? null,
+    totalMensagens: messageCountByChatId.get(chat.id) ?? 0,
   }));
 }
 

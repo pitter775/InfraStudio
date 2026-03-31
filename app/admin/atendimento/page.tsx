@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, LoaderCircle, MessageCircleMore, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, X } from "lucide-react";
+import { BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, LoaderCircle, MessageCircleMore, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, UserRound, X } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -22,6 +22,7 @@ type ChatRecord = {
   canal: string;
   identificadorExterno: string | null;
   ultimaMensagem: string | null;
+  totalMensagens: number;
   contexto?: {
     lead?: {
       nome?: string | null;
@@ -103,6 +104,13 @@ function getChatChannelTone(canal: string) {
 
 function getChatTitle(chat: ChatRecord) {
   return chat.contexto?.lead?.nome?.trim() || chat.identificadorExterno?.trim() || chat.titulo?.trim() || "Conversa sem identificacao";
+}
+
+function formatChatTime(value: string) {
+  return new Date(value).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function getFirstName(name: string | null | undefined) {
@@ -430,6 +438,7 @@ export default function AdminAtendimentoPage() {
                   ...chat,
                   ultimaMensagem: replyText.trim() || (selectedAttachments.length ? "Anexo enviado." : sentMessage.conteudo),
                   updatedAt: sentMessage.createdAt,
+                  totalMensagens: (chat.totalMensagens ?? 0) + 1,
                 }
               : chat,
           )
@@ -706,16 +715,34 @@ export default function AdminAtendimentoPage() {
                           : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10"
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-semibold text-white">{getChatTitle(chat)}</p>
-                          <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400">{chat.ultimaMensagem || "Sem mensagens ainda."}</p>
+                      <div className="flex items-start gap-2.5">
+                        <div className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
+                          active
+                            ? "border-cyan-300/40 bg-cyan-400/15 text-cyan-100"
+                            : "border-white/10 bg-slate-900/70 text-slate-300"
+                        }`}>
+                          <UserRound size={14} />
                         </div>
-                        <span className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(chat.canal)}`}>
-                          {getChatChannelLabel(chat.canal)}
-                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-[12px] font-semibold leading-4 text-white">{getChatTitle(chat)}</p>
+                              <div className="mt-1 flex items-center gap-1.5">
+                                <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(chat.canal)}`}>
+                                  {getChatChannelLabel(chat.canal)}
+                                </span>
+                                <span className="rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] font-semibold text-slate-300">
+                                  {chat.totalMensagens} msg
+                                </span>
+                              </div>
+                            </div>
+                            <p className={`shrink-0 text-[10px] ${active ? "text-cyan-100" : "text-slate-500"}`}>
+                              {formatChatTime(chat.updatedAt)}
+                            </p>
+                          </div>
+                          <p className="mt-1 truncate text-[10px] leading-4 text-slate-400">{chat.ultimaMensagem || "Sem mensagens ainda."}</p>
+                        </div>
                       </div>
-                      <p className="mt-2 text-[10px] text-slate-500">{formatDateTime(chat.updatedAt)}</p>
                     </button>
                   );
                 })}
