@@ -402,6 +402,9 @@ export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: stri
   const endpointBase = connector.endpointBase || "https://api.mercadolibre.com";
   const sellerId = config?.seller_id?.replace(/\D/g, "").trim() || "";
   const accessToken = await ensureMercadoLivreAccessToken(connector);
+  const refreshToken = config?.refresh_token?.trim() || "";
+  const appId = config?.app_id?.trim() || "";
+  const clientSecret = config?.client_secret?.trim() || "";
 
   await appendSystemLog({
     tipo: "mercado_livre_latest_products_start",
@@ -416,7 +419,7 @@ export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: stri
       nickname: config?.nickname ?? null,
       oauthUserId: config?.user_id ?? null,
       hasAccessToken: Boolean(accessToken),
-      hasRefreshToken: Boolean(config?.refresh_token),
+      hasRefreshToken: Boolean(refreshToken),
       tokenExpiresAt: config?.token_expires_at ?? null,
     },
   });
@@ -444,6 +447,44 @@ export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: stri
       },
       produtos: [],
       error: "O conector nao tem seller_id configurado.",
+    };
+  }
+
+  if (!accessToken && !refreshToken) {
+    const secretLooksInvalid = Boolean(appId) && Boolean(clientSecret) && appId === clientSecret;
+    const errorMessage = secretLooksInvalid
+      ? "A loja ainda nao concluiu o OAuth do Mercado Livre e o CLIENT SECRET salvo parece invalido porque esta igual ao APP ID."
+      : "A loja ainda nao concluiu o OAuth do Mercado Livre. Clique em Conectar Mercado Livre para autorizar a conta e gerar access_token e refresh_token.";
+
+    await appendSystemLog({
+      tipo: "mercado_livre_latest_products_error",
+      origem: "api_admin_agente_loja_teste",
+      descricao: "Teste da loja bloqueado porque o conector nao possui tokens OAuth do Mercado Livre.",
+      payload: {
+        agenteId,
+        connectorId: connector.id,
+        connectorName: connector.nome,
+        sellerId,
+        nickname: config?.nickname ?? null,
+        oauthUserId: config?.user_id ?? null,
+        hasAccessToken: false,
+        hasRefreshToken: false,
+        appIdPresent: Boolean(appId),
+        clientSecretPresent: Boolean(clientSecret),
+        clientSecretEqualsAppId: secretLooksInvalid,
+      },
+    });
+
+    return {
+      ok: false,
+      connector: {
+        id: connector.id,
+        nome: connector.nome,
+        sellerId,
+        nickname: config?.nickname ?? null,
+      },
+      produtos: [],
+      error: errorMessage,
     };
   }
 

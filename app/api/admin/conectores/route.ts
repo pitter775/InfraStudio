@@ -29,6 +29,9 @@ function normalizeMercadoLivreConfig(configuracoes: MercadoLivreConnectorConfig 
   const sellerId = typeof configuracoes?.seller_id === "string" ? configuracoes.seller_id.trim() : "";
   const nickname = typeof configuracoes?.nickname === "string" ? configuracoes.nickname.trim() : "";
   const accessToken = typeof configuracoes?.access_token === "string" ? configuracoes.access_token.trim() : "";
+  const refreshToken = typeof configuracoes?.refresh_token === "string" ? configuracoes.refresh_token.trim() : "";
+  const tokenExpiresAt = typeof configuracoes?.token_expires_at === "string" ? configuracoes.token_expires_at.trim() : "";
+  const userId = typeof configuracoes?.user_id === "string" ? configuracoes.user_id.trim() : "";
 
   return {
     app_id: appId || undefined,
@@ -36,6 +39,9 @@ function normalizeMercadoLivreConfig(configuracoes: MercadoLivreConnectorConfig 
     seller_id: sellerId,
     nickname: nickname || undefined,
     access_token: accessToken || undefined,
+    refresh_token: refreshToken || undefined,
+    token_expires_at: tokenExpiresAt || undefined,
+    user_id: userId || undefined,
   };
 }
 
@@ -131,12 +137,24 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Nome do conector e obrigatorio." }, { status: 400 });
   }
 
+  const existingConnector = await getConectorById(body.id);
+  if (!existingConnector) {
+    return NextResponse.json({ error: "Conector nao encontrado." }, { status: 404 });
+  }
+
+  if (!existingConnector.projetoId || existingConnector.projetoId !== body.projetoId) {
+    return NextResponse.json({ error: "Projeto invalido para atualizar conector." }, { status: 403 });
+  }
+
   const agentError = await validateAgentProject(body.projetoId, body.agenteId);
   if (agentError) {
     return NextResponse.json({ error: agentError }, { status: 400 });
   }
 
-  const configuracoes = normalizeMercadoLivreConfig(body.configuracoes);
+  const configuracoes = {
+    ...normalizeMercadoLivreConfig(existingConnector.configuracoes),
+    ...normalizeMercadoLivreConfig(body.configuracoes),
+  };
   const conector = await updateConector({
     id: body.id,
     projetoId: body.projetoId,

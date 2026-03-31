@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "crypto";
-import { cookies } from "next/headers";
+import { SignJWT, jwtVerify } from "jose";
 import {
   getConectorById,
   getMercadoLivreConnectorConfig,
@@ -12,10 +12,9 @@ import {
 const MERCADO_LIVRE_AUTH_URL = "https://auth.mercadolivre.com.br/authorization";
 const MERCADO_LIVRE_TOKEN_URL = "https://api.mercadolibre.com/oauth/token";
 const MERCADO_LIVRE_USER_URL = "https://api.mercadolibre.com/users/me";
-const OAUTH_COOKIE_NAME = "mercado_livre_oauth_state";
 
 type MercadoLivreOAuthState = {
-  state: string;
+  nonce: string;
   connectorId: string;
   projetoId: string;
 };
@@ -37,6 +36,37 @@ type MercadoLivreOAuthCredentials = {
   clientSecret: string;
   redirectUri: string;
 };
+
+function getMercadoLivreOAuthSecret() {
+  const secret = process.env.APP_AUTH_SECRET?.trim() || "";
+  if (!secret) {
+    throw new Error("APP_AUTH_SECRET nao esta configurado para assinar o OAuth do Mercado Livre.");
+  }
+
+  return new TextEncoder().encode(secret);
+}
+
+async function signMercadoLivreOAuthState(payload: MercadoLivreOAuthState) {
+  return new SignJWT({
+    connectorId: payload.connectorId,
+    projetoId: payload.projetoId,
+    nonce: payload.nonce,
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("15m")
+    .sign(getMercadoLivreOAuthSecret());
+}
+
+async function verifyMercadoLivreOAuthState(token: string) {
+  const { payload } = await jwtVerify(token, getMercadoLivreOAuthSecret());
+
+  return {
+    connectorId: String(payload.connectorId ?? "").trim(),
+    projetoId: String(payload.projetoId ?? "").trim(),
+    nonce: String(payload.nonce ?? "").trim(),
+  } satisfies MercadoLivreOAuthState;
+}
 
 function normalizeBaseUrl(value: string | null | undefined) {
   return value?.trim().replace(/\/$/, "") || "";
@@ -102,21 +132,12 @@ export async function buildMercadoLivreAuthorizationUrl(input: {
     throw new Error("Preencha APP ID, CLIENT SECRET no conector e garanta que a aplicacao tenha uma URL publica valida para a callback do Mercado Livre.");
   }
 
-  const state = randomUUID();
-  const cookieStore = await cookies();
   const payload: MercadoLivreOAuthState = {
-    state,
+    nonce: randomUUID(),
     connectorId: input.connector.id,
     projetoId: input.connector.projetoId ?? "",
   };
-
-  cookieStore.set(OAUTH_COOKIE_NAME, Buffer.from(JSON.stringify(payload), "utf-8").toString("base64url"), {
-    httpOnly: true,
-    secure: credentials.redirectUri.startsWith("https://"),
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 15,
-  });
+  const state = await signMercadoLivreOAuthState(payload);
 
   const url = new URL(MERCADO_LIVRE_AUTH_URL);
   url.searchParams.set("response_type", "code");
@@ -255,22 +276,15 @@ export async function completeMercadoLivreOAuthCallback(searchParams: URLSearchP
   const state = searchParams.get("state")?.trim() || "";
   const error = searchParams.get("error")?.trim() || "";
 
-  const cookieStore = await cookies();
-  const rawCookie = cookieStore.get(OAUTH_COOKIE_NAME)?.value;
-  cookieStore.delete(OAUTH_COOKIE_NAME);
-
   if (error) {
     throw new Error(`Mercado Livre recusou a autorizacao: ${error}.`);
   }
 
-  if (!code || !state || !rawCookie) {
+  if (!code || !state) {
     throw new Error("Retorno do OAuth do Mercado Livre incompleto.");
   }
 
-  const parsed = JSON.parse(Buffer.from(rawCookie, "base64url").toString("utf-8")) as MercadoLivreOAuthState;
-  if (parsed.state !== state) {
-    throw new Error("Estado do OAuth do Mercado Livre invalido.");
-  }
+  const parsed = await verifyMercadoLivreOAuthState(state);
 
   const connector = await getConectorById(parsed.connectorId);
   if (!connector || connector.projetoId !== parsed.projetoId) {

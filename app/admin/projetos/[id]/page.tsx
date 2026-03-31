@@ -3897,6 +3897,7 @@ export default function AdminProjetoDetalhePage() {
 
     if (oauthStatus === "success") {
       setFeedbackConnector("Conexao com o Mercado Livre concluida. A integracao recebeu os tokens da loja.");
+      void loadProjeto();
       replaceProjectUrl((nextParams) => {
         nextParams.delete("mercado_livre_oauth");
         nextParams.delete("mercado_livre_oauth_error");
@@ -3906,6 +3907,7 @@ export default function AdminProjetoDetalhePage() {
 
     if (oauthError) {
       setFeedbackConnector(oauthError);
+      void loadProjeto();
       replaceProjectUrl((nextParams) => {
         nextParams.delete("mercado_livre_oauth");
         nextParams.delete("mercado_livre_oauth_error");
