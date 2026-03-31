@@ -37,8 +37,7 @@ const ACTIVE_PROJECT_STORAGE_KEY = "projeto_ativo";
 const adminLinks = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/projetos", label: "Projetos", icon: BriefcaseBusiness },
-  { section: "Atendimento" },
-  { href: "/admin/atendimento", label: "Conversas", icon: MessageCircleMore, indent: true },
+  { href: "/admin/atendimento", label: "Atendimento", icon: MessageCircleMore, tone: "atendimento" },
   { projectTab: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { projectTab: "mercado", label: "Mercado Livre", icon: Store },
   { href: "/admin/planos", label: "Planos", icon: Coins },
@@ -51,15 +50,37 @@ const adminLinks = [
 ] as const;
 
 function isAdminLinkActive(pathname: string, currentProjectTab: string | null, item: (typeof adminLinks)[number]) {
-  if ("section" in item) {
-    return false;
-  }
-
   if ("projectTab" in item) {
     return pathname.startsWith("/admin/projetos/") && currentProjectTab === item.projectTab;
   }
 
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
+
+function getSidebarLinkTone(item: (typeof adminLinks)[number], active: boolean) {
+  const tone = "projectTab" in item
+    ? item.projectTab
+    : "tone" in item
+      ? item.tone
+      : "default";
+
+  if (!active) {
+    return "text-slate-300 hover:bg-white/[0.04] hover:text-white";
+  }
+
+  if (tone === "whatsapp") {
+    return "border border-emerald-400/40 bg-emerald-500/18 text-white shadow-[0_0_0_1px_rgba(52,211,153,0.22),0_0_28px_rgba(16,185,129,0.30),0_18px_46px_rgba(16,185,129,0.24)]";
+  }
+
+  if (tone === "mercado") {
+    return "border border-amber-300/45 bg-amber-400/18 text-white shadow-[0_0_0_1px_rgba(252,211,77,0.20),0_0_28px_rgba(245,158,11,0.30),0_18px_46px_rgba(245,158,11,0.22)]";
+  }
+
+  if (tone === "atendimento") {
+    return "border border-cyan-300/40 bg-cyan-400/18 text-white shadow-[0_0_0_1px_rgba(103,232,249,0.18),0_0_30px_rgba(34,211,238,0.30),0_18px_46px_rgba(14,165,233,0.24)]";
+  }
+
+  return "infra-premium-pill text-white shadow-[0_0_0_1px_rgba(96,165,250,0.18),0_0_24px_rgba(37,99,235,0.22),0_18px_46px_rgba(37,99,235,0.22)]";
 }
 
 function readSidebarCollapsedCookie() {
@@ -110,10 +131,6 @@ function Sidebar({
 }: SidebarProps) {
   const visibleLinks = currentUser && !canAccessGlobalAdmin(currentUser)
     ? adminLinks.filter((item) => {
-        if ("section" in item) {
-          return item.section === "Atendimento";
-        }
-
         return ("projectTab" in item)
           || item.href === "/admin/dashboard"
           || item.href === "/admin/projetos"
@@ -182,17 +199,6 @@ function Sidebar({
         </div>
         <nav className="mt-8 flex-1 space-y-2 px-2">
           {visibleLinks.map((item) => {
-            if ("section" in item) {
-              return collapsed ? null : (
-                <p
-                  key={item.section}
-                  className="px-3 pt-3 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500"
-                >
-                  {item.section}
-                </p>
-              );
-            }
-
             const Icon = item.icon;
             const active = isAdminLinkActive(pathname, currentProjectTab, item);
             const targetKey = "projectTab" in item ? `project-tab:${item.projectTab}` : item.href;
@@ -211,11 +217,8 @@ function Sidebar({
                   onCloseMobile();
                 }}
                 className={cn(
-                  "infra-click-pulse group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition-all duration-200",
-                  active
-                    ? "infra-premium-pill text-white shadow-[0_20px_44px_rgba(37,99,235,0.22)]"
-                    : "text-slate-300 hover:bg-white/[0.04] hover:text-white",
-                  "indent" in item && item.indent && !collapsed ? "ml-3" : "",
+                  "infra-click-pulse group flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition-all duration-200",
+                  getSidebarLinkTone(item, active),
                   collapsed ? "justify-center" : "",
                 )}
                 title={collapsed ? item.label : undefined}
