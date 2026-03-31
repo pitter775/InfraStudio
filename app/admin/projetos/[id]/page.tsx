@@ -361,6 +361,8 @@ type PendingAgenteArquivo = {
   file: File;
 };
 
+const ACTIVE_PROJECT_STORAGE_KEY = "projeto_ativo";
+
 function sanitizePhoneDigits(value: string) {
   const digits = value.replace(/\D/g, "");
   const localDigits = digits.startsWith("55") && digits.length > 11 ? digits.slice(2) : digits;
@@ -5408,6 +5410,9 @@ export default function AdminProjetoDetalhePage() {
       }
 
       redirecting = true;
+      if (typeof window !== "undefined" && window.localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY) === params.id) {
+        window.localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
+      }
       setDeletingProjectRedirecting(true);
       setDeleteProjectModalOpen(false);
       setDeleteProjectConfirmation("");
@@ -5559,6 +5564,14 @@ export default function AdminProjetoDetalhePage() {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, params.id as string);
+  }, [params.id]);
 
   useEffect(() => {
     return () => {

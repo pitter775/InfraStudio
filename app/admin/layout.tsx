@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import {
@@ -15,9 +15,11 @@ import {
   LoaderCircle,
   LogOut,
   Menu,
+  MessageCircle,
   Globe,
   Layers3,
   Settings,
+  Store,
   UserRound,
   Users,
   X,
@@ -29,10 +31,13 @@ import { canAccessGlobalAdmin, canAccessWorkspace } from "@/lib/access";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COOKIE_NAME = "infrastudio_admin_sidebar";
+const ACTIVE_PROJECT_STORAGE_KEY = "projeto_ativo";
 
 const adminLinks = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/projetos", label: "Projetos", icon: BriefcaseBusiness },
+  { projectTab: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { projectTab: "mercado", label: "Mercado Livre", icon: Store },
   { href: "/admin/planos", label: "Planos", icon: Coins },
   { href: "/admin/assinaturas", label: "Assinaturas", icon: Layers3 },
   { href: "/admin/uso", label: "Uso por Projeto", icon: ActivitySquare },
@@ -40,10 +45,14 @@ const adminLinks = [
   { href: "/admin/usage", label: "Uso de Tokens", icon: Coins },
   { href: "/admin/chat-logs", label: "Logs", icon: ActivitySquare },
   { href: "/admin/usuarios", label: "Usuários", icon: Users },
-];
+] as const;
 
-function isAdminLinkActive(pathname: string, href: string) {
-  return pathname === href || pathname.startsWith(`${href}/`);
+function isAdminLinkActive(pathname: string, currentProjectTab: string | null, item: (typeof adminLinks)[number]) {
+  if ("projectTab" in item) {
+    return pathname.startsWith("/admin/projetos/") && currentProjectTab === item.projectTab;
+  }
+
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
 function readSidebarCollapsedCookie() {
@@ -70,10 +79,12 @@ type SidebarProps = {
   collapsed: boolean;
   mobileOpen: boolean;
   pathname: string;
+  currentProjectTab: string | null;
   loadingHref: string | null;
   onCollapseToggle: () => void;
   onCloseMobile: () => void;
   onNavigate: (href: string) => void;
+  onProjectTabNavigate: (tab: "whatsapp" | "mercado") => void;
   onLogout: () => Promise<void> | void;
 };
 
@@ -82,14 +93,16 @@ function Sidebar({
   collapsed,
   mobileOpen,
   pathname,
+  currentProjectTab,
   loadingHref,
   onCollapseToggle,
   onCloseMobile,
   onNavigate,
+  onProjectTabNavigate,
   onLogout,
 }: SidebarProps) {
   const visibleLinks = currentUser && !canAccessGlobalAdmin(currentUser)
-    ? adminLinks.filter((item) => item.href === "/admin/dashboard" || item.href === "/admin/projetos" || item.href === "/admin/me")
+    ? adminLinks.filter((item) => ("projectTab" in item) || item.href === "/admin/dashboard" || item.href === "/admin/projetos" || item.href === "/admin/me")
     : adminLinks;
 
   return (
@@ -153,15 +166,18 @@ function Sidebar({
         <nav className="mt-8 flex-1 space-y-2 px-2">
           {visibleLinks.map((item) => {
             const Icon = item.icon;
-            const active = isAdminLinkActive(pathname, item.href);
-            const isLoading = loadingHref === item.href;
+            const active = isAdminLinkActive(pathname, currentProjectTab, item);
+            const targetKey = "projectTab" in item ? `project-tab:${item.projectTab}` : item.href;
+            const isLoading = loadingHref === targetKey;
 
             return (
               <button
-                key={item.href}
+                key={"projectTab" in item ? item.projectTab : item.href}
                 type="button"
                 onClick={() => {
-                  if (pathname !== item.href) {
+                  if ("projectTab" in item) {
+                    onProjectTabNavigate(item.projectTab);
+                  } else if (pathname !== item.href) {
                     onNavigate(item.href);
                   }
                   onCloseMobile();
@@ -245,6 +261,7 @@ function Sidebar({
 
 export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(readSidebarCollapsedCookie);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -252,6 +269,12 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   const [authResolved, setAuthResolved] = useState(false);
   const [loadingHref, setLoadingHref] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [projectPickerTab, setProjectPickerTab] = useState<"whatsapp" | "mercado" | null>(null);
+  const [projectPickerLoading, setProjectPickerLoading] = useState(false);
+  const [projectPickerProjects, setProjectPickerProjects] = useState<Array<{ id: string; nome: string; descricao: string; status: string }>>([]);
+  const [projectPickerFeedback, setProjectPickerFeedback] = useState<string | null>(null);
+  const currentProjectTab = searchParams.get("tab");
 
   useEffect(() => {
     const loadUser = async () => {
@@ -275,7 +298,9 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
 
   useEffect(() => {
     adminLinks.forEach((item) => {
-      router.prefetch(item.href);
+      if ("href" in item) {
+        router.prefetch(item.href);
+      }
     });
   }, [router]);
 
@@ -302,6 +327,62 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
     router.push(href);
   };
 
+  const loadProjectPickerProjects = async () => {
+    setProjectPickerLoading(true);
+    setProjectPickerFeedback(null);
+
+    try {
+      const response = await fetch("/api/admin/projetos", { cache: "no-store" });
+      const payload = (await response.json()) as {
+        error?: string;
+        projetos?: Array<{ id: string; nome: string; descricao: string; status: string }>;
+      };
+
+      if (!response.ok) {
+        setProjectPickerFeedback(payload.error ?? "Nao foi possivel carregar os projetos.");
+        setProjectPickerProjects([]);
+        setProjectPickerLoading(false);
+        return;
+      }
+
+      setProjectPickerProjects(payload.projetos ?? []);
+      setProjectPickerLoading(false);
+    } catch {
+      setProjectPickerFeedback("Nao foi possivel carregar os projetos.");
+      setProjectPickerProjects([]);
+      setProjectPickerLoading(false);
+    }
+  };
+
+  const handleProjectTabNavigate = async (tab: "whatsapp" | "mercado") => {
+    const loadingKey = `project-tab:${tab}`;
+    const activeProjectId = typeof window === "undefined"
+      ? null
+      : window.localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY)?.trim() || null;
+
+    if (activeProjectId) {
+      setLoadingHref(loadingKey);
+      router.push(`/admin/projetos/${activeProjectId}?tab=${tab}`);
+      return;
+    }
+
+    setProjectPickerTab(tab);
+    setProjectPickerOpen(true);
+    await loadProjectPickerProjects();
+  };
+
+  const handleProjectPickerSelect = (projectId: string) => {
+    if (!projectPickerTab || typeof window === "undefined") {
+      return;
+    }
+
+    const loadingKey = `project-tab:${projectPickerTab}`;
+    window.localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, projectId);
+    setProjectPickerOpen(false);
+    setLoadingHref(loadingKey);
+    router.push(`/admin/projetos/${projectId}?tab=${projectPickerTab}`);
+  };
+
   if (!authResolved || loggingOut) {
     return (
       <div className="infra-premium-bg flex min-h-screen items-center justify-center px-6 text-slate-200">
@@ -325,10 +406,12 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
         collapsed={collapsed}
         mobileOpen={mobileOpen}
         pathname={pathname}
+        currentProjectTab={currentProjectTab}
         loadingHref={loadingHref}
         onCollapseToggle={() => setCollapsed((value) => !value)}
         onCloseMobile={() => setMobileOpen(false)}
         onNavigate={handleNavigate}
+        onProjectTabNavigate={(tab) => void handleProjectTabNavigate(tab)}
         onLogout={handleLogout}
       />
 
@@ -375,6 +458,77 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
           <FooterSection />
          </div>
       </div>
+
+      {projectPickerOpen ? (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
+          <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+              <div>
+                <h2 className="text-2xl font-extrabold text-white">Escolher projeto</h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Selecione o projeto para abrir a aba de {projectPickerTab === "mercado" ? "Mercado Livre" : "WhatsApp"}.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setProjectPickerOpen(false);
+                  setProjectPickerTab(null);
+                  setProjectPickerFeedback(null);
+                }}
+                className="infra-click-pulse inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-100 transition-all hover:border-white/20 hover:bg-white/10"
+                aria-label="Fechar modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-6 py-6">
+              {projectPickerFeedback ? (
+                <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+                  {projectPickerFeedback}
+                </div>
+              ) : null}
+
+              {projectPickerLoading ? (
+                <div className="flex items-center justify-center py-12 text-slate-300">
+                  <LoaderCircle size={18} className="animate-spin" />
+                  <span className="ml-3 text-sm">Carregando projetos...</span>
+                </div>
+              ) : null}
+
+              {!projectPickerLoading && !projectPickerProjects.length ? (
+                <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/30 p-5 text-sm text-slate-400">
+                  Nenhum projeto disponivel para selecionar.
+                </div>
+              ) : null}
+
+              {!projectPickerLoading && projectPickerProjects.length ? (
+                <div className="grid gap-3">
+                  {projectPickerProjects.map((project) => (
+                    <button
+                      key={project.id}
+                      type="button"
+                      onClick={() => handleProjectPickerSelect(project.id)}
+                      className="infra-click-pulse rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-left transition-all hover:border-cyan-400/30 hover:bg-white/10"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold text-white">{project.nome}</p>
+                          <p className="mt-1 text-sm text-slate-400">{project.descricao || "Sem descricao."}</p>
+                        </div>
+                        <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-200">
+                          {project.status}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

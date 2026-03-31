@@ -8,6 +8,8 @@ import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
 
+const ACTIVE_PROJECT_STORAGE_KEY = "projeto_ativo";
+
 type Projeto = {
   id: string;
   nome: string;
@@ -436,6 +438,11 @@ export default function AdminProjetosPage() {
                       </div>
                       <Link
                         href={`/admin/projetos/${projeto.id}`}
+                        onClick={() => {
+                          if (typeof window !== "undefined") {
+                            window.localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, projeto.id);
+                          }
+                        }}
                         className={primaryActionButtonClass}
                       >
                         Abrir projeto
