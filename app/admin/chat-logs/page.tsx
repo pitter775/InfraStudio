@@ -43,6 +43,9 @@ function buildCompactDetails(log: SystemLog) {
 
   const provider = typeof payload.provider === "string" ? payload.provider : null;
   const model = typeof payload.model === "string" ? payload.model : null;
+  const errorCode = typeof payload.code === "string" ? payload.code : null;
+  const errorMessage = typeof payload.message === "string" ? payload.message : null;
+  const databaseHost = typeof payload.databaseHost === "string" ? payload.databaseHost : null;
   const estimatedCostUsd = payload.estimatedCostUsd;
   const messageCount = payload.messageCount;
   const tokens =
@@ -56,6 +59,18 @@ function buildCompactDetails(log: SystemLog) {
 
   if (model) {
     details.push(`model=${model}`);
+  }
+
+  if (errorCode) {
+    details.push(`code=${errorCode}`);
+  }
+
+  if (errorMessage) {
+    details.push(`motivo=${errorMessage}`);
+  }
+
+  if (databaseHost) {
+    details.push(`db=${databaseHost}`);
   }
 
   if (typeof messageCount === "number") {
@@ -75,7 +90,9 @@ function buildCompactDetails(log: SystemLog) {
     details.push(`usd=${estimatedCostUsd.toFixed(4)}`);
   }
 
-  const payloadKeys = Object.keys(payload).filter((key) => !["provider", "model", "estimatedCostUsd", "messageCount", "tokens"].includes(key));
+  const payloadKeys = Object.keys(payload).filter((key) =>
+    !["provider", "model", "code", "message", "databaseHost", "estimatedCostUsd", "messageCount", "tokens"].includes(key),
+  );
   if (payloadKeys.length) {
     details.push(`campos=${payloadKeys.slice(0, 5).join(",")}`);
   }
