@@ -484,7 +484,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
               </motion.div>
             </AnimatePresence>
           </div>
-          <FooterSection />
+          {pathname.startsWith("/admin/atendimento") ? null : <FooterSection />}
          </div>
       </div>
 

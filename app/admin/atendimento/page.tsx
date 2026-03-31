@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { BriefcaseBusiness, Clock3, LoaderCircle, MessageCircleMore, PhoneCall, RefreshCcw, SendHorizonal, Sparkles, SplitSquareVertical } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BriefcaseBusiness, Clock3, LoaderCircle, MessageCircleMore, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, X } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -34,6 +34,13 @@ type ChatMessageRecord = {
   role: "user" | "assistant" | "system";
   conteudo: string;
   createdAt: string;
+  metadata?: {
+    attachments?: Array<{
+      name?: string;
+      type?: string;
+      size?: number;
+    }>;
+  } | null;
 };
 
 type IndicativoSummary = {
@@ -60,6 +67,8 @@ const dddLabels: Record<string, string> = {
   "81": "Recife",
   "85": "Fortaleza",
 };
+
+const quickEmojis = ["😀", "👍", "🙏", "🎯", "📎", "🚀"];
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("pt-BR", {
@@ -124,6 +133,7 @@ function CenterLoader() {
 }
 
 export default function AdminAtendimentoPage() {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -138,6 +148,8 @@ export default function AdminAtendimentoPage() {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [messagesByChatId, setMessagesByChatId] = useState<Record<string, ChatMessageRecord[]>>({});
   const [replyText, setReplyText] = useState("");
+  const [selectedAttachments, setSelectedAttachments] = useState<Array<{ name: string; type: string; size: number }>>([]);
+  const [emojiTrayOpen, setEmojiTrayOpen] = useState(false);
   const [manualAssumedByChat, setManualAssumedByChat] = useState<Record<string, boolean>>({});
 
   const selectedChat = useMemo(
@@ -345,7 +357,7 @@ export default function AdminAtendimentoPage() {
   };
 
   const handleSendMessage = async () => {
-    if (!selectedChatId || !replyText.trim()) {
+    if (!selectedChatId || (!replyText.trim() && !selectedAttachments.length)) {
       return;
     }
 
@@ -360,6 +372,7 @@ export default function AdminAtendimentoPage() {
         },
         body: JSON.stringify({
           conteudo: replyText,
+          attachments: selectedAttachments,
         }),
       });
 
@@ -382,7 +395,7 @@ export default function AdminAtendimentoPage() {
             chat.id === selectedChatId
               ? {
                   ...chat,
-                  ultimaMensagem: sentMessage.conteudo,
+                  ultimaMensagem: replyText.trim() || (selectedAttachments.length ? "Anexo enviado." : sentMessage.conteudo),
                   updatedAt: sentMessage.createdAt,
                 }
               : chat,
@@ -390,6 +403,10 @@ export default function AdminAtendimentoPage() {
           .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()),
       );
       setReplyText("");
+      setSelectedAttachments([]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       setSendingMessage(false);
     } catch {
       setFeedback("Nao foi possivel enviar a mensagem.");
@@ -469,7 +486,7 @@ export default function AdminAtendimentoPage() {
   }
 
   return (
-    <main className="space-y-5">
+    <main className="flex h-[calc(100vh-7.5rem)] flex-col gap-5 overflow-hidden">
       <section className="px-1 py-2">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">
           <MessageCircleMore size={14} />
@@ -602,14 +619,14 @@ export default function AdminAtendimentoPage() {
         </div>
       </section>
 
-      <section className="grid min-h-[calc(100vh-22rem)] gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <section className="grid min-h-0 flex-1 gap-4 overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)]">
         <div className="overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)]">
           <div className="border-b border-white/10 px-4 py-3">
             <p className="text-base font-bold text-white">Conversas do projeto</p>
             <p className="mt-1 text-xs text-slate-400">Site e WhatsApp no mesmo feed.</p>
           </div>
 
-          <div className="max-h-[calc(100vh-24rem)] overflow-y-auto p-3 xl:max-h-[calc(100vh-22rem)]">
+          <div className="h-full overflow-y-auto p-3">
             {loadingChats ? <CenterLoader /> : null}
 
             {!loadingChats && !chats.length ? (
@@ -652,7 +669,7 @@ export default function AdminAtendimentoPage() {
           </div>
         </div>
 
-        <div className="flex min-h-[calc(100vh-22rem)] flex-col overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)]">
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)]">
           {selectedChat ? (
             <>
               <div className="border-b border-white/10 px-4 py-3 sm:px-5">
@@ -715,6 +732,19 @@ export default function AdminAtendimentoPage() {
                               {fromUser ? "user" : "assistant"}
                             </p>
                             <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{message.conteudo}</p>
+                            {message.metadata?.attachments?.length ? (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {message.metadata.attachments.map((attachment, index) => (
+                                  <span
+                                    key={`${message.id}-attachment-${index}`}
+                                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-slate-200"
+                                  >
+                                    <Paperclip size={12} />
+                                    {attachment.name || "arquivo"}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
                             <p className="mt-2 text-[11px] text-slate-400">{formatDateTime(message.createdAt)}</p>
                           </div>
                         </div>
@@ -725,18 +755,93 @@ export default function AdminAtendimentoPage() {
               </div>
 
               <div className="sticky bottom-0 border-t border-white/10 bg-[#07111f]/96 px-4 py-3 backdrop-blur-xl sm:px-5">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    const nextFiles = Array.from(event.target.files ?? []).slice(0, 5).map((file) => ({
+                      name: file.name,
+                      type: file.type,
+                      size: file.size,
+                    }));
+                    setSelectedAttachments(nextFiles);
+                  }}
+                />
+
+                {selectedAttachments.length ? (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {selectedAttachments.map((attachment, index) => (
+                      <span
+                        key={`${attachment.name}-${index}`}
+                        className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-slate-200"
+                      >
+                        <Paperclip size={12} />
+                        {attachment.name}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedAttachments((current) => current.filter((_, currentIndex) => currentIndex !== index))
+                          }
+                          className="text-slate-400 transition-colors hover:text-white"
+                          aria-label="Remover anexo"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
+                {emojiTrayOpen ? (
+                  <div className="mb-2 flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-slate-950/70 p-2">
+                    {quickEmojis.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => {
+                          setReplyText((current) => `${current}${current ? " " : ""}${emoji}`);
+                          setEmojiTrayOpen(false);
+                        }}
+                        className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-lg transition-colors hover:bg-white/10"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="flex items-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                      aria-label="Selecionar anexo"
+                    >
+                      <Paperclip size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEmojiTrayOpen((current) => !current)}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                      aria-label="Abrir emojis"
+                    >
+                      <SmilePlus size={16} />
+                    </button>
+                  </div>
                   <textarea
                     value={replyText}
                     onChange={(event) => setReplyText(event.target.value)}
                     placeholder="Digite sua resposta manual..."
                     rows={2}
-                    className="min-h-[72px] flex-1 rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-500 focus:border-cyan-400/30"
+                    className="max-h-40 min-h-[72px] flex-1 overflow-y-auto rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-500 focus:border-cyan-400/30"
                   />
                   <button
                     type="button"
                     onClick={() => void handleSendMessage()}
-                    disabled={sendingMessage || !replyText.trim()}
+                    disabled={sendingMessage || (!replyText.trim() && !selectedAttachments.length)}
                     className="inline-flex min-w-[120px] items-center justify-center gap-2 rounded-xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 transition-all hover:border-sky-300/30 hover:bg-sky-400/14 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {sendingMessage ? <LoaderCircle size={16} className="animate-spin" /> : <SendHorizonal size={16} />}

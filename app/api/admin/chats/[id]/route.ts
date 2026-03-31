@@ -49,19 +49,36 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Acesso negado para esta conversa." }, { status: 403 });
   }
 
-  const body = (await request.json()) as { conteudo?: string };
+  const body = (await request.json()) as {
+    conteudo?: string;
+    attachments?: Array<{
+      name?: string;
+      type?: string;
+      size?: number;
+    }>;
+  };
   const conteudo = body.conteudo?.trim() || "";
+  const attachments = Array.isArray(body.attachments)
+    ? body.attachments
+        .map((item) => ({
+          name: item.name?.trim() || "arquivo",
+          type: item.type?.trim() || "application/octet-stream",
+          size: typeof item.size === "number" && Number.isFinite(item.size) ? item.size : 0,
+        }))
+        .slice(0, 5)
+    : [];
 
-  if (!conteudo) {
-    return NextResponse.json({ error: "Digite uma mensagem para enviar." }, { status: 400 });
+  if (!conteudo && !attachments.length) {
+    return NextResponse.json({ error: "Digite uma mensagem ou selecione um anexo." }, { status: 400 });
   }
 
   const message = await appendMessage({
     chatId: chat.id,
     role: "assistant",
-    conteudo,
+    conteudo: conteudo || "Anexo enviado.",
     canal: chat.canal,
     identificadorExterno: chat.identificadorExterno,
+    metadata: attachments.length ? { attachments } : null,
   });
 
   if (!message) {
