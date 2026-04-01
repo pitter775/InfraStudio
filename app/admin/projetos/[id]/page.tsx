@@ -7249,7 +7249,7 @@ export default function AdminProjetoDetalhePage() {
 
                       <div className="mt-6 border-t border-white/10 pt-4">
                         <div className="rounded-2xl border border-white/8 bg-slate-950/45 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+                          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
                           <button
                             type="button"
                             onClick={() => void handleConnectWhatsAppChannel(channel)}
@@ -7262,11 +7262,11 @@ export default function AdminProjetoDetalhePage() {
                           <button
                             type="button"
                             onClick={() => void handleConnectWhatsAppChannel(channel, { refreshQr: true })}
-                            disabled={connectingWhatsAppChannelId === channel.id}
+                            disabled={connectingWhatsAppChannelId === channel.id || (!isWaitingQr && runtimeStatus !== "aguardando_qr")}
                             className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-50 transition-all hover:border-cyan-300/30 hover:bg-cyan-500/14 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {connectingWhatsAppChannelId === channel.id ? <BusyIcon /> : <Activity size={15} />}
-                            Atualizar QR
+                            Gerar novo QR
                           </button>
                           <button
                             type="button"
@@ -7293,14 +7293,6 @@ export default function AdminProjetoDetalhePage() {
                           >
                             {deletingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
                             Remover
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void refreshWhatsAppRuntime(channel.id)}
-                            className={`inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-200 transition-all hover:bg-white/10 hover:text-white ${premiumInteractiveClass}`}
-                          >
-                            <Activity size={15} />
-                            Atualizar
                           </button>
                           </div>
                         </div>
