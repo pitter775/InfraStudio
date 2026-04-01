@@ -24,6 +24,11 @@ export type SystemLogEntry = {
   level: "info" | "error";
 };
 
+function normalizeLogField(value: string | undefined, fallback: string, maxLength = 20) {
+  const normalized = value?.trim() || fallback;
+  return normalized.slice(0, maxLength);
+}
+
 function detectLevel(value: { tipo?: string | null; origem?: string | null; descricao?: string | null }) {
   const joined = [value.tipo, value.origem, value.descricao]
     .filter(Boolean)
@@ -89,8 +94,8 @@ export async function appendSystemLog(input: {
   payload?: Record<string, unknown> | null;
 }) {
   const normalized = {
-    tipo: input.tipo?.trim() || "system_event",
-    origem: input.origem?.trim() || "system",
+    tipo: normalizeLogField(input.tipo, "system_event"),
+    origem: normalizeLogField(input.origem, "system"),
     descricao: input.descricao.trim(),
   };
 
