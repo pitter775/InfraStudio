@@ -110,7 +110,8 @@ export async function getAgenteAtivo(projetoId: string) {
     .select("id, slug, nome, descricao, prompt_base, configuracoes, ativo, projeto_id, projetos(nome, slug), modelo_id, created_at")
     .eq("projeto_id", projetoId)
     .eq("ativo", true)
-    .order("created_at", { ascending: true })
+    .order("updated_at", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 

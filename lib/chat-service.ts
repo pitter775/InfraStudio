@@ -536,15 +536,6 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
         identificadorExterno: normalizedExternalIdentifier,
         channelScopeId: channelKind === "whatsapp" ? body.whatsappChannelId ?? null : null,
       });
-
-      if (!chat && resolved.lockedToAgent) {
-        chat = await findActiveChatByChannel({
-          projetoId: resolved.projeto.id,
-          canal: channelKind,
-          identificadorExterno: normalizedExternalIdentifier,
-          channelScopeId: channelKind === "whatsapp" ? body.whatsappChannelId ?? null : null,
-        });
-      }
     }
 
     if (!chat) {
