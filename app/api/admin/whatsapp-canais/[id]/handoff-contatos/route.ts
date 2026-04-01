@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin, canManageProject } from "@/lib/access";
+import { appendSystemLog } from "@/lib/chat-logs";
 import { getSessionUser } from "@/lib/session";
 import { getWhatsAppChannelById } from "@/lib/whatsapp-channels";
 import {
@@ -64,6 +65,19 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (body?.action === "delete" && body.contactId) {
     const ok = await deleteWhatsAppHandoffContact(body.contactId);
+    if (!ok) {
+      await appendSystemLog({
+        projetoId: channel.projetoId,
+        tipo: "whatsapp_handoff_cfg",
+        origem: "whatsapp_handoff_contatos",
+        descricao: "Falha ao remover contato de aviso do atendimento humano.",
+        payload: {
+          channelId: channel.id,
+          contactId: body.contactId,
+          action: "delete",
+        },
+      });
+    }
     return NextResponse.json({ success: ok }, { status: ok ? 200 : 500 });
   }
 
@@ -79,6 +93,18 @@ export async function POST(request: Request, context: RouteContext) {
     });
 
     if (!contact) {
+      await appendSystemLog({
+        projetoId: channel.projetoId,
+        tipo: "whatsapp_handoff_cfg",
+        origem: "whatsapp_handoff_contatos",
+        descricao: "Falha ao atualizar contato de aviso do atendimento humano.",
+        payload: {
+          channelId: channel.id,
+          contactId: body.contactId,
+          action: "update",
+          numero: body.numero ?? null,
+        },
+      });
       return NextResponse.json({ error: "Nao foi possivel atualizar o contato." }, { status: 500 });
     }
 
@@ -101,6 +127,18 @@ export async function POST(request: Request, context: RouteContext) {
   });
 
   if (!contact) {
+    await appendSystemLog({
+      projetoId: channel.projetoId,
+      tipo: "whatsapp_handoff_cfg",
+      origem: "whatsapp_handoff_contatos",
+      descricao: "Falha ao criar contato de aviso do atendimento humano.",
+      payload: {
+        channelId: channel.id,
+        action: "create",
+        nome: body.nome,
+        numero: body.numero,
+      },
+    });
     return NextResponse.json({ error: "Nao foi possivel criar o contato." }, { status: 500 });
   }
 

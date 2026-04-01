@@ -73,6 +73,21 @@ function normalizeSearchText(value: string) {
     .trim();
 }
 
+function buildMercadoLivreCanonicalLink(itemId?: string | null, permalink?: string | null) {
+  const normalizedItemId = typeof itemId === "string" && itemId.trim() ? itemId.trim().toUpperCase() : null;
+  const normalizedPermalink = typeof permalink === "string" ? permalink.trim() : "";
+
+  if (normalizedPermalink && !/mercadoshops\.com\.br|internal-shop/i.test(normalizedPermalink)) {
+    return normalizedPermalink;
+  }
+
+  if (normalizedItemId) {
+    return `https://produto.mercadolivre.com.br/${normalizedItemId}`;
+  }
+
+  return normalizedPermalink || "";
+}
+
 function buildSearchTokens(value: string) {
   return normalizeSearchText(value)
     .split(" ")
@@ -181,7 +196,7 @@ function normalizeProduto(item: MercadoLivreSearchItem): ProdutoPadronizado | nu
     nome: item.title,
     preco: item.price,
     imagem: item.thumbnail,
-    link: item.permalink,
+    link: buildMercadoLivreCanonicalLink(typeof item.id === "string" ? item.id : null, item.permalink),
     publicadoEm:
       (typeof item.date_created === "string" && item.date_created.trim()) ||
       (typeof item.start_time === "string" && item.start_time.trim()) ||

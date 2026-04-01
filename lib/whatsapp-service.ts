@@ -11,6 +11,14 @@ type SendWhatsAppServiceMessageInput = {
   channelId: string;
   to: string;
   message: string;
+  attachments?: Array<{
+    name?: string | null;
+    type?: string | null;
+    size?: number | null;
+    publicUrl?: string | null;
+    storagePath?: string | null;
+    category?: "image" | "video" | "file" | null;
+  }> | null;
 };
 
 function getWhatsAppServiceUrl() {
@@ -80,6 +88,7 @@ export async function sendWhatsAppServiceMessage(input: SendWhatsAppServiceMessa
       channelId: input.channelId,
       to: input.to,
       message: input.message,
+      attachments: Array.isArray(input.attachments) ? input.attachments : [],
     }),
     cache: "no-store",
   });

@@ -60,6 +60,15 @@ function buildWhatsAppLink(phone: string | null | undefined, message: string) {
   return "https://wa.me/" + sanitizedPhone + "?text=" + encodeURIComponent(message);
 }
 
+function getWhatsAppContactNameFromContext(context: Record<string, unknown> | null | undefined) {
+  if (!isPlainObject(context?.whatsapp)) {
+    return null;
+  }
+
+  const value = context.whatsapp.contactName;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -624,8 +633,9 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
         },
       };
 
+      const fallbackChatTitle = getWhatsAppContactNameFromContext(extraContext) ?? (message.length > 60 ? `${message.slice(0, 57)}...` : message);
       chat = await createChat({
-        titulo: message.length > 60 ? `${message.slice(0, 57)}...` : message,
+        titulo: fallbackChatTitle,
         projetoId: resolved.projeto?.id ?? null,
         agenteId: resolved.agente?.id ?? null,
         canal: channelKind,
@@ -976,6 +986,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
 
   const leadNameForTitle =
     typeof nextContext.lead?.nome === "string" && nextContext.lead.nome.trim() ? nextContext.lead.nome.trim() : null;
+  const whatsappContactNameForTitle = getWhatsAppContactNameFromContext(nextContext);
 
   const assistantMessage = await appendMessage({
     chatId: chat.id,
@@ -1024,7 +1035,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     chatId: chat.id,
     totalTokensToAdd: ai.usage.inputTokens + ai.usage.outputTokens,
     totalCustoToAdd: estimatedCostUsd,
-    titulo: leadNameForTitle ?? chat.titulo,
+    titulo: leadNameForTitle ?? whatsappContactNameForTitle ?? chat.titulo,
     contexto: nextContext,
   });
 

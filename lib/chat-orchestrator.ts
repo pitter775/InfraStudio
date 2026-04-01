@@ -2954,7 +2954,7 @@ export function enrichLeadContext(
   const name = extractName(latestUserMessage);
   const whatsappContext =
     currentContext && typeof currentContext.whatsapp === "object" && currentContext.whatsapp !== null
-      ? (currentContext.whatsapp as { remetente?: string | null })
+      ? (currentContext.whatsapp as { remetente?: string | null; contactName?: string | null })
       : null;
   const channelContext =
     currentContext && typeof currentContext.channel === "object" && currentContext.channel !== null
@@ -2967,7 +2967,11 @@ export function enrichLeadContext(
   const isWhatsAppConversation = (channelContext?.kind ?? "").trim().toLowerCase() === "whatsapp";
   const nextCount = history.filter((item) => item.role !== "system").length;
   const resolvedPhone = phone ?? context.lead?.telefone ?? normalizedWhatsappPhone ?? null;
-  const resolvedName = name ?? context.lead?.nome ?? null;
+  const resolvedName =
+    name ??
+    context.lead?.nome ??
+    (typeof whatsappContext?.contactName === "string" && whatsappContext.contactName.trim() ? whatsappContext.contactName.trim() : null) ??
+    null;
 
   const nextContext = {
     origem: context.origem ?? "site",

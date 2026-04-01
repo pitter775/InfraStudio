@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin, canAccessProject } from "@/lib/access";
+import { appendSystemLog } from "@/lib/chat-logs";
 import { claimHumanHandoff, getChatHandoffByChatId } from "@/lib/chat-handoffs";
 import { appendMessage, getChatById, listChatMessages, touchChatUpdatedAt } from "@/lib/chats";
 import { getSessionUser } from "@/lib/session";
@@ -109,9 +110,15 @@ export async function POST(request: Request, context: RouteContext) {
 
   const channelContext =
     chat.contexto && typeof chat.contexto === "object" && !Array.isArray(chat.contexto)
-      ? (chat.contexto.whatsapp as { channelId?: string | null } | undefined)
+      ? (chat.contexto.whatsapp as { channelId?: string | null; remoteJid?: string | null; remetente?: string | null } | undefined)
       : undefined;
   const canalWhatsappId = typeof channelContext?.channelId === "string" ? channelContext.channelId : null;
+  const destinatarioWhatsapp =
+    typeof channelContext?.remoteJid === "string" && channelContext.remoteJid.trim()
+      ? channelContext.remoteJid.trim()
+      : typeof channelContext?.remetente === "string" && channelContext.remetente.trim()
+        ? channelContext.remetente.trim()
+      : chat.identificadorExterno ?? "";
 
   if (sentByHuman && chat.projetoId) {
     await claimHumanHandoff({
@@ -126,16 +133,44 @@ export async function POST(request: Request, context: RouteContext) {
     });
   }
 
-  if (chat.canal === "whatsapp" && canalWhatsappId && conteudo) {
+  if (chat.canal === "whatsapp" && canalWhatsappId && (conteudo || attachments.length)) {
     const outbound = await sendWhatsAppServiceMessage({
       channelId: canalWhatsappId,
-      to: chat.identificadorExterno ?? "",
+      to: destinatarioWhatsapp,
       message: conteudo,
+      attachments,
     });
 
     if (!outbound.ok) {
+      await appendSystemLog({
+        projetoId: chat.projetoId,
+        tipo: "chat_whatsapp_send_error",
+        origem: "admin_chat.outbound",
+        descricao: outbound.error ?? "Nao foi possivel enviar a mensagem pelo whatsapp-service.",
+        payload: {
+          chatId: chat.id,
+          channelId: canalWhatsappId,
+          to: destinatarioWhatsapp,
+          hasText: Boolean(conteudo),
+          attachmentCount: attachments.length,
+        },
+      });
       return NextResponse.json({ error: outbound.error ?? "Nao foi possivel enviar no WhatsApp." }, { status: 502 });
     }
+
+    await appendSystemLog({
+      projetoId: chat.projetoId,
+      tipo: "chat_whatsapp_send",
+      origem: "admin_chat.outbound",
+      descricao: "Mensagem manual enviada para o WhatsApp do contato.",
+      payload: {
+        chatId: chat.id,
+        channelId: canalWhatsappId,
+        to: outbound.to ?? destinatarioWhatsapp,
+        hasText: Boolean(conteudo),
+        attachmentCount: attachments.length,
+      },
+    });
   }
 
   await touchChatUpdatedAt(chat.id);
