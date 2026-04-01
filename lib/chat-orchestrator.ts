@@ -1386,6 +1386,92 @@ function extractProductSearchTerm(message: string) {
   return cleaned || message.trim();
 }
 
+const PRODUCT_SEARCH_STOPWORDS = new Set([
+  "esse",
+  "essa",
+  "esses",
+  "essas",
+  "aquele",
+  "aquela",
+  "aqueles",
+  "aquelas",
+  "isto",
+  "isso",
+  "aquilo",
+  "bem",
+  "muito",
+  "mais",
+  "menos",
+  "para",
+  "pra",
+  "com",
+  "sem",
+  "que",
+  "de",
+  "da",
+  "do",
+  "das",
+  "dos",
+  "na",
+  "no",
+  "nas",
+  "nos",
+  "um",
+  "uma",
+  "uns",
+  "umas",
+  "e",
+  "eh",
+  "bonita",
+  "bonito",
+  "linda",
+  "lindo",
+  "gostei",
+  "quero",
+  "procuro",
+  "buscar",
+  "busca",
+  "produto",
+  "produtos",
+  "item",
+  "itens",
+  "esse",
+  "desse",
+  "dessa",
+]);
+
+function buildProductSearchCandidates(message: string) {
+  const baseTerm = extractProductSearchTerm(message);
+  const normalized = normalizeText(baseTerm).replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  const tokens = normalized
+    .split(/\s+/)
+    .filter((token) => token.length >= 3)
+    .filter((token) => !PRODUCT_SEARCH_STOPWORDS.has(token));
+  const candidates = new Set<string>();
+
+  if (tokens.length) {
+    candidates.add(tokens.join(" "));
+    candidates.add(tokens.slice(-2).join(" "));
+    candidates.add(tokens.slice(0, 2).join(" "));
+  }
+
+  [...tokens].reverse().forEach((token) => {
+    if (token.length >= 4) {
+      candidates.add(token);
+    }
+  });
+
+  if (baseTerm.trim()) {
+    candidates.add(baseTerm.trim());
+  }
+
+  if (normalized && normalized !== baseTerm.trim()) {
+    candidates.add(normalized);
+  }
+
+  return [...candidates].map((term) => term.trim()).filter(Boolean).slice(0, 6);
+}
+
 function didAssistantRecentlyAskForLeadName(history: ConversationMessage[]) {
   const previousAssistantMessage = [...history].reverse().find((item) => item.role === "assistant")?.content ?? "";
   const normalized = normalizeText(previousAssistantMessage);
@@ -2004,19 +2090,32 @@ export async function generateSalesReply(history: ConversationMessage[], context
     !genericMercadoLivreListingRequested &&
     !leadNameReplyDetected &&
     (detectedProductSearch || (hasMercadoLivreConnector && shouldUseMercadoLivreConnectorFallback(history, latestUserMessage, context)));
-  const productSearchTerm = productSearchRequested ? extractProductSearchTerm(latestUserMessage) : "";
+  const productSearchCandidates = productSearchRequested ? buildProductSearchCandidates(latestUserMessage) : [];
+  const productSearchTerm = productSearchCandidates[0] ?? "";
   const mercadoLivreListingSnapshot =
     agent?.id && genericMercadoLivreListingRequested ? await listarProdutosRecentesMercadoLivrePorAgente(agent.id) : null;
   const mercadoLivreListingProducts = mercadoLivreListingSnapshot?.produtos ?? [];
-  const mercadoLivreProducts =
-    agent?.id && productSearchRequested && hasMercadoLivreConnector ? await buscarProdutosMercadoLivrePorAgente(agent.id, productSearchTerm) : [];
+  let mercadoLivreProducts: ProdutoPadronizado[] = [];
+  let resolvedProductSearchTerm = productSearchTerm;
+
+  if (agent?.id && productSearchRequested && hasMercadoLivreConnector) {
+    for (const candidate of productSearchCandidates) {
+      const currentProducts = await buscarProdutosMercadoLivrePorAgente(agent.id, candidate);
+      if (currentProducts.length) {
+        mercadoLivreProducts = currentProducts;
+        resolvedProductSearchTerm = candidate;
+        break;
+      }
+    }
+  }
   const resourceTrace = {
     apiNames: apiContexts.map((item) => item.nome),
     apiErrors: apiContexts.filter((item) => item.erro).map((item) => ({ nome: item.nome, erro: item.erro })),
     mercadoLivreRequested: productSearchRequested,
     mercadoLivreConnectorActive: hasMercadoLivreConnector,
     mercadoLivreListingRequested: genericMercadoLivreListingRequested,
-    mercadoLivreTerm: productSearchTerm || null,
+    mercadoLivreTerm: resolvedProductSearchTerm || null,
+    mercadoLivreCandidates: productSearchCandidates,
     mercadoLivreListingCount: mercadoLivreListingProducts.length,
     mercadoLivreCount: mercadoLivreProducts.length,
   };
@@ -2059,7 +2158,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const directMercadoLivreReply = buildMercadoLivreReply(mercadoLivreProducts, context);
   const mercadoLivreNoResultsReply =
     productSearchRequested && agent?.id && hasMercadoLivreConnector && mercadoLivreProducts.length === 0
-      ? buildMercadoLivreNoResultsReply(productSearchTerm, context)
+      ? buildMercadoLivreNoResultsReply(resolvedProductSearchTerm || productSearchTerm, context)
       : null;
 
   if (leadIdentificationReply && leadNameReplyDetected) {

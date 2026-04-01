@@ -61,6 +61,92 @@ function buildSearchTokens(value: string) {
     .filter((item) => item.length >= 2);
 }
 
+const SEARCH_STOPWORDS = new Set([
+  "esse",
+  "essa",
+  "esses",
+  "essas",
+  "aquele",
+  "aquela",
+  "aqueles",
+  "aquelas",
+  "isto",
+  "isso",
+  "aquilo",
+  "bem",
+  "muito",
+  "mais",
+  "menos",
+  "pra",
+  "para",
+  "com",
+  "sem",
+  "que",
+  "de",
+  "da",
+  "do",
+  "das",
+  "dos",
+  "na",
+  "no",
+  "nas",
+  "nos",
+  "um",
+  "uma",
+  "uns",
+  "umas",
+  "e",
+  "eh",
+  "bonita",
+  "bonito",
+  "linda",
+  "lindo",
+  "gostei",
+  "quero",
+  "procuro",
+  "buscar",
+  "busca",
+  "produto",
+  "produtos",
+  "item",
+  "itens",
+  "modelo",
+]);
+
+function buildSearchVariants(value: string) {
+  const trimmed = value.trim();
+  const normalized = normalizeSearchText(trimmed);
+  const tokens = buildSearchTokens(trimmed);
+  const meaningfulTokens = tokens.filter((token) => token.length >= 3 && !SEARCH_STOPWORDS.has(token));
+  const variants = new Set<string>();
+
+  if (trimmed) {
+    variants.add(trimmed);
+  }
+
+  if (normalized && normalized !== trimmed) {
+    variants.add(normalized);
+  }
+
+  if (meaningfulTokens.length) {
+    variants.add(meaningfulTokens.join(" "));
+  }
+
+  for (var index = 0; index < meaningfulTokens.length; index += 1) {
+    const token = meaningfulTokens[index];
+    if (token.length >= 4) {
+      variants.add(token);
+    }
+
+    const next = meaningfulTokens[index + 1];
+    if (next) {
+      variants.add(token + " " + next);
+    }
+  }
+
+  return [...variants].filter((term) => term.trim().length >= 2).slice(0, 8);
+}
+
 function normalizeProduto(item: MercadoLivreSearchItem): ProdutoPadronizado | null {
   if (
     typeof item.title !== "string" ||
@@ -195,8 +281,7 @@ async function searchConnectorProducts(connector: ConnectorRecord, termo: string
   const endpointBase = connector.endpointBase || "https://api.mercadolibre.com";
   const sellerId = config?.seller_id?.replace(/\D/g, "").trim();
   const accessToken = await ensureMercadoLivreAccessToken(connector);
-  const normalizedTerm = normalizeSearchText(termo);
-  const terms = [...new Set([termo.trim(), normalizedTerm].filter(Boolean))];
+  const terms = buildSearchVariants(termo);
   const batches: ProdutoPadronizado[] = [];
 
   for (const currentTerm of terms) {
