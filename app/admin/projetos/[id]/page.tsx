@@ -3944,12 +3944,14 @@ function EmbeddedAgentTestChat({
 
     const projetoRef = projeto.id;
     const agenteRef = agente.id;
+    const testSessionId = `admin-agent-test:${projeto.id}:${agente.id}:${Date.now()}`;
     const scriptId = "infrastudio-admin-agent-test-chat-sdk";
     const mountWidget = () => {
       infraChatWindow.InfraChat?.destroy();
       infraChatWindow.InfraChat?.mount({
         projeto: projetoRef,
         agente: agenteRef,
+        identificadorExterno: testSessionId,
         apiBase: origin,
         strictHostControl: true,
         open: true,
@@ -3959,7 +3961,7 @@ function EmbeddedAgentTestChat({
         ui: {
           transparent: false,
           title: agente.nome,
-          subtitle: "Testando o agente",
+          subtitle: "Testando o agente 3",
         },
         context: {
           route: {

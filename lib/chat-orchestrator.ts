@@ -378,6 +378,26 @@ function formatHeuristicReply(reply: string, context?: ConversationContext) {
     .replace(/\? ([A-ZÀ-Ú0-9✓→-])/g, "?\n\n$1");
 }
 
+function buildNeutralGlobalFallbackReply(agent: AgenteRecord | null, context?: ConversationContext) {
+  const objective =
+    normalizeAgentRuntimeConfig(agent?.configuracoes?.runtime)?.overview.objetivo?.trim() ||
+    context?.qualificacao?.objetivo?.trim() ||
+    agent?.descricao?.trim() ||
+    context?.projeto?.nome?.trim() ||
+    "este atendimento";
+
+  return [
+    `Sigo por aqui no contexto de ${agent?.nome ?? "atendimento"}.`,
+    `Me diga o ponto exato que voce quer validar em ${objective}.`,
+  ].join("\n\n");
+}
+
+function isInfraStudioFirstPartyContext(context?: ConversationContext) {
+  const projetoSlug = normalizeText(context?.projeto?.slug ?? "");
+  const projetoNome = normalizeText(context?.projeto?.nome ?? "");
+  return projetoSlug === "infrastudio" || projetoNome === "infrastudio";
+}
+
 function normalizeText(value: string) {
   return value
     .normalize("NFD")
@@ -1034,9 +1054,9 @@ function buildAgentScopedRecoveryReply(input: {
   agent: AgenteRecord | null;
   apiContexts: ApiRuntimeContext[];
 }) {
-  const commercialFallback = heuristicReply(input.message, input.context);
-  if (commercialFallback?.trim()) {
-    return formatHeuristicReply(commercialFallback, input.context);
+  const firstPartyFallback = isInfraStudioFirstPartyContext(input.context) ? heuristicReply(input.message, input.context) : null;
+  if (firstPartyFallback?.trim()) {
+    return formatHeuristicReply(firstPartyFallback, input.context);
   }
 
   const runtime = normalizeAgentRuntimeConfig(input.agent?.configuracoes?.runtime);
@@ -1060,10 +1080,13 @@ function buildAgentScopedRecoveryReply(input: {
     return apiReply ? formatHeuristicReply(apiReply, input.context) : baseReply;
   }
 
-  const baseReply = [
-    `Sigo por aqui no contexto de ${input.agent?.nome ?? "atendimento"}.`,
-    `Me diga o ponto exato que voce quer validar em ${objective}: risco, valor, status, documentos ou detalhes.`,
-  ].join("\n\n");
+  const neutralFallbackReply = buildNeutralGlobalFallbackReply(input.agent, input.context);
+  const baseReply = isInfraStudioFirstPartyContext(input.context)
+    ? [
+        `Sigo por aqui no contexto de ${input.agent?.nome ?? "atendimento"}.`,
+        `Me diga o ponto exato que voce quer validar em ${objective}: risco, valor, status, documentos ou detalhes.`,
+      ].join("\n\n")
+    : neutralFallbackReply;
 
   const apiReply = /codigo|status|consulta|buscar|verifica|api|integr/i.test(normalizeText(input.message))
     ? buildApiFallbackReply(input.message, input.apiContexts)
@@ -1550,6 +1573,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const productSearchRequested = shouldContinueProductSearch(history, latestUserMessage, context);
   const productSearchTerm = productSearchRequested ? extractProductSearchTerm(latestUserMessage) : "";
   const channelPolicy = getChatChannelPolicy(context);
+  const enableInfraStudioHeuristics = isInfraStudioFirstPartyContext(context);
   const projectId = context?.projeto?.id ?? null;
   const agentId = context?.agente?.id ?? null;
   const lockedToAgent = context?.agente?.locked === true;
@@ -1617,8 +1641,8 @@ export async function generateSalesReply(history: ConversationMessage[], context
     agent,
     apiContexts,
   });
-  const catalogPricingReply = buildCatalogPricingReply(history, context);
-  const leadIdentificationReply = channelPolicy.allowLeadGate ? maybeAskForLeadIdentification(context ?? {}, history, latestUserMessage) : null;
+  const catalogPricingReply = enableInfraStudioHeuristics ? buildCatalogPricingReply(history, context) : null;
+  const leadIdentificationReply = enableInfraStudioHeuristics && channelPolicy.allowLeadGate ? maybeAskForLeadIdentification(context ?? {}, history, latestUserMessage) : null;
   const mercadoLivrePromptContext = buildMercadoLivrePromptContext(mercadoLivreProducts);
   const directMercadoLivreReply = buildMercadoLivreReply(mercadoLivreProducts, context);
   const mercadoLivreNoResultsReply =
