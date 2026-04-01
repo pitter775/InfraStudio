@@ -122,6 +122,24 @@ function normalizeChannelKind(body: ChatRequestBody) {
     : "web";
 }
 
+function getAdminTestAgentId(body: ChatRequestBody) {
+  return isPlainObject(body.context) &&
+    isPlainObject(body.context.admin) &&
+    typeof body.context.admin.agenteId === "string" &&
+    body.context.admin.agenteId.trim()
+    ? body.context.admin.agenteId.trim()
+    : null;
+}
+
+function getAdminTestProjectId(body: ChatRequestBody) {
+  return isPlainObject(body.context) &&
+    isPlainObject(body.context.admin) &&
+    typeof body.context.admin.projetoId === "string" &&
+    body.context.admin.projetoId.trim()
+    ? body.context.admin.projetoId.trim()
+    : null;
+}
+
 function buildContinuationMessage(input: {
   projetoNome?: string | null;
   agenteNome?: string | null;
@@ -234,9 +252,11 @@ async function validateChatAgainstResolvedChannel(input: {
 }
 
 async function resolveChatChannel(body: ChatRequestBody): Promise<ResolvedChatChannel> {
-  const projetoIdentifier = body.projeto?.trim() || null;
-  const agenteIdentifier = body.agente?.trim() || null;
   const channelKind = normalizeChannelKind(body);
+  const adminTestAgentId = channelKind === "admin_agent_test" ? getAdminTestAgentId(body) : null;
+  const adminTestProjectId = channelKind === "admin_agent_test" ? getAdminTestProjectId(body) : null;
+  const projetoIdentifier = adminTestProjectId ?? (body.projeto?.trim() || null);
+  const agenteIdentifier = adminTestAgentId ?? (body.agente?.trim() || null);
 
   if (projetoIdentifier) {
     const projeto = await getProjetoByIdentifier(projetoIdentifier);
@@ -306,6 +326,18 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
   const channelKind = normalizeChannelKind(body);
   let effectiveBody = body;
   let lockedWhatsAppAgent: AgenteRecord | null = null;
+
+  if (channelKind === "admin_agent_test") {
+    const adminTestAgentId = getAdminTestAgentId(body);
+    const adminTestProjectId = getAdminTestProjectId(body);
+    if (adminTestAgentId || adminTestProjectId) {
+      effectiveBody = {
+        ...body,
+        agente: adminTestAgentId ?? body.agente,
+        projeto: adminTestProjectId ?? body.projeto,
+      };
+    }
+  }
 
   if (channelKind === "whatsapp" && body.whatsappChannelId) {
     const officialChannel = await getWhatsAppChannelById(body.whatsappChannelId);

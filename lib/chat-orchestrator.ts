@@ -38,6 +38,10 @@ type ConversationContext = {
   channel?: {
     kind?: string | null;
   };
+  admin?: {
+    projetoId?: string | null;
+    agenteId?: string | null;
+  };
   ui?: {
     structured_response?: boolean;
     allow_icons?: boolean;
@@ -1726,8 +1730,8 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const detectedProductSearch = shouldContinueProductSearch(history, latestUserMessage, context);
   const channelPolicy = getChatChannelPolicy(context);
   const enableInfraStudioHeuristics = isInfraStudioFirstPartyContext(context);
-  const projectId = context?.projeto?.id ?? null;
-  const agentId = context?.agente?.id ?? null;
+  const projectId = context?.admin?.projetoId ?? context?.projeto?.id ?? null;
+  const agentId = context?.admin?.agenteId ?? context?.agente?.id ?? null;
   const lockedToAgent = context?.agente?.locked === true;
   const resolvedAgent = agentId ? await getAgenteById(agentId) : null;
   const agent =
