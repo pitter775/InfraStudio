@@ -2057,6 +2057,51 @@ function buildMercadoLivreReply(produtos: ProdutoPadronizado[], context?: Conver
     : "Encontrei algumas opcoes parecidas na loja logo abaixo. Se quiser, eu posso buscar mais variacoes desse produto.";
 }
 
+function buildMercadoLivreSingleResultReply(
+  produto: ProdutoDetalhadoMercadoLivre,
+  context?: ConversationContext,
+  cta?: string | null,
+) {
+  const highlights: string[] = [];
+
+  if (produto.atributos?.length) {
+    highlights.push(...produto.atributos.slice(0, 3).map((item) => `${item.nome}: ${item.valor}`));
+  }
+
+  const condition = formatMercadoLivreCondition(produto.condicao);
+  if (condition) {
+    highlights.push(`Condicao: ${condition}`);
+  }
+
+  if (produto.garantia) {
+    highlights.push(`Garantia: ${produto.garantia}`);
+  }
+
+  if (typeof produto.estoque === "number") {
+    highlights.push(`Estoque: ${produto.estoque}`);
+  }
+
+  if (typeof produto.freteGratis === "boolean") {
+    highlights.push(produto.freteGratis ? "Frete gratis" : "Frete a consultar");
+  }
+
+  const intro = isWhatsAppChannel(context)
+    ? `Encontrei um produto que combina com a sua busca: ${produto.nome}. Ele esta por R$ ${produto.preco.toLocaleString("pt-BR")}.`
+    : `Encontrei um produto que combina com a busca: **${produto.nome}** por **R$ ${produto.preco.toLocaleString("pt-BR")}**.`;
+
+  const details = highlights.length
+    ? `Resumo rapido: ${highlights.join(" | ")}.`
+    : produto.descricao
+      ? produto.descricao
+      : "Posso te explicar melhor os detalhes desse item se voce quiser.";
+
+  const close = cta?.trim()
+    ? cta.trim()
+    : 'Se quiser, eu tambem posso buscar outras opcoes parecidas. No WhatsApp, basta responder "mais".';
+
+  return [intro, details, close].filter(Boolean).join("\n\n");
+}
+
 function buildMercadoLivrePromptContext(produtos: ProdutoPadronizado[]) {
   if (!produtos.length) {
     return "";
@@ -2364,9 +2409,26 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const shouldPitchSelectedProduct =
     Boolean(selectedCatalogProduct) &&
     (isMercadoLivrePurchaseIntent(latestUserMessage) || isMercadoLivreDetailIntent(latestUserMessage));
+  const directSingleProduct =
+    mercadoLivreProducts.length === 1
+      ? {
+          id: mercadoLivreProducts[0]?.id ?? null,
+          nome: mercadoLivreProducts[0]?.nome ?? null,
+          descricao: `R$ ${mercadoLivreProducts[0]?.preco.toLocaleString("pt-BR")}`,
+          preco: mercadoLivreProducts[0]?.preco ?? null,
+          link: mercadoLivreProducts[0]?.link ?? null,
+          imagem: mercadoLivreProducts[0]?.imagem ?? null,
+        }
+      : null;
+  const shouldFetchDirectSingleProductDetails =
+    Boolean(directSingleProduct) && productSearchRequested && !genericMercadoLivreListingRequested && Boolean(agent?.id);
   const selectedCatalogProductDetails =
     shouldPitchSelectedProduct && agent?.id && getCatalogProductRefForDetails(selectedCatalogProduct)
       ? await obterDetalhesProdutoMercadoLivrePorAgente(agent.id, getCatalogProductRefForDetails(selectedCatalogProduct) ?? "")
+      : null;
+  const directSingleProductDetails =
+    shouldFetchDirectSingleProductDetails && agent?.id && getCatalogProductRefForDetails(directSingleProduct)
+      ? await obterDetalhesProdutoMercadoLivrePorAgente(agent.id, getCatalogProductRefForDetails(directSingleProduct) ?? "")
       : null;
   const lojaCta =
     typeof agent.configuracoes?.cta_whatsapp === "string" && agent.configuracoes.cta_whatsapp.trim()
@@ -2387,8 +2449,10 @@ export async function generateSalesReply(history: ConversationMessage[], context
     ? buildMercadoLivreListingReply(mercadoLivreListingProducts, context)
     : null;
   const mercadoLivrePromptContext = buildMercadoLivrePromptContext(mercadoLivreProducts);
-  const mercadoLivreDetailPromptContext = buildMercadoLivreDetailPromptContext(selectedCatalogProductDetails);
-  const directMercadoLivreReply = buildMercadoLivreReply(mercadoLivreProducts, context);
+  const mercadoLivreDetailPromptContext = buildMercadoLivreDetailPromptContext(selectedCatalogProductDetails ?? directSingleProductDetails);
+  const directMercadoLivreReply = directSingleProductDetails
+    ? buildMercadoLivreSingleResultReply(directSingleProductDetails, context, lojaCta)
+    : buildMercadoLivreReply(mercadoLivreProducts, context);
   const mercadoLivreNoResultsReply =
     productSearchRequested && agent?.id && hasMercadoLivreConnector && mercadoLivreProducts.length === 0
       ? buildMercadoLivreNoResultsReply(resolvedProductSearchTerm || productSearchTerm, context, {
@@ -2564,7 +2628,16 @@ export async function generateSalesReply(history: ConversationMessage[], context
         agenteId: agent?.id ?? null,
         agenteNome: agent?.nome ?? null,
         catalogoProdutoAtual:
-          mercadoLivreProducts.length === 1
+          directSingleProductDetails
+            ? {
+                id: directSingleProductDetails.id ?? null,
+                nome: directSingleProductDetails.nome,
+                descricao: `R$ ${directSingleProductDetails.preco.toLocaleString("pt-BR")}`,
+                preco: directSingleProductDetails.preco,
+                link: directSingleProductDetails.link,
+                imagem: directSingleProductDetails.imagem,
+              }
+            : mercadoLivreProducts.length === 1
             ? {
                 id: mercadoLivreProducts[0]?.id ?? null,
                 nome: mercadoLivreProducts[0]?.nome ?? null,
