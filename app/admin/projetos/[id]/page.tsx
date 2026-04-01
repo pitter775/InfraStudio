@@ -322,6 +322,12 @@ type AgentStoreLatestResult = {
     nickname: string | null;
   } | null;
   produtos: AgentStoreSearchProduct[];
+  descricaoDiagnostico: {
+    itemId: string;
+    disponivel: boolean;
+    caracteres: number;
+    preview: string | null;
+  } | null;
   error: string | null;
 };
 
@@ -3525,6 +3531,25 @@ function AgentStoreSearchModal({
 
                 {latestResult.error ? <p className="mt-3 text-sm text-rose-100">{latestResult.error}</p> : null}
 
+                {latestResult.descricaoDiagnostico ? (
+                  <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 p-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${latestResult.descricaoDiagnostico.disponivel ? "bg-emerald-500/15 text-emerald-100" : "bg-amber-500/15 text-amber-100"}`}>
+                        {latestResult.descricaoDiagnostico.disponivel ? "Descricao acessivel" : "Descricao sem retorno"}
+                      </span>
+                      <p className="text-xs text-slate-300">
+                        Item testado: <span className="font-semibold text-white">{latestResult.descricaoDiagnostico.itemId}</span>
+                        {latestResult.descricaoDiagnostico.disponivel ? ` | ${latestResult.descricaoDiagnostico.caracteres} caracteres` : ""}
+                      </p>
+                    </div>
+                    {latestResult.descricaoDiagnostico.preview ? (
+                      <p className="mt-3 text-sm leading-relaxed text-slate-200">{latestResult.descricaoDiagnostico.preview}</p>
+                    ) : (
+                      <p className="mt-3 text-sm text-slate-400">Nao houve plain_text de descricao retornado para o primeiro item testado.</p>
+                    )}
+                  </div>
+                ) : null}
+
                 {latestResult.produtos.length ? (
                   <div className="mt-4 space-y-3">
                     {latestResult.produtos.map((produto) => (
@@ -4805,12 +4830,14 @@ export default function AdminProjetoDetalhePage() {
       setAgentStoreLatestResult({
         connector: payload.connector ?? null,
         produtos: Array.isArray(payload.produtos) ? payload.produtos : [],
+        descricaoDiagnostico: payload.descricaoDiagnostico ?? null,
         error: payload.error ?? null,
       });
     } catch (error) {
       setAgentStoreLatestResult({
         connector: null,
         produtos: [],
+        descricaoDiagnostico: null,
         error: error instanceof Error ? error.message : "Nao foi possivel listar os ultimos produtos da loja.",
       });
     } finally {

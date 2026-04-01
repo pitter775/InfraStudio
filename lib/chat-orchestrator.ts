@@ -1368,6 +1368,10 @@ function shouldContinueProductSearch(history: ConversationMessage[], latestUserM
     return false;
   }
 
+  if (!buildProductSearchCandidates(latestUserMessage).length) {
+    return false;
+  }
+
   const previousMessages = history.slice(-4, -1).map((item) => normalizeText(item.content));
   const previousHadCatalogIntent = previousMessages.some((item) =>
     item.includes("na loja") ||
@@ -1631,6 +1635,10 @@ function shouldUseMercadoLivreConnectorFallback(
   const compact = normalized.replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
   const words = compact ? compact.split(" ").filter(Boolean) : [];
   if (!words.length || compact.length > 60 || words.length > 8) {
+    return false;
+  }
+
+  if (!buildProductSearchCandidates(latestUserMessage).length) {
     return false;
   }
 
@@ -2292,12 +2300,14 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const leadNameAcknowledgementReply =
     extractedLeadName ? buildLeadNameAcknowledgementReply(extractedLeadName, hasMercadoLivreConnector, context) : null;
   const referencedCatalogProducts =
-    hasMercadoLivreConnector && !leadNameReplyDetected
+    hasMercadoLivreConnector && !leadNameReplyDetected && !productSearchRequested && !genericMercadoLivreListingRequested
       ? resolveRecentCatalogProductReference(latestUserMessage, context)
       : [];
   const referencedCatalogReply = buildReferencedCatalogReply(referencedCatalogProducts, context);
   const currentCatalogProduct =
-    context?.catalogo?.produtoAtual && typeof context.catalogo.produtoAtual === "object" ? context.catalogo.produtoAtual : null;
+    !productSearchRequested && context?.catalogo?.produtoAtual && typeof context.catalogo.produtoAtual === "object"
+      ? context.catalogo.produtoAtual
+      : null;
   const selectedCatalogProduct =
     referencedCatalogProducts.length === 1 ? referencedCatalogProducts[0] : currentCatalogProduct;
   const shouldPitchSelectedProduct =

@@ -38,6 +38,12 @@ export type MercadoLivreStoreSnapshot = {
     nickname: string | null;
   } | null;
   produtos: ProdutoPadronizado[];
+  descricaoDiagnostico: {
+    itemId: string;
+    disponivel: boolean;
+    caracteres: number;
+    preview: string | null;
+  } | null;
   error: string | null;
 };
 
@@ -297,8 +303,8 @@ function rankProdutosByTermo(produtos: ProdutoPadronizado[], termo: string) {
     })
     .sort(
       (left, right) =>
-        right.timestamp - left.timestamp ||
         right.score - left.score ||
+        right.timestamp - left.timestamp ||
         left.produto.preco - right.produto.preco,
     )
     .map((item) => item.produto);
@@ -310,11 +316,12 @@ async function searchConnectorProducts(connector: ConnectorRecord, termo: string
   const sellerId = config?.seller_id?.replace(/\D/g, "").trim();
   const accessToken = await ensureMercadoLivreAccessToken(connector);
   const terms = buildSearchVariants(termo);
-  const batches: ProdutoPadronizado[] = [];
+  const sellerBatches: ProdutoPadronizado[] = [];
+  const marketplaceBatches: ProdutoPadronizado[] = [];
 
   for (const currentTerm of terms) {
     if (sellerId) {
-      batches.push(
+      sellerBatches.push(
         ...(await fetchMercadoLivreProducts({
           endpointBase,
           termo: currentTerm,
@@ -323,21 +330,26 @@ async function searchConnectorProducts(connector: ConnectorRecord, termo: string
           limit: 12,
         })),
       );
-    }
-
-    batches.push(
+    } else {
+      marketplaceBatches.push(
         ...(await fetchMercadoLivreProducts({
           endpointBase,
           termo: currentTerm,
           accessToken,
           limit: 12,
         })),
-    );
+      );
+    }
   }
 
-  const rankedProducts = rankProdutosByTermo(dedupeProdutos(batches), termo).slice(0, 3);
-  if (rankedProducts.length || !sellerId) {
-    return rankedProducts;
+  const sellerProducts = rankProdutosByTermo(dedupeProdutos(sellerBatches), termo).slice(0, 4);
+  if (sellerProducts.length) {
+    return sellerProducts;
+  }
+
+  const marketplaceProducts = rankProdutosByTermo(dedupeProdutos(marketplaceBatches), termo).slice(0, 4);
+  if (marketplaceProducts.length || !sellerId) {
+    return marketplaceProducts;
   }
 
   try {
@@ -351,9 +363,9 @@ async function searchConnectorProducts(connector: ConnectorRecord, termo: string
 
     return rankProdutosByTermo(dedupeProdutos(fallbackProducts), termo)
       .filter((produto) => normalizeSearchText(produto.nome).includes(normalizeSearchText(termo)))
-      .slice(0, 3);
+      .slice(0, 4);
   } catch {
-    return rankedProducts;
+    return sellerProducts;
   }
 }
 
@@ -518,6 +530,7 @@ async function fetchMercadoLivreItemDescription(input: {
   endpointBase: string;
   itemId: string;
   accessToken?: string;
+  maxLength?: number | null;
 }) {
   const endpoint = new URL(`/items/${input.itemId}/description`, input.endpointBase);
   const response = await fetch(endpoint.toString(), {
@@ -534,7 +547,12 @@ async function fetchMercadoLivreItemDescription(input: {
   }
 
   const payload = (await response.json()) as { plain_text?: string };
-  return typeof payload.plain_text === "string" && payload.plain_text.trim() ? truncateText(payload.plain_text.trim(), 700) : null;
+  if (typeof payload.plain_text !== "string" || !payload.plain_text.trim()) {
+    return null;
+  }
+
+  const plainText = payload.plain_text.trim();
+  return input.maxLength === null ? plainText : truncateText(plainText, input.maxLength ?? 700);
 }
 
 async function fetchMercadoLivreItemDetails(input: {
@@ -643,7 +661,7 @@ export async function obterDetalhesProdutoMercadoLivrePorAgente(agenteId: string
   try {
     const [item, descricao] = await Promise.all([
       fetchMercadoLivreItemDetails({ endpointBase, itemId, accessToken }),
-      fetchMercadoLivreItemDescription({ endpointBase, itemId, accessToken }),
+      fetchMercadoLivreItemDescription({ endpointBase, itemId, accessToken, maxLength: 700 }),
     ]);
 
     return item ? normalizeProdutoDetalhado(item, descricao) : null;
@@ -669,6 +687,7 @@ export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: stri
       ok: false,
       connector: null,
       produtos: [],
+      descricaoDiagnostico: null,
       error: "Agente invalido para testar a loja.",
     };
   }
@@ -681,6 +700,7 @@ export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: stri
       ok: false,
       connector: null,
       produtos: [],
+      descricaoDiagnostico: null,
       error: "Nenhum conector Mercado Livre ativo foi encontrado para este agente.",
     };
   }
@@ -733,6 +753,7 @@ export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: stri
         nickname: config?.nickname ?? null,
       },
       produtos: [],
+      descricaoDiagnostico: null,
       error: "O conector nao tem seller_id configurado.",
     };
   }
@@ -771,6 +792,7 @@ export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: stri
         nickname: config?.nickname ?? null,
       },
       produtos: [],
+      descricaoDiagnostico: null,
       error: errorMessage,
     };
   }
@@ -783,6 +805,15 @@ export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: stri
       limit: 5,
       connector,
     });
+    const firstProductWithId = produtos.find((produto) => typeof produto.id === "string" && produto.id.trim());
+    const descricaoCompleta = firstProductWithId?.id
+      ? await fetchMercadoLivreItemDescription({
+          endpointBase,
+          itemId: firstProductWithId.id,
+          accessToken,
+          maxLength: null,
+        })
+      : null;
 
     await appendSystemLog({
       tipo: "mercado_livre_latest_products_result",
@@ -797,6 +828,9 @@ export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: stri
         sellerId,
         totalProdutos: produtos.length,
         hasAccessToken: Boolean(accessToken),
+        descriptionItemId: firstProductWithId?.id ?? null,
+        descriptionAvailable: Boolean(descricaoCompleta),
+        descriptionLength: descricaoCompleta?.length ?? 0,
       },
     });
 
@@ -809,6 +843,14 @@ export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: stri
         nickname: config?.nickname ?? null,
       },
       produtos,
+      descricaoDiagnostico: firstProductWithId?.id
+        ? {
+            itemId: firstProductWithId.id,
+            disponivel: Boolean(descricaoCompleta),
+            caracteres: descricaoCompleta?.length ?? 0,
+            preview: descricaoCompleta ? truncateText(descricaoCompleta, 280) : null,
+          }
+        : null,
       error: produtos.length ? null : "A loja respondeu, mas nenhum produto publico recente foi retornado.",
     };
   } catch (error) {
@@ -839,6 +881,7 @@ export async function listarProdutosRecentesMercadoLivrePorAgente(agenteId: stri
         nickname: config?.nickname ?? null,
       },
       produtos: [],
+      descricaoDiagnostico: null,
       error:
         error instanceof Error
           ? buildMercadoLivreFriendlyError(error.message)

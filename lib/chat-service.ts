@@ -115,6 +115,12 @@ function extractRecentMercadoLivreProductsFromAssets(assets: unknown) {
     .filter((asset) => asset.nome && asset.imagem);
 }
 
+function isCatalogSearchMessage(message: string) {
+  const latestNormalizedMessage = message.toLowerCase();
+  const catalogSignals = ["tem ", "produto", "produtos", "catalogo", "catálogo", "loja", "vende", "procuro", "estou procurando"];
+  return catalogSignals.some((signal) => latestNormalizedMessage.includes(signal)) || /^\s*e\s+\S+/i.test(message);
+}
+
 function buildBillingBlockedResult(chatId: string, message: string) {
   return {
     chatId,
@@ -713,6 +719,16 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     nextContext.qualificacao = {
       ...nextContext.qualificacao,
       pronto_para_whatsapp: false,
+    };
+  }
+
+  const requestedCatalogSearch = isCatalogSearchMessage(message);
+  if (requestedCatalogSearch) {
+    nextContext.catalogo = {
+      ...(isPlainObject(nextContext.catalogo) ? nextContext.catalogo : {}),
+      ultimaBusca: message.trim(),
+      produtoAtual: null,
+      ultimosProdutos: [],
     };
   }
 
