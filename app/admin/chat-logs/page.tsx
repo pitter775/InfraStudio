@@ -186,7 +186,7 @@ export default function AdminChatLogsPage() {
       ) : null}
 
       <section className="space-y-2">
-        {logs.map((log) => {
+        {logs.map((log, index) => {
           const compactDetails = buildCompactDetails(log);
           const lineClass =
             log.level === "error"
@@ -198,6 +198,8 @@ export default function AdminChatLogsPage() {
           return (
             <article key={log.id} className={`overflow-x-auto rounded-2xl border px-3 py-2 ${lineClass}`}>
               <p className="whitespace-nowrap text-[11px] leading-5">
+                <span className={subtleTextClass}>{String(index + 1).padStart(3, "0")}</span>
+                <span className={`px-2 ${separatorClass}`}>|</span>
                 <span className={subtleTextClass}>{formatDateTime(log.createdAt)}</span>
                 <span className={`px-2 ${separatorClass}`}>|</span>
                 <span className={log.level === "error" ? "font-bold text-red-50" : "text-slate-200"}>{log.tipo}</span>

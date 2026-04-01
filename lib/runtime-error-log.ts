@@ -90,6 +90,15 @@ export async function clearRuntimeErrorLogs() {
     await writeFile(LOG_FILE, "", "utf8");
     return true;
   } catch (error) {
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code?: unknown }).code || "")
+        : "";
+
+    if (code === "ENOENT" || code === "EROFS" || code === "EPERM") {
+      return true;
+    }
+
     console.error("[runtime-error-log] failed to clear logs", error);
     return false;
   }
