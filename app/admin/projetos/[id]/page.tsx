@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Activity, ArrowLeft, Bold, Bot, Boxes, Cable, CheckCircle2, ChevronDown, Coins, Copy, Cpu, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, LoaderCircle, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, Power, ShieldAlert, Sparkles, TestTube2, Trash2, Waypoints, X } from "lucide-react";
 import { getAgentRuntimeBlockEntries, normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
+import { ProjectWhatsAppSection } from "./_components/project-whatsapp-section";
 
 type Projeto = {
   id: string;
@@ -6567,11 +6568,6 @@ export default function AdminProjetoDetalhePage() {
   const agenteAtivo = data.agentes.find((agente) => agente.ativo) ?? null;
   const activeAgentTestTarget = agentTestTarget ? data.agentes.find((agente) => agente.id === agentTestTarget.id) ?? agentTestTarget : null;
   const primaryWhatsAppChannel = data.whatsappChannels[0] ?? null;
-  const recentWhatsAppChats = data.chats
-    .filter((chat) => isWhatsAppChatChannel(chat))
-    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
-    .slice(0, 3);
-  const activeWhatsAppHandoffContacts = whatsappHandoffContacts.filter((contact) => contact.ativo && contact.receberAlertas);
   const overviewStats = [
     { key: "agentes", label: "Agentes", value: data.stats.totalAgentes, icon: Bot, tone: "text-cyan-100", glow: "bg-cyan-400/16" },
     { key: "apis", label: "APIs", value: data.stats.totalApis, icon: Activity, tone: "text-sky-100", glow: "bg-sky-400/16" },
@@ -7460,393 +7456,39 @@ export default function AdminProjetoDetalhePage() {
       </section>
 
       <section className={`${renderedTab === "whatsapp" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
-        <div className="space-y-4">
-          <section>
-            <div className="px-1 py-1">
-              <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Waypoints size={18} className="text-cyan-100" />WhatsApp do projeto</h3>
-              <p className="mt-2 max-w-3xl text-sm text-cyan-50/80">Conecte, acompanhe e ajuste o numero principal que atende seus clientes.</p>
-              {!process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL ? (
-                <p className="mt-3 text-xs text-amber-200/90">A conexao do WhatsApp ainda nao esta disponivel neste ambiente.</p>
-              ) : null}
-            </div>
-            <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1.35fr),minmax(340px,0.92fr)] xl:items-start">
-              {primaryWhatsAppChannel ? (() => {
-                const channel = primaryWhatsAppChannel;
-                const agente = channel.agenteId ? data.agentes.find((item) => item.id === channel.agenteId) ?? null : agenteAtivo;
-                const runtimeStatus = serviceStatusByChannel[channel.id] ?? getChannelStatusLabel(channel.sessionData?.connectionStatus);
-                const qrImage = serviceQrByChannel[channel.id] ?? channel.sessionData?.qrCodeDataUrl ?? channel.sessionData?.qrCodeUrl ?? null;
-                const isConnected = runtimeStatus === "conectado" || runtimeStatus === "online";
-                const isWaitingQr = runtimeStatus === "aguardando_qr" && Boolean(qrImage);
-                const connectButtonLabel = getWhatsAppConnectButtonLabel({
-                  isConnected,
-                  isWaitingQr,
-                  runtimeStatus,
-                });
-                const runtimeNote = channel.sessionData?.notes ?? null;
-                const shouldShowRuntimeNote = runtimeStatus !== "desconectado" && Boolean(runtimeNote);
-
-                return (
-                  <div className="grid gap-6 xl:col-start-1">
-                    <div className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),rgba(8,47,73,0.14)_35%,rgba(2,6,23,0.9)_75%)] p-6">
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Canal principal</p>
-                          <h4 className="mt-3 text-3xl font-black text-white">{formatWhatsAppPhone(channel.numero)}</h4>
-                          <p className="mt-2 text-sm text-slate-300">Agente: {agente?.nome ?? "agente ativo do projeto"}</p>
-                          <p className="mt-2 max-w-xl text-xs text-slate-400">
-                            Recomendado: use um numero so para a IA e deixe seu WhatsApp pessoal para o atendimento humano.
-                          </p>
-                        </div>
-                        <div className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] ${getChannelStatusTone(runtimeStatus)}`}>
-                          {isConnected ? "conectado" : runtimeStatus}
-                        </div>
-                      </div>
-
-                      <div className="mt-6 grid gap-4 md:grid-cols-2">
-                        <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Estado</p>
-                          <p className="mt-3 text-lg font-bold text-white">{isConnected ? "WhatsApp conectado" : isWaitingQr ? "Escaneie o QR" : "Aguardando conexao"}</p>
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Ultima sincronizacao</p>
-                          <p className="mt-3 text-sm font-semibold text-white">
-                            {channel.sessionData?.lastSyncAt ? new Date(channel.sessionData.lastSyncAt).toLocaleString("pt-BR") : "nao sincronizada"}
-                          </p>
-                        </div>
-                      </div>
-
-                      {shouldShowRuntimeNote ? (
-                        <div className="mt-5 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                          {getWhatsAppChannelUserNote(runtimeNote)}
-                        </div>
-                      ) : null}
-
-                      <div className="mt-6 border-t border-white/10 pt-4">
-                        <div className="rounded-2xl border border-white/8 bg-slate-950/45 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                          <button
-                            type="button"
-                            onClick={() => void handleConnectWhatsAppChannel(channel)}
-                            disabled={connectingWhatsAppChannelId === channel.id}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-50 transition-all hover:border-emerald-300/30 hover:bg-emerald-500/14 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {connectingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
-                            {connectButtonLabel}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleConnectWhatsAppChannel(channel, { refreshQr: true })}
-                            disabled={connectingWhatsAppChannelId === channel.id || (!isWaitingQr && runtimeStatus !== "aguardando_qr")}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-50 transition-all hover:border-cyan-300/30 hover:bg-cyan-500/14 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {connectingWhatsAppChannelId === channel.id ? <BusyIcon /> : <Activity size={15} />}
-                            Gerar novo QR
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleDisconnectWhatsAppChannel(channel)}
-                            disabled={disconnectingWhatsAppChannelId === channel.id}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-50 transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {disconnectingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
-                            Desconectar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleEditWhatsAppChannel(channel)}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-50 transition-all hover:border-amber-300/30 hover:bg-amber-500/14"
-                          >
-                            <Pencil size={15} />
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleDeleteWhatsAppChannel(channel)}
-                            disabled={deletingWhatsAppChannelId === channel.id}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-50 transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {deletingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
-                            Remover
-                          </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {!isConnected ? (
-                    <div className="rounded-[28px] border border-white/10 bg-slate-950/55 p-5">
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{isConnected ? "Status da conexao" : "QR Code para escanear"}</p>
-                      {isConnected ? (
-                        <div className="mt-4 rounded-[24px] border border-emerald-500/20 bg-emerald-500/10 px-5 py-8 text-center">
-                          <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300">
-                            <CheckCircle2 size={42} />
-                          </div>
-                          <h5 className="mt-5 text-2xl font-black text-white">WhatsApp conectado</h5>
-                          <p className="mt-2 text-sm text-emerald-50/80">Nao e necessario escanear novamente enquanto a sessao permanecer ativa.</p>
-                        </div>
-                      ) : qrImage ? (
-                        <div className="mt-4 rounded-[24px] border border-cyan-500/20 bg-cyan-500/[0.07] p-4">
-                          <img src={qrImage} alt={`QR do canal ${channel.numero}`} className="mx-auto w-full max-w-[300px] rounded-2xl bg-white p-4 shadow-2xl shadow-cyan-950/40" />
-                          <p className="mt-4 text-center text-sm font-semibold text-white">Abra o WhatsApp no celular e escaneie este QR.</p>
-                          <p className="mt-1 text-center text-xs text-slate-400">Se o codigo expirar, clique em “Conectar e gerar QR”.</p>
-                        </div>
-                      ) : (
-                        <div className="mt-4 rounded-[24px] border border-dashed border-white/10 bg-slate-950/40 px-5 py-12 text-center">
-                          <p className="text-lg font-bold text-white">QR ainda nao disponivel</p>
-                          <p className="mt-2 text-sm text-slate-400">Clique em “Conectar e gerar QR” para iniciar a sessao deste numero.</p>
-                        </div>
-                      )}
-                    </div>
-                    ) : null}
-                  </div>
-                );
-              })() : (
-                <div className="grid gap-4 xl:col-span-2 xl:grid-cols-[minmax(0,1.15fr),420px]">
-                  <div className="grid gap-4">
-                    <div className="px-1 py-2">
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Primeiro passo</p>
-                      <h4 className="mt-3 text-3xl font-black text-white">Crie o numero que vai atender no WhatsApp</h4>
-                      <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-                        Assim que o canal for criado, esta area passa a mostrar o QR bem grande para escanear ou o estado “WhatsApp conectado”.
-                      </p>
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Canal oficial</p>
-                        <p className="mt-3 text-lg font-bold text-white">1 numero principal</p>
-                        <p className="mt-2 text-xs leading-6 text-slate-400">A tela agora prioriza um unico WhatsApp para ficar mais clara e rapida.</p>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">QR em destaque</p>
-                        <p className="mt-3 text-lg font-bold text-white">Escaneamento facil</p>
-                        <p className="mt-2 text-xs leading-6 text-slate-400">Depois de criar o canal, o QR ocupa o bloco principal da direita.</p>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Resposta automatica</p>
-                        <p className="mt-3 text-lg font-bold text-white">Mesmo agente</p>
-                        <p className="mt-2 text-xs leading-6 text-slate-400">O atendimento reutiliza o fluxo atual do chat sem duplicar logica.</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="rounded-[28px] border border-white/10 bg-slate-950/42 p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h4 className="text-base font-bold text-white">Criar canal oficial</h4>
-                        <p className="mt-1 text-sm text-slate-400">Abra o modal para cadastrar o numero principal.</p>
-                      </div>
-                      <div className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100">
-                        2 passos
-                      </div>
-                    </div>
-                    <div className="mt-5 flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={openNewWhatsAppChannelModal}
-                        className={headerActionButtonClass}
-                      >
-                        <Plus size={16} />
-                        Novo canal oficial
-                      </button>
-                    </div>
-                    <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Depois disso</p>
-                      <p className="mt-2 text-sm text-slate-300">O card principal muda para mostrar o QR em destaque ou o estado “WhatsApp conectado”.</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {primaryWhatsAppChannel ? (
-                <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-5 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:sticky xl:top-6">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Atendimento humano</p>
-                      <h4 className="mt-2 text-lg font-bold text-white">Quem recebe o aviso no WhatsApp</h4>
-                      <p className="mt-2 max-w-xl text-sm text-slate-400">
-                        Quando o cliente pedir para falar com uma pessoa, o sistema avisa estes numeros e abre um link direto para a conversa no painel.
-                      </p>
-                    </div>
-                    {data.whatsappChannels.length > 1 ? (
-                      <p className="text-xs text-amber-100/80">Existem {data.whatsappChannels.length} canais cadastrados. A interface esta priorizando o primeiro.</p>
-                    ) : null}
-                  </div>
-                  <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Atendimento humano</p>
-                        <h5 className="mt-2 text-base font-bold text-white">Quem recebe o aviso no WhatsApp</h5>
-                        <p className="mt-2 max-w-xl text-sm text-slate-400">
-                          Quando o cliente pedir para falar com uma pessoa, o sistema avisa estes numeros e abre um link direto para a conversa no painel.
-                        </p>
-                      </div>
-                      <div className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-100">
-                        {activeWhatsAppHandoffContacts.length} ativos
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Nome do atendente</p>
-                        <input
-                          value={whatsappHandoffContactForm.nome}
-                          onChange={(event) =>
-                            setWhatsAppHandoffContactForm((current) => ({
-                              ...current,
-                              nome: event.target.value,
-                            }))
-                          }
-                          placeholder="Ex.: Pitter"
-                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/30"
-                        />
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Numero do WhatsApp</p>
-                        <input
-                          value={whatsappHandoffContactForm.numero}
-                          onChange={(event) =>
-                            setWhatsAppHandoffContactForm((current) => ({
-                              ...current,
-                              numero: formatWhatsAppPhone(event.target.value),
-                            }))
-                          }
-                          placeholder="+55 11 99999-9999"
-                          inputMode="tel"
-                          autoComplete="tel"
-                          maxLength={17}
-                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/30"
-                        />
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Papel</p>
-                        <input
-                          value={whatsappHandoffContactForm.papel}
-                          onChange={(event) =>
-                            setWhatsAppHandoffContactForm((current) => ({
-                              ...current,
-                              papel: event.target.value,
-                            }))
-                          }
-                          placeholder="Ex.: vendas, suporte, plantao"
-                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/30"
-                        />
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Observacoes</p>
-                        <input
-                          value={whatsappHandoffContactForm.observacoes}
-                          onChange={(event) =>
-                            setWhatsAppHandoffContactForm((current) => ({
-                              ...current,
-                              observacoes: event.target.value,
-                            }))
-                          }
-                          placeholder="Ex.: horario comercial ou plantao"
-                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/30"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={() => void handleCreateWhatsAppHandoffContact()}
-                        disabled={savingWhatsAppHandoffContact}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-50 transition-all hover:border-emerald-300/30 hover:bg-emerald-500/14 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {savingWhatsAppHandoffContact ? <BusyIcon /> : <Plus size={16} />}
-                        Adicionar numero de aviso
-                      </button>
-                      <p className="self-center text-xs text-slate-500">
-                        O aviso vai no mesmo canal oficial conectado acima.
-                      </p>
-                    </div>
-
-                    <div className="mt-5">
-                      {loadingWhatsAppHandoffContacts ? (
-                        <div className="rounded-xl border border-white/10 bg-slate-950/40 px-4 py-4 text-sm text-slate-300">
-                          Carregando os numeros configurados...
-                        </div>
-                      ) : whatsappHandoffContacts.length ? (
-                        <div className="space-y-3">
-                          {whatsappHandoffContacts.map((contact) => {
-                            const isBusy = updatingWhatsAppHandoffContactId === contact.id;
-                            const alertsEnabled = contact.ativo && contact.receberAlertas;
-
-                            return (
-                              <div key={contact.id} className="rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-4">
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <p className="text-sm font-bold text-white">{contact.nome}</p>
-                                      <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${alertsEnabled ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}`}>
-                                        {alertsEnabled ? "recebendo alertas" : "pausado"}
-                                      </span>
-                                    </div>
-                                    <p className="mt-1 font-mono text-xs text-cyan-100">{formatWhatsAppPhone(contact.numero)}</p>
-                                    <p className="mt-2 text-xs text-slate-400">
-                                      {contact.papel ? `${contact.papel}` : "Sem papel definido"}
-                                      {contact.observacoes ? ` • ${contact.observacoes}` : ""}
-                                    </p>
-                                  </div>
-                                  <div className="flex flex-wrap gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        void handleUpdateWhatsAppHandoffContact(contact, {
-                                          receberAlertas: !(contact.ativo && contact.receberAlertas),
-                                          ativo: contact.ativo || !contact.receberAlertas ? true : contact.ativo,
-                                        })
-                                      }
-                                      disabled={isBusy}
-                                      className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-50 transition-all hover:border-cyan-300/30 hover:bg-cyan-500/14 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                      {isBusy ? <BusyIcon /> : <Power size={14} />}
-                                      {alertsEnabled ? "Pausar alerta" : "Ativar alerta"}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        void handleUpdateWhatsAppHandoffContact(contact, {
-                                          ativo: !contact.ativo,
-                                          receberAlertas: !contact.ativo ? contact.receberAlertas : false,
-                                        })
-                                      }
-                                      disabled={isBusy}
-                                      className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-50 transition-all hover:border-amber-300/30 hover:bg-amber-500/14 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                      {isBusy ? <BusyIcon /> : <Activity size={14} />}
-                                      {contact.ativo ? "Desativar contato" : "Reativar contato"}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleDeleteWhatsAppHandoffContact(contact)}
-                                      disabled={isBusy}
-                                      className="inline-flex items-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-50 transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                      {isBusy ? <BusyIcon /> : <Trash2 size={14} />}
-                                      Remover
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-6 text-sm text-slate-400">
-                          Nenhum numero de aviso configurado ainda. Cadastre pelo menos um contato para ser avisado quando o cliente pedir atendimento humano.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </section>
-
-        </div>
+        <ProjectWhatsAppSection
+          whatsappServiceEnabled={Boolean(process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL)}
+          primaryChannel={primaryWhatsAppChannel}
+          totalChannels={data.whatsappChannels.length}
+          agentes={data.agentes}
+          agenteAtivo={agenteAtivo}
+          serviceStatusByChannel={serviceStatusByChannel}
+          serviceQrByChannel={serviceQrByChannel}
+          connectingChannelId={connectingWhatsAppChannelId}
+          disconnectingChannelId={disconnectingWhatsAppChannelId}
+          deletingChannelId={deletingWhatsAppChannelId}
+          handoffContacts={whatsappHandoffContacts}
+          handoffContactForm={whatsappHandoffContactForm}
+          loadingHandoffContacts={loadingWhatsAppHandoffContacts}
+          savingHandoffContact={savingWhatsAppHandoffContact}
+          updatingHandoffContactId={updatingWhatsAppHandoffContactId}
+          actionButtonClass={headerActionButtonClass}
+          onOpenNewChannel={openNewWhatsAppChannelModal}
+          onConnectChannel={(channel, options) => void handleConnectWhatsAppChannel(channel, options)}
+          onDisconnectChannel={(channel) => void handleDisconnectWhatsAppChannel(channel)}
+          onEditChannel={handleEditWhatsAppChannel}
+          onDeleteChannel={(channel) => void handleDeleteWhatsAppChannel(channel)}
+          onHandoffFormChange={(field, value) =>
+            setWhatsAppHandoffContactForm((current) => ({
+              ...current,
+              [field]: value,
+            }))
+          }
+          onCreateHandoffContact={() => void handleCreateWhatsAppHandoffContact()}
+          onUpdateHandoffContact={(contact, patch) => void handleUpdateWhatsAppHandoffContact(contact, patch)}
+          onDeleteHandoffContact={(contact) => void handleDeleteWhatsAppHandoffContact(contact)}
+        />
       </section>
-
       <section className={`${renderedTab === "chats" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
         <div className="grid gap-6">
           <section>
