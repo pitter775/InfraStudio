@@ -445,6 +445,35 @@ function getChannelStatusLabel(status: string | null | undefined) {
   return "desconectado";
 }
 
+function getWhatsAppChannelUserNote(note: string | null | undefined) {
+  const value = String(note || "").trim();
+  if (!value) {
+    return "";
+  }
+
+  const normalized = value.toLowerCase();
+
+  if (
+    normalized.includes("failed to launch the browser process") ||
+    normalized.includes("puppeteer") ||
+    normalized.includes("chrome") ||
+    normalized.includes("chromium") ||
+    normalized.includes("libglib")
+  ) {
+    return "O servidor do WhatsApp nao conseguiu iniciar o navegador interno. Nossa equipe ja consegue ver o erro tecnico nos logs.";
+  }
+
+  if (normalized.includes("falha de autenticacao")) {
+    return "A autenticacao do WhatsApp falhou. Tente conectar novamente.";
+  }
+
+  if (normalized.includes("cliente desconectado")) {
+    return "O canal foi desconectado. Tente conectar novamente.";
+  }
+
+  return value;
+}
+
 function summarizeApiFields(campos: ApiCampo[], limit = 6) {
   const labels = campos.slice(0, limit).map((campo) => campo.nome);
   if (campos.length <= limit) {
@@ -7159,7 +7188,7 @@ export default function AdminProjetoDetalhePage() {
 
                       {channel.sessionData?.notes ? (
                         <div className="mt-5 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                          {channel.sessionData.notes}
+                          {getWhatsAppChannelUserNote(channel.sessionData.notes)}
                         </div>
                       ) : null}
 

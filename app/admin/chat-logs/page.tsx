@@ -106,6 +106,7 @@ export default function AdminChatLogsPage() {
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [copiedLogId, setCopiedLogId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -149,6 +150,30 @@ export default function AdminChatLogsPage() {
       setFeedback(error instanceof Error ? error.message : "Nao foi possivel remover todos os logs.");
     } finally {
       setClearing(false);
+    }
+  };
+
+  const handleCopyLogLine = async (log: SystemLog, index: number) => {
+    const compactDetails = buildCompactDetails(log);
+    const line = [
+      String(index + 1).padStart(3, "0"),
+      formatDateTime(log.createdAt),
+      log.tipo,
+      log.origem,
+      log.descricao,
+      compactDetails,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    try {
+      await navigator.clipboard.writeText(line);
+      setCopiedLogId(log.id);
+      window.setTimeout(() => {
+        setCopiedLogId((current) => (current === log.id ? null : current));
+      }, 1600);
+    } catch {
+      setFeedback("Nao foi possivel copiar a linha do log.");
     }
   };
 
@@ -196,7 +221,12 @@ export default function AdminChatLogsPage() {
           const separatorClass = log.level === "error" ? "text-red-300/35" : "text-slate-600";
 
           return (
-            <article key={log.id} className={`overflow-x-auto rounded-2xl border px-3 py-2 ${lineClass}`}>
+            <article
+              key={log.id}
+              onClick={() => void handleCopyLogLine(log, index)}
+              className={`overflow-x-auto rounded-2xl border px-3 py-2 cursor-pointer transition-colors hover:border-white/15 ${lineClass}`}
+              title="Clique para copiar a linha"
+            >
               <p className="whitespace-nowrap text-[11px] leading-5">
                 <span className={subtleTextClass}>{String(index + 1).padStart(3, "0")}</span>
                 <span className={`px-2 ${separatorClass}`}>|</span>
@@ -211,6 +241,12 @@ export default function AdminChatLogsPage() {
                   <>
                     <span className={`px-2 ${separatorClass}`}>|</span>
                     <span className={log.level === "error" ? "text-red-100/95" : "text-slate-400"}>{compactDetails}</span>
+                  </>
+                ) : null}
+                {copiedLogId === log.id ? (
+                  <>
+                    <span className={`px-2 ${separatorClass}`}>|</span>
+                    <span className="font-semibold text-emerald-200">copiado</span>
                   </>
                 ) : null}
               </p>
