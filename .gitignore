@@ -1,5 +1,7 @@
 node_modules/
 build/
+!app/api/meta/build/
+!app/api/meta/build/route.ts
 dist/
 coverage/
 .next/
@@ -15,3 +17,4 @@ tsconfig.tsbuildinfo
 !.env.example
 database/geral-schema.sql
 localinfo/
+PROJECT_AI_SUMMARY.md

@@ -141,6 +141,7 @@ function Sidebar({
   onProjectTabNavigate,
   onLogout,
 }: SidebarProps) {
+  const [buildId, setBuildId] = useState("...");
   const visibleLinks = currentUser && !canAccessGlobalAdmin(currentUser)
     ? adminLinks.filter((item) => {
         return ("projectTab" in item)
@@ -150,6 +151,32 @@ function Sidebar({
           || item.href === "/admin/me";
       })
     : adminLinks;
+
+  useEffect(() => {
+    let active = true;
+
+    const loadBuildId = async () => {
+      try {
+        const response = await fetch("/api/meta/build", { cache: "no-store" });
+        const payload = (await response.json()) as { buildId?: string };
+        if (!active) {
+          return;
+        }
+
+        setBuildId(payload.buildId?.trim() || "local");
+      } catch {
+        if (active) {
+          setBuildId("local");
+        }
+      }
+    };
+
+    void loadBuildId();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <>
@@ -253,6 +280,11 @@ function Sidebar({
           >
             {!collapsed ? (
               <>
+                <div className="flex items-center justify-center">
+                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    build {buildId}
+                  </span>
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Link
                     href="/"
@@ -278,6 +310,12 @@ function Sidebar({
               </>
             ) : (
               <>
+                <span
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400"
+                  title={`Build ${buildId}`}
+                >
+                  {buildId}
+                </span>
                 <Link
                   href="/"
                   className="infra-click-pulse inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
