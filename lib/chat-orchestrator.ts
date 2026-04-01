@@ -392,6 +392,13 @@ function buildNeutralGlobalFallbackReply(agent: AgenteRecord | null, context?: C
   ].join("\n\n");
 }
 
+function buildMercadoLivreFocusedFallbackReply(agent: AgenteRecord | null) {
+  return [
+    `Sigo por aqui no contexto de ${agent?.nome ?? "atendimento"}.`,
+    "Como este agente esta focado na loja do Mercado Livre, me diga o produto, modelo, marca, cor ou SKU que voce quer buscar.",
+  ].join("\n\n");
+}
+
 function isInfraStudioFirstPartyContext(context?: ConversationContext) {
   const projetoSlug = normalizeText(context?.projeto?.slug ?? "");
   const projetoNome = normalizeText(context?.projeto?.nome ?? "");
@@ -1053,6 +1060,7 @@ function buildAgentScopedRecoveryReply(input: {
   context?: ConversationContext;
   agent: AgenteRecord | null;
   apiContexts: ApiRuntimeContext[];
+  hasMercadoLivreConnector: boolean;
 }) {
   const firstPartyFallback = isInfraStudioFirstPartyContext(input.context) ? heuristicReply(input.message, input.context) : null;
   if (firstPartyFallback?.trim()) {
@@ -1081,12 +1089,15 @@ function buildAgentScopedRecoveryReply(input: {
   }
 
   const neutralFallbackReply = buildNeutralGlobalFallbackReply(input.agent, input.context);
+  const mercadoLivreFallbackReply = input.hasMercadoLivreConnector
+    ? buildMercadoLivreFocusedFallbackReply(input.agent)
+    : neutralFallbackReply;
   const baseReply = isInfraStudioFirstPartyContext(input.context)
     ? [
         `Sigo por aqui no contexto de ${input.agent?.nome ?? "atendimento"}.`,
         `Me diga o ponto exato que voce quer validar em ${objective}: risco, valor, status, documentos ou detalhes.`,
       ].join("\n\n")
-    : neutralFallbackReply;
+    : mercadoLivreFallbackReply;
 
   const apiReply = /codigo|status|consulta|buscar|verifica|api|integr/i.test(normalizeText(input.message))
     ? buildApiFallbackReply(input.message, input.apiContexts)
@@ -1095,7 +1106,7 @@ function buildAgentScopedRecoveryReply(input: {
   return apiReply ? formatHeuristicReply(apiReply, input.context) : baseReply;
 }
 
-function buildSystemPrompt(agent: AgenteRecord | null, context?: ConversationContext) {
+function buildSystemPrompt(agent: AgenteRecord | null, context?: ConversationContext, hasMercadoLivreConnector = false) {
   const defaultPrompt = [
     "Voce e o agente comercial inicial da InfraStudio.",
     "Seu papel e entender a necessidade do cliente, mostrar capacidade tecnica com objetividade e conduzir para o WhatsApp quando houver intencao comercial.",
@@ -1107,6 +1118,15 @@ function buildSystemPrompt(agent: AgenteRecord | null, context?: ConversationCon
     "Quando responder com base parcial, use formulacoes honestas como 'com base nos dados enviados' ou 'pelo resumo atual'.",
     isWhatsAppChannel(context) ? "No WhatsApp, mantenha respostas curtas, normalmente entre 2 e 4 linhas." : "Mantenha respostas curtas, normalmente entre 3 e 6 linhas.",
     "Quando houver fit comercial, convide para continuar no WhatsApp.",
+    hasMercadoLivreConnector
+      ? "Este agente pode ter varias integracoes, mas quando o Mercado Livre estiver conectado ele deve receber peso maior na interpretacao das mensagens sobre loja, produtos, anuncios, disponibilidade e variacoes."
+      : "",
+    hasMercadoLivreConnector
+      ? "Quando a mensagem for ambigua, interprete primeiro como uma busca ou duvida sobre produto do Mercado Livre, sem ignorar outras capacidades se a pessoa pedir algo claramente diferente."
+      : "",
+    hasMercadoLivreConnector
+      ? "Se faltar contexto, faca uma pergunta curta pedindo nome do produto, modelo, marca, cor, tamanho ou SKU."
+      : "",
   ].join("\n");
 
   if (!agent) {
@@ -1333,6 +1353,43 @@ function extractProductSearchTerm(message: string) {
     .trim();
 
   return cleaned || message.trim();
+}
+
+function shouldUseMercadoLivreConnectorFallback(latestUserMessage: string, context?: ConversationContext) {
+  const normalized = normalizeText(latestUserMessage).trim();
+  if (!normalized) {
+    return false;
+  }
+
+  if (
+    /^(oi|ola|opa|bom dia|boa tarde|boa noite|obrigado|obrigada|valeu|blz|beleza|tudo bem)\b/.test(normalized)
+  ) {
+    return false;
+  }
+
+  if (
+    /\b(preco|valor|orcamento|quanto|site|chat|agente|automac(?:ao|a)o|integrac(?:ao|a)o|whatsapp|api|status|codigo|consulta)\b/.test(
+      normalized,
+    )
+  ) {
+    return false;
+  }
+
+  if (shouldSearchProducts(latestUserMessage)) {
+    return true;
+  }
+
+  const compact = normalized.replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  const words = compact ? compact.split(" ").filter(Boolean) : [];
+  if (!words.length || compact.length > 60 || words.length > 8) {
+    return false;
+  }
+
+  if (Boolean(context?.catalogo?.ultimaBusca)) {
+    return true;
+  }
+
+  return words.some((word) => word.length >= 3 || /\d/.test(word));
 }
 
 function buildMercadoLivreNoResultsReply(termo: string, context?: ConversationContext) {
@@ -1570,8 +1627,7 @@ function maybeAskForLeadIdentification(context: ConversationContext, history: Co
 
 export async function generateSalesReply(history: ConversationMessage[], context?: ConversationContext) {
   const latestUserMessage = [...history].reverse().find((item) => item.role === "user")?.content ?? "";
-  const productSearchRequested = shouldContinueProductSearch(history, latestUserMessage, context);
-  const productSearchTerm = productSearchRequested ? extractProductSearchTerm(latestUserMessage) : "";
+  const detectedProductSearch = shouldContinueProductSearch(history, latestUserMessage, context);
   const channelPolicy = getChatChannelPolicy(context);
   const enableInfraStudioHeuristics = isInfraStudioFirstPartyContext(context);
   const projectId = context?.projeto?.id ?? null;
@@ -1616,6 +1672,9 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const apiContexts = agent?.id ? await buildAgenteApiRuntimeContext(agent.id, (context ?? {}) as Record<string, unknown>) : [];
   const mercadoLivreConnectors = agent?.id ? await listConectoresByAgente(agent.id, MERCADO_LIVRE_CONNECTOR_TYPE) : [];
   const hasMercadoLivreConnector = mercadoLivreConnectors.length > 0;
+  const productSearchRequested =
+    detectedProductSearch || (hasMercadoLivreConnector && shouldUseMercadoLivreConnectorFallback(latestUserMessage, context));
+  const productSearchTerm = productSearchRequested ? extractProductSearchTerm(latestUserMessage) : "";
   const mercadoLivreProducts =
     agent?.id && productSearchRequested && hasMercadoLivreConnector ? await buscarProdutosMercadoLivrePorAgente(agent.id, productSearchTerm) : [];
   const resourceTrace = {
@@ -1627,7 +1686,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     mercadoLivreCount: mercadoLivreProducts.length,
   };
   const openai = await getProjetoOpenAIConfig(projectId);
-  const systemPrompt = buildSystemPrompt(agent, context);
+  const systemPrompt = buildSystemPrompt(agent, context, hasMercadoLivreConnector);
   const channelReplyInstruction = buildChannelReplyInstruction(context);
   const runtimePrompt = buildRuntimePrompt(agent, latestUserMessage, context, apiContexts);
   const legacyAgentPrompt = buildLegacyAgentPrompt(agent);
@@ -1640,6 +1699,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     context,
     agent,
     apiContexts,
+    hasMercadoLivreConnector,
   });
   const catalogPricingReply = enableInfraStudioHeuristics ? buildCatalogPricingReply(history, context) : null;
   const leadIdentificationReply = enableInfraStudioHeuristics && channelPolicy.allowLeadGate ? maybeAskForLeadIdentification(context ?? {}, history, latestUserMessage) : null;
