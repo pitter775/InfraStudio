@@ -217,6 +217,26 @@ function dedupeProdutos(produtos: ProdutoPadronizado[]) {
   });
 }
 
+function filterExcludedProdutos(produtos: ProdutoPadronizado[], excludeRefs?: string[]) {
+  const excluded = new Set(
+    Array.isArray(excludeRefs)
+      ? excludeRefs
+          .map((item) => String(item || "").trim().toLowerCase())
+          .filter(Boolean)
+      : [],
+  );
+
+  if (!excluded.size) {
+    return produtos;
+  }
+
+  return produtos.filter((produto) => {
+    const id = String(produto.id || "").trim().toLowerCase();
+    const link = String(produto.link || "").trim().toLowerCase();
+    return (!id || !excluded.has(id)) && (!link || !excluded.has(link));
+  });
+}
+
 function truncateText(value: string, max = 280) {
   const normalized = value.replace(/\s+/g, " ").trim();
   if (normalized.length <= max) {
@@ -310,7 +330,11 @@ function rankProdutosByTermo(produtos: ProdutoPadronizado[], termo: string) {
     .map((item) => item.produto);
 }
 
-async function searchConnectorProducts(connector: ConnectorRecord, termo: string) {
+async function searchConnectorProducts(
+  connector: ConnectorRecord,
+  termo: string,
+  options?: { excludeRefs?: string[]; limit?: number },
+) {
   const config = getMercadoLivreConnectorConfig(connector);
   const endpointBase = connector.endpointBase || "https://api.mercadolibre.com";
   const sellerId = config?.seller_id?.replace(/\D/g, "").trim();
@@ -318,6 +342,8 @@ async function searchConnectorProducts(connector: ConnectorRecord, termo: string
   const terms = buildSearchVariants(termo);
   const sellerBatches: ProdutoPadronizado[] = [];
   const marketplaceBatches: ProdutoPadronizado[] = [];
+  const desiredLimit = Math.max(1, options?.limit ?? 3);
+  const internalLimit = Math.max(desiredLimit + 4, 8);
 
   for (const currentTerm of terms) {
     if (sellerId) {
@@ -342,14 +368,20 @@ async function searchConnectorProducts(connector: ConnectorRecord, termo: string
     }
   }
 
-  const sellerProducts = rankProdutosByTermo(dedupeProdutos(sellerBatches), termo).slice(0, 4);
+  const sellerProducts = filterExcludedProdutos(rankProdutosByTermo(dedupeProdutos(sellerBatches), termo), options?.excludeRefs).slice(
+    0,
+    internalLimit,
+  );
   if (sellerProducts.length) {
-    return sellerProducts;
+    return sellerProducts.slice(0, desiredLimit);
   }
 
-  const marketplaceProducts = rankProdutosByTermo(dedupeProdutos(marketplaceBatches), termo).slice(0, 4);
+  const marketplaceProducts = filterExcludedProdutos(
+    rankProdutosByTermo(dedupeProdutos(marketplaceBatches), termo),
+    options?.excludeRefs,
+  ).slice(0, internalLimit);
   if (marketplaceProducts.length || !sellerId) {
-    return marketplaceProducts;
+    return marketplaceProducts.slice(0, desiredLimit);
   }
 
   try {
@@ -361,9 +393,9 @@ async function searchConnectorProducts(connector: ConnectorRecord, termo: string
       connector,
     });
 
-    return rankProdutosByTermo(dedupeProdutos(fallbackProducts), termo)
+    return filterExcludedProdutos(rankProdutosByTermo(dedupeProdutos(fallbackProducts), termo), options?.excludeRefs)
       .filter((produto) => normalizeSearchText(produto.nome).includes(normalizeSearchText(termo)))
-      .slice(0, 4);
+      .slice(0, desiredLimit);
   } catch {
     return sellerProducts;
   }
@@ -577,7 +609,11 @@ async function fetchMercadoLivreItemDetails(input: {
   return (await response.json()) as MercadoLivreItemResponse;
 }
 
-export async function buscarProdutosMercadoLivrePorAgente(agenteId: string, termo: string) {
+export async function buscarProdutosMercadoLivrePorAgente(
+  agenteId: string,
+  termo: string,
+  options?: { excludeRefs?: string[]; limit?: number },
+) {
   const termoNormalizado = termo.trim();
   if (!agenteId.trim() || !termoNormalizado) {
     return [];
@@ -604,13 +640,17 @@ export async function buscarProdutosMercadoLivrePorAgente(agenteId: string, term
     payload: {
       agenteId,
       termo: termoNormalizado,
+      excludeRefs: options?.excludeRefs ?? [],
+      limit: options?.limit ?? 3,
       connectorIds: conectores.map((connector) => connector.id),
     },
   });
 
   try {
-    const resultados = await Promise.all(conectores.map((connector) => searchConnectorProducts(connector, termoNormalizado)));
-    const produtos = dedupeProdutos(resultados.flat()).slice(0, 3);
+    const resultados = await Promise.all(
+      conectores.map((connector) => searchConnectorProducts(connector, termoNormalizado, options)),
+    );
+    const produtos = filterExcludedProdutos(dedupeProdutos(resultados.flat()), options?.excludeRefs).slice(0, options?.limit ?? 3);
 
     await appendSystemLog({
       tipo: "mercado_livre_search_result",
@@ -622,6 +662,8 @@ export async function buscarProdutosMercadoLivrePorAgente(agenteId: string, term
         agenteId,
         termo: termoNormalizado,
         totalProdutos: produtos.length,
+        excludeRefs: options?.excludeRefs ?? [],
+        limit: options?.limit ?? 3,
         connectorIds: conectores.map((connector) => connector.id),
       },
     });
@@ -635,6 +677,8 @@ export async function buscarProdutosMercadoLivrePorAgente(agenteId: string, term
       payload: {
         agenteId,
         termo: termoNormalizado,
+        excludeRefs: options?.excludeRefs ?? [],
+        limit: options?.limit ?? 3,
         connectorIds: conectores.map((connector) => connector.id),
         message: error instanceof Error ? error.message : "Erro desconhecido.",
       },

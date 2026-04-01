@@ -1657,12 +1657,18 @@ function buildMercadoLivreListingReply(produtos: ProdutoPadronizado[], context?:
   }
 
   return isWhatsAppChannel(context)
-    ? "Separei alguns produtos da loja para voce logo abaixo. Se quiser, eu tambem posso buscar um modelo especifico."
+    ? 'Separei alguns produtos da loja para voce logo abaixo. Se quiser ver mais opcoes, me responda "mais".'
     : "Separei alguns produtos da loja logo abaixo. Se quiser, eu tambem posso buscar um modelo especifico.";
 }
 
-function buildMercadoLivreNoResultsReply(termo: string, context?: ConversationContext) {
+function buildMercadoLivreNoResultsReply(termo: string, context?: ConversationContext, options?: { exhausted?: boolean }) {
   const termoLimpo = termo.trim() || "esse produto";
+
+  if (options?.exhausted) {
+    return isWhatsAppChannel(context)
+      ? 'Ja te mostrei as opcoes mais relevantes que encontrei por agora. Se quiser, me diga outro nome, cor, tamanho ou modelo para eu buscar uma nova leva.'
+      : 'Ja mostrei as opcoes mais relevantes encontradas ate aqui. Se quiser, me diga outro nome, cor, tamanho ou modelo para eu fazer uma nova busca.';
+  }
 
   if (isWhatsAppChannel(context)) {
     return [
@@ -1694,6 +1700,36 @@ function normalizeRecentCatalogProducts(context?: ConversationContext): CatalogP
       imagem: typeof item.imagem === "string" ? item.imagem : null,
     }))
     .filter((item) => item.nome);
+}
+
+function isCatalogLoadMoreIntent(message: string, context?: ConversationContext) {
+  const normalized = normalizeText(message);
+  if (!normalized || !normalizeRecentCatalogProducts(context).length) {
+    return false;
+  }
+
+  const compact = normalized.replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  if (!compact) {
+    return false;
+  }
+
+  if (["mais", "outras", "outros", "mais opcoes", "outras opcoes", "mais modelos", "outros modelos"].includes(compact)) {
+    return true;
+  }
+
+  return [
+    /\btem mais\b/,
+    /\bquero mais\b/,
+    /\bme mostra mais\b/,
+    /\bmostra mais\b/,
+    /\btraz mais\b/,
+    /\bmanda mais\b/,
+    /\bver mais\b/,
+    /\boutras opcoes\b/,
+    /\boutros modelos\b/,
+    /\bmais modelos\b/,
+    /\bmais opcoes\b/,
+  ].some((pattern) => pattern.test(normalized));
 }
 
 function tokenizeCatalogReferenceMessage(message: string) {
@@ -2012,12 +2048,12 @@ function buildMercadoLivreReply(produtos: ProdutoPadronizado[], context?: Conver
 
   if (produtos.length === 1) {
     return isWhatsAppChannel(context)
-      ? "Encontrei um produto da loja para voce logo abaixo. Se quiser, eu posso buscar outras opcoes parecidas."
+      ? 'Encontrei um produto da loja para voce logo abaixo. Se quiser ver outras opcoes parecidas, me responda "mais".'
       : "Encontrei um produto da loja logo abaixo. Se quiser, eu posso buscar outras opcoes parecidas.";
   }
 
   return isWhatsAppChannel(context)
-    ? "Encontrei algumas opcoes parecidas na loja logo abaixo. Se quiser, eu posso buscar mais variacoes desse produto."
+    ? 'Encontrei algumas opcoes parecidas na loja logo abaixo. Se quiser ver outras sem repetir estas, me responda "mais".'
     : "Encontrei algumas opcoes parecidas na loja logo abaixo. Se quiser, eu posso buscar mais variacoes desse produto.";
 }
 
@@ -2244,13 +2280,19 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const hasMercadoLivreConnector = mercadoLivreConnectors.length > 0;
   const leadNameReplyDetected = isLikelyLeadNameReply(latestUserMessage, history);
   const extractedLeadName = leadNameReplyDetected ? extractName(latestUserMessage) : null;
+  const recentCatalogProducts = normalizeRecentCatalogProducts(context);
+  const loadMoreCatalogRequested = hasMercadoLivreConnector && !leadNameReplyDetected && isCatalogLoadMoreIntent(latestUserMessage, context);
+  const previousCatalogSearchTerm = typeof context?.catalogo?.ultimaBusca === "string" ? context.catalogo.ultimaBusca.trim() : "";
   const genericMercadoLivreListingRequested =
-    hasMercadoLivreConnector && isMercadoLivreListingIntent(latestUserMessage) && !leadNameReplyDetected;
+    hasMercadoLivreConnector && isMercadoLivreListingIntent(latestUserMessage) && !leadNameReplyDetected && !loadMoreCatalogRequested;
   const productSearchRequested =
     !genericMercadoLivreListingRequested &&
     !leadNameReplyDetected &&
-    (detectedProductSearch || (hasMercadoLivreConnector && shouldUseMercadoLivreConnectorFallback(history, latestUserMessage, context)));
-  const productSearchCandidates = productSearchRequested ? buildProductSearchCandidates(latestUserMessage) : [];
+    (loadMoreCatalogRequested ||
+      detectedProductSearch ||
+      (hasMercadoLivreConnector && shouldUseMercadoLivreConnectorFallback(history, latestUserMessage, context)));
+  const productSearchSeed = loadMoreCatalogRequested ? previousCatalogSearchTerm : latestUserMessage;
+  const productSearchCandidates = productSearchRequested ? buildProductSearchCandidates(productSearchSeed) : [];
   const productSearchTerm = productSearchCandidates[0] ?? "";
   const mercadoLivreListingSnapshot =
     agent?.id && genericMercadoLivreListingRequested ? await listarProdutosRecentesMercadoLivrePorAgente(agent.id) : null;
@@ -2259,8 +2301,16 @@ export async function generateSalesReply(history: ConversationMessage[], context
   let resolvedProductSearchTerm = productSearchTerm;
 
   if (agent?.id && productSearchRequested && hasMercadoLivreConnector) {
+    const excludedProductRefs = loadMoreCatalogRequested
+      ? recentCatalogProducts
+          .flatMap((item) => [typeof item.id === "string" ? item.id : null, typeof item.link === "string" ? item.link : null])
+          .filter((item): item is string => Boolean(item))
+      : [];
     for (const candidate of productSearchCandidates) {
-      const currentProducts = await buscarProdutosMercadoLivrePorAgente(agent.id, candidate);
+      const currentProducts = await buscarProdutosMercadoLivrePorAgente(agent.id, candidate, {
+        excludeRefs: excludedProductRefs,
+        limit: 3,
+      });
       if (currentProducts.length) {
         mercadoLivreProducts = currentProducts;
         resolvedProductSearchTerm = candidate;
@@ -2272,6 +2322,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     apiNames: apiContexts.map((item) => item.nome),
     apiErrors: apiContexts.filter((item) => item.erro).map((item) => ({ nome: item.nome, erro: item.erro })),
     mercadoLivreRequested: productSearchRequested,
+    mercadoLivreLoadMoreRequested: loadMoreCatalogRequested,
     mercadoLivreConnectorActive: hasMercadoLivreConnector,
     mercadoLivreListingRequested: genericMercadoLivreListingRequested,
     mercadoLivreTerm: resolvedProductSearchTerm || null,
@@ -2340,7 +2391,9 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const directMercadoLivreReply = buildMercadoLivreReply(mercadoLivreProducts, context);
   const mercadoLivreNoResultsReply =
     productSearchRequested && agent?.id && hasMercadoLivreConnector && mercadoLivreProducts.length === 0
-      ? buildMercadoLivreNoResultsReply(resolvedProductSearchTerm || productSearchTerm, context)
+      ? buildMercadoLivreNoResultsReply(resolvedProductSearchTerm || productSearchTerm, context, {
+          exhausted: loadMoreCatalogRequested,
+        })
       : null;
 
   if (leadIdentificationReply && leadNameReplyDetected) {
