@@ -98,7 +98,12 @@ function extractRecentMercadoLivreProductsFromAssets(assets: unknown) {
   }
 
   return assets
-    .filter((asset) => isPlainObject(asset) && typeof asset.id === "string" && asset.id.startsWith("mercado-livre-"))
+    .filter(
+      (asset) =>
+        isPlainObject(asset) &&
+        typeof asset.id === "string" &&
+        (asset.id.startsWith("mercado-livre-") || /^MLB\d+$/i.test(asset.id)),
+    )
     .map((asset) => ({
       id: typeof asset.id === "string" ? asset.id : null,
       nome: typeof asset.nome === "string" ? asset.nome : null,
@@ -825,6 +830,13 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     nextContext.catalogo = {
       ...(isPlainObject(nextContext.catalogo) ? nextContext.catalogo : {}),
       ultimosProdutos: recentMercadoLivreProducts,
+    };
+  }
+
+  if (isPlainObject(ai.metadata) && isPlainObject(ai.metadata.catalogoProdutoAtual)) {
+    nextContext.catalogo = {
+      ...(isPlainObject(nextContext.catalogo) ? nextContext.catalogo : {}),
+      produtoAtual: ai.metadata.catalogoProdutoAtual,
     };
   }
 

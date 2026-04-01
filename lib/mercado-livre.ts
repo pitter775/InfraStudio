@@ -10,11 +10,23 @@ import {
 import { ensureMercadoLivreAccessToken } from "@/lib/mercado-livre-oauth";
 
 export type ProdutoPadronizado = {
+  id?: string | null;
   nome: string;
   preco: number;
   imagem: string;
   link: string;
   publicadoEm: string | null;
+};
+
+export type ProdutoDetalhadoMercadoLivre = ProdutoPadronizado & {
+  descricao?: string | null;
+  condicao?: string | null;
+  garantia?: string | null;
+  estoque?: number | null;
+  vendidos?: number | null;
+  aceitaMercadoPago?: boolean | null;
+  freteGratis?: boolean | null;
+  atributos?: Array<{ nome: string; valor: string }>;
 };
 
 export type MercadoLivreStoreSnapshot = {
@@ -30,6 +42,7 @@ export type MercadoLivreStoreSnapshot = {
 };
 
 type MercadoLivreSearchItem = {
+  id?: string;
   title?: string;
   price?: number;
   thumbnail?: string;
@@ -158,6 +171,7 @@ function normalizeProduto(item: MercadoLivreSearchItem): ProdutoPadronizado | nu
   }
 
   return {
+    id: typeof item.id === "string" ? item.id : null,
     nome: item.title,
     preco: item.price,
     imagem: item.thumbnail,
@@ -168,6 +182,20 @@ function normalizeProduto(item: MercadoLivreSearchItem): ProdutoPadronizado | nu
       (typeof item.last_updated === "string" && item.last_updated.trim()) ||
       null,
   };
+}
+
+function extractMercadoLivreItemId(value: string | null | undefined) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return null;
+  }
+
+  const directMatch = text.match(/\bMLB[- ]?(\d{6,})\b/i);
+  if (directMatch) {
+    return `MLB${directMatch[1]}`;
+  }
+
+  return /^[A-Z]{3}\d{6,}$/i.test(text) ? text.toUpperCase() : null;
 }
 
 function dedupeProdutos(produtos: ProdutoPadronizado[]) {
@@ -332,6 +360,7 @@ async function searchConnectorProducts(connector: ConnectorRecord, termo: string
 type MercadoLivreItemDetailsResponse = Array<{
   code?: number;
   body?: {
+    id?: string;
     title?: string;
     price?: number;
     thumbnail?: string;
@@ -339,8 +368,67 @@ type MercadoLivreItemDetailsResponse = Array<{
     date_created?: string;
     start_time?: string;
     last_updated?: string;
+    condition?: string;
+    warranty?: string;
+    available_quantity?: number;
+    sold_quantity?: number;
+    accepts_mercadopago?: boolean;
+    shipping?: { free_shipping?: boolean };
+    attributes?: Array<{ name?: string; value_name?: string; value_struct?: { number?: number; unit?: string } }>;
   };
 }>;
+
+type MercadoLivreItemResponse = {
+  id?: string;
+  title?: string;
+  price?: number;
+  thumbnail?: string;
+  permalink?: string;
+  date_created?: string;
+  start_time?: string;
+  last_updated?: string;
+  condition?: string;
+  warranty?: string;
+  available_quantity?: number;
+  sold_quantity?: number;
+  accepts_mercadopago?: boolean;
+  shipping?: { free_shipping?: boolean };
+  attributes?: Array<{ name?: string; value_name?: string; value_struct?: { number?: number; unit?: string } }>;
+};
+
+function normalizeMercadoLivreAttributes(item: MercadoLivreItemResponse) {
+  return (item.attributes ?? [])
+    .map((attribute) => {
+      const nome = typeof attribute.name === "string" ? attribute.name.trim() : "";
+      const rawValue =
+        typeof attribute.value_name === "string" && attribute.value_name.trim()
+          ? attribute.value_name.trim()
+          : attribute.value_struct && typeof attribute.value_struct.number === "number"
+            ? `${attribute.value_struct.number}${attribute.value_struct.unit ? ` ${attribute.value_struct.unit}` : ""}`.trim()
+            : "";
+      return nome && rawValue ? { nome, valor: rawValue } : null;
+    })
+    .filter(Boolean) as Array<{ nome: string; valor: string }>;
+}
+
+function normalizeProdutoDetalhado(item: MercadoLivreItemResponse, descricao?: string | null): ProdutoDetalhadoMercadoLivre | null {
+  const base = normalizeProduto(item);
+  if (!base) {
+    return null;
+  }
+
+  return {
+    ...base,
+    descricao: descricao?.trim() || null,
+    condicao: typeof item.condition === "string" ? item.condition.trim() || null : null,
+    garantia: typeof item.warranty === "string" ? item.warranty.trim() || null : null,
+    estoque: typeof item.available_quantity === "number" ? item.available_quantity : null,
+    vendidos: typeof item.sold_quantity === "number" ? item.sold_quantity : null,
+    aceitaMercadoPago: typeof item.accepts_mercadopago === "boolean" ? item.accepts_mercadopago : null,
+    freteGratis: typeof item.shipping?.free_shipping === "boolean" ? item.shipping.free_shipping : null,
+    atributos: normalizeMercadoLivreAttributes(item).slice(0, 8),
+  };
+}
 
 async function fetchMercadoLivreLatestProducts(input: {
   endpointBase: string;
@@ -426,6 +514,51 @@ async function fetchMercadoLivreLatestProducts(input: {
     .filter(Boolean) as ProdutoPadronizado[];
 }
 
+async function fetchMercadoLivreItemDescription(input: {
+  endpointBase: string;
+  itemId: string;
+  accessToken?: string;
+}) {
+  const endpoint = new URL(`/items/${input.itemId}/description`, input.endpointBase);
+  const response = await fetch(endpoint.toString(), {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      ...(input.accessToken ? { Authorization: `Bearer ${input.accessToken}` } : {}),
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = (await response.json()) as { plain_text?: string };
+  return typeof payload.plain_text === "string" && payload.plain_text.trim() ? truncateText(payload.plain_text.trim(), 700) : null;
+}
+
+async function fetchMercadoLivreItemDetails(input: {
+  endpointBase: string;
+  itemId: string;
+  accessToken?: string;
+}) {
+  const endpoint = new URL(`/items/${input.itemId}`, input.endpointBase);
+  const response = await fetch(endpoint.toString(), {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      ...(input.accessToken ? { Authorization: `Bearer ${input.accessToken}` } : {}),
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return (await response.json()) as MercadoLivreItemResponse;
+}
+
 export async function buscarProdutosMercadoLivrePorAgente(agenteId: string, termo: string) {
   const termoNormalizado = termo.trim();
   if (!agenteId.trim() || !termoNormalizado) {
@@ -489,6 +622,44 @@ export async function buscarProdutosMercadoLivrePorAgente(agenteId: string, term
       },
     });
     throw error;
+  }
+}
+
+export async function obterDetalhesProdutoMercadoLivrePorAgente(agenteId: string, produtoRef: string) {
+  const itemId = extractMercadoLivreItemId(produtoRef);
+  if (!agenteId.trim() || !itemId) {
+    return null;
+  }
+
+  const conectores = await listConectoresByAgente(agenteId, MERCADO_LIVRE_CONNECTOR_TYPE);
+  const connector = conectores.find((item) => item.ativo) ?? conectores[0] ?? null;
+  if (!connector) {
+    return null;
+  }
+
+  const endpointBase = connector.endpointBase || "https://api.mercadolibre.com";
+  const accessToken = await ensureMercadoLivreAccessToken(connector);
+
+  try {
+    const [item, descricao] = await Promise.all([
+      fetchMercadoLivreItemDetails({ endpointBase, itemId, accessToken }),
+      fetchMercadoLivreItemDescription({ endpointBase, itemId, accessToken }),
+    ]);
+
+    return item ? normalizeProdutoDetalhado(item, descricao) : null;
+  } catch (error) {
+    await appendSystemLog({
+      tipo: "mercado_livre_item_details_error",
+      origem: "api_produtos",
+      descricao: "Falha ao buscar detalhes do produto do Mercado Livre.",
+      payload: {
+        agenteId,
+        itemId,
+        connectorId: connector.id,
+        message: error instanceof Error ? error.message : "Erro desconhecido.",
+      },
+    });
+    return null;
   }
 }
 

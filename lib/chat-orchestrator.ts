@@ -9,6 +9,8 @@ import { listConectoresByAgente, MERCADO_LIVRE_CONNECTOR_TYPE } from "@/lib/cone
 import {
   buscarProdutosMercadoLivrePorAgente,
   listarProdutosRecentesMercadoLivrePorAgente,
+  obterDetalhesProdutoMercadoLivrePorAgente,
+  type ProdutoDetalhadoMercadoLivre,
   type ProdutoPadronizado,
 } from "@/lib/mercado-livre";
 import { appendRuntimeErrorLog } from "@/lib/runtime-error-log";
@@ -83,6 +85,7 @@ type ConversationContext = {
   };
   catalogo?: {
     ultimaBusca?: string | null;
+    produtoAtual?: CatalogProductReference | null;
     ultimosProdutos?: Array<{
       id?: string | null;
       nome?: string | null;
@@ -1158,6 +1161,15 @@ function buildSystemPrompt(agent: AgenteRecord | null, context?: ConversationCon
     hasMercadoLivreConnector
       ? "Se faltar contexto, faca uma pergunta curta pedindo nome do produto, modelo, marca, cor, tamanho ou SKU."
       : "",
+    hasMercadoLivreConnector
+      ? "Quando a pessoa demonstrar interesse em um produto especifico, mude de modo catalogo para modo venda: destaque beneficios concretos do anuncio, reduza inseguranca, responda objecoes e conduza para decisao."
+      : "",
+    hasMercadoLivreConnector
+      ? "Depois de identificar um produto especifico, evite voltar para respostas genericas de busca. Use os dados do anuncio para argumentar melhor e fechar o proximo passo."
+      : "",
+    hasMercadoLivreConnector
+      ? "Se houver detalhes do produto em foco, priorize atributos, garantia, condicao, estoque, vendas e frete. Feche com uma pergunta comercial curta."
+      : "",
   ].join("\n");
 
   if (!agent) {
@@ -1832,9 +1844,149 @@ function buildReferencedCatalogAssets(products: CatalogProductReference[]): Repl
     }));
 }
 
+function isMercadoLivrePurchaseIntent(message: string) {
+  const normalized = normalizeText(message);
+  return /\b(gostei|quero|comprar|levar|fechar|pedido|interesse|tenho interesse|vou querer|separa|reservar|manda o link|me passa o link)\b/.test(
+    normalized,
+  );
+}
+
+function isMercadoLivreDetailIntent(message: string) {
+  const normalized = normalizeText(message);
+  return /\b(detalhe|detalhes|descricao|descrição|garantia|material|medida|medidas|tamanho|capacidade|cor|estoque|frete|entrega|condicao|condição|vendeu|vendidos)\b/.test(
+    normalized,
+  );
+}
+
+function formatMercadoLivreCondition(value: string | null | undefined) {
+  const normalized = normalizeText(value ?? "");
+  if (normalized === "new") {
+    return "novo";
+  }
+  if (normalized === "used") {
+    return "usado";
+  }
+  return value?.trim() || null;
+}
+
+function buildMercadoLivreDetailPromptContext(produto: ProdutoDetalhadoMercadoLivre | null) {
+  if (!produto) {
+    return "";
+  }
+
+  const atributos = (produto.atributos ?? []).map((item) => `- ${item.nome}: ${item.valor}`);
+  return [
+    "Produto atual em foco no Mercado Livre:",
+    `- id: ${produto.id ?? ""}`,
+    `- nome: ${produto.nome}`,
+    `- preco: ${produto.preco}`,
+    produto.condicao ? `- condicao: ${produto.condicao}` : "",
+    produto.garantia ? `- garantia: ${produto.garantia}` : "",
+    typeof produto.estoque === "number" ? `- estoque: ${produto.estoque}` : "",
+    typeof produto.vendidos === "number" ? `- vendidos: ${produto.vendidos}` : "",
+    typeof produto.freteGratis === "boolean" ? `- frete_gratis: ${produto.freteGratis ? "sim" : "nao"}` : "",
+    produto.descricao ? `- descricao: ${produto.descricao}` : "",
+    ...atributos,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildMercadoLivreSalesReply(
+  produto: ProdutoDetalhadoMercadoLivre,
+  latestUserMessage: string,
+  context?: ConversationContext,
+  cta?: string | null,
+) {
+  const normalized = normalizeText(latestUserMessage);
+
+  if (/\bgarantia\b/.test(normalized)) {
+    const garantia = produto.garantia?.trim() || "Nao encontrei garantia informada no anuncio";
+    return isWhatsAppChannel(context)
+      ? `${produto.nome}: ${garantia}.\n\nSe quiser, eu tambem posso te dizer condicao, estoque e frete para voce decidir melhor.`
+      : `**${produto.nome}**: ${garantia}.\n\nSe quiser, eu tambem posso te dizer **condicao, estoque e frete** para voce decidir melhor.`;
+  }
+
+  if (/\bfrete\b|\bentrega\b/.test(normalized)) {
+    const frete =
+      typeof produto.freteGratis === "boolean"
+        ? produto.freteGratis
+          ? "O anuncio indica frete gratis."
+          : "O anuncio nao indica frete gratis."
+        : "Nao encontrei frete detalhado no anuncio.";
+    return [frete, cta?.trim() || "Se quiser, eu sigo com voce e vejo se vale a pena fechar este item ou comparar com outro parecido."].join("\n\n");
+  }
+
+  if (/\bestoque\b|\bdisponivel\b/.test(normalized)) {
+    const estoque =
+      typeof produto.estoque === "number"
+        ? `No anuncio aparecem ${produto.estoque} unidade(s) disponivel(is).`
+        : "Nao encontrei estoque detalhado no anuncio.";
+    return [estoque, cta?.trim() || "Se quiser, eu sigo com voce e te ajudo a decidir se vale fechar este item agora."].join("\n\n");
+  }
+
+  if (/\bmaterial\b|\bmedida\b|\bmedidas\b|\btamanho\b|\bcapacidade\b|\bcor\b/.test(normalized)) {
+    const matchingAttributes = (produto.atributos ?? []).filter((item) =>
+      /\b(material|medida|medidas|tamanho|capacidade|cor)\b/.test(normalizeText(item.nome)),
+    );
+    if (matchingAttributes.length) {
+      const summary = matchingAttributes.slice(0, 3).map((item) => `${item.nome}: ${item.valor}`).join(" | ");
+      return [`Encontrei estes detalhes no anuncio: ${summary}.`, cta?.trim() || "Se quiser, eu tambem posso te falar de garantia, estoque e frete antes de voce decidir."].join("\n\n");
+    }
+  }
+
+  const highlights: string[] = [];
+  if (produto.atributos?.length) {
+    highlights.push(...produto.atributos.slice(0, 3).map((item) => `${item.nome}: ${item.valor}`));
+  }
+  const condition = formatMercadoLivreCondition(produto.condicao);
+  if (condition) {
+    highlights.push(`Condicao: ${condition}`);
+  }
+  if (produto.garantia) {
+    highlights.push(`Garantia: ${produto.garantia}`);
+  }
+  if (typeof produto.freteGratis === "boolean") {
+    highlights.push(produto.freteGratis ? "Frete gratis" : "Frete a consultar");
+  }
+  if (typeof produto.vendidos === "number" && produto.vendidos > 0) {
+    highlights.push(`${produto.vendidos} vendas`);
+  }
+
+  const leadIn = isWhatsAppChannel(context)
+    ? `Boa escolha. ${produto.nome} esta por R$ ${produto.preco.toLocaleString("pt-BR")}.`
+    : `**Boa escolha.** ${produto.nome} esta por **R$ ${produto.preco.toLocaleString("pt-BR")}**.`;
+  const sellingPoint = highlights.length
+    ? `Pelo anuncio, os pontos que mais ajudam na decisao sao: ${highlights.join(" | ")}.`
+    : produto.descricao
+      ? produto.descricao
+      : "Posso te detalhar melhor esse item e te ajudar a decidir com mais seguranca.";
+  const close = cta?.trim()
+    ? cta.trim()
+    : "Se fizer sentido para voce, me diga se quer seguir com este item ou comparar com outra opcao parecida.";
+
+  return [leadIn, sellingPoint, close].filter(Boolean).join("\n\n");
+}
+
+function getCatalogProductRefForDetails(product: CatalogProductReference | null | undefined) {
+  if (!product) {
+    return null;
+  }
+
+  if (typeof product.id === "string" && /^MLB\d+$/i.test(product.id.trim())) {
+    return product.id.trim();
+  }
+
+  if (typeof product.link === "string" && product.link.trim()) {
+    return product.link.trim();
+  }
+
+  return typeof product.id === "string" && product.id.trim() ? product.id.trim() : null;
+}
+
 function buildMercadoLivreProductAssets(produtos: ProdutoPadronizado[]): ReplyAsset[] {
   return produtos.slice(0, 3).map((produto, index) => ({
-    id: `mercado-livre-${index + 1}-${normalizeText(produto.nome).replace(/\s+/g, "-") || "produto"}`,
+    id: produto.id || `mercado-livre-${index + 1}-${normalizeText(produto.nome).replace(/\s+/g, "-") || "produto"}`,
     nome: produto.nome,
     descricao: `R$ ${produto.preco.toLocaleString("pt-BR")}`,
     arquivoNome: produto.nome,
@@ -2144,6 +2296,25 @@ export async function generateSalesReply(history: ConversationMessage[], context
       ? resolveRecentCatalogProductReference(latestUserMessage, context)
       : [];
   const referencedCatalogReply = buildReferencedCatalogReply(referencedCatalogProducts, context);
+  const currentCatalogProduct =
+    context?.catalogo?.produtoAtual && typeof context.catalogo.produtoAtual === "object" ? context.catalogo.produtoAtual : null;
+  const selectedCatalogProduct =
+    referencedCatalogProducts.length === 1 ? referencedCatalogProducts[0] : currentCatalogProduct;
+  const shouldPitchSelectedProduct =
+    Boolean(selectedCatalogProduct) &&
+    (isMercadoLivrePurchaseIntent(latestUserMessage) || isMercadoLivreDetailIntent(latestUserMessage));
+  const selectedCatalogProductDetails =
+    shouldPitchSelectedProduct && agent?.id && getCatalogProductRefForDetails(selectedCatalogProduct)
+      ? await obterDetalhesProdutoMercadoLivrePorAgente(agent.id, getCatalogProductRefForDetails(selectedCatalogProduct) ?? "")
+      : null;
+  const lojaCta =
+    typeof agent.configuracoes?.cta_whatsapp === "string" && agent.configuracoes.cta_whatsapp.trim()
+      ? agent.configuracoes.cta_whatsapp.trim()
+      : null;
+  const selectedProductSalesReply =
+    selectedCatalogProductDetails && shouldPitchSelectedProduct
+      ? buildMercadoLivreSalesReply(selectedCatalogProductDetails, latestUserMessage, context, lojaCta)
+      : null;
   const ambiguousCatalogReferenceReply =
     hasMercadoLivreConnector &&
     !leadNameReplyDetected &&
@@ -2155,6 +2326,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     ? buildMercadoLivreListingReply(mercadoLivreListingProducts, context)
     : null;
   const mercadoLivrePromptContext = buildMercadoLivrePromptContext(mercadoLivreProducts);
+  const mercadoLivreDetailPromptContext = buildMercadoLivreDetailPromptContext(selectedCatalogProductDetails);
   const directMercadoLivreReply = buildMercadoLivreReply(mercadoLivreProducts, context);
   const mercadoLivreNoResultsReply =
     productSearchRequested && agent?.id && hasMercadoLivreConnector && mercadoLivreProducts.length === 0
@@ -2195,6 +2367,39 @@ export async function generateSalesReply(history: ConversationMessage[], context
     };
   }
 
+  if (selectedProductSalesReply && selectedCatalogProductDetails) {
+    await appendRuntimeErrorLog({
+      source: "chat_orchestrator.trace",
+      message: "Resposta comercial de produto especifico do Mercado Livre acionada.",
+      ...traceBase,
+      payload: {
+        ...traceBase.payload,
+        ...resourceTrace,
+        mode: "mercado_livre_product_sales",
+        productId: selectedCatalogProductDetails.id ?? null,
+      },
+    });
+    return {
+      reply: formatHeuristicReply(selectedProductSalesReply, context),
+      assets: buildMercadoLivreProductAssets([selectedCatalogProductDetails]),
+      usage: { inputTokens: 0, outputTokens: 0 },
+      metadata: {
+        provider: "heuristic",
+        model: "mercado_livre_product_sales",
+        agenteId: agent?.id ?? null,
+        agenteNome: agent?.nome ?? null,
+        catalogoProdutoAtual: {
+          id: selectedCatalogProductDetails.id ?? null,
+          nome: selectedCatalogProductDetails.nome,
+          descricao: `R$ ${selectedCatalogProductDetails.preco.toLocaleString("pt-BR")}`,
+          preco: selectedCatalogProductDetails.preco,
+          link: selectedCatalogProductDetails.link,
+          imagem: selectedCatalogProductDetails.imagem,
+        },
+      },
+    };
+  }
+
   if (referencedCatalogReply) {
     await appendRuntimeErrorLog({
       source: "chat_orchestrator.trace",
@@ -2216,6 +2421,17 @@ export async function generateSalesReply(history: ConversationMessage[], context
         model: "catalog_reference_resolution",
         agenteId: agent?.id ?? null,
         agenteNome: agent?.nome ?? null,
+        catalogoProdutoAtual:
+          referencedCatalogProducts.length === 1
+            ? {
+                id: referencedCatalogProducts[0]?.id ?? null,
+                nome: referencedCatalogProducts[0]?.nome ?? null,
+                descricao: referencedCatalogProducts[0]?.descricao ?? null,
+                preco: referencedCatalogProducts[0]?.preco ?? null,
+                link: referencedCatalogProducts[0]?.link ?? null,
+                imagem: referencedCatalogProducts[0]?.imagem ?? null,
+              }
+            : null,
       },
     };
   }
@@ -2284,6 +2500,17 @@ export async function generateSalesReply(history: ConversationMessage[], context
         model: "mercado_livre_connector",
         agenteId: agent?.id ?? null,
         agenteNome: agent?.nome ?? null,
+        catalogoProdutoAtual:
+          mercadoLivreProducts.length === 1
+            ? {
+                id: mercadoLivreProducts[0]?.id ?? null,
+                nome: mercadoLivreProducts[0]?.nome ?? null,
+                descricao: `R$ ${mercadoLivreProducts[0]?.preco.toLocaleString("pt-BR")}`,
+                preco: mercadoLivreProducts[0]?.preco ?? null,
+                link: mercadoLivreProducts[0]?.link ?? null,
+                imagem: mercadoLivreProducts[0]?.imagem ?? null,
+              }
+            : null,
       },
     };
   }
@@ -2383,7 +2610,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
       model: openai.model,
       temperature: 0.5,
       max_output_tokens: 220,
-      instructions: [systemPrompt, channelReplyInstruction, runtimePrompt, legacyAgentPrompt, structuredReplyInstruction, analyticalReplyInstruction, agentAssetInstruction, focusedApiContext.instructions, mercadoLivrePromptContext, summary, lead, qualification]
+      instructions: [systemPrompt, channelReplyInstruction, runtimePrompt, legacyAgentPrompt, structuredReplyInstruction, analyticalReplyInstruction, agentAssetInstruction, focusedApiContext.instructions, mercadoLivrePromptContext, mercadoLivreDetailPromptContext, summary, lead, qualification]
         .filter(Boolean)
         .join("\n\n"),
       input: buildInput(latestUserTurn ? [...recentMessages.filter((item) => item !== latestUserTurn), latestUserTurn] : recentMessages),
@@ -2575,6 +2802,7 @@ export function enrichLeadContext(
     };
     catalogo?: {
       ultimaBusca?: string | null;
+      produtoAtual?: CatalogProductReference | null;
       ultimosProdutos?: Array<{
         id?: string | null;
         nome?: string | null;
@@ -2636,6 +2864,7 @@ export function enrichLeadContext(
     },
     catalogo: {
       ultimaBusca: context.catalogo?.ultimaBusca ?? null,
+      produtoAtual: context.catalogo?.produtoAtual ?? null,
       ultimosProdutos: Array.isArray(context.catalogo?.ultimosProdutos) ? context.catalogo.ultimosProdutos : [],
     },
   };
