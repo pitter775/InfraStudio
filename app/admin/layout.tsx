@@ -142,6 +142,7 @@ function Sidebar({
   onLogout,
 }: SidebarProps) {
   const [buildId, setBuildId] = useState("...");
+  const [activeProjectName, setActiveProjectName] = useState<string | null>(null);
   const visibleLinks = currentUser && !canAccessGlobalAdmin(currentUser)
     ? adminLinks.filter((item) => {
         return ("projectTab" in item)
@@ -178,6 +179,42 @@ function Sidebar({
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    const match = pathname.match(/^\/admin\/projetos\/([^/?#]+)/);
+    const projectId = match?.[1] ?? null;
+
+    if (!projectId) {
+      setActiveProjectName(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    const loadProjectName = async () => {
+      try {
+        const response = await fetch(`/api/admin/projetos/${projectId}`, { cache: "no-store" });
+        const payload = (await response.json()) as { projeto?: { nome?: string | null }; error?: string };
+
+        if (!active) {
+          return;
+        }
+
+        setActiveProjectName(payload.projeto?.nome?.trim() || null);
+      } catch {
+        if (active) {
+          setActiveProjectName(null);
+        }
+      }
+    };
+
+    void loadProjectName();
+
+    return () => {
+      active = false;
+    };
+  }, [pathname]);
+
   return (
     <>
       <div
@@ -210,6 +247,11 @@ function Sidebar({
               {!collapsed ? (
                 <div className="min-w-0">
                   <p className="truncate text-lg font-extrabold text-white">InfraStudio</p>
+                  {activeProjectName ? (
+                    <p className="mt-0.5 truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200/80">
+                      {activeProjectName}
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </Link>
