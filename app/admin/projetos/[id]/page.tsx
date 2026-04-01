@@ -4416,19 +4416,7 @@ export default function AdminProjetoDetalhePage() {
       return;
     }
 
-    const channelsToSync = data.whatsappChannels.filter((channel) => {
-      if (channel.status !== "ativo") {
-        return false;
-      }
-
-      const connectionStatus = channel.sessionData?.connectionStatus ?? "offline";
-      return (
-        connectionStatus !== "online" ||
-        connectingWhatsAppChannelId === channel.id ||
-        disconnectingWhatsAppChannelId === channel.id ||
-        !channel.sessionData?.lastSyncAt
-      );
-    });
+    const channelsToSync = data.whatsappChannels.filter((channel) => channel.status === "ativo");
 
     if (!channelsToSync.length) {
       return;
@@ -4569,15 +4557,49 @@ export default function AdminProjetoDetalhePage() {
       const statusResponse = await fetch(statusUrl, { cache: "no-store" });
       const statusPayload = (await statusResponse.json()) as { status?: string };
       if (statusResponse.ok) {
+        const normalizedStatus = getChannelStatusLabel(statusPayload.status);
         setServiceStatusByChannel((current) => ({
           ...current,
-          [channelId]: getChannelStatusLabel(statusPayload.status),
+          [channelId]: normalizedStatus,
+        }));
+        updateProjetoData((current) => ({
+          ...current,
+          whatsappChannels: current.whatsappChannels.map((entry) =>
+            entry.id === channelId
+              ? {
+                  ...entry,
+                  sessionData: {
+                    ...entry.sessionData,
+                    connectionStatus:
+                      normalizedStatus === "conectado"
+                        ? "online"
+                        : normalizedStatus === "aguardando_qr"
+                          ? "aguardando_qr"
+                          : "offline",
+                  },
+                }
+              : entry,
+          ),
         }));
       }
     } catch {
       setServiceStatusByChannel((current) => ({
         ...current,
         [channelId]: "desconectado",
+      }));
+      updateProjetoData((current) => ({
+        ...current,
+        whatsappChannels: current.whatsappChannels.map((entry) =>
+          entry.id === channelId
+            ? {
+                ...entry,
+                sessionData: {
+                  ...entry.sessionData,
+                  connectionStatus: "offline",
+                },
+              }
+            : entry,
+        ),
       }));
     }
 
@@ -7460,6 +7482,8 @@ export default function AdminProjetoDetalhePage() {
                   isWaitingQr,
                   runtimeStatus,
                 });
+                const runtimeNote = channel.sessionData?.notes ?? null;
+                const shouldShowRuntimeNote = runtimeStatus !== "desconectado" && Boolean(runtimeNote);
 
                 return (
                   <div className="grid gap-6 xl:col-start-1">
@@ -7491,9 +7515,9 @@ export default function AdminProjetoDetalhePage() {
                         </div>
                       </div>
 
-                      {channel.sessionData?.notes ? (
+                      {shouldShowRuntimeNote ? (
                         <div className="mt-5 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                          {getWhatsAppChannelUserNote(channel.sessionData.notes)}
+                          {getWhatsAppChannelUserNote(runtimeNote)}
                         </div>
                       ) : null}
 
