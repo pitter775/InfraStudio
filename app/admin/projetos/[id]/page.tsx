@@ -3942,10 +3942,11 @@ function EmbeddedAgentTestChat({
       };
     };
 
-    const projetoRef = projeto.slug?.trim() || projeto.id;
-    const agenteRef = agente.slug?.trim() || agente.id;
+    const projetoRef = projeto.id;
+    const agenteRef = agente.id;
     const scriptId = "infrastudio-admin-agent-test-chat-sdk";
     const mountWidget = () => {
+      infraChatWindow.InfraChat?.destroy();
       infraChatWindow.InfraChat?.mount({
         projeto: projetoRef,
         agente: agenteRef,
@@ -4000,7 +4001,7 @@ function EmbeddedAgentTestChat({
       script?.removeEventListener("load", mountWidget);
       infraChatWindow.InfraChat?.destroy();
     };
-  }, [agente.id, agente.slug, origin, projeto.id, projeto.slug]);
+  }, [agente.id, origin, projeto.id]);
 
   return null;
 }
