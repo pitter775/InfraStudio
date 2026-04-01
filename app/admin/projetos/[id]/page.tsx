@@ -3925,15 +3925,11 @@ function EmbeddedAgentTestChat({
   projeto,
   agente,
   origin,
-  onClose,
 }: {
   projeto: Projeto;
   agente: Agente;
   origin: string;
-  onClose: () => void;
 }) {
-  const targetIdRef = useRef(`admin-agent-test-${Math.random().toString(36).slice(2)}`);
-
   useEffect(() => {
     if (typeof window === "undefined" || !origin) {
       return;
@@ -3950,22 +3946,19 @@ function EmbeddedAgentTestChat({
     const agenteRef = agente.slug?.trim() || agente.id;
     const scriptId = "infrastudio-admin-agent-test-chat-sdk";
     const mountWidget = () => {
-      const target = document.getElementById(targetIdRef.current);
-      if (!target) {
-        return;
-      }
-
-      target.innerHTML = "";
       infraChatWindow.InfraChat?.mount({
         projeto: projetoRef,
         agente: agenteRef,
         apiBase: origin,
         strictHostControl: true,
         open: true,
-        embedded: true,
-        target: `#${targetIdRef.current}`,
+        destroyOnClose: true,
+        hideLauncher: true,
+        mobileFullscreen: true,
         ui: {
           transparent: false,
+          title: agente.nome,
+          subtitle: "Testando o agente",
         },
         context: {
           route: {
@@ -4006,52 +3999,10 @@ function EmbeddedAgentTestChat({
     return () => {
       script?.removeEventListener("load", mountWidget);
       infraChatWindow.InfraChat?.destroy();
-      const target = document.getElementById(targetIdRef.current);
-      if (target) {
-        target.innerHTML = "";
-      }
     };
   }, [agente.id, agente.slug, origin, projeto.id, projeto.slug]);
 
-  return (
-    <section className="mt-6 overflow-hidden rounded-[28px] border border-emerald-400/18 bg-[linear-gradient(180deg,rgba(16,185,129,0.08),rgba(2,6,23,0.3))] p-4 shadow-[0_24px_60px_rgba(2,8,23,0.22)]">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-200">Ambiente interno de teste</p>
-          <h4 className="mt-2 text-xl font-extrabold text-white">Testando o agente {agente.nome}</h4>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-            Este chat fica preso ao agente escolhido nesta aba e usa o mesmo fluxo real de atendimento, com APIs, arquivos, Mercado Livre e WhatsApp do agente configurado.
-          </p>
-          <p className="mt-2 text-xs text-emerald-100/80">
-            Este bloco nao representa o chat institucional da InfraStudio nem o widget publico do site.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition-colors hover:border-rose-300/30 hover:bg-rose-400/10"
-        >
-          <X size={16} />
-          Fechar
-        </button>
-      </div>
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]">
-        <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Escopo do teste</p>
-          <div className="mt-3 space-y-3 text-sm text-slate-300">
-            <p>Projeto: <span className="font-semibold text-white">{projeto.nome}</span></p>
-            <p>Agente: <span className="font-semibold text-white">{agente.nome}</span></p>
-            <p>Objetivo: validar o agente configurado exatamente como o usuario vai testar no painel, sem botao flutuante.</p>
-          </div>
-        </div>
-
-        <div className="rounded-[24px] border border-white/10 bg-slate-950/30 p-3">
-          <div id={targetIdRef.current} className="min-h-[560px]" />
-        </div>
-      </div>
-    </section>
-  );
+  return null;
 }
 
 export default function AdminProjetoDetalhePage() {
@@ -6650,7 +6601,6 @@ export default function AdminProjetoDetalhePage() {
               projeto={data.projeto}
               agente={activeAgentTestTarget}
               origin={origin}
-              onClose={() => setAgentTestTarget(null)}
             />
           ) : null}
           <div className="pt-2">
