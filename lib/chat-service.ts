@@ -766,6 +766,9 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
       ? estimateOpenAICostUsd(ai.usage.inputTokens, ai.usage.outputTokens, typeof ai.metadata?.model === "string" ? ai.metadata.model : null)
       : 0;
 
+  const leadNameForTitle =
+    typeof nextContext.lead?.nome === "string" && nextContext.lead.nome.trim() ? nextContext.lead.nome.trim() : null;
+
   const assistantMessage = await appendMessage({
     chatId: chat.id,
     role: "assistant",
@@ -813,6 +816,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     chatId: chat.id,
     totalTokensToAdd: ai.usage.inputTokens + ai.usage.outputTokens,
     totalCustoToAdd: estimatedCostUsd,
+    titulo: leadNameForTitle ?? chat.titulo,
     contexto: nextContext,
   });
 

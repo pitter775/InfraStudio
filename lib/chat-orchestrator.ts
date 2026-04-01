@@ -6,7 +6,11 @@ import { normalizeAgentRuntimeConfig, selectAgentRuntimeLines } from "@/lib/agen
 import { buildAgenteApiRuntimeContext, type ApiRuntimeContext } from "@/lib/apis";
 import { getChatChannelPolicy } from "@/lib/chat-channel-policy";
 import { listConectoresByAgente, MERCADO_LIVRE_CONNECTOR_TYPE } from "@/lib/conectores";
-import { buscarProdutosMercadoLivrePorAgente, type ProdutoPadronizado } from "@/lib/mercado-livre";
+import {
+  buscarProdutosMercadoLivrePorAgente,
+  listarProdutosRecentesMercadoLivrePorAgente,
+  type ProdutoPadronizado,
+} from "@/lib/mercado-livre";
 import { appendRuntimeErrorLog } from "@/lib/runtime-error-log";
 import { getProjetoOpenAIConfig } from "@/lib/segredos";
 import type { ChatMessageRole } from "@/lib/chats";
@@ -1355,9 +1359,72 @@ function extractProductSearchTerm(message: string) {
   return cleaned || message.trim();
 }
 
-function shouldUseMercadoLivreConnectorFallback(latestUserMessage: string, context?: ConversationContext) {
+function didAssistantRecentlyAskForLeadName(history: ConversationMessage[]) {
+  const previousAssistantMessage = [...history].reverse().find((item) => item.role === "assistant")?.content ?? "";
+  const normalized = normalizeText(previousAssistantMessage);
+
+  return (
+    normalized.includes("como posso te chamar") ||
+    normalized.includes("qual e o seu nome") ||
+    normalized.includes("me diga seu nome") ||
+    normalized.includes("qual seu nome")
+  );
+}
+
+function isLikelyLeadNameReply(message: string, history: ConversationMessage[]) {
+  if (!didAssistantRecentlyAskForLeadName(history)) {
+    return false;
+  }
+
+  const extractedName = extractName(message);
+  if (!extractedName) {
+    return false;
+  }
+
+  const normalized = normalizeText(message);
+  if (
+    /\b(produto|produtos|modelo|marca|cor|tamanho|sku|loja|mercado livre|ml|catalogo)\b/.test(normalized)
+  ) {
+    return false;
+  }
+
+  const words = normalized.split(/\s+/).filter(Boolean);
+  return words.length >= 1 && words.length <= 3;
+}
+
+function isMercadoLivreListingIntent(message: string) {
+  const normalized = normalizeText(message);
+
+  return [
+    /\bquais produtos\b/,
+    /\bquais sao os produtos\b/,
+    /\bmostra(?:r)? os produtos\b/,
+    /\bme mostra(?:r)? os produtos\b/,
+    /\btraga os produtos\b/,
+    /\blistar produtos\b/,
+    /\blista de produtos\b/,
+    /\bo que voce tem\b/,
+    /\bo que vc tem\b/,
+    /\bprodutos que voce tem\b/,
+    /\bprodutos que vc tem\b/,
+    /\bme mostra a loja\b/,
+    /\bmostra a loja\b/,
+    /\bver catalogo\b/,
+    /\bver produtos\b/,
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function shouldUseMercadoLivreConnectorFallback(
+  history: ConversationMessage[],
+  latestUserMessage: string,
+  context?: ConversationContext,
+) {
   const normalized = normalizeText(latestUserMessage).trim();
   if (!normalized) {
+    return false;
+  }
+
+  if (isLikelyLeadNameReply(latestUserMessage, history)) {
     return false;
   }
 
@@ -1390,6 +1457,30 @@ function shouldUseMercadoLivreConnectorFallback(latestUserMessage: string, conte
   }
 
   return words.some((word) => word.length >= 3 || /\d/.test(word));
+}
+
+function buildMercadoLivreListingReply(produtos: ProdutoPadronizado[], context?: ConversationContext) {
+  if (!produtos.length) {
+    return isWhatsAppChannel(context)
+      ? "Nao encontrei produtos visiveis na loja neste momento."
+      : "Nao encontrei produtos visiveis na loja neste momento.";
+  }
+
+  if (isWhatsAppChannel(context)) {
+    return [
+      "Estes sao alguns produtos da loja agora:",
+      ...produtos.map((produto, index) => `${index + 1}. ${produto.nome}\nR$ ${produto.preco.toLocaleString("pt-BR")}\n${produto.link}`),
+      "",
+      "Se quiser, eu posso buscar um modelo especifico para voce.",
+    ].join("\n\n");
+  }
+
+  return [
+    "**Estes sao alguns produtos da loja agora:**",
+    ...produtos.map((produto) => `- **${produto.nome}**\n  R$ ${produto.preco.toLocaleString("pt-BR")}\n  ${produto.link}`),
+    "",
+    "Se quiser, eu posso buscar um modelo especifico para voce.",
+  ].join("\n");
 }
 
 function buildMercadoLivreNoResultsReply(termo: string, context?: ConversationContext) {
@@ -1672,9 +1763,15 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const apiContexts = agent?.id ? await buildAgenteApiRuntimeContext(agent.id, (context ?? {}) as Record<string, unknown>) : [];
   const mercadoLivreConnectors = agent?.id ? await listConectoresByAgente(agent.id, MERCADO_LIVRE_CONNECTOR_TYPE) : [];
   const hasMercadoLivreConnector = mercadoLivreConnectors.length > 0;
+  const genericMercadoLivreListingRequested =
+    hasMercadoLivreConnector && isMercadoLivreListingIntent(latestUserMessage) && !isLikelyLeadNameReply(latestUserMessage, history);
   const productSearchRequested =
-    detectedProductSearch || (hasMercadoLivreConnector && shouldUseMercadoLivreConnectorFallback(latestUserMessage, context));
+    !genericMercadoLivreListingRequested &&
+    (detectedProductSearch || (hasMercadoLivreConnector && shouldUseMercadoLivreConnectorFallback(history, latestUserMessage, context)));
   const productSearchTerm = productSearchRequested ? extractProductSearchTerm(latestUserMessage) : "";
+  const mercadoLivreListingSnapshot =
+    agent?.id && genericMercadoLivreListingRequested ? await listarProdutosRecentesMercadoLivrePorAgente(agent.id) : null;
+  const mercadoLivreListingProducts = mercadoLivreListingSnapshot?.produtos ?? [];
   const mercadoLivreProducts =
     agent?.id && productSearchRequested && hasMercadoLivreConnector ? await buscarProdutosMercadoLivrePorAgente(agent.id, productSearchTerm) : [];
   const resourceTrace = {
@@ -1682,7 +1779,9 @@ export async function generateSalesReply(history: ConversationMessage[], context
     apiErrors: apiContexts.filter((item) => item.erro).map((item) => ({ nome: item.nome, erro: item.erro })),
     mercadoLivreRequested: productSearchRequested,
     mercadoLivreConnectorActive: hasMercadoLivreConnector,
+    mercadoLivreListingRequested: genericMercadoLivreListingRequested,
     mercadoLivreTerm: productSearchTerm || null,
+    mercadoLivreListingCount: mercadoLivreListingProducts.length,
     mercadoLivreCount: mercadoLivreProducts.length,
   };
   const openai = await getProjetoOpenAIConfig(projectId);
@@ -1703,12 +1802,44 @@ export async function generateSalesReply(history: ConversationMessage[], context
   });
   const catalogPricingReply = enableInfraStudioHeuristics ? buildCatalogPricingReply(history, context) : null;
   const leadIdentificationReply = enableInfraStudioHeuristics && channelPolicy.allowLeadGate ? maybeAskForLeadIdentification(context ?? {}, history, latestUserMessage) : null;
+  const mercadoLivreListingReply = genericMercadoLivreListingRequested
+    ? buildMercadoLivreListingReply(mercadoLivreListingProducts, context)
+    : null;
   const mercadoLivrePromptContext = buildMercadoLivrePromptContext(mercadoLivreProducts);
   const directMercadoLivreReply = buildMercadoLivreReply(mercadoLivreProducts, context);
   const mercadoLivreNoResultsReply =
     productSearchRequested && agent?.id && hasMercadoLivreConnector && mercadoLivreProducts.length === 0
       ? buildMercadoLivreNoResultsReply(productSearchTerm, context)
       : null;
+
+  if (leadIdentificationReply && isLikelyLeadNameReply(latestUserMessage, history)) {
+    await appendRuntimeErrorLog({
+      source: "chat_orchestrator.trace",
+      message: "Resposta de nome do lead priorizada antes do conector Mercado Livre.",
+      ...traceBase,
+      payload: { ...traceBase.payload, ...resourceTrace, mode: "lead_name_priority" },
+    });
+  }
+
+  if (mercadoLivreListingReply) {
+    await appendRuntimeErrorLog({
+      source: "chat_orchestrator.trace",
+      message: "Listagem de produtos recentes do Mercado Livre acionada.",
+      ...traceBase,
+      payload: { ...traceBase.payload, ...resourceTrace, mode: "mercado_livre_listing" },
+    });
+    return {
+      reply: formatHeuristicReply(mercadoLivreListingReply, context),
+      assets: [],
+      usage: { inputTokens: 0, outputTokens: 0 },
+      metadata: {
+        provider: "heuristic",
+        model: "mercado_livre_listing",
+        agenteId: agent?.id ?? null,
+        agenteNome: agent?.nome ?? null,
+      },
+    };
+  }
 
   if (directMercadoLivreReply) {
     await appendRuntimeErrorLog({
