@@ -115,6 +115,18 @@ function buildHumanHandoffReply(channelKind: ChatChannelKind) {
     : "Perfeito. Ja acionei um atendente humano para continuar por aqui assim que possivel.";
 }
 
+function shouldEscalateToHumanByAi(metadata: Record<string, unknown> | null | undefined) {
+  if (!metadata || typeof metadata !== "object") {
+    return false;
+  }
+
+  if (metadata.provider === "agent_scoped_recovery") {
+    return true;
+  }
+
+  return metadata.handoffSuggested === true;
+}
+
 function parseAssetPrice(value: unknown) {
   if (typeof value !== "string") {
     return null;
@@ -801,7 +813,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     channelKind === "whatsapp" &&
     Boolean(chat.projetoId) &&
     Boolean(getChatWhatsAppChannelId(chat, body)) &&
-    isHumanHandoffIntent(message);
+    (isHumanHandoffIntent(message) || shouldEscalateToHumanByAi(ai.metadata));
 
   if (handoffRequested && chat.projetoId) {
     const canalWhatsappId = getChatWhatsAppChannelId(chat, body);
@@ -817,7 +829,9 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
                 ? nextContext.lead.nome.trim()
                 : chat.titulo,
             latestUserMessage: message,
-            motivo: "Cliente pediu atendimento humano.",
+            motivo: isHumanHandoffIntent(message)
+              ? "Cliente pediu atendimento humano."
+              : "Conversa saiu do alcance do agente e foi escalada para um humano.",
           })
       : { ok: false, sent: 0, link: null, failures: [] as Array<{ numero: string; error: string }> };
 
@@ -826,9 +840,11 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
       projetoId: chat.projetoId,
       canalWhatsappId: canalWhatsappId ?? null,
       requestedBy: "agent",
-      motivo: "Cliente pediu atendimento humano.",
+      motivo: isHumanHandoffIntent(message)
+        ? "Cliente pediu atendimento humano."
+        : "Conversa saiu do alcance do agente e foi escalada para um humano.",
       metadata: {
-        trigger: "message_intent",
+        trigger: isHumanHandoffIntent(message) ? "message_intent" : "agent_scope_limit",
         alertSent: alertResult.sent,
         alertLink: alertResult.link ?? null,
         failures: "failures" in alertResult ? alertResult.failures : [],

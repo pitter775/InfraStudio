@@ -60,6 +60,9 @@ export async function POST(request: Request, context: RouteContext) {
       name?: string;
       type?: string;
       size?: number;
+      publicUrl?: string;
+      storagePath?: string;
+      category?: "image" | "video" | "file";
     }>;
   };
   const conteudo = body.conteudo?.trim() || "";
@@ -69,6 +72,12 @@ export async function POST(request: Request, context: RouteContext) {
           name: item.name?.trim() || "arquivo",
           type: item.type?.trim() || "application/octet-stream",
           size: typeof item.size === "number" && Number.isFinite(item.size) ? item.size : 0,
+          publicUrl: item.publicUrl?.trim() || null,
+          storagePath: item.storagePath?.trim() || null,
+          category:
+            item.category === "image" || item.category === "video" || item.category === "file"
+              ? item.category
+              : null,
         }))
         .slice(0, 5)
     : [];

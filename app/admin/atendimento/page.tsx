@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, LoaderCircle, MessageCircleMore, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, UserRound, X } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, ExternalLink, LoaderCircle, MessageCircleMore, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, UserRound, X } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -48,8 +48,18 @@ type ChatMessageRecord = {
       name?: string;
       type?: string;
       size?: number;
+      publicUrl?: string | null;
+      storagePath?: string | null;
+      category?: "image" | "video" | "file" | null;
     }>;
   } | null;
+};
+
+type PendingAttachment = {
+  file: File;
+  name: string;
+  type: string;
+  size: number;
 };
 
 type IndicativoSummary = {
@@ -132,6 +142,70 @@ function getFirstName(name: string | null | undefined) {
   return normalized.split(/\s+/)[0] || "Equipe";
 }
 
+function formatFileSize(value: number | null | undefined) {
+  const size = Number(value ?? 0);
+  if (size >= 1024 * 1024) {
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  if (size >= 1024) {
+    return `${Math.round(size / 1024)} KB`;
+  }
+
+  return `${size} B`;
+}
+
+function getAttachmentCategory(type: string | null | undefined, category?: string | null) {
+  if (category === "image" || category === "video" || category === "file") {
+    return category;
+  }
+
+  const normalized = String(type || "").toLowerCase();
+  if (normalized.startsWith("image/")) {
+    return "image";
+  }
+
+  if (normalized.startsWith("video/")) {
+    return "video";
+  }
+
+  return "file";
+}
+
+function getChatMediaItems(messages: ChatMessageRecord[]) {
+  return messages.flatMap((message) =>
+    (message.metadata?.attachments ?? []).map((attachment, index) => ({
+      key: `${message.id}:${index}`,
+      attachment,
+      message,
+      category: getAttachmentCategory(attachment.type, attachment.category),
+    })),
+  );
+}
+
+function AttachmentPreview({
+  attachment,
+}: {
+  attachment: NonNullable<NonNullable<ChatMessageRecord["metadata"]>["attachments"]>[number];
+}) {
+  const category = getAttachmentCategory(attachment.type, attachment.category);
+  const url = attachment.publicUrl?.trim() || "";
+
+  if (category === "image" && url) {
+    return <img src={url} alt={attachment.name || "Imagem"} className="h-28 w-full rounded-xl object-cover" />;
+  }
+
+  if (category === "video" && url) {
+    return <video src={url} controls className="h-28 w-full rounded-xl bg-slate-950/60 object-cover" />;
+  }
+
+  return (
+    <div className="flex h-28 w-full items-center justify-center rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-3 text-center text-xs font-semibold text-slate-300">
+      {category === "file" ? "Arquivo" : "Midia"}
+    </div>
+  );
+}
+
 function extractIndicativo(rawValue: string | null | undefined) {
   const digits = (rawValue ?? "").replace(/\D/g, "");
   if (!digits) {
@@ -161,6 +235,78 @@ function CenterLoader() {
   );
 }
 
+function ChatMediaModal({
+  open,
+  chatTitle,
+  items,
+  onClose,
+}: {
+  open: boolean;
+  chatTitle: string;
+  items: ReturnType<typeof getChatMediaItems>;
+  onClose: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/82 px-4 py-6 backdrop-blur-sm">
+      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Midias e anexos</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{chatTitle}</h2>
+            <p className="mt-1 text-sm text-slate-400">Tudo que foi anexado nesta conversa fica reunido aqui.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Fechar modal"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          {items.length ? (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {items.map((item) => (
+                <div key={item.key} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                  <AttachmentPreview attachment={item.attachment} />
+                  <div className="mt-3 space-y-1">
+                    <p className="truncate text-sm font-semibold text-white">{item.attachment.name || "Arquivo"}</p>
+                    <p className="text-xs text-slate-400">
+                      {item.category === "image" ? "Imagem" : item.category === "video" ? "Video" : "Arquivo"} • {formatFileSize(item.attachment.size)}
+                    </p>
+                    <p className="text-xs text-slate-500">{formatFullDateTime(item.message.createdAt)}</p>
+                  </div>
+                  {item.attachment.publicUrl ? (
+                    <a
+                      href={item.attachment.publicUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-3 inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/20"
+                    >
+                      <ExternalLink size={14} />
+                      Abrir anexo
+                    </a>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/30 p-8 text-center text-slate-400">
+              Nenhuma midia ou anexo registrado neste contato ainda.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminAtendimentoPage() {
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -178,10 +324,11 @@ export default function AdminAtendimentoPage() {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [messagesByChatId, setMessagesByChatId] = useState<Record<string, ChatMessageRecord[]>>({});
   const [replyText, setReplyText] = useState("");
-  const [selectedAttachments, setSelectedAttachments] = useState<Array<{ name: string; type: string; size: number }>>([]);
+  const [selectedAttachments, setSelectedAttachments] = useState<PendingAttachment[]>([]);
   const [emojiTrayOpen, setEmojiTrayOpen] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const availableProjects = useMemo(() => {
     if (projects.length) {
       return projects;
@@ -222,6 +369,7 @@ export default function AdminAtendimentoPage() {
   }, [activeProjectId, availableProjects, currentUser?.memberships, projectName]);
 
   const selectedMessages = selectedChatId ? (messagesByChatId[selectedChatId] ?? []) : [];
+  const selectedMediaItems = useMemo(() => getChatMediaItems(selectedMessages), [selectedMessages]);
   const dashboard = useMemo(() => {
     const whatsappChats = chats.filter((chat) => chat.canal === "whatsapp");
     const siteChats = chats.filter((chat) => chat.canal !== "whatsapp");
@@ -553,6 +701,40 @@ export default function AdminAtendimentoPage() {
     setFeedback(null);
 
     try {
+      let uploadedAttachments: Array<{
+        name?: string;
+        type?: string;
+        size?: number;
+        publicUrl?: string | null;
+        storagePath?: string | null;
+        category?: "image" | "video" | "file" | null;
+      }> = [];
+
+      if (selectedAttachments.length) {
+        const formData = new FormData();
+        selectedAttachments.forEach((attachment) => {
+          formData.append("files", attachment.file);
+        });
+
+        const uploadResponse = await fetch(`/api/admin/chats/${selectedChatId}/attachments`, {
+          method: "POST",
+          body: formData,
+        });
+
+        const uploadPayload = (await uploadResponse.json()) as {
+          error?: string;
+          attachments?: typeof uploadedAttachments;
+        };
+
+        if (!uploadResponse.ok) {
+          setFeedback(uploadPayload.error ?? "Nao foi possivel enviar os anexos.");
+          setSendingMessage(false);
+          return;
+        }
+
+        uploadedAttachments = Array.isArray(uploadPayload.attachments) ? uploadPayload.attachments : [];
+      }
+
       const response = await fetch(`/api/admin/chats/${selectedChatId}`, {
         method: "POST",
         headers: {
@@ -560,7 +742,7 @@ export default function AdminAtendimentoPage() {
         },
         body: JSON.stringify({
           conteudo: replyText,
-          attachments: selectedAttachments,
+          attachments: uploadedAttachments,
           sentByHuman: true,
           senderName: currentUserFirstName,
         }),
@@ -590,7 +772,7 @@ export default function AdminAtendimentoPage() {
                     claimedByUsuarioId: currentUser?.id ?? null,
                     claimedAt: sentMessage.createdAt,
                   },
-                  ultimaMensagem: replyText.trim() || (selectedAttachments.length ? "Anexo enviado." : sentMessage.conteudo),
+                  ultimaMensagem: replyText.trim() || (uploadedAttachments.length ? "Anexo enviado." : sentMessage.conteudo),
                   updatedAt: sentMessage.createdAt,
                   totalMensagens: (chat.totalMensagens ?? 0) + 1,
                 }
@@ -682,6 +864,7 @@ export default function AdminAtendimentoPage() {
   }
 
   return (
+    <>
     <main className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <section className="px-1 pt-1">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">
@@ -959,6 +1142,14 @@ export default function AdminAtendimentoPage() {
                     <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${isChatUnderHumanHandoff(selectedChat) ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}`}>
                       {isChatUnderHumanHandoff(selectedChat) ? "Voce esta atendendo" : "IA atendendo"}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => setMediaModalOpen(true)}
+                      className={`${compactButtonClass} border-white/10 bg-white/5 text-slate-100 hover:border-white/20 hover:bg-white/10`}
+                    >
+                      <Paperclip size={14} />
+                      Midias
+                    </button>
                     {!isChatUnderHumanHandoff(selectedChat) ? (
                       <button
                         type="button"
@@ -1012,15 +1203,23 @@ export default function AdminAtendimentoPage() {
                             </p>
                             <p className="mt-1.5 whitespace-pre-wrap text-xs leading-5 sm:text-[13px]">{message.conteudo}</p>
                             {message.metadata?.attachments?.length ? (
-                              <div className="mt-3 flex flex-wrap gap-2">
+                              <div className="mt-3 grid gap-2 sm:grid-cols-2">
                                 {message.metadata.attachments.map((attachment, index) => (
-                                  <span
+                                  <a
                                     key={`${message.id}-attachment-${index}`}
-                                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-slate-200"
+                                    href={attachment.publicUrl || undefined}
+                                    target={attachment.publicUrl ? "_blank" : undefined}
+                                    rel={attachment.publicUrl ? "noreferrer" : undefined}
+                                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-slate-200 transition-colors hover:bg-white/10"
                                   >
-                                    <Paperclip size={12} />
-                                    {attachment.name || "arquivo"}
-                                  </span>
+                                    <div className="flex items-center gap-2">
+                                      <Paperclip size={12} />
+                                      <span className="truncate font-semibold">{attachment.name || "arquivo"}</span>
+                                    </div>
+                                    <div className="mt-1 text-[10px] text-slate-400">
+                                      {getAttachmentCategory(attachment.type, attachment.category)} • {formatFileSize(attachment.size)}
+                                    </div>
+                                  </a>
                                 ))}
                               </div>
                             ) : null}
@@ -1041,6 +1240,7 @@ export default function AdminAtendimentoPage() {
                   className="hidden"
                   onChange={(event) => {
                     const nextFiles = Array.from(event.target.files ?? []).slice(0, 5).map((file) => ({
+                      file,
                       name: file.name,
                       type: file.type,
                       size: file.size,
@@ -1058,6 +1258,7 @@ export default function AdminAtendimentoPage() {
                       >
                         <Paperclip size={12} />
                         {attachment.name}
+                        <span className="text-slate-500">{formatFileSize(attachment.size)}</span>
                         <button
                           type="button"
                           onClick={() =>
@@ -1140,5 +1341,12 @@ export default function AdminAtendimentoPage() {
         </div>
       </section>
     </main>
+    <ChatMediaModal
+      open={mediaModalOpen}
+      chatTitle={selectedChat ? getChatTitle(selectedChat) : "Conversa"}
+      items={selectedMediaItems}
+      onClose={() => setMediaModalOpen(false)}
+    />
+    </>
   );
 }

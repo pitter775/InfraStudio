@@ -7469,6 +7469,9 @@ export default function AdminProjetoDetalhePage() {
                           <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Canal principal</p>
                           <h4 className="mt-3 text-3xl font-black text-white">{formatWhatsAppPhone(channel.numero)}</h4>
                           <p className="mt-2 text-sm text-slate-300">Agente: {agente?.nome ?? "agente ativo do projeto"}</p>
+                          <p className="mt-2 max-w-xl text-xs text-slate-400">
+                            Recomendado: use um numero so para a IA e deixe seu WhatsApp pessoal para o atendimento humano.
+                          </p>
                         </div>
                         <div className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] ${getChannelStatusTone(runtimeStatus)}`}>
                           {isConnected ? "conectado" : runtimeStatus}
@@ -7546,6 +7549,7 @@ export default function AdminProjetoDetalhePage() {
                       </div>
                     </div>
 
+                    {!isConnected ? (
                     <div className="rounded-[28px] border border-white/10 bg-slate-950/55 p-5">
                       <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{isConnected ? "Status da conexao" : "QR Code para escanear"}</p>
                       {isConnected ? (
@@ -7569,6 +7573,7 @@ export default function AdminProjetoDetalhePage() {
                         </div>
                       )}
                     </div>
+                    ) : null}
                   </div>
                 );
               })() : (
@@ -7631,72 +7636,15 @@ export default function AdminProjetoDetalhePage() {
                 <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-5 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:sticky xl:top-6">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Configuracao do canal</p>
-                      <h4 className="mt-2 text-lg font-bold text-white">Acoes rapidas do canal atual</h4>
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Atendimento humano</p>
+                      <h4 className="mt-2 text-lg font-bold text-white">Quem recebe o aviso no WhatsApp</h4>
+                      <p className="mt-2 max-w-xl text-sm text-slate-400">
+                        Quando o cliente pedir para falar com uma pessoa, o sistema avisa estes numeros e abre um link direto para a conversa no painel.
+                      </p>
                     </div>
                     {data.whatsappChannels.length > 1 ? (
                       <p className="text-xs text-amber-100/80">Existem {data.whatsappChannels.length} canais cadastrados. A interface esta priorizando o primeiro.</p>
                     ) : null}
-                  </div>
-                  <div className="mt-5 grid gap-4 md:grid-cols-3">
-                    <div className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Numero atual</p>
-                      <p className="mt-2 text-base font-bold text-white">{formatWhatsAppPhone(primaryWhatsAppChannel.numero)}</p>
-                    </div>
-                    <div className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Agente atual</p>
-                      <p className="mt-2 text-base font-bold text-white">
-                        {primaryWhatsAppChannel.agenteId
-                          ? data.agentes.find((agente) => agente.id === primaryWhatsAppChannel.agenteId)?.nome ?? "Agente nao encontrado"
-                          : agenteAtivo?.nome ?? "Agente ativo do projeto"}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Status</p>
-                      <p className="mt-2 text-base font-bold text-white">{primaryWhatsAppChannel.status}</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <div className="rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Atividade do canal</p>
-                      <div className="mt-3 space-y-3 text-sm text-slate-300">
-                        <div>
-                          <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Ultima mensagem recebida</p>
-                          <p className="mt-1 font-semibold text-white">{formatDateTimeLabel(primaryWhatsAppChannel.sessionData?.lastInboundAt)}</p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Ultima resposta enviada</p>
-                          <p className="mt-1 font-semibold text-white">{formatDateTimeLabel(primaryWhatsAppChannel.sessionData?.lastOutboundAt)}</p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Numero bruto</p>
-                          <p className="mt-1 font-mono text-sm text-cyan-100">{primaryWhatsAppChannel.numero}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Ultimas conversas</p>
-                      {recentWhatsAppChats.length ? (
-                        <div className="mt-3 space-y-3">
-                          {recentWhatsAppChats.map((chat) => (
-                            <button
-                              key={chat.id}
-                              type="button"
-                              onClick={() => void handleOpenChatHistory(chat)}
-                              className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-3 text-left transition-colors hover:border-cyan-400/20 hover:bg-slate-900/80"
-                            >
-                              <p className="truncate text-sm font-semibold text-white">{chat.titulo || chat.identificadorExterno || "Conversa WhatsApp"}</p>
-                              <p className="mt-1 text-xs text-slate-400">{chat.identificadorExterno || "sem identificador"}</p>
-                              <p className="mt-1 text-[11px] text-slate-500">{new Date(chat.updatedAt).toLocaleString("pt-BR")}</p>
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="mt-3 rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-6 text-sm text-slate-400">
-                          As conversas do WhatsApp vao aparecer aqui conforme o canal receber mensagens.
-                        </div>
-                      )}
-                    </div>
                   </div>
                   <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -7865,35 +7813,6 @@ export default function AdminProjetoDetalhePage() {
                           Nenhum numero de aviso configurado ainda. Cadastre pelo menos um contato para ser avisado quando o cliente pedir atendimento humano.
                         </div>
                       )}
-                    </div>
-                  </div>
-                  <div className="mt-5 border-t border-white/10 bg-slate-950/20 px-1 pt-5">
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={() => handleEditWhatsAppChannel(primaryWhatsAppChannel)}
-                        className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 font-semibold ${editButtonClass}`}
-                      >
-                        <Pencil size={16} />
-                        Editar canal
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleDeleteWhatsAppChannel(primaryWhatsAppChannel)}
-                        disabled={deletingWhatsAppChannelId === primaryWhatsAppChannel.id}
-                        className={dangerActionButtonClass}
-                      >
-                        <Trash2 size={16} />
-                        {deletingWhatsAppChannelId === primaryWhatsAppChannel.id ? "Removendo..." : "Remover canal"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={openNewWhatsAppChannelModal}
-                        className={headerActionButtonClass}
-                      >
-                        <Plus size={16} />
-                        Novo canal
-                      </button>
                     </div>
                   </div>
                 </div>
