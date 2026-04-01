@@ -404,6 +404,11 @@ function buildMercadoLivreFocusedFallbackReply(agent: AgenteRecord | null) {
 }
 
 function isInfraStudioFirstPartyContext(context?: ConversationContext) {
+  const channelKind = normalizeText(context?.channel?.kind ?? "");
+  if (channelKind === "admin_agent_test") {
+    return false;
+  }
+
   const projetoSlug = normalizeText(context?.projeto?.slug ?? "");
   const projetoNome = normalizeText(context?.projeto?.nome ?? "");
   return projetoSlug === "infrastudio" || projetoNome === "infrastudio";
