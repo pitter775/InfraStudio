@@ -467,8 +467,24 @@ function getWhatsAppChannelUserNote(note: string | null | undefined) {
     return "Pareamento aceito. Finalizando a conexao do canal.";
   }
 
+  if (normalized.includes("qr code gerado e aguardando leitura")) {
+    return "QR Code gerado. Escaneie com o WhatsApp deste numero.";
+  }
+
   if (normalized.includes("estado atual do cliente:")) {
     return "O canal esta processando a conexao com o WhatsApp.";
+  }
+
+  if (normalized.includes("canal conectado e pronto para receber mensagens")) {
+    return "Canal conectado com sucesso e pronto para receber mensagens.";
+  }
+
+  if (normalized.includes("acione o worker externo para gerar o qr")) {
+    return 'Clique em "Gerar QR Code" para iniciar a conexao deste numero.';
+  }
+
+  if (normalized.includes('clique em "gerar qr code" para iniciar a conexao')) {
+    return 'Clique em "Gerar QR Code" para iniciar a conexao deste numero.';
   }
 
   if (normalized.includes("falha de autenticacao")) {
@@ -477,6 +493,18 @@ function getWhatsAppChannelUserNote(note: string | null | undefined) {
 
   if (normalized.includes("cliente desconectado")) {
     return "O canal foi desconectado. Tente conectar novamente.";
+  }
+
+  if (normalized.includes("mensagem recebida de")) {
+    return "Mensagem recebida. O canal esta processando o atendimento.";
+  }
+
+  if (normalized.includes("mensagem recebida, mas o backend nao retornou resposta")) {
+    return "A mensagem foi recebida, mas o sistema nao conseguiu enviar uma resposta neste momento.";
+  }
+
+  if (normalized.includes("falha ao processar mensagem recebida")) {
+    return "A mensagem foi recebida, mas ocorreu uma falha no processamento. Nossa equipe pode analisar os detalhes nos logs.";
   }
 
   return value;
@@ -5721,8 +5749,8 @@ export default function AdminProjetoDetalhePage() {
       await refreshWhatsAppRuntime(channel.id);
       setFeedbackWhatsApp(
         options?.refreshQr
-          ? `Novo QR solicitado para ${formatWhatsAppPhone(channel.numero)}.`
-          : `Geracao do QR iniciada para ${formatWhatsAppPhone(channel.numero)}.`,
+          ? `Novo QR solicitado para ${formatWhatsAppPhone(channel.numero)}. A sessao anterior foi limpa antes da reconexao.`
+          : `Geracao do QR iniciada para ${formatWhatsAppPhone(channel.numero)}. A sessao anterior foi limpa antes da reconexao.`,
       );
     } catch (error) {
       setFeedbackWhatsApp(error instanceof Error ? error.message : "Nao foi possivel conectar o WhatsApp.");
@@ -5739,7 +5767,7 @@ export default function AdminProjetoDetalhePage() {
 
     try {
       if (serviceUrl) {
-        await fetch(`${serviceUrl.replace(/\/$/, "")}/disconnect`, {
+        await fetch(`${serviceUrl.replace(/\/$/, "")}/purge`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

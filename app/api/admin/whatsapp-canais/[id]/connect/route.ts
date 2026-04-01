@@ -29,8 +29,8 @@ export async function POST(_request: Request, context: RouteContext) {
       connectionStatus: "aguardando_qr",
       qrCodeUrl: null,
       qrCodeDataUrl: null,
-      qrCodeText: channel.sessionData?.qrCodeText ?? "Aguardando sincronizacao do worker whatsapp-web.js.",
-      notes: "Acione o worker externo para gerar o QR e sincronizar em /api/whatsapp/session.",
+      qrCodeText: channel.sessionData?.qrCodeText ?? null,
+      notes: 'Clique em "Gerar QR Code" para iniciar a conexao deste numero.',
     },
     "ativo",
   );
