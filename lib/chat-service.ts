@@ -1,5 +1,6 @@
 import { getAgenteById, getAgenteByIdentifier, type AgenteRecord } from "@/lib/agentes";
 import { appendChatRequestLog, appendSystemLog } from "@/lib/chat-logs";
+import { getChatHandoffByChatId, requestHumanHandoff, shouldPauseAssistantForHandoff } from "@/lib/chat-handoffs";
 import { enrichLeadContext, generateSalesReply, shouldRefreshSummary, summarizeConversation } from "@/lib/chat-orchestrator";
 import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetByProjetoAgente, getChatWidgetBySlug } from "@/lib/chat-widgets";
 import { appendMessage, createChat, findActiveChatByChannel, getChatById, getChatContext, listChatMessages, type ChatChannelKind, updateChatContext, updateChatStats } from "@/lib/chats";
@@ -7,6 +8,7 @@ import { registrarUso, verifyProjetoBillingAccess } from "@/lib/billing";
 import { estimateOpenAICostUsd } from "@/lib/openai-pricing";
 import { getProjetoById, getProjetoByIdentifier } from "@/lib/projetos";
 import { appendRuntimeErrorLog } from "@/lib/runtime-error-log";
+import { notifyWhatsAppHandoffContacts } from "@/lib/whatsapp-handoff-alerts";
 import { getPreferredWhatsAppChannel, getWhatsAppChannelById, updateWhatsAppChannelSession } from "@/lib/whatsapp-channels";
 
 export type ChatRequestBody = {
@@ -80,6 +82,37 @@ function buildSilentChatResult(chatId?: string | null) {
     assets: [],
     whatsapp: null,
   };
+}
+
+function getChatWhatsAppChannelId(
+  chat: NonNullable<Awaited<ReturnType<typeof getChatById>>> | null,
+  body: ChatRequestBody,
+) {
+  if (typeof body.whatsappChannelId === "string" && body.whatsappChannelId.trim()) {
+    return body.whatsappChannelId.trim();
+  }
+
+  const context = getChatContext(chat) as Record<string, unknown>;
+  const whatsapp = isPlainObject(context.whatsapp) ? context.whatsapp : null;
+  return typeof whatsapp?.channelId === "string" && whatsapp.channelId.trim() ? whatsapp.channelId.trim() : null;
+}
+
+function isHumanHandoffIntent(message: string) {
+  const normalized = message.toLowerCase();
+  return [
+    /\bfalar com (um )?(humano|atendente|vendedor|pessoa)\b/,
+    /\bquero falar com (um )?(humano|atendente|vendedor|pessoa)\b/,
+    /\bme passa (um )?(humano|atendente|vendedor)\b/,
+    /\bchama (um )?(humano|atendente|vendedor)\b/,
+    /\bprefiro falar com (uma )?pessoa\b/,
+    /\btem algu[eé]m ai\b/,
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function buildHumanHandoffReply(channelKind: ChatChannelKind) {
+  return channelKind === "whatsapp"
+    ? "Perfeito. Ja acionei um atendente humano para continuar por aqui. Assim que alguem assumir, seguimos neste mesmo WhatsApp."
+    : "Perfeito. Ja acionei um atendente humano para continuar por aqui assim que possivel.";
 }
 
 function parseAssetPrice(value: unknown) {
@@ -651,6 +684,30 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     throw new Error("Nao foi possivel gravar a mensagem do cliente. Verifique permissoes na tabela `mensagens`.");
   }
 
+  const currentHandoff = await getChatHandoffByChatId(chat.id);
+  if (shouldPauseAssistantForHandoff(currentHandoff)) {
+    await appendSystemLog({
+      projetoId: chat.projetoId,
+      tipo: "chat_handoff_paused",
+      origem: "chat_service.handoff",
+      descricao: "Mensagem recebida com atendimento humano ativo; IA permaneceu em silencio.",
+      payload: {
+        chatId: chat.id,
+        handoffStatus: currentHandoff?.status ?? null,
+        channelKind,
+      },
+    });
+
+    if (channelKind === "whatsapp" && body.whatsappChannelId) {
+      await updateWhatsAppChannelSession(body.whatsappChannelId, {
+        connectionStatus: "online",
+        lastInboundAt: new Date().toISOString(),
+      });
+    }
+
+    return buildSilentChatResult(chat.id);
+  }
+
   const history = await listChatMessages(chat.id);
   const billingAccess = chat.projetoId ? await verifyProjetoBillingAccess(chat.projetoId) : null;
   if (billingAccess && !billingAccess.allowed) {
@@ -739,6 +796,55 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     })),
     nextContext as Parameters<typeof generateSalesReply>[1],
   );
+
+  const handoffRequested =
+    channelKind === "whatsapp" &&
+    Boolean(chat.projetoId) &&
+    Boolean(getChatWhatsAppChannelId(chat, body)) &&
+    isHumanHandoffIntent(message);
+
+  if (handoffRequested && chat.projetoId) {
+    const canalWhatsappId = getChatWhatsAppChannelId(chat, body);
+    const acknowledgement = buildHumanHandoffReply(channelKind);
+    const alertResult = canalWhatsappId
+        ? await notifyWhatsAppHandoffContacts({
+            projetoId: chat.projetoId,
+            projetoNome: nextContext.projeto?.nome ? String(nextContext.projeto.nome) : null,
+            canalWhatsappId,
+            chatId: chat.id,
+            chatTitle:
+              typeof nextContext.lead?.nome === "string" && nextContext.lead.nome.trim()
+                ? nextContext.lead.nome.trim()
+                : chat.titulo,
+            latestUserMessage: message,
+            motivo: "Cliente pediu atendimento humano.",
+          })
+      : { ok: false, sent: 0, link: null, failures: [] as Array<{ numero: string; error: string }> };
+
+    await requestHumanHandoff({
+      chatId: chat.id,
+      projetoId: chat.projetoId,
+      canalWhatsappId: canalWhatsappId ?? null,
+      requestedBy: "agent",
+      motivo: "Cliente pediu atendimento humano.",
+      metadata: {
+        trigger: "message_intent",
+        alertSent: alertResult.sent,
+        alertLink: alertResult.link ?? null,
+        failures: "failures" in alertResult ? alertResult.failures : [],
+      },
+      alertMessage: alertResult.link ?? null,
+    });
+
+    ai.reply = acknowledgement;
+    ai.assets = [];
+    (nextContext as Record<string, unknown>).handoff = {
+      status: "pending_human",
+      requestedAt: new Date().toISOString(),
+      alertLink: alertResult.link ?? null,
+      alertCount: alertResult.sent ?? 0,
+    };
+  }
 
   if (!String(ai.reply ?? "").trim()) {
     await appendChatFailureLog({

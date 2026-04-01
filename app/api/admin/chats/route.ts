@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin, canAccessProject, resolveCurrentProjectId } from "@/lib/access";
+import { listChatHandoffsByChatIds } from "@/lib/chat-handoffs";
 import { listChats } from "@/lib/chats";
 import { getSessionUser } from "@/lib/session";
 
@@ -19,5 +20,14 @@ export async function GET(request: Request) {
   }
 
   const chats = await listChats(projetoId);
-  return NextResponse.json({ chats }, { status: 200 });
+  const handoffsByChatId = await listChatHandoffsByChatIds(chats.map((chat) => chat.id));
+  return NextResponse.json(
+    {
+      chats: chats.map((chat) => ({
+        ...chat,
+        handoff: handoffsByChatId.get(chat.id) ?? null,
+      })),
+    },
+    { status: 200 },
+  );
 }

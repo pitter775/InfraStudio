@@ -115,6 +115,28 @@ type WhatsAppChannel = {
   updatedAt: string;
 };
 
+type WhatsAppHandoffContact = {
+  id: string;
+  projetoId: string;
+  canalWhatsappId: string | null;
+  usuarioId: string | null;
+  nome: string;
+  numero: string;
+  papel: string | null;
+  observacoes: string | null;
+  ativo: boolean;
+  receberAlertas: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type WhatsAppHandoffContactFormState = {
+  nome: string;
+  numero: string;
+  papel: string;
+  observacoes: string;
+};
+
 type ChatWidget = {
   id?: string;
   nome: string;
@@ -1493,6 +1515,13 @@ const emptyWhatsAppChannelForm: WhatsAppChannelFormState = {
   numero: "",
   agenteId: null,
   status: "ativo",
+};
+
+const emptyWhatsAppHandoffContactForm: WhatsAppHandoffContactFormState = {
+  nome: "",
+  numero: "",
+  papel: "",
+  observacoes: "",
 };
 
 function FormLabel({ children }: { children: string }) {
@@ -4159,6 +4188,11 @@ export default function AdminProjetoDetalhePage() {
   const [feedbackConnector, setFeedbackConnector] = useState<string | null>(null);
   const [feedbackWidget, setFeedbackWidget] = useState<string | null>(null);
   const [feedbackWhatsApp, setFeedbackWhatsApp] = useState<string | null>(null);
+  const [whatsappHandoffContacts, setWhatsAppHandoffContacts] = useState<WhatsAppHandoffContact[]>([]);
+  const [whatsappHandoffContactForm, setWhatsAppHandoffContactForm] = useState<WhatsAppHandoffContactFormState>(emptyWhatsAppHandoffContactForm);
+  const [loadingWhatsAppHandoffContacts, setLoadingWhatsAppHandoffContacts] = useState(false);
+  const [savingWhatsAppHandoffContact, setSavingWhatsAppHandoffContact] = useState(false);
+  const [updatingWhatsAppHandoffContactId, setUpdatingWhatsAppHandoffContactId] = useState<string | null>(null);
   const [feedbackBilling, setFeedbackBilling] = useState<string | null>(null);
   const [agenteModalOpen, setAgenteModalOpen] = useState(false);
   const [apiModalOpen, setApiModalOpen] = useState(false);
@@ -4414,6 +4448,20 @@ export default function AdminProjetoDetalhePage() {
     };
   }, [activeTab, connectingWhatsAppChannelId, data?.whatsappChannels, disconnectingWhatsAppChannelId]);
 
+  useEffect(() => {
+    if (activeTab !== "whatsapp") {
+      return;
+    }
+
+    const channelId = data?.whatsappChannels[0]?.id ?? null;
+    if (!channelId) {
+      setWhatsAppHandoffContacts([]);
+      return;
+    }
+
+    void loadWhatsAppHandoffContacts(channelId);
+  }, [activeTab, data?.whatsappChannels]);
+
   const resetAgenteForm = () => {
     setAgenteForm({
       ...emptyAgenteForm,
@@ -4449,6 +4497,35 @@ export default function AdminProjetoDetalhePage() {
   const resetWhatsAppChannelForm = () => {
     setWhatsAppChannelForm(emptyWhatsAppChannelForm);
     setFeedbackWhatsApp(null);
+  };
+
+  const resetWhatsAppHandoffContactForm = () => {
+    setWhatsAppHandoffContactForm(emptyWhatsAppHandoffContactForm);
+  };
+
+  const loadWhatsAppHandoffContacts = async (channelId: string) => {
+    setLoadingWhatsAppHandoffContacts(true);
+
+    try {
+      const response = await fetch(`/api/admin/whatsapp-canais/${channelId}/handoff-contatos`, {
+        cache: "no-store",
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        contacts?: WhatsAppHandoffContact[];
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Nao foi possivel carregar os contatos de aviso.");
+      }
+
+      setWhatsAppHandoffContacts(Array.isArray(payload.contacts) ? payload.contacts : []);
+    } catch (error) {
+      setWhatsAppHandoffContacts([]);
+      setFeedbackWhatsApp(error instanceof Error ? error.message : "Nao foi possivel carregar os contatos de aviso.");
+    } finally {
+      setLoadingWhatsAppHandoffContacts(false);
+    }
   };
 
   const openNewWhatsAppChannelModal = () => {
@@ -5811,6 +5888,147 @@ export default function AdminProjetoDetalhePage() {
     }
   };
 
+  const handleCreateWhatsAppHandoffContact = async () => {
+    if (!primaryWhatsAppChannel) {
+      setFeedbackWhatsApp("Crie o canal principal antes de cadastrar os numeros de aviso.");
+      return;
+    }
+
+    if (!whatsappHandoffContactForm.nome.trim() || !sanitizePhoneDigits(whatsappHandoffContactForm.numero)) {
+      setFeedbackWhatsApp("Preencha nome e numero do contato que vai receber o alerta.");
+      return;
+    }
+
+    setSavingWhatsAppHandoffContact(true);
+    setFeedbackWhatsApp(null);
+
+    try {
+      const response = await fetch(`/api/admin/whatsapp-canais/${primaryWhatsAppChannel.id}/handoff-contatos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          nome: whatsappHandoffContactForm.nome.trim(),
+          numero: sanitizePhoneDigits(whatsappHandoffContactForm.numero),
+          papel: whatsappHandoffContactForm.papel.trim() || null,
+          observacoes: whatsappHandoffContactForm.observacoes.trim() || null,
+          ativo: true,
+          receberAlertas: true,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        contact?: WhatsAppHandoffContact;
+      };
+
+      if (!response.ok || !payload.contact) {
+        throw new Error(payload.error ?? "Nao foi possivel salvar o contato de aviso.");
+      }
+
+      setWhatsAppHandoffContacts((current) => [...current, payload.contact!].sort((left, right) => left.nome.localeCompare(right.nome, "pt-BR")));
+      resetWhatsAppHandoffContactForm();
+      setFeedbackWhatsApp(`Contato ${payload.contact.nome} configurado para receber alertas de atendimento humano.`);
+    } catch (error) {
+      setFeedbackWhatsApp(error instanceof Error ? error.message : "Nao foi possivel salvar o contato de aviso.");
+    } finally {
+      setSavingWhatsAppHandoffContact(false);
+    }
+  };
+
+  const handleUpdateWhatsAppHandoffContact = async (
+    contact: WhatsAppHandoffContact,
+    patch: Partial<Pick<WhatsAppHandoffContact, "ativo" | "receberAlertas">>,
+  ) => {
+    if (!primaryWhatsAppChannel) {
+      return;
+    }
+
+    setUpdatingWhatsAppHandoffContactId(contact.id);
+    setFeedbackWhatsApp(null);
+
+    try {
+      const response = await fetch(`/api/admin/whatsapp-canais/${primaryWhatsAppChannel.id}/handoff-contatos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contactId: contact.id,
+          nome: contact.nome,
+          numero: contact.numero,
+          papel: contact.papel,
+          observacoes: contact.observacoes,
+          ativo: patch.ativo ?? contact.ativo,
+          receberAlertas: patch.receberAlertas ?? contact.receberAlertas,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        contact?: WhatsAppHandoffContact;
+      };
+
+      if (!response.ok || !payload.contact) {
+        throw new Error(payload.error ?? "Nao foi possivel atualizar o contato.");
+      }
+
+      setWhatsAppHandoffContacts((current) =>
+        current
+          .map((entry) => (entry.id === payload.contact!.id ? payload.contact! : entry))
+          .sort((left, right) => left.nome.localeCompare(right.nome, "pt-BR")),
+      );
+    } catch (error) {
+      setFeedbackWhatsApp(error instanceof Error ? error.message : "Nao foi possivel atualizar o contato.");
+    } finally {
+      setUpdatingWhatsAppHandoffContactId(null);
+    }
+  };
+
+  const handleDeleteWhatsAppHandoffContact = async (contact: WhatsAppHandoffContact) => {
+    if (!primaryWhatsAppChannel) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Remover ${contact.nome} da lista de aviso do handoff humano?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setUpdatingWhatsAppHandoffContactId(contact.id);
+    setFeedbackWhatsApp(null);
+
+    try {
+      const response = await fetch(`/api/admin/whatsapp-canais/${primaryWhatsAppChannel.id}/handoff-contatos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "delete",
+          contactId: contact.id,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        success?: boolean;
+      };
+
+      if (!response.ok || payload.success !== true) {
+        throw new Error(payload.error ?? "Nao foi possivel remover o contato.");
+      }
+
+      setWhatsAppHandoffContacts((current) => current.filter((entry) => entry.id !== contact.id));
+      setFeedbackWhatsApp(`Contato ${contact.nome} removido da lista de aviso.`);
+    } catch (error) {
+      setFeedbackWhatsApp(error instanceof Error ? error.message : "Nao foi possivel remover o contato.");
+    } finally {
+      setUpdatingWhatsAppHandoffContactId(null);
+    }
+  };
+
   const handleDeleteApi = async (api: Api) => {
     const confirmed = window.confirm(`Tem certeza que deseja excluir a API "${api.nome}"?`);
     if (!confirmed) {
@@ -6331,6 +6549,7 @@ export default function AdminProjetoDetalhePage() {
     .filter((chat) => isWhatsAppChatChannel(chat))
     .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
     .slice(0, 3);
+  const activeWhatsAppHandoffContacts = whatsappHandoffContacts.filter((contact) => contact.ativo && contact.receberAlertas);
   const overviewStats = [
     { key: "agentes", label: "Agentes", value: data.stats.totalAgentes, icon: Bot, tone: "text-cyan-100", glow: "bg-cyan-400/16" },
     { key: "apis", label: "APIs", value: data.stats.totalApis, icon: Activity, tone: "text-sky-100", glow: "bg-sky-400/16" },
@@ -7475,6 +7694,175 @@ export default function AdminProjetoDetalhePage() {
                       ) : (
                         <div className="mt-3 rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-6 text-sm text-slate-400">
                           As conversas do WhatsApp vao aparecer aqui conforme o canal receber mensagens.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Atendimento humano</p>
+                        <h5 className="mt-2 text-base font-bold text-white">Quem recebe o aviso no WhatsApp</h5>
+                        <p className="mt-2 max-w-xl text-sm text-slate-400">
+                          Quando o cliente pedir para falar com uma pessoa, o sistema avisa estes numeros e abre um link direto para a conversa no painel.
+                        </p>
+                      </div>
+                      <div className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-100">
+                        {activeWhatsAppHandoffContacts.length} ativos
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Nome do atendente</p>
+                        <input
+                          value={whatsappHandoffContactForm.nome}
+                          onChange={(event) =>
+                            setWhatsAppHandoffContactForm((current) => ({
+                              ...current,
+                              nome: event.target.value,
+                            }))
+                          }
+                          placeholder="Ex.: Pitter"
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/30"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Numero do WhatsApp</p>
+                        <input
+                          value={whatsappHandoffContactForm.numero}
+                          onChange={(event) =>
+                            setWhatsAppHandoffContactForm((current) => ({
+                              ...current,
+                              numero: formatWhatsAppPhone(event.target.value),
+                            }))
+                          }
+                          placeholder="+55 11 99999-9999"
+                          inputMode="tel"
+                          autoComplete="tel"
+                          maxLength={17}
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/30"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Papel</p>
+                        <input
+                          value={whatsappHandoffContactForm.papel}
+                          onChange={(event) =>
+                            setWhatsAppHandoffContactForm((current) => ({
+                              ...current,
+                              papel: event.target.value,
+                            }))
+                          }
+                          placeholder="Ex.: vendas, suporte, plantao"
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/30"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Observacoes</p>
+                        <input
+                          value={whatsappHandoffContactForm.observacoes}
+                          onChange={(event) =>
+                            setWhatsAppHandoffContactForm((current) => ({
+                              ...current,
+                              observacoes: event.target.value,
+                            }))
+                          }
+                          placeholder="Ex.: horario comercial ou plantao"
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/30"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => void handleCreateWhatsAppHandoffContact()}
+                        disabled={savingWhatsAppHandoffContact}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-50 transition-all hover:border-emerald-300/30 hover:bg-emerald-500/14 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {savingWhatsAppHandoffContact ? <BusyIcon /> : <Plus size={16} />}
+                        Adicionar numero de aviso
+                      </button>
+                      <p className="self-center text-xs text-slate-500">
+                        O aviso vai no mesmo canal oficial conectado acima.
+                      </p>
+                    </div>
+
+                    <div className="mt-5">
+                      {loadingWhatsAppHandoffContacts ? (
+                        <div className="rounded-xl border border-white/10 bg-slate-950/40 px-4 py-4 text-sm text-slate-300">
+                          Carregando os numeros configurados...
+                        </div>
+                      ) : whatsappHandoffContacts.length ? (
+                        <div className="space-y-3">
+                          {whatsappHandoffContacts.map((contact) => {
+                            const isBusy = updatingWhatsAppHandoffContactId === contact.id;
+                            const alertsEnabled = contact.ativo && contact.receberAlertas;
+
+                            return (
+                              <div key={contact.id} className="rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-4">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="text-sm font-bold text-white">{contact.nome}</p>
+                                      <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${alertsEnabled ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}`}>
+                                        {alertsEnabled ? "recebendo alertas" : "pausado"}
+                                      </span>
+                                    </div>
+                                    <p className="mt-1 font-mono text-xs text-cyan-100">{formatWhatsAppPhone(contact.numero)}</p>
+                                    <p className="mt-2 text-xs text-slate-400">
+                                      {contact.papel ? `${contact.papel}` : "Sem papel definido"}
+                                      {contact.observacoes ? ` • ${contact.observacoes}` : ""}
+                                    </p>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        void handleUpdateWhatsAppHandoffContact(contact, {
+                                          receberAlertas: !(contact.ativo && contact.receberAlertas),
+                                          ativo: contact.ativo || !contact.receberAlertas ? true : contact.ativo,
+                                        })
+                                      }
+                                      disabled={isBusy}
+                                      className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-50 transition-all hover:border-cyan-300/30 hover:bg-cyan-500/14 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {isBusy ? <BusyIcon /> : <Power size={14} />}
+                                      {alertsEnabled ? "Pausar alerta" : "Ativar alerta"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        void handleUpdateWhatsAppHandoffContact(contact, {
+                                          ativo: !contact.ativo,
+                                          receberAlertas: !contact.ativo ? contact.receberAlertas : false,
+                                        })
+                                      }
+                                      disabled={isBusy}
+                                      className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-50 transition-all hover:border-amber-300/30 hover:bg-amber-500/14 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {isBusy ? <BusyIcon /> : <Activity size={14} />}
+                                      {contact.ativo ? "Desativar contato" : "Reativar contato"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleDeleteWhatsAppHandoffContact(contact)}
+                                      disabled={isBusy}
+                                      className="inline-flex items-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-50 transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {isBusy ? <BusyIcon /> : <Trash2 size={14} />}
+                                      Remover
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-6 text-sm text-slate-400">
+                          Nenhum numero de aviso configurado ainda. Cadastre pelo menos um contato para ser avisado quando o cliente pedir atendimento humano.
                         </div>
                       )}
                     </div>

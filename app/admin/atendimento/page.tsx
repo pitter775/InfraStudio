@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, LoaderCircle, MessageCircleMore, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, UserRound, X } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
@@ -27,6 +28,11 @@ type ChatRecord = {
     lead?: {
       nome?: string | null;
     } | null;
+  } | null;
+  handoff?: {
+    status?: "bot" | "pending_human" | "human";
+    claimedByUsuarioId?: string | null;
+    claimedAt?: string | null;
   } | null;
 };
 
@@ -106,6 +112,10 @@ function getChatTitle(chat: ChatRecord) {
   return chat.contexto?.lead?.nome?.trim() || chat.identificadorExterno?.trim() || chat.titulo?.trim() || "Conversa sem identificacao";
 }
 
+function isChatUnderHumanHandoff(chat: ChatRecord | null | undefined) {
+  return chat?.handoff?.status === "human" || chat?.handoff?.status === "pending_human";
+}
+
 function formatChatTime(value: string) {
   return new Date(value).toLocaleTimeString("pt-BR", {
     hour: "2-digit",
@@ -152,6 +162,7 @@ function CenterLoader() {
 }
 
 export default function AdminAtendimentoPage() {
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
@@ -169,7 +180,6 @@ export default function AdminAtendimentoPage() {
   const [replyText, setReplyText] = useState("");
   const [selectedAttachments, setSelectedAttachments] = useState<Array<{ name: string; type: string; size: number }>>([]);
   const [emojiTrayOpen, setEmojiTrayOpen] = useState(false);
-  const [manualAssumedByChat, setManualAssumedByChat] = useState<Record<string, boolean>>({});
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
   const availableProjects = useMemo(() => {
@@ -323,7 +333,11 @@ export default function AdminAtendimentoPage() {
 
     try {
       const response = await fetch(`/api/admin/chats/${chatId}`, { cache: "no-store" });
-      const payload = (await response.json()) as { error?: string; messages?: ChatMessageRecord[] };
+      const payload = (await response.json()) as {
+        error?: string;
+        messages?: ChatMessageRecord[];
+        handoff?: ChatRecord["handoff"];
+      };
 
       if (!response.ok) {
         setFeedback(payload.error ?? "Nao foi possivel carregar a conversa.");
@@ -335,6 +349,11 @@ export default function AdminAtendimentoPage() {
         ...current,
         [chatId]: (payload.messages ?? []).filter((message) => message.role !== "system"),
       }));
+      if (payload.handoff) {
+        setChats((current) =>
+          current.map((chat) => (chat.id === chatId ? { ...chat, handoff: payload.handoff ?? null } : chat)),
+        );
+      }
       setLoadingConversation(false);
     } catch {
       setFeedback("Nao foi possivel carregar a conversa.");
@@ -365,6 +384,34 @@ export default function AdminAtendimentoPage() {
 
     void load();
   }, []);
+
+  useEffect(() => {
+    if (!authResolved || currentUser) {
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const returnTo = window.location.pathname + window.location.search;
+    window.location.href = `/?returnTo=${encodeURIComponent(returnTo)}`;
+  }, [authResolved, currentUser]);
+
+  useEffect(() => {
+    const requestedProjectId = searchParams.get("projeto")?.trim() || null;
+    if (!requestedProjectId || activeProjectId === requestedProjectId) {
+      return;
+    }
+
+    const projectFromList = availableProjects.find((project) => project.id === requestedProjectId);
+    if (projectFromList) {
+      void handleProjectSelect(projectFromList);
+      return;
+    }
+
+    setActiveProjectId(requestedProjectId);
+  }, [activeProjectId, availableProjects, searchParams]);
 
   useEffect(() => {
     if (!activeProjectId) {
@@ -405,6 +452,15 @@ export default function AdminAtendimentoPage() {
 
     void loadConversation(selectedChatId);
   }, [messagesByChatId, selectedChatId]);
+
+  useEffect(() => {
+    const requestedChatId = searchParams.get("chat")?.trim() || null;
+    if (!requestedChatId || !chats.some((chat) => chat.id === requestedChatId)) {
+      return;
+    }
+
+    setSelectedChatId(requestedChatId);
+  }, [chats, searchParams]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -454,6 +510,40 @@ export default function AdminAtendimentoPage() {
     }
   };
 
+  const handleHandoffAction = async (action: "claim" | "release") => {
+    if (!selectedChatId) {
+      return;
+    }
+
+    setFeedback(null);
+
+    try {
+      const response = await fetch(`/api/admin/chats/${selectedChatId}/handoff`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action,
+          motivo: action === "claim" ? "Atendimento assumido pela inbox." : "Atendimento liberado para a IA pela inbox.",
+        }),
+      });
+
+      const payload = (await response.json()) as { error?: string; handoff?: ChatRecord["handoff"] };
+
+      if (!response.ok) {
+        setFeedback(payload.error ?? "Nao foi possivel atualizar o handoff.");
+        return;
+      }
+
+      setChats((current) =>
+        current.map((chat) => (chat.id === selectedChatId ? { ...chat, handoff: payload.handoff ?? null } : chat)),
+      );
+    } catch {
+      setFeedback("Nao foi possivel atualizar o handoff.");
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!selectedChatId || (!replyText.trim() && !selectedAttachments.length)) {
       return;
@@ -495,6 +585,11 @@ export default function AdminAtendimentoPage() {
             chat.id === selectedChatId
               ? {
                   ...chat,
+                  handoff: {
+                    status: "human" as const,
+                    claimedByUsuarioId: currentUser?.id ?? null,
+                    claimedAt: sentMessage.createdAt,
+                  },
                   ultimaMensagem: replyText.trim() || (selectedAttachments.length ? "Anexo enviado." : sentMessage.conteudo),
                   updatedAt: sentMessage.createdAt,
                   totalMensagens: (chat.totalMensagens ?? 0) + 1,
@@ -861,23 +956,26 @@ export default function AdminAtendimentoPage() {
                     <p className="mt-1 text-[11px] text-slate-400 sm:text-xs">Ultima atividade em {formatFullDateTime(selectedChat.updatedAt)}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${manualAssumedByChat[selectedChat.id] ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}`}>
-                      {manualAssumedByChat[selectedChat.id] ? "Voce esta atendendo" : "IA atendendo"}
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${isChatUnderHumanHandoff(selectedChat) ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}`}>
+                      {isChatUnderHumanHandoff(selectedChat) ? "Voce esta atendendo" : "IA atendendo"}
                     </span>
-                    {!manualAssumedByChat[selectedChat.id] ? (
+                    {!isChatUnderHumanHandoff(selectedChat) ? (
                       <button
                         type="button"
-                        onClick={() =>
-                          setManualAssumedByChat((current) => ({
-                            ...current,
-                            [selectedChat.id]: true,
-                          }))
-                        }
+                        onClick={() => void handleHandoffAction("claim")}
                         className={`${compactButtonClass} border-emerald-500/20 bg-emerald-500/10 text-emerald-100 hover:border-emerald-400/30 hover:bg-emerald-500/15`}
                       >
                         Assumir atendimento
                       </button>
-                    ) : null}
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void handleHandoffAction("release")}
+                        className={`${compactButtonClass} border-amber-400/20 bg-amber-500/10 text-amber-50 hover:border-amber-300/30 hover:bg-amber-500/15`}
+                      >
+                        Liberar para IA
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

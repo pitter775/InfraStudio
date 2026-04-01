@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin, canAccessProject } from "@/lib/access";
+import { claimHumanHandoff, getChatHandoffByChatId } from "@/lib/chat-handoffs";
 import { appendMessage, getChatById, listChatMessages, touchChatUpdatedAt } from "@/lib/chats";
 import { getSessionUser } from "@/lib/session";
+import { sendWhatsAppServiceMessage } from "@/lib/whatsapp-service";
 
 type RouteContext = {
   params: Promise<{
@@ -28,7 +30,8 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   const messages = await listChatMessages(id);
-  return NextResponse.json({ chat, messages }, { status: 200 });
+  const handoff = await getChatHandoffByChatId(id);
+  return NextResponse.json({ chat, messages, handoff }, { status: 200 });
 }
 
 export async function POST(request: Request, context: RouteContext) {
@@ -93,6 +96,37 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (!message) {
     return NextResponse.json({ error: "Nao foi possivel enviar a mensagem." }, { status: 500 });
+  }
+
+  const channelContext =
+    chat.contexto && typeof chat.contexto === "object" && !Array.isArray(chat.contexto)
+      ? (chat.contexto.whatsapp as { channelId?: string | null } | undefined)
+      : undefined;
+  const canalWhatsappId = typeof channelContext?.channelId === "string" ? channelContext.channelId : null;
+
+  if (sentByHuman && chat.projetoId) {
+    await claimHumanHandoff({
+      chatId: chat.id,
+      projetoId: chat.projetoId,
+      usuarioId: user!.id,
+      canalWhatsappId,
+      motivo: "Atendimento assumido por mensagem manual.",
+      metadata: {
+        senderName,
+      },
+    });
+  }
+
+  if (chat.canal === "whatsapp" && canalWhatsappId && conteudo) {
+    const outbound = await sendWhatsAppServiceMessage({
+      channelId: canalWhatsappId,
+      to: chat.identificadorExterno ?? "",
+      message: conteudo,
+    });
+
+    if (!outbound.ok) {
+      return NextResponse.json({ error: outbound.error ?? "Nao foi possivel enviar no WhatsApp." }, { status: 502 });
+    }
   }
 
   await touchChatUpdatedAt(chat.id);

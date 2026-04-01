@@ -35,6 +35,7 @@ function HomePageContent() {
   const authProvider = getAuthProviderLabel();
   const embeddedProjeto = searchParams.get("projeto")?.trim() || DEFAULT_CHAT_PROJECT;
   const embeddedAgente = searchParams.get("agente")?.trim() || DEFAULT_CHAT_AGENT;
+  const returnTo = searchParams.get("returnTo")?.trim() || null;
   const externalWidgetTestMode = searchParams.get("embed") === "1" && Boolean(embeddedProjeto && embeddedAgente);
 
   useEffect(() => {
@@ -51,7 +52,7 @@ function HomePageContent() {
 
     if (result.user) {
       setCurrentUser(result.user);
-      window.location.href = isAdminUser(result.user) ? "/admin/dashboard" : "/admin/projetos";
+      window.location.href = returnTo || (isAdminUser(result.user) ? "/admin/dashboard" : "/admin/projetos");
     }
 
     return result.error;
