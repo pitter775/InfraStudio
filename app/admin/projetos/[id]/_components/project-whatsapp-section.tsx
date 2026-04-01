@@ -533,7 +533,7 @@ export function ProjectWhatsAppSection({
                 </div>
 
                 <div className="mt-5">
-                  {loadingHandoffContacts ? (
+                  {loadingHandoffContacts && !handoffContacts.length ? (
                     <div className="rounded-xl border border-white/10 bg-slate-950/40 px-4 py-4 text-sm text-slate-300">
                       Carregando os numeros configurados...
                     </div>

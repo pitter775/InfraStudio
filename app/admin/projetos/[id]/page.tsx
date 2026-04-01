@@ -4194,6 +4194,7 @@ export default function AdminProjetoDetalhePage() {
   const [whatsappHandoffContacts, setWhatsAppHandoffContacts] = useState<WhatsAppHandoffContact[]>([]);
   const [whatsappHandoffContactForm, setWhatsAppHandoffContactForm] = useState<WhatsAppHandoffContactFormState>(emptyWhatsAppHandoffContactForm);
   const [loadingWhatsAppHandoffContacts, setLoadingWhatsAppHandoffContacts] = useState(false);
+  const lastLoadedWhatsAppHandoffChannelRef = useRef<string | null>(null);
   const [savingWhatsAppHandoffContact, setSavingWhatsAppHandoffContact] = useState(false);
   const [updatingWhatsAppHandoffContactId, setUpdatingWhatsAppHandoffContactId] = useState<string | null>(null);
   const [feedbackBilling, setFeedbackBilling] = useState<string | null>(null);
@@ -4447,11 +4448,14 @@ export default function AdminProjetoDetalhePage() {
     const channelId = data?.whatsappChannels[0]?.id ?? null;
     if (!channelId) {
       setWhatsAppHandoffContacts([]);
+      lastLoadedWhatsAppHandoffChannelRef.current = null;
       return;
     }
 
-    void loadWhatsAppHandoffContacts(channelId);
-  }, [activeTab, data?.whatsappChannels]);
+    const shouldLoadSilently = lastLoadedWhatsAppHandoffChannelRef.current === channelId;
+    void loadWhatsAppHandoffContacts(channelId, { silent: shouldLoadSilently });
+    lastLoadedWhatsAppHandoffChannelRef.current = channelId;
+  }, [activeTab, data?.whatsappChannels[0]?.id]);
 
   const resetAgenteForm = () => {
     setAgenteForm({
@@ -4494,8 +4498,10 @@ export default function AdminProjetoDetalhePage() {
     setWhatsAppHandoffContactForm(emptyWhatsAppHandoffContactForm);
   };
 
-  const loadWhatsAppHandoffContacts = async (channelId: string) => {
-    setLoadingWhatsAppHandoffContacts(true);
+  const loadWhatsAppHandoffContacts = async (channelId: string, options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setLoadingWhatsAppHandoffContacts(true);
+    }
 
     try {
       const response = await fetch(`/api/admin/whatsapp-canais/${channelId}/handoff-contatos`, {
@@ -4515,7 +4521,9 @@ export default function AdminProjetoDetalhePage() {
       setWhatsAppHandoffContacts([]);
       setFeedbackWhatsApp(error instanceof Error ? error.message : "Nao foi possivel carregar os contatos de aviso.");
     } finally {
-      setLoadingWhatsAppHandoffContacts(false);
+      if (!options?.silent) {
+        setLoadingWhatsAppHandoffContacts(false);
+      }
     }
   };
 
