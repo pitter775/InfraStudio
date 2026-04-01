@@ -463,6 +463,14 @@ function getWhatsAppChannelUserNote(note: string | null | undefined) {
     return "O servidor do WhatsApp nao conseguiu iniciar o navegador interno. Nossa equipe ja consegue ver o erro tecnico nos logs.";
   }
 
+  if (normalized.includes("pareamento aceito pelo whatsapp")) {
+    return "Pareamento aceito. Finalizando a conexao do canal.";
+  }
+
+  if (normalized.includes("estado atual do cliente:")) {
+    return "O canal esta processando a conexao com o WhatsApp.";
+  }
+
   if (normalized.includes("falha de autenticacao")) {
     return "A autenticacao do WhatsApp falhou. Tente conectar novamente.";
   }
@@ -472,6 +480,22 @@ function getWhatsAppChannelUserNote(note: string | null | undefined) {
   }
 
   return value;
+}
+
+function getWhatsAppConnectButtonLabel(input: {
+  isConnected: boolean;
+  isWaitingQr: boolean;
+  runtimeStatus: string;
+}) {
+  if (input.isConnected) {
+    return "Reconectar canal";
+  }
+
+  if (input.isWaitingQr || input.runtimeStatus === "aguardando_qr") {
+    return "Gerar novo QR";
+  }
+
+  return "Gerar QR Code";
 }
 
 function summarizeApiFields(campos: ApiCampo[], limit = 6) {
@@ -5628,7 +5652,7 @@ export default function AdminProjetoDetalhePage() {
     resetWhatsAppChannelForm();
   };
 
-  const handleConnectWhatsAppChannel = async (channel: WhatsAppChannel) => {
+  const handleConnectWhatsAppChannel = async (channel: WhatsAppChannel, options?: { refreshQr?: boolean }) => {
     const serviceUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL?.trim();
     if (!serviceUrl) {
       setFeedbackWhatsApp("Defina NEXT_PUBLIC_WHATSAPP_SERVICE_URL para conectar o whatsapp-service.");
@@ -5639,6 +5663,28 @@ export default function AdminProjetoDetalhePage() {
     setFeedbackWhatsApp(null);
 
     try {
+      if (options?.refreshQr) {
+        await fetch(`${serviceUrl.replace(/\/$/, "")}/purge`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            channelId: channel.id,
+          }),
+        });
+
+        await fetch(`/api/admin/whatsapp-canais/${channel.id}/disconnect`, { method: "POST" });
+        setServiceQrByChannel((current) => ({
+          ...current,
+          [channel.id]: null,
+        }));
+        setServiceStatusByChannel((current) => ({
+          ...current,
+          [channel.id]: "desconectado",
+        }));
+      }
+
       const connectResponse = await fetch(`${serviceUrl.replace(/\/$/, "")}/connect`, {
         method: "POST",
         headers: {
@@ -5673,7 +5719,11 @@ export default function AdminProjetoDetalhePage() {
         ),
       }));
       await refreshWhatsAppRuntime(channel.id);
-      setFeedbackWhatsApp(`Conexao iniciada para ${formatWhatsAppPhone(channel.numero)}.`);
+      setFeedbackWhatsApp(
+        options?.refreshQr
+          ? `Novo QR solicitado para ${formatWhatsAppPhone(channel.numero)}.`
+          : `Geracao do QR iniciada para ${formatWhatsAppPhone(channel.numero)}.`,
+      );
     } catch (error) {
       setFeedbackWhatsApp(error instanceof Error ? error.message : "Nao foi possivel conectar o WhatsApp.");
     } finally {
@@ -7158,6 +7208,11 @@ export default function AdminProjetoDetalhePage() {
                 const qrImage = serviceQrByChannel[channel.id] ?? channel.sessionData?.qrCodeDataUrl ?? channel.sessionData?.qrCodeUrl ?? null;
                 const isConnected = runtimeStatus === "conectado" || runtimeStatus === "online";
                 const isWaitingQr = runtimeStatus === "aguardando_qr" && Boolean(qrImage);
+                const connectButtonLabel = getWhatsAppConnectButtonLabel({
+                  isConnected,
+                  isWaitingQr,
+                  runtimeStatus,
+                });
 
                 return (
                   <div className="grid gap-6 xl:col-start-1">
@@ -7194,7 +7249,7 @@ export default function AdminProjetoDetalhePage() {
 
                       <div className="mt-6 border-t border-white/10 pt-4">
                         <div className="rounded-2xl border border-white/8 bg-slate-950/45 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
                           <button
                             type="button"
                             onClick={() => void handleConnectWhatsAppChannel(channel)}
@@ -7202,7 +7257,16 @@ export default function AdminProjetoDetalhePage() {
                             className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-50 transition-all hover:border-emerald-300/30 hover:bg-emerald-500/14 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {connectingWhatsAppChannelId === channel.id ? <BusyIcon /> : null}
-                            {isConnected ? "Reconectar" : "Conectar"}
+                            {connectButtonLabel}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleConnectWhatsAppChannel(channel, { refreshQr: true })}
+                            disabled={connectingWhatsAppChannelId === channel.id}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-50 transition-all hover:border-cyan-300/30 hover:bg-cyan-500/14 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {connectingWhatsAppChannelId === channel.id ? <BusyIcon /> : <Activity size={15} />}
+                            Atualizar QR
                           </button>
                           <button
                             type="button"
