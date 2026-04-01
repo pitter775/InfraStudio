@@ -6812,16 +6812,7 @@ export default function AdminProjetoDetalhePage() {
 
                     <div className="mt-5 border-t border-white/10 pt-4">
                       <div className="rounded-2xl border border-white/8 bg-slate-950/45 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                      <button
-                        type="button"
-                        onClick={() => void handleRunAgentDiagnostic(agente)}
-                        disabled={runningAgentDiagnosticId === agente.id}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-400/20 bg-sky-400/10 px-3 py-2 text-xs font-semibold text-sky-50 transition-all hover:border-sky-300/30 hover:bg-sky-400/14 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {runningAgentDiagnosticId === agente.id ? <BusyIcon /> : <TestTube2 size={14} />}
-                        Validar
-                      </button>
+                        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                       <button
                         type="button"
                         onClick={() => handleOpenAgentTestChat(agente)}
