@@ -1375,8 +1375,11 @@ function didAssistantRecentlyAskForLeadName(history: ConversationMessage[]) {
   return (
     normalized.includes("como posso te chamar") ||
     normalized.includes("qual e o seu nome") ||
+    normalized.includes("qual e seu nome") ||
     normalized.includes("me diga seu nome") ||
-    normalized.includes("qual seu nome")
+    normalized.includes("qual seu nome") ||
+    normalized.includes("primeiro nome") ||
+    (normalized.includes("nome") && /\b(qual|diga|informe|passa)\b/.test(normalized))
   );
 }
 
@@ -1401,6 +1404,19 @@ function isLikelyLeadNameReply(message: string, history: ConversationMessage[]) 
   return words.length >= 1 && words.length <= 3;
 }
 
+function buildLeadNameAcknowledgementReply(name: string, hasMercadoLivreConnector: boolean, context?: ConversationContext) {
+  const safeName = name.trim();
+  if (hasMercadoLivreConnector) {
+    return isWhatsAppChannel(context)
+      ? `Prazer, ${safeName}.\n\nMe diga agora qual produto, modelo, marca, cor ou SKU voce quer buscar na loja.`
+      : `Prazer, **${safeName}**.\n\nMe diga agora qual produto, modelo, marca, cor ou SKU voce quer buscar na loja.`;
+  }
+
+  return isWhatsAppChannel(context)
+    ? `Prazer, ${safeName}.\n\nPode me dizer o que voce quer validar?`
+    : `Prazer, **${safeName}**.\n\nPode me dizer o que voce quer validar?`;
+}
+
 function isMercadoLivreListingIntent(message: string) {
   const normalized = normalizeText(message);
 
@@ -1408,8 +1424,12 @@ function isMercadoLivreListingIntent(message: string) {
     /\bquais produtos\b/,
     /\bquais sao os produtos\b/,
     /\bmostra(?:r)? os produtos\b/,
+    /\bmostra(?:r)? seus produtos\b/,
     /\bme mostra(?:r)? os produtos\b/,
+    /\bme mostra(?:r)? seus produtos\b/,
     /\btraga os produtos\b/,
+    /\btraga seus produtos\b/,
+    /\bme traga seus produtos\b/,
     /\blistar produtos\b/,
     /\blista de produtos\b/,
     /\bo que voce tem\b/,
@@ -1772,10 +1792,13 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const apiContexts = agent?.id ? await buildAgenteApiRuntimeContext(agent.id, (context ?? {}) as Record<string, unknown>) : [];
   const mercadoLivreConnectors = agent?.id ? await listConectoresByAgente(agent.id, MERCADO_LIVRE_CONNECTOR_TYPE) : [];
   const hasMercadoLivreConnector = mercadoLivreConnectors.length > 0;
+  const leadNameReplyDetected = isLikelyLeadNameReply(latestUserMessage, history);
+  const extractedLeadName = leadNameReplyDetected ? extractName(latestUserMessage) : null;
   const genericMercadoLivreListingRequested =
-    hasMercadoLivreConnector && isMercadoLivreListingIntent(latestUserMessage) && !isLikelyLeadNameReply(latestUserMessage, history);
+    hasMercadoLivreConnector && isMercadoLivreListingIntent(latestUserMessage) && !leadNameReplyDetected;
   const productSearchRequested =
     !genericMercadoLivreListingRequested &&
+    !leadNameReplyDetected &&
     (detectedProductSearch || (hasMercadoLivreConnector && shouldUseMercadoLivreConnectorFallback(history, latestUserMessage, context)));
   const productSearchTerm = productSearchRequested ? extractProductSearchTerm(latestUserMessage) : "";
   const mercadoLivreListingSnapshot =
@@ -1811,6 +1834,8 @@ export async function generateSalesReply(history: ConversationMessage[], context
   });
   const catalogPricingReply = enableInfraStudioHeuristics ? buildCatalogPricingReply(history, context) : null;
   const leadIdentificationReply = enableInfraStudioHeuristics && channelPolicy.allowLeadGate ? maybeAskForLeadIdentification(context ?? {}, history, latestUserMessage) : null;
+  const leadNameAcknowledgementReply =
+    extractedLeadName ? buildLeadNameAcknowledgementReply(extractedLeadName, hasMercadoLivreConnector, context) : null;
   const mercadoLivreListingReply = genericMercadoLivreListingRequested
     ? buildMercadoLivreListingReply(mercadoLivreListingProducts, context)
     : null;
@@ -1821,13 +1846,38 @@ export async function generateSalesReply(history: ConversationMessage[], context
       ? buildMercadoLivreNoResultsReply(productSearchTerm, context)
       : null;
 
-  if (leadIdentificationReply && isLikelyLeadNameReply(latestUserMessage, history)) {
+  if (leadIdentificationReply && leadNameReplyDetected) {
     await appendRuntimeErrorLog({
       source: "chat_orchestrator.trace",
       message: "Resposta de nome do lead priorizada antes do conector Mercado Livre.",
       ...traceBase,
       payload: { ...traceBase.payload, ...resourceTrace, mode: "lead_name_priority" },
     });
+  }
+
+  if (leadNameAcknowledgementReply) {
+    await appendRuntimeErrorLog({
+      source: "chat_orchestrator.trace",
+      message: "Nome do lead reconhecido e confirmado antes de outras heuristicas.",
+      ...traceBase,
+      payload: {
+        ...traceBase.payload,
+        ...resourceTrace,
+        mode: "lead_name_acknowledgement",
+        extractedLeadName,
+      },
+    });
+    return {
+      reply: formatHeuristicReply(leadNameAcknowledgementReply, context),
+      assets: [],
+      usage: { inputTokens: 0, outputTokens: 0 },
+      metadata: {
+        provider: "heuristic",
+        model: "lead_name_acknowledgement",
+        agenteId: agent?.id ?? null,
+        agenteNome: agent?.nome ?? null,
+      },
+    };
   }
 
   if (mercadoLivreListingReply) {

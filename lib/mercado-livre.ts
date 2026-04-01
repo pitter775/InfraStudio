@@ -222,7 +222,26 @@ async function searchConnectorProducts(connector: ConnectorRecord, termo: string
     );
   }
 
-  return rankProdutosByTermo(dedupeProdutos(batches), termo).slice(0, 3);
+  const rankedProducts = rankProdutosByTermo(dedupeProdutos(batches), termo).slice(0, 3);
+  if (rankedProducts.length || !sellerId) {
+    return rankedProducts;
+  }
+
+  try {
+    const fallbackProducts = await fetchMercadoLivreLatestProducts({
+      endpointBase,
+      sellerId,
+      accessToken,
+      limit: 20,
+      connector,
+    });
+
+    return rankProdutosByTermo(dedupeProdutos(fallbackProducts), termo)
+      .filter((produto) => normalizeSearchText(produto.nome).includes(normalizeSearchText(termo)))
+      .slice(0, 3);
+  } catch {
+    return rankedProducts;
+  }
 }
 
 type MercadoLivreItemDetailsResponse = Array<{
