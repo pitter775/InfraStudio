@@ -35,6 +35,15 @@ type RuntimeReplyAsset = ReplyAsset & {
   key: string;
 };
 
+type CatalogProductReference = {
+  id?: string | null;
+  nome?: string | null;
+  descricao?: string | null;
+  preco?: number | null;
+  link?: string | null;
+  imagem?: string | null;
+};
+
 type ConversationContext = {
   channel?: {
     kind?: string | null;
@@ -74,6 +83,14 @@ type ConversationContext = {
   };
   catalogo?: {
     ultimaBusca?: string | null;
+    ultimosProdutos?: Array<{
+      id?: string | null;
+      nome?: string | null;
+      descricao?: string | null;
+      preco?: number | null;
+      link?: string | null;
+      imagem?: string | null;
+    }>;
   };
 };
 
@@ -1555,6 +1572,180 @@ function buildMercadoLivreNoResultsReply(termo: string, context?: ConversationCo
   ].join("\n");
 }
 
+function normalizeRecentCatalogProducts(context?: ConversationContext): CatalogProductReference[] {
+  if (!Array.isArray(context?.catalogo?.ultimosProdutos)) {
+    return [];
+  }
+
+  return context.catalogo.ultimosProdutos
+    .filter((item) => item && typeof item === "object")
+    .map((item) => ({
+      id: typeof item.id === "string" ? item.id : null,
+      nome: typeof item.nome === "string" ? item.nome : null,
+      descricao: typeof item.descricao === "string" ? item.descricao : null,
+      preco: typeof item.preco === "number" && Number.isFinite(item.preco) ? item.preco : null,
+      link: typeof item.link === "string" ? item.link : null,
+      imagem: typeof item.imagem === "string" ? item.imagem : null,
+    }))
+    .filter((item) => item.nome);
+}
+
+function tokenizeCatalogReferenceMessage(message: string) {
+  return normalizeText(message)
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter((token) => token.length >= 3)
+    .filter(
+      (token) =>
+        ![
+          "esse",
+          "essa",
+          "esses",
+          "essas",
+          "aquele",
+          "aquela",
+          "aquilo",
+          "produto",
+          "produtos",
+          "item",
+          "itens",
+          "bonita",
+          "bonito",
+          "lindo",
+          "linda",
+          "quero",
+          "gostei",
+          "desse",
+          "dessa",
+          "dele",
+          "dela",
+        ].includes(token),
+    );
+}
+
+function resolveRecentCatalogProductReference(message: string, context?: ConversationContext) {
+  const products = normalizeRecentCatalogProducts(context);
+  if (!products.length) {
+    return [];
+  }
+
+  const normalized = normalizeText(message);
+  const ordinalMatchers = [
+    { pattern: /\b(primeiro|1|um)\b/, index: 0 },
+    { pattern: /\b(segundo|2|dois)\b/, index: 1 },
+    { pattern: /\b(terceiro|3|tres|três)\b/, index: 2 },
+    { pattern: /\b(quarto|4|quatro)\b/, index: 3 },
+    { pattern: /\b(quinto|5|cinco)\b/, index: 4 },
+    { pattern: /\b(ultimo|último)\b/, index: products.length - 1 },
+  ];
+
+  for (const matcher of ordinalMatchers) {
+    if (matcher.index >= 0 && matcher.index < products.length && matcher.pattern.test(normalized)) {
+      return [products[matcher.index]];
+    }
+  }
+
+  if (/\b(mais caro)\b/.test(normalized)) {
+    return [...products]
+      .filter((item) => typeof item.preco === "number")
+      .sort((a, b) => Number(b.preco ?? 0) - Number(a.preco ?? 0))
+      .slice(0, 1);
+  }
+
+  if (/\b(mais barato)\b/.test(normalized)) {
+    return [...products]
+      .filter((item) => typeof item.preco === "number")
+      .sort((a, b) => Number(a.preco ?? 0) - Number(b.preco ?? 0))
+      .slice(0, 1);
+  }
+
+  const priceMatch = normalized.match(/\b(?:r\$?\s*)?(\d{2,6})(?:[.,]\d{1,2})?\b/);
+  if (priceMatch) {
+    const price = Number(priceMatch[1]);
+    const byPrice = products.filter((item) => Number(item.preco ?? NaN) === price);
+    if (byPrice.length) {
+      return byPrice.slice(0, 2);
+    }
+  }
+
+  const tokens = tokenizeCatalogReferenceMessage(message);
+  if (!tokens.length) {
+    return [];
+  }
+
+  const scored = products
+    .map((item) => {
+      const haystack = normalizeText([item.nome, item.descricao].filter(Boolean).join(" "));
+      const score = tokens.reduce((total, token) => (haystack.includes(token) ? total + 1 : total), 0);
+      return { item, score };
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  if (!scored.length) {
+    return [];
+  }
+
+  const topScore = scored[0]?.score ?? 0;
+  return scored.filter((entry) => entry.score === topScore).slice(0, 2).map((entry) => entry.item);
+}
+
+function isRecentCatalogReferenceAttempt(message: string, context?: ConversationContext) {
+  const products = normalizeRecentCatalogProducts(context);
+  if (!products.length) {
+    return false;
+  }
+
+  const normalized = normalizeText(message);
+  return /\b(esse|essa|esses|essas|aquele|aquela|aqueles|aquelas|primeiro|segundo|terceiro|ultimo|último|mais caro|mais barato)\b/.test(
+    normalized,
+  );
+}
+
+function buildReferencedCatalogReply(products: CatalogProductReference[], context?: ConversationContext) {
+  if (!products.length) {
+    return null;
+  }
+
+  if (products.length === 1) {
+    const product = products[0];
+    const priceLabel = typeof product.preco === "number" ? `R$ ${product.preco.toLocaleString("pt-BR")}` : product.descricao ?? "";
+
+    return isWhatsAppChannel(context)
+      ? `Acredito que voce esteja falando de ${product.nome}${priceLabel ? `, por ${priceLabel}` : ""}. Se quiser, eu posso te mostrar mais detalhes ou buscar opcoes parecidas.`
+      : `Acredito que voce esteja falando de **${product.nome}**${priceLabel ? `, por **${priceLabel}**` : ""}. Se quiser, eu posso te mostrar mais detalhes ou buscar opcoes parecidas.`;
+  }
+
+  return isWhatsAppChannel(context)
+    ? "Acredito que voce esteja falando de uma destas opcoes logo abaixo. Se quiser, me diga o numero do card ou o preco para eu cravar qual delas."
+    : "Acredito que voce esteja falando de uma destas opcoes logo abaixo. Se quiser, me diga o **numero do card** ou o **preco** para eu cravar qual delas.";
+}
+
+function buildAmbiguousCatalogReferenceReply(context?: ConversationContext) {
+  return isWhatsAppChannel(context)
+    ? "Acho que voce esta se referindo a um dos produtos que acabei de mostrar. Me diga o numero do card ou o preco para eu identificar certinho."
+    : "Acho que voce esta se referindo a um dos produtos que acabei de mostrar. Me diga o **numero do card** ou o **preco** para eu identificar certinho.";
+}
+
+function buildReferencedCatalogAssets(products: CatalogProductReference[]): ReplyAsset[] {
+  return products
+    .filter((item) => item.nome && item.imagem)
+    .slice(0, 2)
+    .map((item, index) => ({
+      id: item.id || `catalog-ref-${index + 1}`,
+      nome: String(item.nome),
+      descricao:
+        typeof item.preco === "number"
+          ? `R$ ${item.preco.toLocaleString("pt-BR")}`
+          : String(item.descricao || ""),
+      arquivoNome: String(item.nome),
+      mimeType: "image/jpeg",
+      categoria: "image",
+      publicUrl: String(item.imagem),
+      targetUrl: item.link || null,
+    }));
+}
+
 function buildMercadoLivreProductAssets(produtos: ProdutoPadronizado[]): ReplyAsset[] {
   return produtos.slice(0, 3).map((produto, index) => ({
     id: `mercado-livre-${index + 1}-${normalizeText(produto.nome).replace(/\s+/g, "-") || "produto"}`,
@@ -1849,6 +2040,18 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const leadIdentificationReply = enableInfraStudioHeuristics && channelPolicy.allowLeadGate ? maybeAskForLeadIdentification(context ?? {}, history, latestUserMessage) : null;
   const leadNameAcknowledgementReply =
     extractedLeadName ? buildLeadNameAcknowledgementReply(extractedLeadName, hasMercadoLivreConnector, context) : null;
+  const referencedCatalogProducts =
+    hasMercadoLivreConnector && !leadNameReplyDetected
+      ? resolveRecentCatalogProductReference(latestUserMessage, context)
+      : [];
+  const referencedCatalogReply = buildReferencedCatalogReply(referencedCatalogProducts, context);
+  const ambiguousCatalogReferenceReply =
+    hasMercadoLivreConnector &&
+    !leadNameReplyDetected &&
+    !referencedCatalogReply &&
+    isRecentCatalogReferenceAttempt(latestUserMessage, context)
+      ? buildAmbiguousCatalogReferenceReply(context)
+      : null;
   const mercadoLivreListingReply = genericMercadoLivreListingRequested
     ? buildMercadoLivreListingReply(mercadoLivreListingProducts, context)
     : null;
@@ -1887,6 +2090,57 @@ export async function generateSalesReply(history: ConversationMessage[], context
       metadata: {
         provider: "heuristic",
         model: "lead_name_acknowledgement",
+        agenteId: agent?.id ?? null,
+        agenteNome: agent?.nome ?? null,
+      },
+    };
+  }
+
+  if (referencedCatalogReply) {
+    await appendRuntimeErrorLog({
+      source: "chat_orchestrator.trace",
+      message: "Referencia aos ultimos produtos do catalogo resolvida pelo contexto.",
+      ...traceBase,
+      payload: {
+        ...traceBase.payload,
+        ...resourceTrace,
+        mode: "catalog_reference_resolution",
+        matchedCount: referencedCatalogProducts.length,
+      },
+    });
+    return {
+      reply: formatHeuristicReply(referencedCatalogReply, context),
+      assets: buildReferencedCatalogAssets(referencedCatalogProducts),
+      usage: { inputTokens: 0, outputTokens: 0 },
+      metadata: {
+        provider: "heuristic",
+        model: "catalog_reference_resolution",
+        agenteId: agent?.id ?? null,
+        agenteNome: agent?.nome ?? null,
+      },
+    };
+  }
+
+  if (ambiguousCatalogReferenceReply) {
+    const recentProducts = normalizeRecentCatalogProducts(context);
+    await appendRuntimeErrorLog({
+      source: "chat_orchestrator.trace",
+      message: "Referencia ambigua aos ultimos produtos do catalogo tratada com confirmacao.",
+      ...traceBase,
+      payload: {
+        ...traceBase.payload,
+        ...resourceTrace,
+        mode: "catalog_reference_ambiguous",
+        recentCount: recentProducts.length,
+      },
+    });
+    return {
+      reply: formatHeuristicReply(ambiguousCatalogReferenceReply, context),
+      assets: buildReferencedCatalogAssets(recentProducts),
+      usage: { inputTokens: 0, outputTokens: 0 },
+      metadata: {
+        provider: "heuristic",
+        model: "catalog_reference_ambiguous",
         agenteId: agent?.id ?? null,
         agenteNome: agent?.nome ?? null,
       },
@@ -2220,7 +2474,17 @@ export function enrichLeadContext(
       objetivo?: string | null;
       pronto_para_whatsapp?: boolean;
     };
-    catalogo?: { ultimaBusca?: string | null };
+    catalogo?: {
+      ultimaBusca?: string | null;
+      ultimosProdutos?: Array<{
+        id?: string | null;
+        nome?: string | null;
+        descricao?: string | null;
+        preco?: number | null;
+        link?: string | null;
+        imagem?: string | null;
+      }>;
+    };
   };
 
   const phone = extractPhone(latestUserMessage);
@@ -2273,6 +2537,7 @@ export function enrichLeadContext(
     },
     catalogo: {
       ultimaBusca: context.catalogo?.ultimaBusca ?? null,
+      ultimosProdutos: Array.isArray(context.catalogo?.ultimosProdutos) ? context.catalogo.ultimosProdutos : [],
     },
   };
 

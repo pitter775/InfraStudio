@@ -82,6 +82,34 @@ function buildSilentChatResult(chatId?: string | null) {
   };
 }
 
+function parseAssetPrice(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const numeric = value.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}\b)/g, "").replace(",", ".");
+  const parsed = Number(numeric);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function extractRecentMercadoLivreProductsFromAssets(assets: unknown) {
+  if (!Array.isArray(assets)) {
+    return [];
+  }
+
+  return assets
+    .filter((asset) => isPlainObject(asset) && typeof asset.id === "string" && asset.id.startsWith("mercado-livre-"))
+    .map((asset) => ({
+      id: typeof asset.id === "string" ? asset.id : null,
+      nome: typeof asset.nome === "string" ? asset.nome : null,
+      descricao: typeof asset.descricao === "string" ? asset.descricao : null,
+      preco: parseAssetPrice(asset.descricao),
+      link: typeof asset.targetUrl === "string" ? asset.targetUrl : null,
+      imagem: typeof asset.publicUrl === "string" ? asset.publicUrl : null,
+    }))
+    .filter((asset) => asset.nome && asset.imagem);
+}
+
 function buildBillingBlockedResult(chatId: string, message: string) {
   return {
     chatId,
@@ -789,6 +817,14 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     nextContext.catalogo = {
       ...(isPlainObject(nextContext.catalogo) ? nextContext.catalogo : {}),
       ultimaBusca: message.trim(),
+    };
+  }
+
+  const recentMercadoLivreProducts = extractRecentMercadoLivreProductsFromAssets(ai.assets);
+  if (recentMercadoLivreProducts.length) {
+    nextContext.catalogo = {
+      ...(isPlainObject(nextContext.catalogo) ? nextContext.catalogo : {}),
+      ultimosProdutos: recentMercadoLivreProducts,
     };
   }
 
