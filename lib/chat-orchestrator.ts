@@ -1420,28 +1420,65 @@ function buildLeadNameAcknowledgementReply(name: string, hasMercadoLivreConnecto
 
 function isMercadoLivreListingIntent(message: string) {
   const normalized = normalizeText(message);
+  const compact = normalized.replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
 
-  return [
+  if (!compact) {
+    return false;
+  }
+
+  if (
+    ["produtos", "produto", "catalogo", "catálogo", "loja", "vitrine", "anuncios", "anúncios", "itens"].includes(compact)
+  ) {
+    return true;
+  }
+
+  const explicitPatterns = [
     /\bquais produtos\b/,
     /\bquais sao os produtos\b/,
-    /\bmostra(?:r)? os produtos\b/,
-    /\bmostra(?:r)? seus produtos\b/,
-    /\bme mostra(?:r)? os produtos\b/,
-    /\bme mostra(?:r)? seus produtos\b/,
+    /\bmostra(?:r|i|e)? os produtos\b/,
+    /\bmostra(?:r|i|e)? seus produtos\b/,
+    /\bme mostra(?:r|i|e)? os produtos\b/,
+    /\bme mostra(?:r|i|e)? seus produtos\b/,
     /\btraga os produtos\b/,
     /\btraga seus produtos\b/,
     /\bme traga seus produtos\b/,
+    /\bexiba os produtos\b/,
+    /\bexiba seus produtos\b/,
+    /\bexibe os produtos\b/,
+    /\bexibe seus produtos\b/,
     /\blistar produtos\b/,
     /\blista de produtos\b/,
+    /\bliste os produtos\b/,
+    /\bliste seus produtos\b/,
     /\bo que voce tem\b/,
     /\bo que vc tem\b/,
+    /\bo que voce vende\b/,
+    /\bo que vc vende\b/,
     /\bprodutos que voce tem\b/,
     /\bprodutos que vc tem\b/,
     /\bme mostra a loja\b/,
     /\bmostra a loja\b/,
     /\bver catalogo\b/,
     /\bver produtos\b/,
-  ].some((pattern) => pattern.test(normalized));
+    /\bme passa seu catalogo\b/,
+    /\bmanda seu catalogo\b/,
+    /\bme envia seu catalogo\b/,
+    /\bquero ver seus produtos\b/,
+    /\bquero ver os produtos\b/,
+    /\bquais itens voce tem\b/,
+    /\bquais itens vc tem\b/,
+    /\bquais anuncios voce tem\b/,
+    /\bquais anuncios vc tem\b/,
+  ];
+
+  if (explicitPatterns.some((pattern) => pattern.test(normalized))) {
+    return true;
+  }
+
+  const browseVerb = /\b(mostra|mostrar|mostre|exiba|exibe|exibir|liste|listar|lista|traga|trazer|manda|mandar|envia|enviar|ver|veja|quero ver|apresenta|apresentar)\b/;
+  const catalogNoun = /\b(produto|produtos|item|itens|catalogo|catálogo|loja|vitrine|anuncio|anuncios|anúncio|anúncios)\b/;
+
+  return browseVerb.test(normalized) && catalogNoun.test(normalized);
 }
 
 function shouldUseMercadoLivreConnectorFallback(
