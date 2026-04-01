@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -524,7 +524,7 @@ function stripDecorativeCharacters(value: string) {
   return value
     .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
     .replace(/[\u2600-\u27BF]/gu, "")
-    .replace(/[âœ“âœ”âœ•âœ–âœ³â­ðŸ”¥ðŸ’¬ðŸ“ŒðŸŽ¯âš™ï¸â“ðŸ”]/gu, "")
+    .replace(/[✓✔✕✖✳⭐🔥💬📌🎯⚙️❓🔁]/gu, "")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
@@ -2510,7 +2510,7 @@ function AgenteModal({
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{asset.nome}</p>
                           <p className="text-xs text-slate-400">
-                            {asset.arquivoNome} â€¢ {formatFileSize(asset.tamanhoBytes)}
+                            {asset.arquivoNome} • {formatFileSize(asset.tamanhoBytes)}
                           </p>
                           <a
                             href={asset.publicUrl}
@@ -2556,7 +2556,7 @@ function AgenteModal({
                         <AgenteAssetPreview categoria={item.file.type.startsWith("image/") ? "image" : "file"} file={item.file} alt={item.file.name} />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{item.file.name}</p>
-                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} â€¢ aguardando upload</p>
+                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} • aguardando upload</p>
                         </div>
                       </div>
                       <button
@@ -2711,7 +2711,7 @@ function AgenteModal({
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{asset.nome}</p>
                           <p className="text-xs text-slate-400">
-                            {asset.arquivoNome} â€¢ {formatFileSize(asset.tamanhoBytes)}
+                            {asset.arquivoNome} • {formatFileSize(asset.tamanhoBytes)}
                           </p>
                           <a
                             href={asset.publicUrl}
@@ -2756,7 +2756,7 @@ function AgenteModal({
                         <AgenteAssetPreview categoria={item.file.type.startsWith("image/") ? "image" : "file"} file={item.file} alt={item.file.name} />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{item.file.name}</p>
-                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} â€¢ aguardando upload</p>
+                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} • aguardando upload</p>
                         </div>
                       </div>
                       <button
@@ -3352,7 +3352,7 @@ function ConnectorModal({
               {tutorialOpen ? <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4 text-xs leading-6 text-slate-200">
                 <p>Abre esse link:</p>
                 <p className="font-semibold text-white">https://developers.mercadolivre.com.br/apps</p>
-                <p className="mt-3">Clica em â€œCriar aplicaÃ§Ã£oâ€</p>
+                <p className="mt-3">Clica em “Criar aplicação”</p>
                 <p className="mt-3">Preenche assim:</p>
                 <p>Nome: InfraStudio</p>
                 <p>Tipo: Web</p>
@@ -3374,7 +3374,7 @@ function ConnectorModal({
                 <p>APP ID</p>
                 <p>CLIENT SECRET</p>
                 <p className="mt-3">Envie esses dois dados para configurar a integracao da loja.</p>
-                <p className="mt-3">Se aparecer botao de â€œautorizarâ€ ou â€œpermitirâ€, pode seguir normalmente.</p>
+                <p className="mt-3">Se aparecer botao de “autorizar” ou “permitir”, pode seguir normalmente.</p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-3 text-emerald-50">
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100">Obrigatorio agora</p>
@@ -3921,6 +3921,139 @@ function WidgetCodeModal({
   );
 }
 
+function EmbeddedAgentTestChat({
+  projeto,
+  agente,
+  origin,
+  onClose,
+}: {
+  projeto: Projeto;
+  agente: Agente;
+  origin: string;
+  onClose: () => void;
+}) {
+  const targetIdRef = useRef(`admin-agent-test-${Math.random().toString(36).slice(2)}`);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !origin) {
+      return;
+    }
+
+    const infraChatWindow = window as Window & {
+      InfraChat?: {
+        mount: (config: Record<string, unknown>) => boolean;
+        destroy: () => boolean;
+      };
+    };
+
+    const projetoRef = projeto.slug?.trim() || projeto.id;
+    const agenteRef = agente.slug?.trim() || agente.id;
+    const scriptId = "infrastudio-admin-agent-test-chat-sdk";
+    const mountWidget = () => {
+      const target = document.getElementById(targetIdRef.current);
+      if (!target) {
+        return;
+      }
+
+      target.innerHTML = "";
+      infraChatWindow.InfraChat?.mount({
+        projeto: projetoRef,
+        agente: agenteRef,
+        apiBase: origin,
+        strictHostControl: true,
+        open: true,
+        embedded: true,
+        target: `#${targetIdRef.current}`,
+        ui: {
+          transparent: false,
+        },
+        context: {
+          route: {
+            path: window.location.pathname,
+          },
+          channel: {
+            kind: "admin_agent_test",
+          },
+          admin: {
+            mode: "agent_test",
+            projetoId: projeto.id,
+            agenteId: agente.id,
+          },
+        },
+        policy: {
+          allowed: true,
+          allowedRoutes: [window.location.pathname],
+        },
+      });
+    };
+
+    let script = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (!script) {
+      script = document.createElement("script");
+      script.id = scriptId;
+      script.src = `${origin}/chat.js`;
+      script.async = true;
+      script.setAttribute("data-projeto", projetoRef);
+      script.setAttribute("data-agente", agenteRef);
+      document.body.appendChild(script);
+    }
+
+    script.addEventListener("load", mountWidget);
+    if (infraChatWindow.InfraChat) {
+      mountWidget();
+    }
+
+    return () => {
+      script?.removeEventListener("load", mountWidget);
+      infraChatWindow.InfraChat?.destroy();
+      const target = document.getElementById(targetIdRef.current);
+      if (target) {
+        target.innerHTML = "";
+      }
+    };
+  }, [agente.id, agente.slug, origin, projeto.id, projeto.slug]);
+
+  return (
+    <section className="mt-6 overflow-hidden rounded-[28px] border border-emerald-400/18 bg-[linear-gradient(180deg,rgba(16,185,129,0.08),rgba(2,6,23,0.3))] p-4 shadow-[0_24px_60px_rgba(2,8,23,0.22)]">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-200">Ambiente interno de teste</p>
+          <h4 className="mt-2 text-xl font-extrabold text-white">Testando o agente {agente.nome}</h4>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+            Este chat fica preso ao agente escolhido nesta aba e usa o mesmo fluxo real de atendimento, com APIs, arquivos, Mercado Livre e WhatsApp do agente configurado.
+          </p>
+          <p className="mt-2 text-xs text-emerald-100/80">
+            Este bloco nao representa o chat institucional da InfraStudio nem o widget publico do site.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition-colors hover:border-rose-300/30 hover:bg-rose-400/10"
+        >
+          <X size={16} />
+          Fechar
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]">
+        <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Escopo do teste</p>
+          <div className="mt-3 space-y-3 text-sm text-slate-300">
+            <p>Projeto: <span className="font-semibold text-white">{projeto.nome}</span></p>
+            <p>Agente: <span className="font-semibold text-white">{agente.nome}</span></p>
+            <p>Objetivo: validar o agente configurado exatamente como o usuario vai testar no painel, sem botao flutuante.</p>
+          </div>
+        </div>
+
+        <div className="rounded-[24px] border border-white/10 bg-slate-950/30 p-3">
+          <div id={targetIdRef.current} className="min-h-[560px]" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function AdminProjetoDetalhePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -3993,6 +4126,7 @@ export default function AdminProjetoDetalhePage() {
   const [agentStoreSearchLoading, setAgentStoreSearchLoading] = useState(false);
   const [agentStoreLatestResult, setAgentStoreLatestResult] = useState<AgentStoreLatestResult | null>(null);
   const [agentStoreSearchResult, setAgentStoreSearchResult] = useState<AgentStoreSearchResult | null>(null);
+  const [agentTestTarget, setAgentTestTarget] = useState<Agente | null>(null);
   const [activeTab, setActiveTab] = useState<ProjectTab>("agentes");
   const [renderedTab, setRenderedTab] = useState<ProjectTab>("agentes");
   const [tabContentVisible, setTabContentVisible] = useState(true);
@@ -4687,6 +4821,11 @@ export default function AdminProjetoDetalhePage() {
     setAgentStoreLatestLoading(false);
     setAgentStoreSearchLoading(false);
     setAgentStoreSearchModalOpen(true);
+  };
+
+  const handleOpenAgentTestChat = (agente: Agente) => {
+    setFeedbackAgente(null);
+    setAgentTestTarget(agente);
   };
 
   const handleLoadAgentLatestProducts = async () => {
@@ -5997,6 +6136,12 @@ export default function AdminProjetoDetalhePage() {
   }, [searchParams]);
 
   useEffect(() => {
+    if (activeTab !== "agentes") {
+      setAgentTestTarget(null);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
@@ -6092,6 +6237,7 @@ export default function AdminProjetoDetalhePage() {
   }
 
   const agenteAtivo = data.agentes.find((agente) => agente.ativo) ?? null;
+  const activeAgentTestTarget = agentTestTarget ? data.agentes.find((agente) => agente.id === agentTestTarget.id) ?? agentTestTarget : null;
   const primaryWhatsAppChannel = data.whatsappChannels[0] ?? null;
   const recentWhatsAppChats = data.chats
     .filter((chat) => isWhatsAppChatChannel(chat))
@@ -6498,6 +6644,15 @@ export default function AdminProjetoDetalhePage() {
               Novo agente
             </button>
           </div>
+          {renderedTab === "agentes" && activeAgentTestTarget ? (
+            <EmbeddedAgentTestChat
+              key={activeAgentTestTarget.id}
+              projeto={data.projeto}
+              agente={activeAgentTestTarget}
+              origin={origin}
+              onClose={() => setAgentTestTarget(null)}
+            />
+          ) : null}
           <div className="pt-2">
             {data.agentes.length ? (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -6531,7 +6686,7 @@ export default function AdminProjetoDetalhePage() {
                 ].filter(Boolean);
                 const miniSummary = miniSummaryParts.length
                   ? `Configurado com ${miniSummaryParts.join(", ")}.`
-                  : "Ainda sem canais, APIs ou integraÃ§Ãµes vinculadas.";
+                  : "Ainda sem canais, APIs ou integrações vinculadas.";
                 const agentCardPreview = (() => {
                   const source = normalizeAgentText(agente.promptBase || agente.descricao || "");
                   if (!source) {
@@ -6613,7 +6768,7 @@ export default function AdminProjetoDetalhePage() {
                             {agente.ativo ? "ativo" : "inativo"}
                           </span>
                         </div>
-                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descriÃ§Ã£o."}</p>
+                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descrição."}</p>
                       </div>
                     </div>
 
@@ -6689,7 +6844,7 @@ export default function AdminProjetoDetalhePage() {
                                   diagnostic.connections.whatsappChannels.length ? `${diagnostic.connections.whatsappChannels.length} WhatsApp` : null,
                                   diagnostic.connections.connectors.length ? `${diagnostic.connections.connectors.length} fonte(s)` : null,
                                   diagnostic.connections.apis.length ? `${diagnostic.connections.apis.length} API(s)` : null,
-                                ].filter(Boolean).join(" | ") || "sem vÃ­nculos diretos"}
+                                ].filter(Boolean).join(" | ") || "sem vínculos diretos"}
                               </span>
                             </p>
                             {diagnostic.warnings.length ? (
@@ -6716,11 +6871,11 @@ export default function AdminProjetoDetalhePage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleOpenAgentStoreSearchModal(agente)}
+                        onClick={() => handleOpenAgentTestChat(agente)}
                         className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-50 transition-all hover:border-emerald-300/30 hover:bg-emerald-500/14 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <TestTube2 size={14} />
-                        Testar
+                        Testar o agente
                       </button>
                       <button type="button" onClick={() => handleEditAgente(agente)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-50 transition-all hover:border-amber-300/30 hover:bg-amber-500/14 disabled:cursor-not-allowed disabled:opacity-60">
                         <Pencil size={14} />
@@ -7102,12 +7257,12 @@ export default function AdminProjetoDetalhePage() {
                         <div className="mt-4 rounded-[24px] border border-cyan-500/20 bg-cyan-500/[0.07] p-4">
                           <img src={qrImage} alt={`QR do canal ${channel.numero}`} className="mx-auto w-full max-w-[300px] rounded-2xl bg-white p-4 shadow-2xl shadow-cyan-950/40" />
                           <p className="mt-4 text-center text-sm font-semibold text-white">Abra o WhatsApp no celular e escaneie este QR.</p>
-                          <p className="mt-1 text-center text-xs text-slate-400">Se o codigo expirar, clique em â€œConectar e gerar QRâ€.</p>
+                          <p className="mt-1 text-center text-xs text-slate-400">Se o codigo expirar, clique em “Conectar e gerar QR”.</p>
                         </div>
                       ) : (
                         <div className="mt-4 rounded-[24px] border border-dashed border-white/10 bg-slate-950/40 px-5 py-12 text-center">
                           <p className="text-lg font-bold text-white">QR ainda nao disponivel</p>
-                          <p className="mt-2 text-sm text-slate-400">Clique em â€œConectar e gerar QRâ€ para iniciar a sessao deste numero.</p>
+                          <p className="mt-2 text-sm text-slate-400">Clique em “Conectar e gerar QR” para iniciar a sessao deste numero.</p>
                         </div>
                       )}
                     </div>
@@ -7120,7 +7275,7 @@ export default function AdminProjetoDetalhePage() {
                       <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Primeiro passo</p>
                       <h4 className="mt-3 text-3xl font-black text-white">Crie o numero que vai atender no WhatsApp</h4>
                       <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-                        Assim que o canal for criado, esta area passa a mostrar o QR bem grande para escanear ou o estado â€œWhatsApp conectadoâ€.
+                        Assim que o canal for criado, esta area passa a mostrar o QR bem grande para escanear ou o estado “WhatsApp conectado”.
                       </p>
                     </div>
                     <div className="grid gap-4 md:grid-cols-3">
@@ -7163,7 +7318,7 @@ export default function AdminProjetoDetalhePage() {
                     </div>
                     <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-4">
                       <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Depois disso</p>
-                      <p className="mt-2 text-sm text-slate-300">O card principal muda para mostrar o QR em destaque ou o estado â€œWhatsApp conectadoâ€.</p>
+                      <p className="mt-2 text-sm text-slate-300">O card principal muda para mostrar o QR em destaque ou o estado “WhatsApp conectado”.</p>
                     </div>
                   </div>
                 </div>
@@ -7547,7 +7702,7 @@ export default function AdminProjetoDetalhePage() {
               "Abre esse link:",
               "https://developers.mercadolivre.com.br/apps",
               "",
-              "Clica em \"Criar aplicaÃ§Ã£o\"",
+              "Clica em \"Criar aplicação\"",
               "",
               "Preenche assim:",
               "Nome: InfraStudio",
