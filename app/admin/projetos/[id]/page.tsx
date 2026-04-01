@@ -4231,7 +4231,6 @@ export default function AdminProjetoDetalhePage() {
   const [tabsPinned, setTabsPinned] = useState(false);
   const [tabsBarHeight, setTabsBarHeight] = useState(0);
   const [tabsBarLeft, setTabsBarLeft] = useState(0);
-  const [projectDetailsExpanded, setProjectDetailsExpanded] = useState(false);
   const pendingAgentDiagnosticsRef = useRef<Record<string, boolean>>({});
   const tabSwitchTimeoutRef = useRef<number | null>(null);
   const tabRevealTimeoutRef = useRef<number | null>(null);
@@ -6578,19 +6577,12 @@ export default function AdminProjetoDetalhePage() {
   const agenteAtivo = data.agentes.find((agente) => agente.ativo) ?? null;
   const activeAgentTestTarget = agentTestTarget ? data.agentes.find((agente) => agente.id === agentTestTarget.id) ?? agentTestTarget : null;
   const primaryWhatsAppChannel = data.whatsappChannels[0] ?? null;
-  const overviewStats = [
-    { key: "agentes", label: "Agentes", value: data.stats.totalAgentes, icon: Bot, tone: "text-cyan-100", glow: "bg-cyan-400/16" },
-    { key: "apis", label: "APIs", value: data.stats.totalApis, icon: Activity, tone: "text-sky-100", glow: "bg-sky-400/16" },
-    { key: "conectores", label: "Integracoes", value: data.stats.totalConectores, icon: Cable, tone: "text-violet-100", glow: "bg-violet-400/16" },
-    { key: "widgets", label: "Widgets", value: data.stats.totalWidgets, icon: PanelsTopLeft, tone: "text-amber-100", glow: "bg-amber-400/16" },
-    { key: "whatsapp", label: "WhatsApp", value: data.stats.totalWhatsAppChannels, icon: Waypoints, tone: "text-emerald-100", glow: "bg-emerald-400/16" },
-    { key: "chats", label: "Chats", value: data.stats.totalChats, icon: MessageSquareText, tone: "text-rose-100", glow: "bg-rose-400/16" },
-  ] as const;
   const projectTabs = [
     {
       key: "agentes" as const,
       label: "Agentes",
       icon: Bot,
+      count: data.stats.totalAgentes,
       activeClass: "border-cyan-400/30 bg-cyan-400/14 text-cyan-50 shadow-[0_10px_25px_rgba(34,211,238,0.12)]",
       inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-400/18 hover:bg-cyan-400/[0.08] hover:text-cyan-50",
     },
@@ -6598,6 +6590,7 @@ export default function AdminProjetoDetalhePage() {
       key: "apis" as const,
       label: "APIs",
       icon: Activity,
+      count: data.stats.totalApis,
       activeClass: "border-sky-400/30 bg-sky-400/14 text-sky-50 shadow-[0_10px_25px_rgba(56,189,248,0.12)]",
       inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-sky-400/18 hover:bg-sky-400/[0.08] hover:text-sky-50",
     },
@@ -6605,6 +6598,7 @@ export default function AdminProjetoDetalhePage() {
       key: "whatsapp" as const,
       label: "WhatsApp",
       icon: Waypoints,
+      count: data.stats.totalWhatsAppChannels,
       activeClass: "border-emerald-400/30 bg-emerald-400/14 text-emerald-50 shadow-[0_10px_25px_rgba(52,211,153,0.12)]",
       inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-emerald-400/18 hover:bg-emerald-400/[0.08] hover:text-emerald-50",
     },
@@ -6612,6 +6606,7 @@ export default function AdminProjetoDetalhePage() {
       key: "mercado" as const,
       label: "Mercado Livre",
       icon: Cable,
+      count: data.stats.totalConectores,
       activeClass: "border-amber-400/30 bg-amber-400/14 text-amber-50 shadow-[0_10px_25px_rgba(251,191,36,0.12)]",
       inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-amber-400/18 hover:bg-amber-400/[0.08] hover:text-amber-50",
     },
@@ -6619,6 +6614,7 @@ export default function AdminProjetoDetalhePage() {
       key: "chats" as const,
       label: "Chats",
       icon: MessageSquareText,
+      count: data.stats.totalChats,
       activeClass: "border-violet-400/30 bg-violet-400/14 text-violet-50 shadow-[0_10px_25px_rgba(167,139,250,0.12)]",
       inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-violet-400/18 hover:bg-violet-400/[0.08] hover:text-violet-50",
     },
@@ -6879,56 +6875,6 @@ export default function AdminProjetoDetalhePage() {
           </section>
         ) : null}
 
-        <section className="mt-8 rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-3 shadow-[0_8px_18px_rgba(2,8,23,0.08)] sm:px-4">
-          <button
-            type="button"
-            onClick={() => setProjectDetailsExpanded((current) => !current)}
-            aria-expanded={projectDetailsExpanded}
-            className="flex w-full items-center justify-between gap-3 rounded-2xl text-left transition-colors hover:text-white"
-          >
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-200">Detalhes do projeto</p>
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                Painel auxiliar recolhido por padrao.
-              </p>
-            </div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] font-semibold text-slate-300">
-              {projectDetailsExpanded ? "Ocultar" : "Mostrar"}
-              <ChevronDown
-                size={14}
-                className={`transition-transform duration-300 ${projectDetailsExpanded ? "rotate-180" : "rotate-0"}`}
-              />
-            </span>
-          </button>
-
-          <div
-            className={`grid overflow-hidden transition-[grid-template-rows,opacity,margin] duration-200 ease-out ${
-              projectDetailsExpanded ? "mt-3 grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0"
-            }`}
-          >
-            <div className="min-h-0 overflow-hidden">
-              <div className="grid gap-2 pt-1 sm:grid-cols-2 xl:grid-cols-3">
-                {overviewStats.map((item) => {
-                  const Icon = item.icon;
-
-                  return (
-                    <div
-                      key={item.key}
-                      className="relative overflow-hidden rounded-xl border border-white/8 bg-slate-950/25 px-3 py-2.5 shadow-[0_8px_18px_rgba(2,8,23,0.1)]"
-                    >
-                      <div className={`pointer-events-none absolute right-3 top-3 ${item.tone} opacity-20`}>
-                        <Icon size={18} />
-                      </div>
-                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
-                      <p className="mt-2 text-2xl font-black leading-none text-slate-100">{item.value}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </section>
-
         <div ref={tabsAnchorRef} className="mt-8" style={{ minHeight: tabsBarHeight ? `${tabsBarHeight}px` : undefined }}>
           <section
             ref={tabsBarRef}
@@ -6958,6 +6904,15 @@ export default function AdminProjetoDetalhePage() {
                   >
                     <Icon size={15} />
                     {tab.label}
+                    <span
+                      className={`inline-flex min-w-[1.65rem] items-center justify-center rounded-full border px-1.5 py-0.5 text-[10px] font-bold leading-none ${
+                        active
+                          ? "border-white/20 bg-white/12 text-white"
+                          : "border-white/10 bg-white/[0.06] text-slate-300"
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
                   </button>
                 );
               })}
