@@ -28,6 +28,7 @@ type ReplyAsset = {
   mimeType: string;
   categoria: "image" | "file";
   publicUrl: string;
+  targetUrl?: string | null;
 };
 
 type RuntimeReplyAsset = ReplyAsset & {
@@ -1495,21 +1496,9 @@ function buildMercadoLivreListingReply(produtos: ProdutoPadronizado[], context?:
       : "Nao encontrei produtos visiveis na loja neste momento.";
   }
 
-  if (isWhatsAppChannel(context)) {
-    return [
-      "Estes sao alguns produtos da loja agora:",
-      ...produtos.map((produto, index) => `${index + 1}. ${produto.nome}\nR$ ${produto.preco.toLocaleString("pt-BR")}\n${produto.link}`),
-      "",
-      "Se quiser, eu posso buscar um modelo especifico para voce.",
-    ].join("\n\n");
-  }
-
-  return [
-    "**Estes sao alguns produtos da loja agora:**",
-    ...produtos.map((produto) => `- **${produto.nome}**\n  R$ ${produto.preco.toLocaleString("pt-BR")}\n  ${produto.link}`),
-    "",
-    "Se quiser, eu posso buscar um modelo especifico para voce.",
-  ].join("\n");
+  return isWhatsAppChannel(context)
+    ? "Separei alguns produtos da loja para voce logo abaixo. Se quiser, eu tambem posso buscar um modelo especifico."
+    : "Separei alguns produtos da loja logo abaixo. Se quiser, eu tambem posso buscar um modelo especifico.";
 }
 
 function buildMercadoLivreNoResultsReply(termo: string, context?: ConversationContext) {
@@ -1529,46 +1518,33 @@ function buildMercadoLivreNoResultsReply(termo: string, context?: ConversationCo
   ].join("\n");
 }
 
+function buildMercadoLivreProductAssets(produtos: ProdutoPadronizado[]): ReplyAsset[] {
+  return produtos.slice(0, 3).map((produto, index) => ({
+    id: `mercado-livre-${index + 1}-${normalizeText(produto.nome).replace(/\s+/g, "-") || "produto"}`,
+    nome: produto.nome,
+    descricao: `R$ ${produto.preco.toLocaleString("pt-BR")}`,
+    arquivoNome: produto.nome,
+    mimeType: "image/jpeg",
+    categoria: "image",
+    publicUrl: produto.imagem,
+    targetUrl: produto.link,
+  }));
+}
+
 function buildMercadoLivreReply(produtos: ProdutoPadronizado[], context?: ConversationContext) {
   if (!produtos.length) {
     return null;
   }
 
   if (produtos.length === 1) {
-    const produto = produtos[0];
-
-    if (isWhatsAppChannel(context)) {
-      return [
-        "Encontrei este produto na loja:",
-        `${produto.nome}\nR$ ${produto.preco.toLocaleString("pt-BR")}\n${produto.link}`,
-        "",
-        "Se quiser, eu posso buscar mais opcoes parecidas.",
-      ].join("\n\n");
-    }
-
-    return [
-      "**Encontrei este produto na loja:**",
-      `- **${produto.nome}**\n  R$ ${produto.preco.toLocaleString("pt-BR")}\n  ${produto.link}`,
-      "",
-      "Se quiser, eu posso buscar outras opcoes parecidas.",
-    ].join("\n");
+    return isWhatsAppChannel(context)
+      ? "Encontrei um produto da loja para voce logo abaixo. Se quiser, eu posso buscar outras opcoes parecidas."
+      : "Encontrei um produto da loja logo abaixo. Se quiser, eu posso buscar outras opcoes parecidas.";
   }
 
-  if (isWhatsAppChannel(context)) {
-    return [
-      "Encontrei algumas opcoes parecidas na loja:",
-      ...produtos.map((produto, index) => `${index + 1}. ${produto.nome}\nR$ ${produto.preco.toLocaleString("pt-BR")}\n${produto.link}`),
-      "",
-      "Se quiser, eu posso te mostrar mais opcoes ou buscar outro modelo.",
-    ].join("\n\n");
-  }
-
-  return [
-    "**Encontrei estas opcoes parecidas na loja:**",
-    ...produtos.map((produto) => `- **${produto.nome}**\n  R$ ${produto.preco.toLocaleString("pt-BR")}\n  ${produto.link}`),
-    "",
-    "Se quiser, eu posso buscar mais variacoes desse produto.",
-  ].join("\n");
+  return isWhatsAppChannel(context)
+    ? "Encontrei algumas opcoes parecidas na loja logo abaixo. Se quiser, eu posso buscar mais variacoes desse produto."
+    : "Encontrei algumas opcoes parecidas na loja logo abaixo. Se quiser, eu posso buscar mais variacoes desse produto.";
 }
 
 function buildMercadoLivrePromptContext(produtos: ProdutoPadronizado[]) {
@@ -1881,6 +1857,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   }
 
   if (mercadoLivreListingReply) {
+    const mercadoLivreAssets = buildMercadoLivreProductAssets(mercadoLivreListingProducts);
     await appendRuntimeErrorLog({
       source: "chat_orchestrator.trace",
       message: "Listagem de produtos recentes do Mercado Livre acionada.",
@@ -1889,7 +1866,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     });
     return {
       reply: formatHeuristicReply(mercadoLivreListingReply, context),
-      assets: [],
+      assets: mercadoLivreAssets,
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
         provider: "heuristic",
@@ -1901,6 +1878,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   }
 
   if (directMercadoLivreReply) {
+    const mercadoLivreAssets = buildMercadoLivreProductAssets(mercadoLivreProducts);
     await appendRuntimeErrorLog({
       source: "chat_orchestrator.trace",
       message: "Resposta heuristica por conector Mercado Livre acionada.",
@@ -1909,7 +1887,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     });
     return {
       reply: formatHeuristicReply(directMercadoLivreReply, context),
-      assets: [],
+      assets: mercadoLivreAssets,
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
         provider: "heuristic",
