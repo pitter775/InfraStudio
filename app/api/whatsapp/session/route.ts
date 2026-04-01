@@ -29,6 +29,14 @@ function shouldAppendWhatsAppErrorLog(body: WhatsAppSessionBody) {
   return /\berro\b|\berror\b|\bfailed\b|\bfailure\b|\bexception\b|\bchrome\b|\bchromium\b|\bpuppeteer\b/.test(notes);
 }
 
+function shouldAppendWhatsAppTraceLog(body: WhatsAppSessionBody) {
+  if (shouldAppendWhatsAppErrorLog(body)) {
+    return false;
+  }
+
+  return body.connectionStatus === "connecting" || body.connectionStatus === "online" || body.connectionStatus === "aguardando_qr";
+}
+
 export async function POST(request: Request) {
   try {
     if (!isBridgeAuthorized(request)) {
@@ -76,6 +84,23 @@ export async function POST(request: Request) {
           connectionStatus: body.connectionStatus ?? null,
           qrAvailable: Boolean(body.qrCodeDataUrl || body.qrCodeText),
         },
+      });
+    } else if (shouldAppendWhatsAppTraceLog(body)) {
+      await appendSystemLog({
+        projetoId: channel.projetoId,
+        tipo: "whatsapp_worker_trace",
+        origem: "whatsapp-session",
+        descricao:
+          body.notes?.trim() ||
+          `Worker sincronizou o canal em ${body.connectionStatus ?? "estado_desconhecido"}.`,
+        payload: {
+          channelId: channel.id,
+          agenteId: channel.agenteId,
+          numero: channel.numero,
+          connectionStatus: body.connectionStatus ?? null,
+          qrAvailable: Boolean(body.qrCodeDataUrl || body.qrCodeText),
+        },
+        skipErrorGate: true,
       });
     }
 

@@ -92,6 +92,7 @@ export async function appendSystemLog(input: {
   origem?: string;
   descricao: string;
   payload?: Record<string, unknown> | null;
+  skipErrorGate?: boolean;
 }) {
   const normalized = {
     tipo: normalizeLogField(input.tipo, "system_event"),
@@ -99,7 +100,7 @@ export async function appendSystemLog(input: {
     descricao: input.descricao.trim(),
   };
 
-  if (!isErrorLogLike(normalized)) {
+  if (!input.skipErrorGate && !isErrorLogLike(normalized)) {
     return;
   }
 
