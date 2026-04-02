@@ -374,10 +374,16 @@ async function fetchMercadoLivreProducts(input: {
     }
 
     const payload = (await response.json()) as MercadoLivreSearchResponse;
-    return (payload.results ?? [])
+    const products = (payload.results ?? [])
       .map((item) => normalizeProduto(item))
       .filter(Boolean)
       .slice(0, input.limit ?? 12) as ProdutoPadronizado[];
+
+    return await enrichMercadoLivreProductsWithDetails({
+      endpointBase: input.endpointBase,
+      accessToken: input.accessToken,
+      products,
+    });
   } catch (error) {
     if ((error as Error).name !== "AbortError") {
       console.error("[mercado-livre] failed to fetch products", error);
@@ -385,6 +391,64 @@ async function fetchMercadoLivreProducts(input: {
     return [];
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+async function enrichMercadoLivreProductsWithDetails(input: {
+  endpointBase: string;
+  accessToken?: string;
+  products: ProdutoPadronizado[];
+}) {
+  const ids = input.products
+    .map((product) => (typeof product.id === "string" ? product.id.trim().toUpperCase() : ""))
+    .filter(Boolean)
+    .slice(0, 20);
+
+  if (!ids.length) {
+    return input.products;
+  }
+
+  try {
+    const detailsEndpoint = new URL("/items", input.endpointBase);
+    detailsEndpoint.searchParams.set("ids", ids.join(","));
+
+    const response = await fetch(detailsEndpoint.toString(), {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        ...(input.accessToken ? { Authorization: `Bearer ${input.accessToken}` } : {}),
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return input.products;
+    }
+
+    const payload = (await response.json()) as MercadoLivreItemDetailsResponse;
+    const detailedById = new Map<string, ProdutoPadronizado>();
+
+    for (const entry of payload) {
+      const normalized = entry.body ? normalizeProduto(entry.body) : null;
+      const itemId = typeof normalized?.id === "string" ? normalized.id.trim().toUpperCase() : "";
+      if (normalized && itemId) {
+        detailedById.set(itemId, normalized);
+      }
+    }
+
+    return input.products.map((product) => {
+      const itemId = typeof product.id === "string" ? product.id.trim().toUpperCase() : "";
+      const detailed = itemId ? detailedById.get(itemId) : null;
+      return detailed
+        ? {
+            ...product,
+            link: detailed.link,
+            imagem: detailed.imagem || product.imagem,
+          }
+        : product;
+    });
+  } catch {
+    return input.products;
   }
 }
 
