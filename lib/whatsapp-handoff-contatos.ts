@@ -9,6 +9,42 @@ export class WhatsAppHandoffContactError extends Error {
   }
 }
 
+function mapHandoffContactError(error: { code?: string; message?: string | null } | null | undefined, fallback: string) {
+  const rawMessage = String(error?.message || "").trim().toLowerCase();
+  const isDuplicateNumber =
+    error?.code === "23505" ||
+    rawMessage.includes("duplicate key") ||
+    rawMessage.includes("already exists") ||
+    rawMessage.includes("whatsapp_handoff_contatos_numero_unique");
+  const isMissingTable =
+    error?.code === "42P01" ||
+    (rawMessage.includes("relation") && rawMessage.includes("whatsapp_handoff_contatos"));
+  const isPermissionDenied =
+    error?.code === "42501" ||
+    rawMessage.includes("permission denied") ||
+    rawMessage.includes("not allowed");
+
+  if (isDuplicateNumber) {
+    return new WhatsAppHandoffContactError(
+      "Este numero ja esta cadastrado como contato de aviso neste projeto. Use outro numero ou edite o contato existente.",
+    );
+  }
+
+  if (isMissingTable) {
+    return new WhatsAppHandoffContactError(
+      "A configuracao de atendimento humano ainda nao foi criada no banco. Aplique o SQL de `database/seeder/20260401_whatsapp_handoff.sql` no Supabase.",
+    );
+  }
+
+  if (isPermissionDenied) {
+    return new WhatsAppHandoffContactError(
+      "O banco bloqueou o acesso aos contatos de handoff deste projeto. Libere a tabela `whatsapp_handoff_contatos` no Supabase para o backend.",
+    );
+  }
+
+  return new WhatsAppHandoffContactError(error?.message || fallback);
+}
+
 export type WhatsAppHandoffContactRecord = {
   id: string;
   projetoId: string;
@@ -84,7 +120,7 @@ export async function listWhatsAppHandoffContacts(input: {
 
   if (error || !data) {
     console.error("[whatsapp-handoff-contatos] failed to list contacts", error);
-    return [];
+    throw mapHandoffContactError(error, "Nao foi possivel carregar os contatos de aviso.");
   }
 
   return (data as WhatsAppHandoffContactRow[]).map((row) => mapContact(row));
@@ -124,31 +160,7 @@ export async function createWhatsAppHandoffContact(input: {
 
   if (error || !data) {
     console.error("[whatsapp-handoff-contatos] failed to create contact", error);
-    const rawMessage = String(error?.message || "").trim().toLowerCase();
-    const isDuplicateNumber =
-      error?.code === "23505" ||
-      rawMessage.includes("duplicate key") ||
-      rawMessage.includes("already exists") ||
-      rawMessage.includes("whatsapp_handoff_contatos_numero_unique");
-    const isMissingTable =
-      error?.code === "42P01" ||
-      rawMessage.includes("relation") && rawMessage.includes("whatsapp_handoff_contatos");
-
-    if (isDuplicateNumber) {
-      throw new WhatsAppHandoffContactError(
-        "Este numero ja esta cadastrado como contato de aviso neste projeto. Use outro numero ou edite o contato existente.",
-      );
-    }
-
-    if (isMissingTable) {
-      throw new WhatsAppHandoffContactError(
-        "A configuracao de atendimento humano ainda nao foi criada no banco. Aplique o SQL de `database/seeder/20260401_whatsapp_handoff.sql` no Supabase.",
-      );
-    }
-
-    throw new WhatsAppHandoffContactError(
-      error?.message || `Falha ao criar contato de aviso para o numero ${normalizedPhone || "informado"}.`,
-    );
+    throw mapHandoffContactError(error, `Falha ao criar contato de aviso para o numero ${normalizedPhone || "informado"}.`);
   }
 
   return mapContact(data);

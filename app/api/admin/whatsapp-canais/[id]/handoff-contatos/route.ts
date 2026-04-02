@@ -31,12 +31,36 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Canal WhatsApp nao encontrado ou sem acesso." }, { status: 404 });
   }
 
-  const contacts = await listWhatsAppHandoffContacts({
-    projetoId: channel.projetoId,
-    canalWhatsappId: channel.id,
-  });
+  try {
+    const contacts = await listWhatsAppHandoffContacts({
+      projetoId: channel.projetoId,
+      canalWhatsappId: channel.id,
+    });
 
-  return NextResponse.json({ contacts }, { status: 200 });
+    return NextResponse.json({ contacts }, { status: 200 });
+  } catch (error) {
+    const message =
+      error instanceof WhatsAppHandoffContactError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : "Nao foi possivel carregar os contatos de aviso.";
+
+    await appendSystemLog({
+      projetoId: channel.projetoId,
+      tipo: "whatsapp_handoff_error",
+      origem: "whatsapp_handoff_contatos",
+      descricao: "Erro ao carregar contatos de aviso do atendimento humano.",
+      payload: {
+        channelId: channel.id,
+        action: "list",
+        error: message,
+      },
+      skipErrorGate: true,
+    });
+
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request, context: RouteContext) {
@@ -69,14 +93,15 @@ export async function POST(request: Request, context: RouteContext) {
     if (!ok) {
       await appendSystemLog({
         projetoId: channel.projetoId,
-        tipo: "whatsapp_handoff_cfg",
+        tipo: "whatsapp_handoff_error",
         origem: "whatsapp_handoff_contatos",
-        descricao: "Falha ao remover contato de aviso do atendimento humano.",
+        descricao: "Erro ao remover contato de aviso do atendimento humano.",
         payload: {
           channelId: channel.id,
           contactId: body.contactId,
           action: "delete",
         },
+        skipErrorGate: true,
       });
     }
     return NextResponse.json({ success: ok }, { status: ok ? 200 : 500 });
@@ -96,15 +121,16 @@ export async function POST(request: Request, context: RouteContext) {
     if (!contact) {
       await appendSystemLog({
         projetoId: channel.projetoId,
-        tipo: "whatsapp_handoff_cfg",
+        tipo: "whatsapp_handoff_error",
         origem: "whatsapp_handoff_contatos",
-        descricao: "Falha ao atualizar contato de aviso do atendimento humano.",
+        descricao: "Erro ao atualizar contato de aviso do atendimento humano.",
         payload: {
           channelId: channel.id,
           contactId: body.contactId,
           action: "update",
           numero: body.numero ?? null,
         },
+        skipErrorGate: true,
       });
       return NextResponse.json({ error: "Nao foi possivel atualizar o contato." }, { status: 500 });
     }
@@ -143,25 +169,28 @@ export async function POST(request: Request, context: RouteContext) {
 
     return NextResponse.json({ contact }, { status: 201 });
   } catch (error) {
-    await appendSystemLog({
-      projetoId: channel.projetoId,
-      tipo: "whatsapp_handoff_cfg",
-      origem: "whatsapp_handoff_contatos",
-      descricao: "Falha ao criar contato de aviso do atendimento humano.",
-      payload: {
-        channelId: channel.id,
-        action: "create",
-        nome: body.nome,
-        numero: body.numero,
-        error: error instanceof Error ? error.message : null,
-      },
-    });
     const message =
       error instanceof WhatsAppHandoffContactError
         ? error.message
         : error instanceof Error
           ? error.message
           : "Nao foi possivel criar o contato.";
+
+    await appendSystemLog({
+      projetoId: channel.projetoId,
+      tipo: "whatsapp_handoff_error",
+      origem: "whatsapp_handoff_contatos",
+      descricao: "Erro ao criar contato de aviso do atendimento humano.",
+      payload: {
+        channelId: channel.id,
+        action: "create",
+        nome: body.nome,
+        numero: body.numero,
+        error: message,
+      },
+      skipErrorGate: true,
+    });
+
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

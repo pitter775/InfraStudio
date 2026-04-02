@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, CheckCircle2, LoaderCircle, Pencil, Plus, Power, Trash2, Waypoints } from "lucide-react";
+import { Activity, CheckCircle2, LoaderCircle, Pencil, Plus, Power, Trash2, Unplug, Waypoints } from "lucide-react";
 
 type AgenteSummary = {
   id: string;
@@ -71,6 +71,7 @@ type ProjectWhatsAppSectionProps = {
   savingHandoffContact: boolean;
   updatingHandoffContactId: string | null;
   handoffFeedback: string | null;
+  handoffFeedbackTone: "success" | "error";
   actionButtonClass: string;
   onOpenNewChannel: () => void;
   onConnectChannel: (channel: WhatsAppChannel, options?: { refreshQr?: boolean }) => void;
@@ -210,22 +211,6 @@ function getWhatsAppChannelUserNote(note: string | null | undefined) {
   return value;
 }
 
-function getWhatsAppConnectButtonLabel(input: {
-  isConnected: boolean;
-  isWaitingQr: boolean;
-  runtimeStatus: string;
-}) {
-  if (input.isConnected) {
-    return "Reconectar canal";
-  }
-
-  if (input.isWaitingQr || input.runtimeStatus === "aguardando_qr") {
-    return "Gerar QR Code";
-  }
-
-  return "Gerar QR Code";
-}
-
 function BusyIcon() {
   return <LoaderCircle size={15} className="animate-spin" />;
 }
@@ -247,6 +232,7 @@ export function ProjectWhatsAppSection({
   savingHandoffContact,
   updatingHandoffContactId,
   handoffFeedback,
+  handoffFeedbackTone,
   actionButtonClass,
   onOpenNewChannel,
   onConnectChannel,
@@ -278,11 +264,6 @@ export function ProjectWhatsAppSection({
             const qrImage = serviceQrByChannel[channel.id] ?? channel.sessionData?.qrCodeDataUrl ?? channel.sessionData?.qrCodeUrl ?? null;
             const isConnected = runtimeStatus === "conectado" || runtimeStatus === "online";
             const isWaitingQr = runtimeStatus === "aguardando_qr" && Boolean(qrImage);
-            const connectButtonLabel = getWhatsAppConnectButtonLabel({
-              isConnected,
-              isWaitingQr,
-              runtimeStatus,
-            });
             const runtimeNote = channel.sessionData?.notes ?? null;
             const shouldShowRuntimeNote = runtimeStatus !== "desconectado" && Boolean(runtimeNote);
 
@@ -324,24 +305,15 @@ export function ProjectWhatsAppSection({
 
                   <div className="mt-6 border-t border-white/10 pt-4">
                     <div className="rounded-2xl border border-white/8 bg-slate-950/45 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                        <button
-                          type="button"
-                          onClick={() => onConnectChannel(channel)}
-                          disabled={connectingChannelId === channel.id}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-50 transition-all hover:border-emerald-300/30 hover:bg-emerald-500/14 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {connectingChannelId === channel.id ? <BusyIcon /> : null}
-                          {connectButtonLabel}
-                        </button>
+                      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                         <button
                           type="button"
                           onClick={() => onConnectChannel(channel, { refreshQr: true })}
-                          disabled={connectingChannelId === channel.id || (!isWaitingQr && runtimeStatus !== "aguardando_qr")}
+                          disabled={connectingChannelId === channel.id}
                           className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-50 transition-all hover:border-cyan-300/30 hover:bg-cyan-500/14 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {connectingChannelId === channel.id ? <BusyIcon /> : <Activity size={15} />}
-                          Gerar novo QR
+                          Gerar QR Code
                         </button>
                         <button
                           type="button"
@@ -349,7 +321,7 @@ export function ProjectWhatsAppSection({
                           disabled={disconnectingChannelId === channel.id}
                           className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-50 transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {disconnectingChannelId === channel.id ? <BusyIcon /> : null}
+                          {disconnectingChannelId === channel.id ? <BusyIcon /> : <Unplug size={15} />}
                           Desconectar
                         </button>
                         <button
@@ -366,7 +338,7 @@ export function ProjectWhatsAppSection({
                           disabled={deletingChannelId === channel.id}
                           className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-50 transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {deletingChannelId === channel.id ? <BusyIcon /> : null}
+                          {deletingChannelId === channel.id ? <BusyIcon /> : <Trash2 size={15} />}
                           Remover
                         </button>
                       </div>
@@ -374,23 +346,6 @@ export function ProjectWhatsAppSection({
                   </div>
                 </div>
 
-                {!isConnected ? (
-                  <div className="rounded-[28px] border border-white/10 bg-slate-950/55 p-5">
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">QR Code para escanear</p>
-                    {qrImage ? (
-                      <div className="mt-4 rounded-[24px] border border-cyan-500/20 bg-cyan-500/[0.07] p-4">
-                        <img src={qrImage} alt={`QR do canal ${channel.numero}`} className="mx-auto w-full max-w-[300px] rounded-2xl bg-white p-4 shadow-2xl shadow-cyan-950/40" />
-                        <p className="mt-4 text-center text-sm font-semibold text-white">Abra o WhatsApp no celular e escaneie este QR.</p>
-                        <p className="mt-1 text-center text-xs text-slate-400">Se o codigo expirar, clique em "Gerar novo QR".</p>
-                      </div>
-                    ) : (
-                      <div className="mt-4 rounded-[24px] border border-dashed border-white/10 bg-slate-950/40 px-5 py-12 text-center">
-                        <p className="text-lg font-bold text-white">QR ainda nao disponivel</p>
-                        <p className="mt-2 text-sm text-slate-400">Clique em "Gerar QR Code" para iniciar a sessao deste numero.</p>
-                      </div>
-                    )}
-                  </div>
-                ) : null}
               </div>
             );
           })() : (
@@ -450,16 +405,15 @@ export function ProjectWhatsAppSection({
           )}
 
           {primaryChannel ? (
-            <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-5 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:sticky xl:top-6">
+            <div className="rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:sticky xl:top-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Atendimento humano</p>
-                </div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Atendimento humano</p>
                 {totalChannels > 1 ? (
                   <p className="text-xs text-amber-100/80">Existem {totalChannels} canais cadastrados. A interface esta priorizando o primeiro.</p>
                 ) : null}
               </div>
-              <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4">
+
+              <div className="mt-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h5 className="text-base font-bold text-white">Quem recebe o aviso no WhatsApp</h5>
@@ -530,7 +484,13 @@ export function ProjectWhatsAppSection({
                 </div>
 
                 {handoffFeedback ? (
-                  <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+                  <div
+                    className={`mt-4 rounded-xl px-4 py-3 text-sm ${
+                      handoffFeedbackTone === "error"
+                        ? "border border-rose-400/20 bg-rose-500/10 text-rose-100"
+                        : "border border-emerald-500/20 bg-emerald-500/10 text-emerald-100"
+                    }`}
+                  >
                     {handoffFeedback}
                   </div>
                 ) : null}

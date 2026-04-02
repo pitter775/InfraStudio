@@ -65,7 +65,7 @@ export function ProjectMercadoSection({
   const mercadoLivreUrls = useMemo(
     () => ({
       callback: `${appBaseUrl}/api/admin/conectores/mercado-livre/callback`,
-      webhook: `${appBaseUrl}/api/mercado-livre/webhook`,
+      webhook: `${appBaseUrl}/api/mercado-livre/webhook?canal=ml`,
     }),
     [appBaseUrl],
   );
@@ -201,8 +201,8 @@ export function ProjectMercadoSection({
               <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Checklist</p>
               <p className="mt-3">1. Criar aplicacao do tipo `Web`.</p>
               <p className="mt-2">2. Ativar `Authorization Code`, `Refresh Token` e `PKCE`.</p>
-              <p className="mt-2">3. Liberar `Usuarios`, `Publicacao e sincronizacao` e `Metricas do negocio`.</p>
-              <p className="mt-2">4. Copiar `APP ID` e `CLIENT SECRET` para o cadastro da loja.</p>
+              <p className="mt-2">3. Liberar `Usuários`, `Publicação e sincronização` e também todas as outras permissões solicitadas pelo app.</p>
+              <p className="mt-2">4. Os dados `APP ID` e `CLIENT SECRET` só aparecem depois de concluir a criação do app. Copie esses dados e adicione no cadastro da loja.</p>
               <p className="mt-2">5. Salvar a integracao e depois concluir a autorizacao OAuth.</p>
             </div>
 
@@ -215,7 +215,7 @@ export function ProjectMercadoSection({
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tutorial</p>
                   <p className="mt-2 text-sm font-semibold text-white">URLs usadas no app do Mercado Livre</p>
-                  <p className="mt-1 text-xs text-slate-400">Abra para copiar a callback e o webhook usados nesta integracao.</p>
+                  <p className="mt-1 text-xs text-slate-400">Abra para copiar a callback OAuth e ver a orientacao correta do webhook desta integracao.</p>
                 </div>
                 <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
                   {tutorialExpanded ? "Ocultar" : "Mostrar"}
@@ -225,7 +225,7 @@ export function ProjectMercadoSection({
               {tutorialExpanded ? (
                 <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
                   <p className="text-xs text-amber-100/90">
-                    No app do Mercado Livre, habilite todas as permissoes solicitadas e use as URLs abaixo exatamente como estao.
+                    No app do Mercado Livre, use a callback abaixo exatamente como esta. Para Notifications, nao cole o endpoint interno direto se o painel recusar esse formato.
                   </p>
 
                   <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3.5 py-3">
@@ -241,15 +241,16 @@ export function ProjectMercadoSection({
                   </div>
 
                   <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3.5 py-3">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Webhook Notifications</p>
-                    <button
-                      type="button"
-                      title={copiedKey === "webhook" ? "URL copiada" : "Clique para copiar"}
-                      onClick={() => void handleCopyUrl("webhook", mercadoLivreUrls.webhook)}
-                      className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left font-mono text-[11px] text-cyan-100 transition-colors hover:border-cyan-300/25 hover:bg-cyan-500/10"
-                    >
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Notifications webhook</p>
+                    <p className="mt-2 text-xs leading-6 text-slate-300">
+                      O painel do Mercado Livre pode recusar o endpoint direto do InfraStudio nesse campo.
+                    </p>
+                    <p className="mt-2 text-xs leading-6 text-slate-300">
+                      Quando isso acontecer, use uma URL publica intermediaria via variavel/proxy e aponte essa URL para o endpoint interno abaixo:
+                    </p>
+                    <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-[11px] text-cyan-100">
                       {mercadoLivreUrls.webhook}
-                    </button>
+                    </div>
                   </div>
                 </div>
               ) : null}
