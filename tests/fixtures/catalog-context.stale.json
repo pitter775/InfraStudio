@@ -1,0 +1,43 @@
+{
+  "channel": {
+    "kind": "whatsapp"
+  },
+  "memoria": {
+    "mensagem_count": 50
+  },
+  "catalogo": {
+    "ultimaBusca": "jogo de jantar",
+    "snapshotId": "snapshot-stale-1",
+    "snapshotCreatedAt": "2024-01-01T00:00:00.000Z",
+    "snapshotTurnId": 1,
+    "produtoAtual": {
+      "id": "MLB2",
+      "nome": "Jogo de Sopeira Completo",
+      "descricao": "Sopeira amarela com tigelas",
+      "preco": 250,
+      "link": "https://example.com/sopeira",
+      "imagem": "https://example.com/sopeira.jpg",
+      "cardIndex": 1
+    },
+    "ultimosProdutos": [
+      {
+        "id": "MLB1",
+        "nome": "Jogo de Jantar Porcelana",
+        "descricao": "Jogo branco completo",
+        "preco": 2990,
+        "link": "https://example.com/jantar",
+        "imagem": "https://example.com/jantar.jpg",
+        "cardIndex": 0
+      },
+      {
+        "id": "MLB2",
+        "nome": "Jogo de Sopeira Completo",
+        "descricao": "Sopeira amarela com tigelas",
+        "preco": 250,
+        "link": "https://example.com/sopeira",
+        "imagem": "https://example.com/sopeira.jpg",
+        "cardIndex": 1
+      }
+    ]
+  }
+}

@@ -2,59 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bot, CalendarRange, Coins, MessageSquare, Sparkles, Waypoints } from "lucide-react";
-
-type TopChat = {
-  chatId: string;
-  titulo: string;
-  leadNome: string | null;
-  projetoNome: string | null;
-  agenteNome: string | null;
-  mensagens: number;
-  tokensInput: number;
-  tokensOutput: number;
-  totalTokens: number;
-  custo: number;
-  updatedAt: string;
-};
-
-type TopAgent = {
-  agenteNome: string;
-  chats: number;
-  totalTokens: number;
-};
-
-type RecentActivity = {
-  id: string;
-  chatId: string;
-  titulo: string;
-  leadNome: string | null;
-  agenteNome: string | null;
-  role: string;
-  totalTokens: number;
-  tokensInput: number;
-  tokensOutput: number;
-  custo: number;
-  createdAt: string;
-};
-
-type IaUsageSummary = {
-  periodLabel: string;
-  startDate: string;
-  endDate: string;
-  costModel: string;
-  costCurrency: "USD";
-  tokensInput: number;
-  tokensOutput: number;
-  totalTokens: number;
-  totalCost: number;
-  hasCostData: boolean;
-  processedMessages: number;
-  activeChats: number;
-  activeAgents: number;
-  topChats: TopChat[];
-  topAgents: TopAgent[];
-  recentActivity: RecentActivity[];
-};
+import type { IaUsageSummary } from "@/lib/ia-usage-types";
 
 function formatInteger(value: number) {
   return value.toLocaleString("pt-BR");
@@ -330,6 +278,36 @@ export default function AdminIaTokensPage() {
         <div className="space-y-6">
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
             <div className="border-b border-white/10 px-6 py-5">
+              <h2 className="text-2xl font-bold text-white">Origens com maior consumo</h2>
+              <p className="mt-1 text-sm text-slate-400">Leitura por canal, provider, rota e dominio da conversa.</p>
+            </div>
+
+            <div className="space-y-3 p-5">
+              {summary?.topOrigins.length ? (
+                summary.topOrigins.map((origin) => (
+                  <div key={origin.origem} className="rounded-2xl border border-white/8 bg-slate-950/30 p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-semibold text-white">{origin.label}</p>
+                        <p className="mt-1 text-sm text-slate-400">{formatInteger(origin.mensagens)} mensagens com consumo</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-extrabold text-white">{formatInteger(origin.totalTokens)} tokens</p>
+                        <p className="mt-1 text-xs text-emerald-300">
+                          {origin.custo > 0 ? formatCurrency(origin.custo, summary.costCurrency) : "Sem valor monetario salvo"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-400">Ainda nao ha origens classificadas com consumo neste intervalo.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+            <div className="border-b border-white/10 px-6 py-5">
               <h2 className="text-2xl font-bold text-white">Agentes com maior uso</h2>
               <p className="mt-1 text-sm text-slate-400">Consumo agregado por agente no intervalo.</p>
             </div>
@@ -378,6 +356,10 @@ export default function AdminIaTokensPage() {
                         </p>
                         <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
                           {item.role} | {new Date(item.createdAt).toLocaleString("pt-BR")}
+                        </p>
+                        <p className="mt-2 text-xs text-cyan-200">{item.origemLabel ?? "Sem classificacao"}</p>
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          {item.provider ?? "sem provider"} | {item.routeStage ?? "sem rota"} | {item.domainStage ?? "sem dominio"}
                         </p>
                       </div>
                       <div className="text-right">

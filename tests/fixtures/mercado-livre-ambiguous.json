@@ -1,0 +1,80 @@
+{
+  "listingProducts": [
+    {
+      "id": "MLB10",
+      "nome": "Sopeira Amarela Floral",
+      "preco": 320,
+      "imagem": "https://example.com/sopeira-floral.jpg",
+      "link": "https://example.com/sopeira-floral",
+      "publicadoEm": "2026-04-01T10:00:00.000Z"
+    },
+    {
+      "id": "MLB11",
+      "nome": "Sopeira Amarela Imperial",
+      "preco": 410,
+      "imagem": "https://example.com/sopeira-imperial.jpg",
+      "link": "https://example.com/sopeira-imperial",
+      "publicadoEm": "2026-04-01T11:00:00.000Z"
+    }
+  ],
+  "searchProducts": [
+    {
+      "id": "MLB10",
+      "nome": "Sopeira Amarela Floral",
+      "preco": 320,
+      "imagem": "https://example.com/sopeira-floral.jpg",
+      "link": "https://example.com/sopeira-floral",
+      "publicadoEm": "2026-04-01T10:00:00.000Z"
+    },
+    {
+      "id": "MLB11",
+      "nome": "Sopeira Amarela Imperial",
+      "preco": 410,
+      "imagem": "https://example.com/sopeira-imperial.jpg",
+      "link": "https://example.com/sopeira-imperial",
+      "publicadoEm": "2026-04-01T11:00:00.000Z"
+    }
+  ],
+  "detailedProducts": [
+    {
+      "id": "MLB10",
+      "nome": "Sopeira Amarela Floral",
+      "preco": 320,
+      "imagem": "https://example.com/sopeira-floral.jpg",
+      "link": "https://example.com/sopeira-floral",
+      "publicadoEm": "2026-04-01T10:00:00.000Z",
+      "descricao": "Modelo floral amarelo.",
+      "condicao": "novo",
+      "garantia": "30 dias",
+      "estoque": 3,
+      "vendidos": 9,
+      "aceitaMercadoPago": true,
+      "freteGratis": true,
+      "sellerId": "SELLER-001",
+      "pertenceALoja": true,
+      "atributos": [
+        { "nome": "cor", "valor": "amarelo" }
+      ]
+    },
+    {
+      "id": "MLB11",
+      "nome": "Sopeira Amarela Imperial",
+      "preco": 410,
+      "imagem": "https://example.com/sopeira-imperial.jpg",
+      "link": "https://example.com/sopeira-imperial",
+      "publicadoEm": "2026-04-01T11:00:00.000Z",
+      "descricao": "Modelo imperial amarelo.",
+      "condicao": "novo",
+      "garantia": "90 dias",
+      "estoque": 2,
+      "vendidos": 5,
+      "aceitaMercadoPago": true,
+      "freteGratis": false,
+      "sellerId": "SELLER-001",
+      "pertenceALoja": true,
+      "atributos": [
+        { "nome": "cor", "valor": "amarelo" }
+      ]
+    }
+  ]
+}

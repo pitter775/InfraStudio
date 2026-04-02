@@ -1,5 +1,13 @@
 import { getAgenteById, getAgenteByIdentifier, type AgenteRecord } from "@/lib/agentes";
 import { appendChatRequestLog, appendSystemLog } from "@/lib/chat-logs";
+import { buildChatUsageTelemetry } from "@/lib/chat-usage-metrics";
+import {
+  appendOptionalHumanOffer,
+  buildHumanHandoffReply,
+  classifyHumanEscalationNeed,
+  isHumanHandoffIntent,
+  type HumanEscalationDecision,
+} from "@/lib/chat-handoff-policy";
 import { getChatHandoffByChatId, requestHumanHandoff, shouldPauseAssistantForHandoff } from "@/lib/chat-handoffs";
 import { enrichLeadContext, generateSalesReply, shouldRefreshSummary, summarizeConversation } from "@/lib/chat-orchestrator";
 import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetByProjetoAgente, getChatWidgetBySlug } from "@/lib/chat-widgets";
@@ -179,36 +187,6 @@ function getChatWhatsAppChannelId(
   return typeof whatsapp?.channelId === "string" && whatsapp.channelId.trim() ? whatsapp.channelId.trim() : null;
 }
 
-function isHumanHandoffIntent(message: string) {
-  const normalized = message.toLowerCase();
-  return [
-    /\bfalar com (um )?(humano|atendente|vendedor|pessoa)\b/,
-    /\bquero falar com (um )?(humano|atendente|vendedor|pessoa)\b/,
-    /\bme passa (um )?(humano|atendente|vendedor)\b/,
-    /\bchama (um )?(humano|atendente|vendedor)\b/,
-    /\bprefiro falar com (uma )?pessoa\b/,
-    /\btem algu[eé]m ai\b/,
-  ].some((pattern) => pattern.test(normalized));
-}
-
-function buildHumanHandoffReply(channelKind: ChatChannelKind) {
-  return channelKind === "whatsapp"
-    ? "Perfeito. Ja acionei um atendente humano para continuar por aqui. Assim que alguem assumir, seguimos neste mesmo WhatsApp."
-    : "Perfeito. Ja acionei um atendente humano para continuar por aqui assim que possivel.";
-}
-
-function shouldEscalateToHumanByAi(metadata: Record<string, unknown> | null | undefined) {
-  if (!metadata || typeof metadata !== "object") {
-    return false;
-  }
-
-  if (metadata.provider === "agent_scoped_recovery") {
-    return true;
-  }
-
-  return metadata.handoffSuggested === true;
-}
-
 function parseAssetPrice(value: unknown) {
   if (typeof value !== "string") {
     return null;
@@ -231,13 +209,14 @@ function extractRecentMercadoLivreProductsFromAssets(assets: unknown) {
         typeof asset.id === "string" &&
         (asset.id.startsWith("mercado-livre-") || /^MLB\d+$/i.test(asset.id)),
     )
-    .map((asset) => ({
+    .map((asset, index) => ({
       id: typeof asset.id === "string" ? asset.id : null,
       nome: typeof asset.nome === "string" ? asset.nome : null,
       descricao: typeof asset.descricao === "string" ? asset.descricao : null,
       preco: parseAssetPrice(asset.descricao),
       link: typeof asset.targetUrl === "string" ? asset.targetUrl : null,
       imagem: typeof asset.publicUrl === "string" ? asset.publicUrl : null,
+      cardIndex: index,
     }))
     .filter((asset) => asset.nome);
 }
@@ -1131,6 +1110,9 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
       ultimaBusca: message.trim(),
       produtoAtual: null,
       ultimosProdutos: [],
+      snapshotId: null,
+      snapshotCreatedAt: null,
+      snapshotTurnId: null,
     };
   }
 
@@ -1142,11 +1124,56 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     nextContext as Parameters<typeof generateSalesReply>[1],
   );
 
+  const explicitHumanHandoffRequested = isHumanHandoffIntent(message);
+  const aiHumanEscalationDecision = explicitHumanHandoffRequested
+    ? ({
+        decision: "required",
+        confidence: 1,
+        reason: "Cliente pediu atendimento humano explicitamente.",
+        usedLlm: false,
+      } satisfies HumanEscalationDecision)
+    : await classifyHumanEscalationNeed({
+        projetoId: chat.projetoId,
+        channelKind,
+        message,
+        aiReply: String(ai.reply ?? ""),
+        aiMetadata: ai.metadata,
+        context: nextContext as Record<string, unknown>,
+        history,
+      });
+
+  await appendSystemLog({
+    projetoId: chat.projetoId,
+    tipo: "chat_handoff_decision",
+    origem: "chat_service.handoff",
+    descricao: "Decisao de escalada humana avaliada.",
+    payload: {
+      chatId: chat.id,
+      channelKind,
+      explicitHumanHandoffRequested,
+      decision: aiHumanEscalationDecision.decision,
+      confidence: aiHumanEscalationDecision.confidence,
+      reason: aiHumanEscalationDecision.reason,
+      usedLlm: aiHumanEscalationDecision.usedLlm,
+      provider: typeof ai.metadata?.provider === "string" ? ai.metadata.provider : null,
+      model: typeof ai.metadata?.model === "string" ? ai.metadata.model : null,
+    },
+    skipErrorGate: true,
+  });
+
+  if (
+    aiHumanEscalationDecision.decision === "offer" &&
+    !explicitHumanHandoffRequested &&
+    String(ai.reply ?? "").trim()
+  ) {
+    ai.reply = appendOptionalHumanOffer(ai.reply, channelKind);
+  }
+
   const handoffRequested =
     channelKind === "whatsapp" &&
     Boolean(chat.projetoId) &&
     Boolean(getChatWhatsAppChannelId(chat, body)) &&
-    (isHumanHandoffIntent(message) || shouldEscalateToHumanByAi(ai.metadata));
+    aiHumanEscalationDecision.decision === "required";
 
   if (handoffRequested && chat.projetoId) {
     const canalWhatsappId = getChatWhatsAppChannelId(chat, body);
@@ -1162,9 +1189,9 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
                 ? nextContext.lead.nome.trim()
                 : chat.titulo,
             latestUserMessage: message,
-            motivo: isHumanHandoffIntent(message)
+            motivo: explicitHumanHandoffRequested
               ? "Cliente pediu atendimento humano."
-              : "Conversa saiu do alcance do agente e foi escalada para um humano.",
+              : aiHumanEscalationDecision.reason,
           })
       : { ok: false, sent: 0, link: null, failures: [] as Array<{ numero: string; error: string }> };
 
@@ -1173,11 +1200,15 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
       projetoId: chat.projetoId,
       canalWhatsappId: canalWhatsappId ?? null,
       requestedBy: "agent",
-      motivo: isHumanHandoffIntent(message)
+      motivo: explicitHumanHandoffRequested
         ? "Cliente pediu atendimento humano."
-        : "Conversa saiu do alcance do agente e foi escalada para um humano.",
+        : aiHumanEscalationDecision.reason,
       metadata: {
-        trigger: isHumanHandoffIntent(message) ? "message_intent" : "agent_scope_limit",
+        trigger: explicitHumanHandoffRequested ? "message_intent" : "classified_required",
+        escalationDecision: aiHumanEscalationDecision.decision,
+        escalationConfidence: aiHumanEscalationDecision.confidence,
+        escalationUsedLlm: aiHumanEscalationDecision.usedLlm,
+        escalationReason: aiHumanEscalationDecision.reason,
         alertSent: alertResult.sent,
         alertLink: alertResult.link ?? null,
         failures: "failures" in alertResult ? alertResult.failures : [],
@@ -1291,16 +1322,24 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
 
   const recentMercadoLivreProducts = extractRecentMercadoLivreProductsFromAssets(ai.assets);
   if (recentMercadoLivreProducts.length) {
+    const snapshotCreatedAt = new Date().toISOString();
+    const snapshotTurnId = Number(nextContext.memoria?.mensagem_count ?? history.length + 1);
     nextContext.catalogo = {
       ...(isPlainObject(nextContext.catalogo) ? nextContext.catalogo : {}),
       ultimosProdutos: recentMercadoLivreProducts,
+      snapshotId: `${chat.id}:${snapshotTurnId}:${snapshotCreatedAt}`,
+      snapshotCreatedAt,
+      snapshotTurnId,
     };
   }
 
-  if (isPlainObject(ai.metadata) && isPlainObject(ai.metadata.catalogoProdutoAtual)) {
+  const metadataCatalogProduct =
+    isPlainObject(ai.metadata) && "catalogoProdutoAtual" in ai.metadata ? ai.metadata.catalogoProdutoAtual : null;
+
+  if (isPlainObject(metadataCatalogProduct)) {
     nextContext.catalogo = {
       ...(isPlainObject(nextContext.catalogo) ? nextContext.catalogo : {}),
-      produtoAtual: ai.metadata.catalogoProdutoAtual,
+      produtoAtual: metadataCatalogProduct,
     };
   }
 
@@ -1308,6 +1347,22 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     ai.metadata?.provider === "openai"
       ? estimateOpenAICostUsd(ai.usage.inputTokens, ai.usage.outputTokens, typeof ai.metadata?.model === "string" ? ai.metadata.model : null)
       : 0;
+  const usageTelemetry = buildChatUsageTelemetry({
+    channelKind,
+    provider: typeof ai.metadata?.provider === "string" ? ai.metadata.provider : null,
+    model: typeof ai.metadata?.model === "string" ? ai.metadata.model : null,
+    routeStage: typeof ai.metadata?.routeStage === "string" ? ai.metadata.routeStage : null,
+    heuristicStage: typeof ai.metadata?.heuristicStage === "string" ? ai.metadata.heuristicStage : null,
+    domainStage:
+      typeof ai.metadata?.domainStage === "string"
+        ? ai.metadata.domainStage
+        : typeof ai.metadata?.debugRequest?.domainStage === "string"
+          ? ai.metadata.debugRequest.domainStage
+          : null,
+    inputTokens: ai.usage.inputTokens,
+    outputTokens: ai.usage.outputTokens,
+    estimatedCostUsd,
+  });
 
   const leadNameForTitle =
     typeof nextContext.lead?.nome === "string" && nextContext.lead.nome.trim() ? nextContext.lead.nome.trim() : null;
@@ -1332,6 +1387,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     custo: estimatedCostUsd,
     metadata: {
       ...ai.metadata,
+      usageTelemetry,
       assets: ai.assets ?? [],
     },
   });
@@ -1398,7 +1454,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
         tokensInput: ai.usage.inputTokens,
         tokensOutput: ai.usage.outputTokens,
         usuarioId: chat.usuarioId,
-        origem: channelKind,
+        origem: usageTelemetry.billingOrigin,
         referenciaId: assistantMessage.id,
       },
     );
@@ -1422,6 +1478,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
         output: ai.usage.outputTokens,
         total: ai.usage.inputTokens + ai.usage.outputTokens,
       },
+      usageTelemetry,
       estimatedCostUsd,
       requestDebug:
         ai.metadata && typeof ai.metadata === "object" && "debugRequest" in ai.metadata
@@ -1505,3 +1562,4 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     whatsapp,
   };
 }
+

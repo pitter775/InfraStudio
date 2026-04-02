@@ -13,6 +13,7 @@ import {
   Waypoints,
 } from "lucide-react";
 import { getCurrentProjectUser } from "@/lib/auth";
+import type { IaUsageSummary } from "@/lib/ia-usage-types";
 
 type Projeto = {
   id: string;
@@ -45,53 +46,6 @@ type ChatRecord = {
   totalCusto: number;
   projetoId: string | null;
   updatedAt: string;
-};
-
-type TopChat = {
-  chatId: string;
-  titulo: string;
-  leadNome: string | null;
-  projetoNome: string | null;
-  agenteNome: string | null;
-  mensagens: number;
-  tokensInput: number;
-  tokensOutput: number;
-  totalTokens: number;
-  custo: number;
-  updatedAt: string;
-};
-
-type RecentActivity = {
-  id: string;
-  chatId: string;
-  titulo: string;
-  leadNome: string | null;
-  agenteNome: string | null;
-  role: string;
-  totalTokens: number;
-  tokensInput: number;
-  tokensOutput: number;
-  custo: number;
-  createdAt: string;
-};
-
-type IaUsageSummary = {
-  periodLabel: string;
-  startDate: string;
-  endDate: string;
-  costModel: string;
-  costCurrency: "USD";
-  tokensInput: number;
-  tokensOutput: number;
-  totalTokens: number;
-  totalCost: number;
-  hasCostData: boolean;
-  processedMessages: number;
-  activeChats: number;
-  activeAgents: number;
-  topChats: TopChat[];
-  topAgents: Array<{ agenteNome: string; chats: number; totalTokens: number }>;
-  recentActivity: RecentActivity[];
 };
 
 type DashboardState = {
@@ -602,6 +556,7 @@ export default function AdminDashboardPage() {
                   <p className="mt-2 text-[11px] uppercase tracking-[0.16em] text-slate-500">
                     {item.role} | {formatDateTime(item.createdAt)}
                   </p>
+                  <p className="mt-2 text-[11px] text-cyan-200">{item.origemLabel ?? "Sem classificacao"}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-white">{formatCompact(item.totalTokens)}</p>
@@ -616,6 +571,38 @@ export default function AdminDashboardPage() {
               </div>
             )}
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Origens</p>
+            <h2 className="mt-1 text-lg font-bold text-white">Consumo por canal e tipo de conversa</h2>
+          </div>
+          <div className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-right">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Top</p>
+            <p className="text-sm font-bold text-white">{formatInteger(usage?.topOrigins.length ?? 0)} origens</p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+          {(usage?.topOrigins ?? []).slice(0, 4).map((origin) => (
+            <div key={origin.origem} className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
+              <p className="text-sm font-bold text-white">{origin.label}</p>
+              <p className="mt-2 text-xl font-extrabold text-white">{formatCompact(origin.totalTokens)}</p>
+              <p className="mt-1 text-xs text-slate-400">{formatInteger(origin.mensagens)} mensagens</p>
+              <p className="mt-2 text-[11px] text-emerald-300">
+                {origin.custo > 0 ? formatCurrency(origin.custo, usage?.costCurrency ?? "USD") : "sem valor"}
+              </p>
+            </div>
+          ))}
+
+          {!(usage?.topOrigins ?? []).length && (
+            <div className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-5 text-sm text-slate-400 lg:col-span-2 xl:col-span-4">
+              Ainda nao ha consumo classificado por origem suficiente para este quadro.
+            </div>
+          )}
         </div>
       </section>
 

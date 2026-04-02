@@ -1,0 +1,90 @@
+{
+  "listingProducts": [
+    {
+      "id": "MLB1",
+      "nome": "Jogo de Jantar Porcelana",
+      "preco": 2990,
+      "imagem": "https://example.com/jantar.jpg",
+      "link": "https://example.com/jantar",
+      "publicadoEm": "2026-03-29T10:00:00.000Z"
+    },
+    {
+      "id": "MLB2",
+      "nome": "Jogo de Sopeira Completo",
+      "preco": 250,
+      "imagem": "https://example.com/sopeira.jpg",
+      "link": "https://example.com/sopeira",
+      "publicadoEm": "2026-03-31T15:30:00.000Z"
+    },
+    {
+      "id": "MLB3",
+      "nome": "Jogo de Canecas Cha Floral",
+      "preco": 390,
+      "imagem": "https://example.com/canecas.jpg",
+      "link": "https://example.com/canecas",
+      "publicadoEm": "2026-04-01T12:45:00.000Z"
+    }
+  ],
+  "searchProducts": [
+    {
+      "id": "MLB2",
+      "nome": "Jogo de Sopeira Completo",
+      "preco": 250,
+      "imagem": "https://example.com/sopeira.jpg",
+      "link": "https://example.com/sopeira",
+      "publicadoEm": "2026-03-31T15:30:00.000Z"
+    },
+    {
+      "id": "MLB4",
+      "nome": "Sopeira Ceramica Imperial",
+      "preco": 480,
+      "imagem": "https://example.com/sopeira-imperial.jpg",
+      "link": "https://example.com/sopeira-imperial",
+      "publicadoEm": "2026-03-28T08:00:00.000Z"
+    }
+  ],
+  "detailedProducts": [
+    {
+      "id": "MLB2",
+      "nome": "Jogo de Sopeira Completo",
+      "preco": 250,
+      "imagem": "https://example.com/sopeira.jpg",
+      "link": "https://example.com/sopeira",
+      "publicadoEm": "2026-03-31T15:30:00.000Z",
+      "descricao": "Sopeira amarela com 1 sopeira central e 4 tigelas.",
+      "condicao": "novo",
+      "garantia": "90 dias",
+      "estoque": 7,
+      "vendidos": 31,
+      "aceitaMercadoPago": true,
+      "freteGratis": true,
+      "sellerId": "SELLER-001",
+      "pertenceALoja": true,
+      "atributos": [
+        { "nome": "cor", "valor": "amarelo" },
+        { "nome": "material", "valor": "ceramica" }
+      ]
+    },
+    {
+      "id": "MLB4",
+      "nome": "Sopeira Ceramica Imperial",
+      "preco": 480,
+      "imagem": "https://example.com/sopeira-imperial.jpg",
+      "link": "https://example.com/sopeira-imperial",
+      "publicadoEm": "2026-03-28T08:00:00.000Z",
+      "descricao": "Sopeira decorada com acabamento imperial.",
+      "condicao": "novo",
+      "garantia": "30 dias",
+      "estoque": 2,
+      "vendidos": 8,
+      "aceitaMercadoPago": true,
+      "freteGratis": false,
+      "sellerId": "SELLER-001",
+      "pertenceALoja": true,
+      "atributos": [
+        { "nome": "cor", "valor": "branco" },
+        { "nome": "material", "valor": "ceramica" }
+      ]
+    }
+  ]
+}

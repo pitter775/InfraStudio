@@ -1,0 +1,20 @@
+{
+  "apis": [
+    {
+      "apiId": "api-produtos-erro",
+      "nome": "Consulta de produtos internos",
+      "url": "https://sandbox.exemplo.local/api/produtos/{sku}",
+      "descricao": "Simula indisponibilidade temporaria da API de produtos.",
+      "campos": [],
+      "resumo": "",
+      "erro": "timeout na consulta de produtos",
+      "parametros": [
+        {
+          "nome": "sku",
+          "tipo": "string",
+          "obrigatorio": true
+        }
+      ]
+    }
+  ]
+}

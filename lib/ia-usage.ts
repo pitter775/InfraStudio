@@ -1,6 +1,18 @@
 import "server-only";
 
 import { buildCurrentMonthWindow, listBillingUsageByProject } from "@/lib/billing";
+import type {
+  AgentUsageAggregate,
+  ChatUsageAggregate,
+  IaUsageSummary,
+  RecentUsageItem,
+  TokenUsageGroup,
+  TokenUsageOverview,
+  TokenUsageProjectAgent,
+  TokenUsageUserProjectGroup,
+  UsageOriginAggregate,
+} from "@/lib/ia-usage-types";
+import { describeChatUsageOrigin, readChatUsageTelemetry } from "@/lib/chat-usage-metrics";
 import { estimateOpenAICostUsd, getDefaultOpenAIModel } from "@/lib/openai-pricing";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { AppUser } from "@/lib/app-user";
@@ -25,106 +37,17 @@ type MessageUsageRow = {
   tokens_input: number | null;
   tokens_output: number | null;
   custo: number | null;
+  metadata: Record<string, unknown> | null;
   created_at: string | null;
-};
-
-type ChatUsageAggregate = {
-  chatId: string;
-  titulo: string;
-  leadNome: string | null;
-  projetoNome: string | null;
-  agenteNome: string | null;
-  mensagens: number;
-  tokensInput: number;
-  tokensOutput: number;
-  totalTokens: number;
-  custo: number;
-  updatedAt: string;
-};
-
-type AgentUsageAggregate = {
-  agenteNome: string;
-  chats: number;
-  totalTokens: number;
-};
-
-type RecentUsageItem = {
-  id: string;
-  chatId: string;
-  titulo: string;
-  leadNome: string | null;
-  agenteNome: string | null;
-  role: string;
-  totalTokens: number;
-  tokensInput: number;
-  tokensOutput: number;
-  custo: number;
-  createdAt: string;
-};
-
-export type IaUsageSummary = {
-  periodLabel: string;
-  startDate: string;
-  endDate: string;
-  costModel: string;
-  costCurrency: "USD";
-  tokensInput: number;
-  tokensOutput: number;
-  totalTokens: number;
-  totalCost: number;
-  hasCostData: boolean;
-  processedMessages: number;
-  activeChats: number;
-  activeAgents: number;
-  topChats: ChatUsageAggregate[];
-  topAgents: AgentUsageAggregate[];
-  recentActivity: RecentUsageItem[];
 };
 
 type ConsumoRow = {
   usuario_id: string | null;
   projeto_id: string | null;
+  origem: string | null;
   tokens_input: number | null;
   tokens_output: number | null;
   custo_total: number | null;
-};
-
-export type TokenUsageGroup = {
-  id: string;
-  nome: string;
-  tokensInput: number;
-  tokensOutput: number;
-  custoTotal: number;
-};
-
-export type TokenUsageUserProjectGroup = {
-  usuarioId: string;
-  usuarioNome: string;
-  projetoId: string;
-  projetoNome: string;
-  tokensInput: number;
-  tokensOutput: number;
-  custoTotal: number;
-};
-
-export type TokenUsageProjectAgent = {
-  id: string;
-  projetoId: string;
-  nome: string;
-  ativo: boolean;
-};
-
-export type TokenUsageOverview = {
-  isAdmin: boolean;
-  tokensInput: number;
-  tokensOutput: number;
-  custoTotal: number;
-  totalUsuarios: number;
-  totalProjetos: number;
-  porUsuario: TokenUsageGroup[];
-  porProjeto: TokenUsageGroup[];
-  porUsuarioProjeto: TokenUsageUserProjectGroup[];
-  agentesPorProjeto: TokenUsageProjectAgent[];
 };
 
 type IaUsageRange = {
@@ -209,6 +132,7 @@ export async function getTokenUsageOverview(user: AppUser): Promise<TokenUsageOv
   const admin = isGlobalAdminUser(user);
   const supabase = getSupabaseAdminClient();
   const usageRows = await listBillingUsageByProject();
+  const { data: consumosData } = await supabase.from("consumos").select("projeto_id, usuario_id, origem, tokens_input, tokens_output, custo_total");
   const projetoIds = usageRows.map((item) => item.projetoId);
   const agentesResponse = projetoIds.length
     ? await supabase.from("agentes").select("id, projeto_id, nome, ativo").in("projeto_id", projetoIds)
@@ -225,6 +149,25 @@ export async function getTokenUsageOverview(user: AppUser): Promise<TokenUsageOv
     .sort((left, right) => right.custoTotal - left.custoTotal || right.tokensInput + right.tokensOutput - (left.tokensInput + left.tokensOutput));
 
   const totals = sumTokenUsage(porProjeto);
+  const porOrigemMap = new Map<string, TokenUsageGroup>();
+  for (const row of (consumosData ?? []) as ConsumoRow[]) {
+    const origin = row.origem?.trim() || "sem_classificacao";
+    const current = porOrigemMap.get(origin) ?? {
+      id: origin,
+      nome: describeChatUsageOrigin(origin),
+      tokensInput: 0,
+      tokensOutput: 0,
+      custoTotal: 0,
+    };
+
+    current.tokensInput += row.tokens_input ?? 0;
+    current.tokensOutput += row.tokens_output ?? 0;
+    current.custoTotal += Number(row.custo_total ?? 0);
+    porOrigemMap.set(origin, current);
+  }
+  const porOrigem = [...porOrigemMap.values()].sort(
+    (left, right) => right.custoTotal - left.custoTotal || right.tokensInput + right.tokensOutput - (left.tokensInput + left.tokensOutput),
+  );
   const agentesPorProjeto = ((agentesResponse.data ?? []) as Array<{ id: string; projeto_id: string | null; nome: string | null; ativo: boolean | null }>)
     .filter((item) => item.projeto_id)
     .map((item) => ({
@@ -244,12 +187,20 @@ export async function getTokenUsageOverview(user: AppUser): Promise<TokenUsageOv
     totalProjetos: porProjeto.length,
     porUsuario: [],
     porProjeto,
+    porOrigem,
     porUsuarioProjeto: [],
     agentesPorProjeto,
   };
 }
 
 export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsageRange): Promise<IaUsageSummary> {
+  return getIaUsageSummaryForProjects(projetoId ? [projetoId] : null, range);
+}
+
+export async function getIaUsageSummaryForProjects(
+  projetoIds?: string[] | null,
+  range?: IaUsageRange,
+): Promise<IaUsageSummary> {
   const supabase = getSupabaseAdminClient();
   const { startIso, endIso, startDate, endDate, label } = resolveRange(range);
 
@@ -258,8 +209,8 @@ export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsa
     .select("id, titulo, projeto_id, total_tokens, total_custo, created_at, updated_at, contexto")
     .order("updated_at", { ascending: false });
 
-  if (projetoId) {
-    chatsQuery = chatsQuery.eq("projeto_id", projetoId);
+  if (projetoIds?.length) {
+    chatsQuery = chatsQuery.in("projeto_id", projetoIds);
   }
 
   const { data: chatsData, error: chatsError } = await chatsQuery;
@@ -282,6 +233,7 @@ export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsa
       activeAgents: 0,
       topChats: [],
       topAgents: [],
+      topOrigins: [],
       recentActivity: [],
     };
   }
@@ -307,13 +259,14 @@ export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsa
       activeAgents: 0,
       topChats: [],
       topAgents: [],
+      topOrigins: [],
       recentActivity: [],
     };
   }
 
   const { data: messagesData, error: messagesError } = await supabase
     .from("mensagens")
-    .select("id, chat_id, role, conteudo, tokens_input, tokens_output, custo, created_at")
+    .select("id, chat_id, role, conteudo, tokens_input, tokens_output, custo, metadata, created_at")
     .in("chat_id", chatIds)
     .gte("created_at", startIso)
     .lt("created_at", endIso)
@@ -337,6 +290,7 @@ export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsa
       activeAgents: 0,
       topChats: [],
       topAgents: [],
+      topOrigins: [],
       recentActivity: [],
     };
   }
@@ -395,9 +349,32 @@ export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsa
   }
 
   const topAgents = [...perAgent.values()].sort((a, b) => b.totalTokens - a.totalTokens).slice(0, 5);
+  const perOrigin = new Map<string, UsageOriginAggregate>();
+  for (const message of processedMessages) {
+    const usageTelemetry = readChatUsageTelemetry(message.metadata);
+    const origin = usageTelemetry?.billingOrigin?.trim();
+    if (!origin) {
+      continue;
+    }
+
+    const aggregate = perOrigin.get(origin) ?? {
+      origem: origin,
+      label: describeChatUsageOrigin(origin),
+      mensagens: 0,
+      totalTokens: 0,
+      custo: 0,
+    };
+
+    aggregate.mensagens += 1;
+    aggregate.totalTokens += (message.tokens_input ?? 0) + (message.tokens_output ?? 0);
+    aggregate.custo += resolveMessageCost(message);
+    perOrigin.set(origin, aggregate);
+  }
+  const topOrigins = [...perOrigin.values()].sort((a, b) => b.totalTokens - a.totalTokens).slice(0, 8);
 
   const recentActivity = processedMessages.slice(0, 8).map((message) => {
     const chat = chatMap.get(message.chat_id!);
+    const usageTelemetry = readChatUsageTelemetry(message.metadata);
     return {
       id: message.id,
       chatId: message.chat_id!,
@@ -409,6 +386,11 @@ export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsa
       tokensInput: message.tokens_input ?? 0,
       tokensOutput: message.tokens_output ?? 0,
       custo: resolveMessageCost(message),
+      origem: usageTelemetry?.billingOrigin ?? null,
+      origemLabel: usageTelemetry?.billingOrigin ? describeChatUsageOrigin(usageTelemetry.billingOrigin) : null,
+      provider: usageTelemetry?.provider ?? null,
+      routeStage: usageTelemetry?.routeStage ?? null,
+      domainStage: usageTelemetry?.domainStage ?? null,
       createdAt: message.created_at ?? new Date().toISOString(),
     };
   });
@@ -429,6 +411,7 @@ export async function getIaUsageSummary(projetoId?: string | null, range?: IaUsa
     activeAgents: perAgent.size,
     topChats,
     topAgents,
+    topOrigins,
     recentActivity,
   };
 }
