@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { Cable, ExternalLink, Pencil, Plus, TestTube2, Trash2 } from "lucide-react";
 
 type ConnectorConfig = {
@@ -52,6 +53,43 @@ export function ProjectMercadoSection({
   onEditConnector,
   onDeleteConnector,
 }: ProjectMercadoSectionProps) {
+  const [tutorialExpanded, setTutorialExpanded] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const appBaseUrl = useMemo(() => {
+    if (typeof window !== "undefined" && window.location?.origin) {
+      return window.location.origin;
+    }
+
+    return process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://infrastudio.vercel.app";
+  }, []);
+  const mercadoLivreUrls = useMemo(
+    () => ({
+      callback: `${appBaseUrl}/api/admin/conectores/mercado-livre/callback`,
+      webhook: `${appBaseUrl}/api/mercado-livre/webhook`,
+    }),
+    [appBaseUrl],
+  );
+
+  useEffect(() => {
+    if (!copiedKey) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => setCopiedKey(null), 1800);
+    return () => window.clearTimeout(timer);
+  }, [copiedKey]);
+
+  const handleCopyUrl = async (key: string, value: string) => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        setCopiedKey(key);
+      }
+    } catch {
+      setCopiedKey(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <section>
@@ -166,6 +204,55 @@ export function ProjectMercadoSection({
               <p className="mt-2">3. Liberar `Usuarios`, `Publicacao e sincronizacao` e `Metricas do negocio`.</p>
               <p className="mt-2">4. Copiar `APP ID` e `CLIENT SECRET` para o cadastro da loja.</p>
               <p className="mt-2">5. Salvar a integracao e depois concluir a autorizacao OAuth.</p>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4 text-sm text-slate-300">
+              <button
+                type="button"
+                onClick={() => setTutorialExpanded((current) => !current)}
+                className="flex w-full items-center justify-between gap-3 text-left"
+              >
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tutorial</p>
+                  <p className="mt-2 text-sm font-semibold text-white">URLs usadas no app do Mercado Livre</p>
+                  <p className="mt-1 text-xs text-slate-400">Abra para copiar a callback e o webhook usados nesta integracao.</p>
+                </div>
+                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
+                  {tutorialExpanded ? "Ocultar" : "Mostrar"}
+                </span>
+              </button>
+
+              {tutorialExpanded ? (
+                <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+                  <p className="text-xs text-amber-100/90">
+                    No app do Mercado Livre, habilite todas as permissoes solicitadas e use as URLs abaixo exatamente como estao.
+                  </p>
+
+                  <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3.5 py-3">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Callback OAuth</p>
+                    <button
+                      type="button"
+                      title={copiedKey === "callback" ? "URL copiada" : "Clique para copiar"}
+                      onClick={() => void handleCopyUrl("callback", mercadoLivreUrls.callback)}
+                      className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left font-mono text-[11px] text-cyan-100 transition-colors hover:border-cyan-300/25 hover:bg-cyan-500/10"
+                    >
+                      {mercadoLivreUrls.callback}
+                    </button>
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3.5 py-3">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Webhook Notifications</p>
+                    <button
+                      type="button"
+                      title={copiedKey === "webhook" ? "URL copiada" : "Clique para copiar"}
+                      onClick={() => void handleCopyUrl("webhook", mercadoLivreUrls.webhook)}
+                      className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left font-mono text-[11px] text-cyan-100 transition-colors hover:border-cyan-300/25 hover:bg-cyan-500/10"
+                    >
+                      {mercadoLivreUrls.webhook}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-4 rounded-xl border border-emerald-500/18 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-50/90">
