@@ -511,9 +511,9 @@ export default function AdminAtendimentoPage() {
   }, [chatChannelFilter, chats]);
   const chatChannelTabs = useMemo(
     () => [
-      { id: "all" as const, label: "Todos", total: chats.length },
-      { id: "whatsapp" as const, label: "WhatsApp", total: chats.filter((chat) => chat.canal === "whatsapp").length },
-      { id: "site" as const, label: "Site", total: chats.filter((chat) => chat.canal !== "whatsapp").length },
+      { id: "all" as const, label: "Todos", total: chats.length, icon: SplitSquareVertical },
+      { id: "whatsapp" as const, label: "WhatsApp", total: chats.filter((chat) => chat.canal === "whatsapp").length, icon: MessageCircleMore },
+      { id: "site" as const, label: "Site", total: chats.filter((chat) => chat.canal !== "whatsapp").length, icon: BriefcaseBusiness },
     ],
     [chats],
   );
@@ -1231,18 +1231,21 @@ export default function AdminAtendimentoPage() {
             <div className="mt-3 flex items-center gap-2">
               {chatChannelTabs.map((tab) => {
                 const active = chatChannelFilter === tab.id;
+                const TabIcon = tab.icon;
                 return (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => setChatChannelFilter(tab.id)}
+                    title={tab.label}
+                    aria-label={tab.label}
                     className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors ${
                       active
                         ? "border-cyan-400/30 bg-cyan-500/10 text-cyan-100"
                         : "border-white/10 bg-white/5 text-slate-300 hover:border-white/20 hover:bg-white/10 hover:text-white"
                     }`}
                   >
-                    <span>{tab.label}</span>
+                    <TabIcon size={12} />
                     <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${active ? "bg-cyan-400/15 text-cyan-50" : "bg-white/5 text-slate-400"}`}>
                       {tab.total}
                     </span>
@@ -1450,7 +1453,7 @@ export default function AdminAtendimentoPage() {
                               </div>
                             ) : null}
                             {message.metadata?.assets?.length ? (
-                              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                                 {message.metadata.assets.map((asset, index) => (
                                   <a
                                     key={`${message.id}-asset-${index}`}
@@ -1460,7 +1463,7 @@ export default function AdminAtendimentoPage() {
                                     className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-slate-200 transition-colors hover:bg-white/10"
                                   >
                                     {asset.categoria === "image" && asset.publicUrl ? (
-                                      <img src={asset.publicUrl} alt={asset.nome || "Imagem"} className="mb-2 h-28 w-full rounded-lg object-cover" />
+                                      <img src={asset.publicUrl} alt={asset.nome || "Imagem"} className="mb-2 h-20 w-full rounded-lg object-cover" />
                                     ) : null}
                                     <div className="flex items-center gap-2">
                                       <ExternalLink size={12} />
@@ -1559,6 +1562,25 @@ export default function AdminAtendimentoPage() {
                     >
                       <SmilePlus size={16} />
                     </button>
+                    <div
+                      className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border ${
+                        selectedChat && !isChatUnderHumanHandoff(selectedChat)
+                          ? "border-emerald-400/30 bg-emerald-500/12 text-emerald-200"
+                          : "border-white/10 bg-white/5 text-slate-500"
+                      }`}
+                      title={
+                        selectedChat && !isChatUnderHumanHandoff(selectedChat)
+                          ? "IA atendendo automaticamente"
+                          : "IA pausada neste contato"
+                      }
+                      aria-label={
+                        selectedChat && !isChatUnderHumanHandoff(selectedChat)
+                          ? "IA atendendo automaticamente"
+                          : "IA pausada neste contato"
+                      }
+                    >
+                      <Sparkles size={16} />
+                    </div>
                   </div>
                   <textarea
                     value={replyText}
