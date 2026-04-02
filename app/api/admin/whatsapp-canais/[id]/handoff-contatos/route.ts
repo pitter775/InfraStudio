@@ -7,6 +7,7 @@ import {
   createWhatsAppHandoffContact,
   deleteWhatsAppHandoffContact,
   listWhatsAppHandoffContacts,
+  WhatsAppHandoffContactError,
   updateWhatsAppHandoffContact,
 } from "@/lib/whatsapp-handoff-contatos";
 
@@ -115,18 +116,33 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Nome e numero sao obrigatorios." }, { status: 400 });
   }
 
-  const contact = await createWhatsAppHandoffContact({
-    projetoId: channel.projetoId,
-    canalWhatsappId: channel.id,
-    nome: body.nome,
-    numero: body.numero,
-    papel: body.papel ?? null,
-    observacoes: body.observacoes ?? null,
-    ativo: body.ativo,
-    receberAlertas: body.receberAlertas,
-  });
+  const normalizedChannelPhone = String(channel.numero || "").replace(/\D/g, "");
+  const normalizedContactPhone = String(body.numero || "").replace(/\D/g, "");
 
-  if (!contact) {
+  if (normalizedChannelPhone && normalizedContactPhone && normalizedChannelPhone === normalizedContactPhone) {
+    return NextResponse.json(
+      {
+        error:
+          "Use um numero diferente do canal principal. Se o mesmo numero receber o alerta, o WhatsApp pode gerar auto-mensagem no proprio canal.",
+      },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const contact = await createWhatsAppHandoffContact({
+      projetoId: channel.projetoId,
+      canalWhatsappId: channel.id,
+      nome: body.nome,
+      numero: body.numero,
+      papel: body.papel ?? null,
+      observacoes: body.observacoes ?? null,
+      ativo: body.ativo,
+      receberAlertas: body.receberAlertas,
+    });
+
+    return NextResponse.json({ contact }, { status: 201 });
+  } catch (error) {
     await appendSystemLog({
       projetoId: channel.projetoId,
       tipo: "whatsapp_handoff_cfg",
@@ -137,10 +153,15 @@ export async function POST(request: Request, context: RouteContext) {
         action: "create",
         nome: body.nome,
         numero: body.numero,
+        error: error instanceof Error ? error.message : null,
       },
     });
-    return NextResponse.json({ error: "Nao foi possivel criar o contato." }, { status: 500 });
+    const message =
+      error instanceof WhatsAppHandoffContactError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : "Nao foi possivel criar o contato.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  return NextResponse.json({ contact }, { status: 201 });
 }
