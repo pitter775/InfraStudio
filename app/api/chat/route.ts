@@ -32,6 +32,7 @@ export async function POST(request: Request) {
       {
         chatId: result.chatId,
         reply: result.reply,
+        followUpReply: result.followUpReply ?? "",
         assets: result.assets,
         whatsapp: result.whatsapp,
       },

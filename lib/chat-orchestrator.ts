@@ -253,10 +253,12 @@ function buildChannelReplyInstruction(context?: ConversationContext) {
     "Canal atual: WhatsApp.",
     "Responda de forma mais humana e natural, como conversa comercial real no WhatsApp.",
     "Prefira respostas curtas, normalmente entre 2 e 4 linhas.",
+    "Quando houver mais de um ponto, organize em lista curta e escaneavel.",
+    "No WhatsApp, use *negrito* com um asterisco para destaques importantes, nao markdown com **dois** asteriscos.",
+    "Se ajudar a leitura, use no maximo 1 icone simples por mensagem, como ✓, -> ou •.",
     "Faca uma pergunta por vez.",
     "Nao repita a resposta anterior com outras palavras.",
     "Quando o cliente mandar algo curto como 'agenda', 'site', 'sim' ou 'quero', trate isso como continuacao do contexto.",
-    "Pode usar no maximo 1 icone simples quando ajudar a leitura, sem exagero.",
     "Evite blocos longos, listas extensas e tom robotico.",
   ].join("\n");
 }
@@ -1929,6 +1931,7 @@ function buildMercadoLivreDetailPromptContext(produto: ProdutoDetalhadoMercadoLi
     typeof produto.estoque === "number" ? `- estoque: ${produto.estoque}` : "",
     typeof produto.vendidos === "number" ? `- vendidos: ${produto.vendidos}` : "",
     typeof produto.freteGratis === "boolean" ? `- frete_gratis: ${produto.freteGratis ? "sim" : "nao"}` : "",
+    typeof produto.pertenceALoja === "boolean" ? `- pertence_a_loja: ${produto.pertenceALoja ? "sim" : "nao"}` : "",
     produto.descricao ? `- descricao: ${produto.descricao}` : "",
     ...atributos,
   ]
@@ -1943,12 +1946,19 @@ function buildMercadoLivreSalesReply(
   cta?: string | null,
 ) {
   const normalized = normalizeText(latestUserMessage);
+  const storeOwnershipNote =
+    produto.pertenceALoja === false
+      ? isWhatsAppChannel(context)
+        ? "Vi que esse link e de um anuncio fora da loja conectada aqui."
+        : "Vi que esse link e de um anuncio fora da loja conectada aqui."
+      : null;
 
   if (/\bgarantia\b/.test(normalized)) {
     const garantia = produto.garantia?.trim() || "Nao encontrei garantia informada no anuncio";
-    return isWhatsAppChannel(context)
+    const baseReply = isWhatsAppChannel(context)
       ? `${produto.nome}: ${garantia}.\n\nSe quiser, eu tambem posso te dizer condicao, estoque e frete para voce decidir melhor.`
       : `**${produto.nome}**: ${garantia}.\n\nSe quiser, eu tambem posso te dizer **condicao, estoque e frete** para voce decidir melhor.`;
+    return [storeOwnershipNote, baseReply].filter(Boolean).join("\n\n");
   }
 
   if (/\bfrete\b|\bentrega\b/.test(normalized)) {
@@ -1958,7 +1968,7 @@ function buildMercadoLivreSalesReply(
           ? "O anuncio indica frete gratis."
           : "O anuncio nao indica frete gratis."
         : "Nao encontrei frete detalhado no anuncio.";
-    return [frete, cta?.trim() || "Se quiser, eu sigo com voce e vejo se vale a pena fechar este item ou comparar com outro parecido."].join("\n\n");
+    return [storeOwnershipNote, frete, cta?.trim() || "Se quiser, eu sigo com voce e vejo se vale a pena fechar este item ou comparar com outro parecido."].filter(Boolean).join("\n\n");
   }
 
   if (/\bestoque\b|\bdisponivel\b/.test(normalized)) {
@@ -1966,7 +1976,7 @@ function buildMercadoLivreSalesReply(
       typeof produto.estoque === "number"
         ? `No anuncio aparecem ${produto.estoque} unidade(s) disponivel(is).`
         : "Nao encontrei estoque detalhado no anuncio.";
-    return [estoque, cta?.trim() || "Se quiser, eu sigo com voce e te ajudo a decidir se vale fechar este item agora."].join("\n\n");
+    return [storeOwnershipNote, estoque, cta?.trim() || "Se quiser, eu sigo com voce e te ajudo a decidir se vale fechar este item agora."].filter(Boolean).join("\n\n");
   }
 
   if (/\bmaterial\b|\bmedida\b|\bmedidas\b|\btamanho\b|\bcapacidade\b|\bcor\b/.test(normalized)) {
@@ -1975,7 +1985,15 @@ function buildMercadoLivreSalesReply(
     );
     if (matchingAttributes.length) {
       const summary = matchingAttributes.slice(0, 3).map((item) => `${item.nome}: ${item.valor}`).join(" | ");
-      return [`Encontrei estes detalhes no anuncio: ${summary}.`, cta?.trim() || "Se quiser, eu tambem posso te falar de garantia, estoque e frete antes de voce decidir."].join("\n\n");
+      return [storeOwnershipNote, `Encontrei estes detalhes no anuncio: ${summary}.`, cta?.trim() || "Se quiser, eu tambem posso te falar de garantia, estoque e frete antes de voce decidir."].filter(Boolean).join("\n\n");
+    }
+
+    if (produto.descricao) {
+      return [
+        storeOwnershipNote,
+        `Na descricao do anuncio encontrei isto que ajuda na sua duvida: ${produto.descricao}`,
+        cta?.trim() || "Se quiser, eu tambem posso te resumir garantia, estoque e frete deste item.",
+      ].filter(Boolean).join("\n\n");
     }
   }
 
@@ -2009,7 +2027,7 @@ function buildMercadoLivreSalesReply(
     ? cta.trim()
     : "Se fizer sentido para voce, me diga se quer seguir com este item ou comparar com outra opcao parecida.";
 
-  return [leadIn, sellingPoint, close].filter(Boolean).join("\n\n");
+  return [storeOwnershipNote, leadIn, sellingPoint, close].filter(Boolean).join("\n\n");
 }
 
 function getCatalogProductRefForDetails(product: CatalogProductReference | null | undefined) {
@@ -2416,8 +2434,12 @@ export async function generateSalesReply(history: ConversationMessage[], context
       : null;
   const selectedCatalogProduct =
     referencedCatalogProducts.length === 1 ? referencedCatalogProducts[0] : currentCatalogProduct;
+  const linkedProductDetails =
+    !productSearchRequested && agent?.id
+      ? await obterDetalhesProdutoMercadoLivrePorAgente(agent.id, latestUserMessage)
+      : null;
   const shouldPitchSelectedProduct =
-    Boolean(selectedCatalogProduct) &&
+    Boolean(selectedCatalogProduct || linkedProductDetails) &&
     (isMercadoLivrePurchaseIntent(latestUserMessage) || isMercadoLivreDetailIntent(latestUserMessage));
   const directSingleProduct =
     mercadoLivreProducts.length === 1
@@ -2445,9 +2467,10 @@ export async function generateSalesReply(history: ConversationMessage[], context
       ? agent.configuracoes.cta_whatsapp.trim()
       : null;
   const selectedProductSalesReply =
-    selectedCatalogProductDetails && shouldPitchSelectedProduct
-      ? buildMercadoLivreSalesReply(selectedCatalogProductDetails, latestUserMessage, context, lojaCta)
+    (selectedCatalogProductDetails ?? linkedProductDetails) && shouldPitchSelectedProduct
+      ? buildMercadoLivreSalesReply(selectedCatalogProductDetails ?? linkedProductDetails!, latestUserMessage, context, lojaCta)
       : null;
+  const salesFocusProduct = selectedCatalogProductDetails ?? linkedProductDetails;
   const ambiguousCatalogReferenceReply =
     hasMercadoLivreConnector &&
     !leadNameReplyDetected &&
@@ -2459,7 +2482,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     ? buildMercadoLivreListingReply(mercadoLivreListingProducts, context)
     : null;
   const mercadoLivrePromptContext = buildMercadoLivrePromptContext(mercadoLivreProducts);
-  const mercadoLivreDetailPromptContext = buildMercadoLivreDetailPromptContext(selectedCatalogProductDetails ?? directSingleProductDetails);
+  const mercadoLivreDetailPromptContext = buildMercadoLivreDetailPromptContext(selectedCatalogProductDetails ?? linkedProductDetails ?? directSingleProductDetails);
   const directMercadoLivreReply = directSingleProductDetails
     ? buildMercadoLivreSingleResultReply(directSingleProductDetails, context, lojaCta)
     : buildMercadoLivreReply(mercadoLivreProducts, context);
@@ -2504,7 +2527,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     };
   }
 
-  if (selectedProductSalesReply && selectedCatalogProductDetails) {
+  if (selectedProductSalesReply && salesFocusProduct) {
     await appendRuntimeErrorLog({
       source: "chat_orchestrator.trace",
       message: "Resposta comercial de produto especifico do Mercado Livre acionada.",
@@ -2513,12 +2536,12 @@ export async function generateSalesReply(history: ConversationMessage[], context
         ...traceBase.payload,
         ...resourceTrace,
         mode: "mercado_livre_product_sales",
-        productId: selectedCatalogProductDetails.id ?? null,
+        productId: salesFocusProduct.id ?? null,
       },
     });
     return {
       reply: formatHeuristicReply(selectedProductSalesReply, context),
-      assets: buildMercadoLivreProductAssets([selectedCatalogProductDetails]),
+      assets: buildMercadoLivreProductAssets([salesFocusProduct]),
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
         provider: "heuristic",
@@ -2526,12 +2549,12 @@ export async function generateSalesReply(history: ConversationMessage[], context
         agenteId: agent?.id ?? null,
         agenteNome: agent?.nome ?? null,
         catalogoProdutoAtual: {
-          id: selectedCatalogProductDetails.id ?? null,
-          nome: selectedCatalogProductDetails.nome,
-          descricao: `R$ ${selectedCatalogProductDetails.preco.toLocaleString("pt-BR")}`,
-          preco: selectedCatalogProductDetails.preco,
-          link: selectedCatalogProductDetails.link,
-          imagem: selectedCatalogProductDetails.imagem,
+          id: salesFocusProduct.id ?? null,
+          nome: salesFocusProduct.nome,
+          descricao: `R$ ${salesFocusProduct.preco.toLocaleString("pt-BR")}`,
+          preco: salesFocusProduct.preco,
+          link: salesFocusProduct.link,
+          imagem: salesFocusProduct.imagem,
         },
       },
     };

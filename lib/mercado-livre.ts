@@ -26,6 +26,8 @@ export type ProdutoDetalhadoMercadoLivre = ProdutoPadronizado & {
   vendidos?: number | null;
   aceitaMercadoPago?: boolean | null;
   freteGratis?: boolean | null;
+  sellerId?: string | null;
+  pertenceALoja?: boolean | null;
   atributos?: Array<{ nome: string; valor: string }>;
 };
 
@@ -705,6 +707,7 @@ type MercadoLivreItemDetailsResponse = Array<{
     permalink?: string;
     catalog_product_id?: string;
     status?: string;
+    seller_id?: string | number;
     date_created?: string;
     start_time?: string;
     last_updated?: string;
@@ -726,6 +729,7 @@ type MercadoLivreItemResponse = {
   permalink?: string;
   catalog_product_id?: string;
   status?: string;
+  seller_id?: string | number;
   date_created?: string;
   start_time?: string;
   last_updated?: string;
@@ -753,11 +757,23 @@ function normalizeMercadoLivreAttributes(item: MercadoLivreItemResponse) {
     .filter(Boolean) as Array<{ nome: string; valor: string }>;
 }
 
-function normalizeProdutoDetalhado(item: MercadoLivreItemResponse, descricao?: string | null): ProdutoDetalhadoMercadoLivre | null {
+function normalizeProdutoDetalhado(
+  item: MercadoLivreItemResponse,
+  descricao?: string | null,
+  sellerIdLoja?: string | null,
+): ProdutoDetalhadoMercadoLivre | null {
   const base = normalizeProduto(item);
   if (!base) {
     return null;
   }
+
+  const sellerIdItem =
+    typeof item.seller_id === "number"
+      ? String(item.seller_id)
+      : typeof item.seller_id === "string" && item.seller_id.trim()
+        ? item.seller_id.trim()
+        : null;
+  const normalizedStoreSellerId = typeof sellerIdLoja === "string" && sellerIdLoja.trim() ? sellerIdLoja.trim() : null;
 
   return {
     ...base,
@@ -769,6 +785,8 @@ function normalizeProdutoDetalhado(item: MercadoLivreItemResponse, descricao?: s
     vendidos: typeof item.sold_quantity === "number" ? item.sold_quantity : null,
     aceitaMercadoPago: typeof item.accepts_mercadopago === "boolean" ? item.accepts_mercadopago : null,
     freteGratis: typeof item.shipping?.free_shipping === "boolean" ? item.shipping.free_shipping : null,
+    sellerId: sellerIdItem,
+    pertenceALoja: normalizedStoreSellerId && sellerIdItem ? sellerIdItem === normalizedStoreSellerId : null,
     atributos: normalizeMercadoLivreAttributes(item).slice(0, 8),
   };
 }
@@ -1014,15 +1032,36 @@ export async function obterDetalhesProdutoMercadoLivrePorAgente(agenteId: string
   }
 
   const endpointBase = connector.endpointBase || "https://api.mercadolibre.com";
+  const config = getMercadoLivreConnectorConfig(connector);
+  const sellerIdLoja = config?.seller_id?.replace(/\D/g, "").trim() || null;
   const accessToken = await ensureMercadoLivreAccessToken(connector);
 
   try {
     const [item, descricao] = await Promise.all([
       fetchMercadoLivreItemDetails({ endpointBase, itemId, accessToken }),
-      fetchMercadoLivreItemDescription({ endpointBase, itemId, accessToken, maxLength: 700 }),
+      fetchMercadoLivreItemDescription({ endpointBase, itemId, accessToken, maxLength: 2500 }),
     ]);
+    const produto = item ? normalizeProdutoDetalhado(item, descricao, sellerIdLoja) : null;
 
-    return item ? normalizeProdutoDetalhado(item, descricao) : null;
+    await appendSystemLog({
+      tipo: "mercado_livre_item_details_debug",
+      origem: "mercado_livre",
+      descricao: "Diagnostico de detalhes do item Mercado Livre.",
+      skipErrorGate: true,
+      payload: {
+        agenteId,
+        itemId,
+        connectorId: connector.id,
+        sellerIdLoja,
+        sellerIdItem: produto?.sellerId ?? null,
+        pertenceALoja: produto?.pertenceALoja ?? null,
+        descricaoLength: produto?.descricao?.length ?? 0,
+        hasDescricao: Boolean(produto?.descricao),
+        link: produto?.link ?? null,
+      },
+    });
+
+    return produto;
   } catch (error) {
     await appendSystemLog({
       tipo: "mercado_livre_item_details_error",

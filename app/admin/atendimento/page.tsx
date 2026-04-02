@@ -584,9 +584,11 @@ export default function AdminAtendimentoPage() {
     }
   };
 
-  const loadChats = async (projetoId: string) => {
-    setLoadingChats(true);
-    setFeedback(null);
+  const loadChats = async (projetoId: string, options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setLoadingChats(true);
+      setFeedback(null);
+    }
 
     try {
       const response = await fetch(`/api/admin/chats?projetoId=${encodeURIComponent(projetoId)}`, { cache: "no-store" });
@@ -602,7 +604,9 @@ export default function AdminAtendimentoPage() {
         setFeedback(payload.error ?? "Nao foi possivel carregar as conversas.");
         setChats([]);
         setSelectedChatId(null);
-        setLoadingChats(false);
+        if (!options?.silent) {
+          setLoadingChats(false);
+        }
         return;
       }
 
@@ -614,18 +618,24 @@ export default function AdminAtendimentoPage() {
         }
         return nextChats[0]?.id ?? null;
       });
-      setLoadingChats(false);
+      if (!options?.silent) {
+        setLoadingChats(false);
+      }
     } catch {
       setFeedback("Nao foi possivel carregar as conversas.");
       setChats([]);
       setSelectedChatId(null);
-      setLoadingChats(false);
+      if (!options?.silent) {
+        setLoadingChats(false);
+      }
     }
   };
 
-  const loadConversation = async (chatId: string) => {
-    setLoadingConversation(true);
-    setFeedback(null);
+  const loadConversation = async (chatId: string, options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setLoadingConversation(true);
+      setFeedback(null);
+    }
 
     try {
       const response = await fetch(`/api/admin/chats/${chatId}`, { cache: "no-store" });
@@ -637,7 +647,9 @@ export default function AdminAtendimentoPage() {
 
       if (!response.ok) {
         setFeedback(payload.error ?? "Nao foi possivel carregar a conversa.");
-        setLoadingConversation(false);
+        if (!options?.silent) {
+          setLoadingConversation(false);
+        }
         return;
       }
 
@@ -650,10 +662,14 @@ export default function AdminAtendimentoPage() {
           current.map((chat) => (chat.id === chatId ? { ...chat, handoff: payload.handoff ?? null } : chat)),
         );
       }
-      setLoadingConversation(false);
+      if (!options?.silent) {
+        setLoadingConversation(false);
+      }
     } catch {
       setFeedback("Nao foi possivel carregar a conversa.");
-      setLoadingConversation(false);
+      if (!options?.silent) {
+        setLoadingConversation(false);
+      }
     }
   };
 
@@ -755,8 +771,11 @@ export default function AdminAtendimentoPage() {
     }
 
     const intervalId = window.setInterval(() => {
-      void loadChats(activeProjectId);
-    }, 10000);
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+      void loadChats(activeProjectId, { silent: true });
+    }, 30000);
 
     return () => window.clearInterval(intervalId);
   }, [activeProjectId]);
@@ -767,8 +786,11 @@ export default function AdminAtendimentoPage() {
     }
 
     const intervalId = window.setInterval(() => {
-      void loadConversation(selectedChatId);
-    }, 6000);
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+      void loadConversation(selectedChatId, { silent: true });
+    }, 15000);
 
     return () => window.clearInterval(intervalId);
   }, [selectedChatId]);

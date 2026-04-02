@@ -153,6 +153,7 @@ function buildSilentChatResult(chatId?: string | null) {
   return {
     chatId: chatId ?? "",
     reply: "",
+    followUpReply: "",
     assets: [],
     whatsapp: null,
   };
@@ -231,7 +232,7 @@ function extractRecentMercadoLivreProductsFromAssets(assets: unknown) {
       link: typeof asset.targetUrl === "string" ? asset.targetUrl : null,
       imagem: typeof asset.publicUrl === "string" ? asset.publicUrl : null,
     }))
-    .filter((asset) => asset.nome && asset.imagem);
+    .filter((asset) => asset.nome);
 }
 
 function isCatalogSearchMessage(message: string) {
@@ -240,10 +241,88 @@ function isCatalogSearchMessage(message: string) {
   return catalogSignals.some((signal) => latestNormalizedMessage.includes(signal)) || /^\s*e\s+\S+/i.test(message);
 }
 
+function isCatalogLoadMoreMessage(message: string) {
+  const normalized = String(message || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) {
+    return false;
+  }
+
+  if (["mais", "outras", "outros", "mais opcoes", "outras opcoes", "mais modelos", "outros modelos"].includes(normalized)) {
+    return true;
+  }
+
+  return [
+    /\btem mais\b/,
+    /\bquero mais\b/,
+    /\bme mostra mais\b/,
+    /\bmostra mais\b/,
+    /\btraz mais\b/,
+    /\bmanda mais\b/,
+    /\bver mais\b/,
+    /\boutras opcoes\b/,
+    /\boutros modelos\b/,
+    /\bmais modelos\b/,
+    /\bmais opcoes\b/,
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function splitCatalogReplyForWhatsApp(reply: string, hasAssets: boolean) {
+  const normalizedReply = String(reply || "").trim();
+  if (!hasAssets || !normalizedReply) {
+    return {
+      mainReply: normalizedReply,
+      followUpReply: "",
+    };
+  }
+
+  const followUpPatterns = [
+    /Se quiser ver outras sem repetir estas, me responda "mais"\.?/i,
+    /Se quiser ver outras opcoes parecidas, me responda "mais"\.?/i,
+    /Se quiser ver mais opcoes, me responda "mais"\.?/i,
+    /Se quiser, eu tambem posso buscar outras opcoes parecidas\. No WhatsApp, basta responder "mais"\.?/i,
+  ];
+
+  const matchedPattern = followUpPatterns.find((pattern) => pattern.test(normalizedReply));
+  if (!matchedPattern) {
+    return {
+      mainReply: normalizedReply,
+      followUpReply: "",
+    };
+  }
+
+  const followUpReply = normalizedReply.match(matchedPattern)?.[0]?.trim() ?? "";
+  const mainReply = normalizedReply.replace(matchedPattern, "").replace(/\n{3,}/g, "\n\n").trim();
+
+  return {
+    mainReply: mainReply || normalizedReply,
+    followUpReply,
+  };
+}
+
+function formatWhatsAppOutboundText(reply: string) {
+  return String(reply || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\*\*(.+?)\*\*/g, "*$1*")
+    .replace(/__(.+?)__/g, "*$1*")
+    .replace(/^[\-\*]\s+/gm, "• ")
+    .replace(/^(\d+)\)\s+/gm, "$1. ")
+    .replace(/^([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s]{1,28}):\s*/gm, "*$1:* ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function buildBillingBlockedResult(chatId: string, message: string) {
   return {
     chatId,
     reply: message,
+    followUpReply: "",
     assets: [],
     whatsapp: null,
   };
@@ -1098,7 +1177,9 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
 
   const latestNormalizedMessage = message.toLowerCase();
   const catalogSignals = ["tem ", "produto", "produtos", "catalogo", "catálogo", "loja", "vende", "procuro", "estou procurando"];
-  const catalogSearchRequested = catalogSignals.some((signal) => latestNormalizedMessage.includes(signal)) || /^\s*e\s+\S+/i.test(message);
+  const catalogSearchRequested =
+    !isCatalogLoadMoreMessage(message) &&
+    (catalogSignals.some((signal) => latestNormalizedMessage.includes(signal)) || /^\s*e\s+\S+/i.test(message));
   if (catalogSearchRequested) {
     nextContext.catalogo = {
       ...(isPlainObject(nextContext.catalogo) ? nextContext.catalogo : {}),
@@ -1131,10 +1212,17 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
   const whatsappContactNameForTitle = getWhatsAppContactNameFromContext(nextContext);
   const contactSnapshot = resolveChatContactSnapshot(nextContext, normalizedExternalIdentifier);
 
+  const splitReply =
+    channelKind === "whatsapp" ? splitCatalogReplyForWhatsApp(ai.reply, Array.isArray(ai.assets) && ai.assets.length > 0) : null;
+  const primaryReplyRaw = splitReply?.mainReply || ai.reply;
+  const followUpReplyRaw = splitReply?.followUpReply || "";
+  const primaryReply = channelKind === "whatsapp" ? formatWhatsAppOutboundText(primaryReplyRaw) : primaryReplyRaw;
+  const followUpReply = channelKind === "whatsapp" ? formatWhatsAppOutboundText(followUpReplyRaw) : followUpReplyRaw;
+
   const assistantMessage = await appendMessage({
     chatId: chat.id,
     role: "assistant",
-    conteudo: ai.reply,
+    conteudo: primaryReply,
     canal: channelKind,
     identificadorExterno: normalizedExternalIdentifier,
     tokensInput: ai.usage.inputTokens,
@@ -1148,6 +1236,19 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
 
   if (!assistantMessage) {
     throw new Error("O modelo respondeu, mas nao foi possivel salvar a resposta no banco.");
+  }
+
+  if (followUpReply) {
+    await appendMessage({
+      chatId: chat.id,
+      role: "assistant",
+      conteudo: followUpReply,
+      canal: channelKind,
+      identificadorExterno: normalizedExternalIdentifier,
+      metadata: {
+        followUpReply: true,
+      },
+    });
   }
 
   const messageCount = Number(nextContext.memoria?.mensagem_count ?? 0);
@@ -1224,7 +1325,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
         ai.metadata && typeof ai.metadata === "object" && "debugRequest" in ai.metadata
           ? (ai.metadata.debugRequest as Record<string, unknown>)
           : null,
-      replyPreview: String(ai.reply ?? "").slice(0, 500),
+      replyPreview: String(primaryReply ?? "").slice(0, 500),
     },
   });
 
@@ -1295,7 +1396,8 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
 
   return {
     chatId: chat.id,
-    reply: assistantMessage.conteudo ?? ai.reply,
+    reply: assistantMessage.conteudo ?? primaryReply,
+    followUpReply,
     assets: ai.assets ?? [],
     whatsapp,
   };
