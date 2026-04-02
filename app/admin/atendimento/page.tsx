@@ -1453,17 +1453,17 @@ export default function AdminAtendimentoPage() {
                               </div>
                             ) : null}
                             {message.metadata?.assets?.length ? (
-                              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3 xl:max-w-[980px]">
                                 {message.metadata.assets.map((asset, index) => (
                                   <a
                                     key={`${message.id}-asset-${index}`}
                                     href={asset.targetUrl || asset.publicUrl || undefined}
                                     target={asset.targetUrl || asset.publicUrl ? "_blank" : undefined}
                                     rel={asset.targetUrl || asset.publicUrl ? "noreferrer" : undefined}
-                                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-slate-200 transition-colors hover:bg-white/10"
+                                    className="max-w-[310px] rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-slate-200 transition-colors hover:bg-white/10"
                                   >
                                     {asset.categoria === "image" && asset.publicUrl ? (
-                                      <img src={asset.publicUrl} alt={asset.nome || "Imagem"} className="mb-2 h-20 w-full rounded-lg object-cover" />
+                                      <img src={asset.publicUrl} alt={asset.nome || "Imagem"} className="mb-2 aspect-[4/3] w-full rounded-lg object-cover" />
                                     ) : null}
                                     <div className="flex items-center gap-2">
                                       <ExternalLink size={12} />

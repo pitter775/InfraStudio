@@ -85,22 +85,6 @@ function slugifyMercadoLivreTitle(value: string | null | undefined) {
   return normalized || null;
 }
 
-function buildMercadoLivrePublicFallbackLink(itemId?: string | null, title?: string | null) {
-  const normalizedItemId = typeof itemId === "string" && itemId.trim() ? itemId.trim().toUpperCase() : null;
-  if (!normalizedItemId) {
-    return "";
-  }
-
-  const itemIdWithDash = normalizedItemId.replace(/^([A-Z]+)(\d+)$/, "$1-$2");
-  const slug = slugifyMercadoLivreTitle(title);
-
-  if (slug) {
-    return `https://produto.mercadolivre.com.br/${itemIdWithDash}-${slug}-_JM`;
-  }
-
-  return `https://produto.mercadolivre.com.br/${itemIdWithDash}-_JM`;
-}
-
 function buildMercadoLivreCatalogLink(
   itemId?: string | null,
   title?: string | null,
@@ -148,7 +132,7 @@ function buildMercadoLivreCanonicalLink(
     return normalizedPermalink;
   }
 
-  return buildMercadoLivrePublicFallbackLink(itemId, title);
+  return "";
 }
 
 function buildSearchTokens(value: string) {
