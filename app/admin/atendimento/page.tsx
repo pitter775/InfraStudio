@@ -160,16 +160,29 @@ function formatDisplayPhone(value: string | null | undefined) {
     return null;
   }
 
-  const normalized = digits.startsWith("55") && digits.length >= 12 ? digits.slice(2) : digits;
+  let normalized = digits;
+  let countryCode = "55";
+
+  if (digits.startsWith("55") && digits.length >= 12) {
+    normalized = digits.slice(2);
+  } else if (digits.length > 11) {
+    const maybeCountry = digits.slice(0, digits.length - 11);
+    const maybeLocal = digits.slice(-11);
+    if (maybeLocal.length === 11 || maybeLocal.length === 10) {
+      countryCode = maybeCountry || "55";
+      normalized = maybeLocal;
+    }
+  }
+
   if (normalized.length === 11) {
-    return `+55 ${normalized.slice(0, 2)} ${normalized.slice(2, 7)}-${normalized.slice(7)}`;
+    return `+${countryCode} ${normalized.slice(0, 2)} ${normalized.slice(2, 7)}-${normalized.slice(7)}`;
   }
 
   if (normalized.length === 10) {
-    return `+55 ${normalized.slice(0, 2)} ${normalized.slice(2, 6)}-${normalized.slice(6)}`;
+    return `+${countryCode} ${normalized.slice(0, 2)} ${normalized.slice(2, 6)}-${normalized.slice(6)}`;
   }
 
-  return digits.startsWith("55") ? `+${digits}` : `+55 ${normalized}`;
+  return digits.startsWith(countryCode) ? `+${digits}` : `+${countryCode} ${normalized}`;
 }
 
 function getChatPhone(chat: ChatRecord) {
@@ -184,7 +197,12 @@ function getChatPhone(chat: ChatRecord) {
 
 function getChatAvatarUrl(chat: ChatRecord) {
   const value = chat.contatoAvatarUrl || chat.contexto?.whatsapp?.profilePicUrl;
-  return typeof value === "string" && value.trim() ? value.trim() : null;
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (!normalized) {
+    return null;
+  }
+
+  return /^https?:\/\//i.test(normalized) ? normalized : null;
 }
 
 function getChatSubtitle(chat: ChatRecord) {

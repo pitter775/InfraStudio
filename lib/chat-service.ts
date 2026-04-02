@@ -755,6 +755,56 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     throw new Error("Nao foi possivel gravar a mensagem do cliente. Verifique permissoes na tabela `mensagens`.");
   }
 
+  if (channelKind === "whatsapp") {
+    const inboundWhatsappContext =
+      effectiveBody.context && isPlainObject(effectiveBody.context.whatsapp)
+        ? (effectiveBody.context.whatsapp as {
+            [key: string]: unknown;
+            channelId?: string | null;
+            remoteJid?: string | null;
+            remotePhone?: string | null;
+            remetente?: string | null;
+            contactName?: string | null;
+            profilePicUrl?: string | null;
+          })
+        : null;
+    const inboundLeadContext =
+      effectiveBody.context && isPlainObject(effectiveBody.context.lead)
+        ? (effectiveBody.context.lead as Record<string, unknown>)
+        : null;
+    const inboundContactSnapshot = resolveChatContactSnapshot(
+      effectiveBody.context && typeof effectiveBody.context === "object" ? effectiveBody.context : null,
+      normalizedExternalIdentifier,
+    );
+
+    await appendSystemLog({
+      projetoId: chat.projetoId,
+      tipo: "chat_whatsapp_contact_snapshot",
+      origem: "chat_service.whatsapp",
+      descricao: "Snapshot de contato recebido do WhatsApp.",
+      payload: {
+        chatId: chat.id,
+        channelId: inboundWhatsappContext?.channelId ?? body.whatsappChannelId ?? null,
+        remoteJid: inboundWhatsappContext?.remoteJid ?? null,
+        remotePhone: inboundWhatsappContext?.remotePhone ?? null,
+        remetente: inboundWhatsappContext?.remetente ?? null,
+        contactName: inboundWhatsappContext?.contactName ?? null,
+        profilePicUrl: inboundWhatsappContext?.profilePicUrl ?? null,
+        profilePicUrlPresent: Boolean(inboundWhatsappContext?.profilePicUrl),
+        rawWhatsappContext: inboundWhatsappContext,
+        rawLeadContext: inboundLeadContext,
+        resolvedSnapshot: inboundContactSnapshot,
+        storedChatSnapshot: {
+          contatoNome: chat.contatoNome ?? null,
+          contatoTelefone: chat.contatoTelefone ?? null,
+          contatoAvatarUrl: chat.contatoAvatarUrl ?? null,
+        },
+        normalizedExternalIdentifier,
+      },
+      skipErrorGate: true,
+    });
+  }
+
   const currentHandoff = await getChatHandoffByChatId(chat.id);
   if (shouldPauseAssistantForHandoff(currentHandoff)) {
     await appendSystemLog({
