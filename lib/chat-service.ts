@@ -3,6 +3,7 @@ import { appendChatRequestLog, appendSystemLog } from "@/lib/chat-logs";
 import { getChatHandoffByChatId, requestHumanHandoff, shouldPauseAssistantForHandoff } from "@/lib/chat-handoffs";
 import { enrichLeadContext, generateSalesReply, shouldRefreshSummary, summarizeConversation } from "@/lib/chat-orchestrator";
 import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetByProjetoAgente, getChatWidgetBySlug } from "@/lib/chat-widgets";
+import { getChatAttachmentsMetadata, uploadChatAttachmentPayloads } from "@/lib/chat-attachments";
 import { appendMessage, createChat, findActiveChatByChannel, getChatById, getChatContext, listChatMessages, type ChatChannelKind, updateChatContext, updateChatStats } from "@/lib/chats";
 import { registrarUso, verifyProjetoBillingAccess } from "@/lib/billing";
 import { estimateOpenAICostUsd } from "@/lib/openai-pricing";
@@ -24,6 +25,11 @@ export type ChatRequestBody = {
   identificador?: string | null;
   source?: string | null;
   whatsappChannelId?: string | null;
+  attachments?: Array<{
+    name?: string | null;
+    type?: string | null;
+    dataBase64?: string | null;
+  }> | null;
 };
 
 type ResolvedChatChannel = {
@@ -51,6 +57,20 @@ function sanitizePhone(phone: string | null | undefined) {
   return String(phone || "").replace(/\D/g, "");
 }
 
+function normalizeInboundPhoneCandidate(value: string | null | undefined) {
+  const raw = String(value || "").trim();
+  if (!raw || raw.includes("@")) {
+    return null;
+  }
+
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 10 || digits.length > 13) {
+    return null;
+  }
+
+  return digits;
+}
+
 function buildWhatsAppLink(phone: string | null | undefined, message: string) {
   const sanitizedPhone = sanitizePhone(phone);
   if (!sanitizedPhone) {
@@ -75,8 +95,9 @@ function getWhatsAppContactPhoneFromContext(context: Record<string, unknown> | n
   }
 
   const leadPhone = isPlainObject(context?.lead) ? context.lead.telefone : null;
-  if (typeof leadPhone === "string" && leadPhone.trim()) {
-    return leadPhone.trim();
+  const normalizedLeadPhone = normalizeInboundPhoneCandidate(typeof leadPhone === "string" ? leadPhone : null);
+  if (normalizedLeadPhone) {
+    return normalizedLeadPhone;
   }
 
   if (!isPlainObject(context?.whatsapp)) {
@@ -84,12 +105,13 @@ function getWhatsAppContactPhoneFromContext(context: Record<string, unknown> | n
   }
 
   const remotePhone = context.whatsapp.remotePhone;
-  if (typeof remotePhone === "string" && remotePhone.trim()) {
-    return remotePhone.trim();
+  const normalizedRemotePhone = normalizeInboundPhoneCandidate(typeof remotePhone === "string" ? remotePhone : null);
+  if (normalizedRemotePhone) {
+    return normalizedRemotePhone;
   }
 
   const senderPhone = context.whatsapp.remetente;
-  return typeof senderPhone === "string" && senderPhone.trim() ? senderPhone.trim() : null;
+  return normalizeInboundPhoneCandidate(typeof senderPhone === "string" ? senderPhone : null);
 }
 
 function getWhatsAppContactAvatarFromContext(context: Record<string, unknown> | null | undefined) {
@@ -107,7 +129,7 @@ function resolveChatContactSnapshot(
 ) {
   return {
     contatoNome: getWhatsAppContactNameFromContext(context),
-    contatoTelefone: getWhatsAppContactPhoneFromContext(context) ?? sanitizePhone(fallbackExternalIdentifier),
+    contatoTelefone: getWhatsAppContactPhoneFromContext(context) ?? normalizeInboundPhoneCandidate(fallbackExternalIdentifier),
     contatoAvatarUrl: getWhatsAppContactAvatarFromContext(context),
   };
 }
@@ -453,8 +475,18 @@ async function resolveChatChannel(body: ChatRequestBody): Promise<ResolvedChatCh
 }
 
 export async function processIncomingChatMessage(body: ChatRequestBody) {
-  const message = (body.message ?? body.mensagem)?.trim();
-  if (!message) {
+  const message = (body.message ?? body.mensagem)?.trim() || "";
+  const inboundAttachments = Array.isArray(body.attachments)
+    ? body.attachments
+        .map((attachment) => ({
+          name: attachment.name?.trim() || "arquivo",
+          type: attachment.type?.trim() || "application/octet-stream",
+          dataBase64: attachment.dataBase64?.trim() || "",
+        }))
+        .filter((attachment) => attachment.dataBase64)
+        .slice(0, 5)
+    : [];
+  if (!message && !inboundAttachments.length) {
     throw new Error("Mensagem obrigatoria.");
   }
 
@@ -678,8 +710,9 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
 
       const initialContext = mergeContext(baseContext, extraContext);
       const contactSnapshot = resolveChatContactSnapshot(initialContext, normalizedExternalIdentifier);
+      const previewText = message || "Midia recebida";
       const fallbackChatTitle =
-        contactSnapshot.contatoNome ?? (message.length > 60 ? `${message.slice(0, 57)}...` : message);
+        contactSnapshot.contatoNome ?? (previewText.length > 60 ? `${previewText.slice(0, 57)}...` : previewText);
       chat = await createChat({
         titulo: fallbackChatTitle,
         projetoId: resolved.projeto?.id ?? null,
@@ -740,14 +773,24 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     authoritativeAgent = currentAgent;
   }
 
+  const uploadedInboundAttachments =
+    inboundAttachments.length && chat.id
+      ? await uploadChatAttachmentPayloads({
+          projetoId: chat.projetoId,
+          chatId: chat.id,
+          attachments: inboundAttachments,
+        })
+      : [];
+
   const userMessage = await appendMessage({
     chatId: chat.id,
     role: "user",
-    conteudo: message,
+    conteudo: message || "Midia recebida pelo WhatsApp.",
     canal: channelKind,
     identificadorExterno: normalizedExternalIdentifier,
     metadata: {
       source: effectiveBody.source?.trim() || (channelKind === "whatsapp" ? "whatsapp_bridge" : "site_widget"),
+      ...(uploadedInboundAttachments.length ? { attachments: getChatAttachmentsMetadata(uploadedInboundAttachments) } : {}),
     },
   });
 

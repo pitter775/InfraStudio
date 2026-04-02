@@ -126,6 +126,63 @@ export async function uploadChatAttachments(input: {
   return uploaded;
 }
 
+export async function uploadChatAttachmentPayloads(input: {
+  projetoId: string | null;
+  chatId: string;
+  attachments: Array<{
+    name?: string | null;
+    type?: string | null;
+    dataBase64: string;
+  }>;
+}) {
+  const supabase = getSupabaseAdminClient();
+  await ensureBucket();
+
+  const uploaded: ChatAttachmentRecord[] = [];
+
+  for (const attachment of input.attachments) {
+    const base64 = String(attachment.dataBase64 || "").trim();
+    if (!base64) {
+      continue;
+    }
+
+    const fileBuffer = Buffer.from(base64, "base64");
+    if (!fileBuffer.byteLength) {
+      continue;
+    }
+
+    const rawName = attachment.name?.trim() || "arquivo";
+    const extension = rawName.includes(".") ? rawName.split(".").pop() ?? "" : "";
+    const compactStamp = Date.now().toString(36);
+    const compactToken = randomUUID().replace(/-/g, "").slice(0, 10);
+    const safeExtension = extension ? sanitizeFileName(extension) : "";
+    const compactFileName = `${compactStamp}-${compactToken}${safeExtension ? `.${safeExtension}` : ""}`;
+    const storagePath = `p-${shortenId(input.projetoId)}/c-${shortenId(input.chatId)}/${compactFileName}`;
+    const mimeType = attachment.type?.trim() || "application/octet-stream";
+
+    const uploadResult = await supabase.storage.from(CHAT_ATTACHMENTS_BUCKET).upload(storagePath, fileBuffer, {
+      contentType: mimeType,
+      upsert: false,
+    });
+
+    if (uploadResult.error) {
+      throw uploadResult.error;
+    }
+
+    const publicUrl = supabase.storage.from(CHAT_ATTACHMENTS_BUCKET).getPublicUrl(storagePath).data.publicUrl;
+    uploaded.push({
+      name: rawName,
+      type: mimeType,
+      size: fileBuffer.byteLength,
+      publicUrl,
+      storagePath,
+      category: inferCategory(mimeType),
+    });
+  }
+
+  return uploaded;
+}
+
 export async function deleteChatAttachmentsByStoragePaths(storagePaths: string[]) {
   const normalized = storagePaths.map((item) => item.trim()).filter(Boolean);
   if (!normalized.length) {

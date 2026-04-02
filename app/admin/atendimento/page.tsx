@@ -53,6 +53,16 @@ type ChatMessageRecord = {
   metadata?: {
     sentByHuman?: boolean;
     senderName?: string;
+    assets?: Array<{
+      id?: string;
+      nome?: string;
+      descricao?: string;
+      arquivoNome?: string;
+      mimeType?: string;
+      categoria?: "image" | "file";
+      publicUrl?: string | null;
+      targetUrl?: string | null;
+    }>;
     attachments?: Array<{
       name?: string;
       type?: string;
@@ -76,6 +86,8 @@ type IndicativoSummary = {
   label: string;
   total: number;
 };
+
+type ChatChannelFilter = "all" | "site" | "whatsapp";
 
 const compactButtonClass =
   "inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-all sm:text-sm";
@@ -423,6 +435,8 @@ function ChatMediaModal({
 export default function AdminAtendimentoPage() {
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const conversationViewportRef = useRef<HTMLDivElement | null>(null);
+  const conversationBottomRef = useRef<HTMLDivElement | null>(null);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -434,6 +448,7 @@ export default function AdminAtendimentoPage() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>("");
   const [chats, setChats] = useState<ChatRecord[]>([]);
+  const [chatChannelFilter, setChatChannelFilter] = useState<ChatChannelFilter>("all");
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [messagesByChatId, setMessagesByChatId] = useState<Record<string, ChatMessageRecord[]>>({});
   const [replyText, setReplyText] = useState("");
@@ -483,6 +498,25 @@ export default function AdminAtendimentoPage() {
 
   const selectedMessages = selectedChatId ? (messagesByChatId[selectedChatId] ?? []) : [];
   const selectedMediaItems = useMemo(() => getChatMediaItems(selectedMessages), [selectedMessages]);
+  const filteredChats = useMemo(() => {
+    if (chatChannelFilter === "all") {
+      return chats;
+    }
+
+    if (chatChannelFilter === "whatsapp") {
+      return chats.filter((chat) => chat.canal === "whatsapp");
+    }
+
+    return chats.filter((chat) => chat.canal !== "whatsapp");
+  }, [chatChannelFilter, chats]);
+  const chatChannelTabs = useMemo(
+    () => [
+      { id: "all" as const, label: "Todos", total: chats.length },
+      { id: "whatsapp" as const, label: "WhatsApp", total: chats.filter((chat) => chat.canal === "whatsapp").length },
+      { id: "site" as const, label: "Site", total: chats.filter((chat) => chat.canal !== "whatsapp").length },
+    ],
+    [chats],
+  );
   const dashboard = useMemo(() => {
     const whatsappChats = chats.filter((chat) => chat.canal === "whatsapp");
     const siteChats = chats.filter((chat) => chat.canal !== "whatsapp");
@@ -715,6 +749,22 @@ export default function AdminAtendimentoPage() {
   }, [messagesByChatId, selectedChatId]);
 
   useEffect(() => {
+    if (!selectedChatId) {
+      return;
+    }
+
+    const viewport = conversationViewportRef.current;
+    const bottom = conversationBottomRef.current;
+    if (!viewport || !bottom) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      bottom.scrollIntoView({ behavior: "smooth", block: "end" });
+    });
+  }, [selectedChatId, selectedMessages.length, loadingConversation]);
+
+  useEffect(() => {
     const requestedChatId = searchParams.get("chat")?.trim() || null;
     if (!requestedChatId || !chats.some((chat) => chat.id === requestedChatId)) {
       return;
@@ -722,6 +772,18 @@ export default function AdminAtendimentoPage() {
 
     setSelectedChatId(requestedChatId);
   }, [chats, searchParams]);
+
+  useEffect(() => {
+    if (!filteredChats.length) {
+      return;
+    }
+
+    if (selectedChatId && filteredChats.some((chat) => chat.id === selectedChatId)) {
+      return;
+    }
+
+    setSelectedChatId(filteredChats[0]?.id ?? null);
+  }, [filteredChats, selectedChatId]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1166,20 +1228,42 @@ export default function AdminAtendimentoPage() {
           <div className="shrink-0 border-b border-white/10 px-3 py-2.5">
             <p className="text-sm font-bold text-white">Conversas do projeto</p>
             <p className="mt-1 text-[11px] text-slate-400">Site e WhatsApp no mesmo feed.</p>
+            <div className="mt-3 flex items-center gap-2">
+              {chatChannelTabs.map((tab) => {
+                const active = chatChannelFilter === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setChatChannelFilter(tab.id)}
+                    className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                      active
+                        ? "border-cyan-400/30 bg-cyan-500/10 text-cyan-100"
+                        : "border-white/10 bg-white/5 text-slate-300 hover:border-white/20 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${active ? "bg-cyan-400/15 text-cyan-50" : "bg-white/5 text-slate-400"}`}>
+                      {tab.total}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
             {loadingChats ? <CenterLoader /> : null}
 
-            {!loadingChats && !chats.length ? (
+            {!loadingChats && !filteredChats.length ? (
               <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/30 p-5 text-sm text-slate-400">
-                Nenhuma conversa encontrada para este projeto.
+                Nenhuma conversa encontrada para este filtro.
               </div>
             ) : null}
 
             {!loadingChats ? (
               <div className="space-y-2">
-                {chats.map((chat) => {
+                {filteredChats.map((chat) => {
                   const active = selectedChatId === chat.id;
                   const chatAvatarUrl = getChatAvatarUrl(chat);
                   const chatSubtitle = getChatSubtitle(chat);
@@ -1313,7 +1397,7 @@ export default function AdminAtendimentoPage() {
                 </div>
               </div>
 
-              <div className="min-h-0 overflow-y-auto px-3 py-3 sm:px-4">
+              <div ref={conversationViewportRef} className="min-h-0 overflow-y-auto px-3 py-3 sm:px-4">
                 {loadingConversation ? <CenterLoader /> : null}
 
                 {!loadingConversation && !selectedMessages.length ? (
@@ -1365,11 +1449,34 @@ export default function AdminAtendimentoPage() {
                                 ))}
                               </div>
                             ) : null}
+                            {message.metadata?.assets?.length ? (
+                              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                {message.metadata.assets.map((asset, index) => (
+                                  <a
+                                    key={`${message.id}-asset-${index}`}
+                                    href={asset.targetUrl || asset.publicUrl || undefined}
+                                    target={asset.targetUrl || asset.publicUrl ? "_blank" : undefined}
+                                    rel={asset.targetUrl || asset.publicUrl ? "noreferrer" : undefined}
+                                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-slate-200 transition-colors hover:bg-white/10"
+                                  >
+                                    {asset.categoria === "image" && asset.publicUrl ? (
+                                      <img src={asset.publicUrl} alt={asset.nome || "Imagem"} className="mb-2 h-28 w-full rounded-lg object-cover" />
+                                    ) : null}
+                                    <div className="flex items-center gap-2">
+                                      <ExternalLink size={12} />
+                                      <span className="truncate font-semibold">{asset.nome || asset.arquivoNome || "item"}</span>
+                                    </div>
+                                    {asset.descricao ? <div className="mt-1 text-[10px] text-slate-400">{asset.descricao}</div> : null}
+                                  </a>
+                                ))}
+                              </div>
+                            ) : null}
                             <p className="mt-2 text-[11px] text-slate-400">{formatDateTime(message.createdAt)}</p>
                           </div>
                         </div>
                       );
                     })}
+                    <div ref={conversationBottomRef} />
                   </div>
                 ) : null}
               </div>
