@@ -2098,11 +2098,6 @@ function WhatsAppQrCodeModal({
             </div>
           )}
 
-          {isConnected ? (
-            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-              Canal conectado com sucesso. Pode fechar esta janela.
-            </div>
-          ) : null}
         </div>
       </div>
     </div>
@@ -4466,11 +4461,7 @@ export default function AdminProjetoDetalhePage() {
       return;
     }
 
-    const timer = window.setTimeout(() => {
-      setWhatsAppQrModalChannelId(null);
-    }, 1200);
-
-    return () => window.clearTimeout(timer);
+    setWhatsAppQrModalChannelId(null);
   }, [serviceStatusByChannel, whatsAppQrModalChannelId]);
 
   useEffect(() => {

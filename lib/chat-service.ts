@@ -69,6 +69,49 @@ function getWhatsAppContactNameFromContext(context: Record<string, unknown> | nu
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function getWhatsAppContactPhoneFromContext(context: Record<string, unknown> | null | undefined) {
+  if (!isPlainObject(context?.lead) && !isPlainObject(context?.whatsapp)) {
+    return null;
+  }
+
+  const leadPhone = isPlainObject(context?.lead) ? context.lead.telefone : null;
+  if (typeof leadPhone === "string" && leadPhone.trim()) {
+    return leadPhone.trim();
+  }
+
+  if (!isPlainObject(context?.whatsapp)) {
+    return null;
+  }
+
+  const remotePhone = context.whatsapp.remotePhone;
+  if (typeof remotePhone === "string" && remotePhone.trim()) {
+    return remotePhone.trim();
+  }
+
+  const senderPhone = context.whatsapp.remetente;
+  return typeof senderPhone === "string" && senderPhone.trim() ? senderPhone.trim() : null;
+}
+
+function getWhatsAppContactAvatarFromContext(context: Record<string, unknown> | null | undefined) {
+  if (!isPlainObject(context?.whatsapp)) {
+    return null;
+  }
+
+  const value = context.whatsapp.profilePicUrl;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function resolveChatContactSnapshot(
+  context: Record<string, unknown> | null | undefined,
+  fallbackExternalIdentifier?: string | null,
+) {
+  return {
+    contatoNome: getWhatsAppContactNameFromContext(context),
+    contatoTelefone: getWhatsAppContactPhoneFromContext(context) ?? sanitizePhone(fallbackExternalIdentifier),
+    contatoAvatarUrl: getWhatsAppContactAvatarFromContext(context),
+  };
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -633,14 +676,20 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
         },
       };
 
-      const fallbackChatTitle = getWhatsAppContactNameFromContext(extraContext) ?? (message.length > 60 ? `${message.slice(0, 57)}...` : message);
+      const initialContext = mergeContext(baseContext, extraContext);
+      const contactSnapshot = resolveChatContactSnapshot(initialContext, normalizedExternalIdentifier);
+      const fallbackChatTitle =
+        contactSnapshot.contatoNome ?? (message.length > 60 ? `${message.slice(0, 57)}...` : message);
       chat = await createChat({
         titulo: fallbackChatTitle,
         projetoId: resolved.projeto?.id ?? null,
         agenteId: resolved.agente?.id ?? null,
         canal: channelKind,
         identificadorExterno: normalizedExternalIdentifier,
-        contexto: mergeContext(baseContext, extraContext),
+        contexto: initialContext,
+        contatoNome: contactSnapshot.contatoNome,
+        contatoTelefone: contactSnapshot.contatoTelefone,
+        contatoAvatarUrl: contactSnapshot.contatoAvatarUrl,
       });
     }
   }
@@ -987,6 +1036,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
   const leadNameForTitle =
     typeof nextContext.lead?.nome === "string" && nextContext.lead.nome.trim() ? nextContext.lead.nome.trim() : null;
   const whatsappContactNameForTitle = getWhatsAppContactNameFromContext(nextContext);
+  const contactSnapshot = resolveChatContactSnapshot(nextContext, normalizedExternalIdentifier);
 
   const assistantMessage = await appendMessage({
     chatId: chat.id,
@@ -1037,6 +1087,10 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     totalCustoToAdd: estimatedCostUsd,
     titulo: leadNameForTitle ?? whatsappContactNameForTitle ?? chat.titulo,
     contexto: nextContext,
+    identificadorExterno: normalizedExternalIdentifier,
+    contatoNome: contactSnapshot.contatoNome,
+    contatoTelefone: contactSnapshot.contatoTelefone,
+    contatoAvatarUrl: contactSnapshot.contatoAvatarUrl,
   });
 
   if (chat.projetoId) {

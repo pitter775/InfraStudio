@@ -8,6 +8,9 @@ export type ChatChannelKind = "web" | "whatsapp" | string;
 export type ChatRecord = {
   id: string;
   titulo: string;
+  contatoNome: string | null;
+  contatoTelefone: string | null;
+  contatoAvatarUrl: string | null;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -40,6 +43,9 @@ export type ChatMessageRecord = {
 type ChatRow = {
   id: string;
   titulo: string | null;
+  contato_nome: string | null;
+  contato_telefone: string | null;
+  contato_avatar_url: string | null;
   status: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -74,6 +80,46 @@ type ChatContext = {
   };
 };
 
+type ChatContactSnapshot = {
+  contatoNome: string | null;
+  contatoTelefone: string | null;
+  contatoAvatarUrl: string | null;
+};
+
+function normalizeOptionalText(value: string | null | undefined) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  return normalized ? normalized : null;
+}
+
+function extractChatContactSnapshot(
+  contexto: Record<string, unknown> | null | undefined,
+  fallbackExternalIdentifier?: string | null,
+): ChatContactSnapshot {
+  const lead =
+    contexto && typeof contexto.lead === "object" && contexto.lead !== null && !Array.isArray(contexto.lead)
+      ? (contexto.lead as { nome?: string | null; telefone?: string | null })
+      : null;
+  const whatsapp =
+    contexto && typeof contexto.whatsapp === "object" && contexto.whatsapp !== null && !Array.isArray(contexto.whatsapp)
+      ? (contexto.whatsapp as {
+          contactName?: string | null;
+          remotePhone?: string | null;
+          remetente?: string | null;
+          profilePicUrl?: string | null;
+        })
+      : null;
+
+  return {
+    contatoNome: normalizeOptionalText(lead?.nome) ?? normalizeOptionalText(whatsapp?.contactName),
+    contatoTelefone:
+      normalizeOptionalText(lead?.telefone) ??
+      normalizeOptionalText(whatsapp?.remotePhone) ??
+      normalizeOptionalText(whatsapp?.remetente) ??
+      normalizeOptionalText(fallbackExternalIdentifier),
+    contatoAvatarUrl: normalizeOptionalText(whatsapp?.profilePicUrl),
+  };
+}
+
 type MensagemRow = {
   id: string;
   chat_id: string | null;
@@ -92,6 +138,9 @@ function mapChat(row: ChatRow): ChatRecord {
   return {
     id: row.id,
     titulo: row.titulo?.trim() || "Nova conversa",
+    contatoNome: normalizeOptionalText(row.contato_nome),
+    contatoTelefone: normalizeOptionalText(row.contato_telefone),
+    contatoAvatarUrl: normalizeOptionalText(row.contato_avatar_url),
     status: row.status ?? "ativo",
     createdAt: row.created_at ?? new Date().toISOString(),
     updatedAt: row.updated_at ?? new Date().toISOString(),
@@ -132,13 +181,20 @@ export async function createChat(input: {
   canal?: ChatChannelKind;
   identificadorExterno?: string | null;
   contexto?: Record<string, unknown> | null;
+  contatoNome?: string | null;
+  contatoTelefone?: string | null;
+  contatoAvatarUrl?: string | null;
 }) {
   const supabase = getSupabaseAdminClient();
   const now = new Date().toISOString();
+  const contactSnapshot = extractChatContactSnapshot(input.contexto, input.identificadorExterno);
   const { data, error } = await supabase
     .from("chats")
     .insert({
       titulo: input.titulo?.trim() || "Nova conversa",
+      contato_nome: normalizeOptionalText(input.contatoNome) ?? contactSnapshot.contatoNome,
+      contato_telefone: normalizeOptionalText(input.contatoTelefone) ?? contactSnapshot.contatoTelefone,
+      contato_avatar_url: normalizeOptionalText(input.contatoAvatarUrl) ?? contactSnapshot.contatoAvatarUrl,
       usuario_id: input.usuarioId ?? null,
       projeto_id: input.projetoId ?? null,
       agente_id: input.agenteId ?? null,
@@ -151,7 +207,7 @@ export async function createChat(input: {
       created_at: now,
       updated_at: now,
     } as never)
-    .select("id, titulo, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
+    .select("id, titulo, contato_nome, contato_telefone, contato_avatar_url, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
     .single();
 
   if (error || !data) {
@@ -210,15 +266,23 @@ export async function updateChatStats(input: {
   totalCustoToAdd?: number;
   titulo?: string;
   contexto?: Record<string, unknown> | null;
+  identificadorExterno?: string | null;
+  contatoNome?: string | null;
+  contatoTelefone?: string | null;
+  contatoAvatarUrl?: string | null;
 }) {
   const supabase = getSupabaseAdminClient();
   const { data: current, error: currentError } = await supabase
     .from("chats")
-    .select("id, titulo, total_tokens, total_custo")
+    .select("id, titulo, identificador_externo, contato_nome, contato_telefone, contato_avatar_url, total_tokens, total_custo")
     .eq("id", input.chatId)
     .single<{
       id: string;
       titulo: string | null;
+      identificador_externo: string | null;
+      contato_nome: string | null;
+      contato_telefone: string | null;
+      contato_avatar_url: string | null;
       total_tokens: number | null;
       total_custo: number | null;
     }>();
@@ -228,10 +292,26 @@ export async function updateChatStats(input: {
     return;
   }
 
+  const contactSnapshot = extractChatContactSnapshot(
+    input.contexto,
+    input.identificadorExterno ?? current.identificador_externo,
+  );
   const { error } = await supabase
     .from("chats")
     .update({
       titulo: input.titulo?.trim() || current.titulo,
+      contato_nome:
+        normalizeOptionalText(input.contatoNome) ??
+        contactSnapshot.contatoNome ??
+        normalizeOptionalText(current.contato_nome),
+      contato_telefone:
+        normalizeOptionalText(input.contatoTelefone) ??
+        contactSnapshot.contatoTelefone ??
+        normalizeOptionalText(current.contato_telefone),
+      contato_avatar_url:
+        normalizeOptionalText(input.contatoAvatarUrl) ??
+        contactSnapshot.contatoAvatarUrl ??
+        normalizeOptionalText(current.contato_avatar_url),
       total_tokens: (current.total_tokens ?? 0) + (input.totalTokensToAdd ?? 0),
       total_custo: Number(current.total_custo ?? 0) + Number(input.totalCustoToAdd ?? 0),
       contexto: input.contexto ?? undefined,
@@ -277,7 +357,7 @@ export async function getChatById(chatId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("chats")
-    .select("id, titulo, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
+    .select("id, titulo, contato_nome, contato_telefone, contato_avatar_url, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
     .eq("id", chatId)
     .maybeSingle();
 
@@ -299,7 +379,7 @@ export async function findActiveChatByChannel(input: {
   const supabase = getSupabaseAdminClient();
   let query = supabase
     .from("chats")
-    .select("id, titulo, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
+    .select("id, titulo, contato_nome, contato_telefone, contato_avatar_url, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
     .eq("canal", input.canal)
     .eq("identificador_externo", input.identificadorExterno.trim())
     .eq("status", "ativo")
@@ -349,7 +429,7 @@ export async function listChats(projetoId?: string | null) {
   const supabase = getSupabaseAdminClient();
   let query = supabase
     .from("chats")
-    .select("id, titulo, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
+    .select("id, titulo, contato_nome, contato_telefone, contato_avatar_url, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
     .order("updated_at", { ascending: false });
 
   if (projetoId) {

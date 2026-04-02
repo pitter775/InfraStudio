@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, ExternalLink, LoaderCircle, MessageCircleMore, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, UserRound, X } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, ExternalLink, LoaderCircle, MessageCircleMore, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, X } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -19,6 +19,9 @@ type Projeto = {
 type ChatRecord = {
   id: string;
   titulo: string;
+  contatoNome?: string | null;
+  contatoTelefone?: string | null;
+  contatoAvatarUrl?: string | null;
   updatedAt: string;
   canal: string;
   identificadorExterno: string | null;
@@ -125,11 +128,28 @@ function getChatChannelTone(canal: string) {
 }
 
 function getChatTitle(chat: ChatRecord) {
+  const explicitContactName = chat.contatoNome?.trim();
+  if (explicitContactName) {
+    return explicitContactName;
+  }
+
+  const contextName = chat.contexto?.lead?.nome?.trim() || chat.contexto?.whatsapp?.contactName?.trim();
+  if (contextName) {
+    return contextName;
+  }
+
+  const title = chat.titulo?.trim();
+  if (title && title !== "Nova conversa") {
+    return title;
+  }
+
+  const formattedPhone = getChatPhone(chat);
+  if (formattedPhone) {
+    return formattedPhone;
+  }
+
   return (
-    chat.contexto?.lead?.nome?.trim() ||
-    chat.contexto?.whatsapp?.contactName?.trim() ||
     chat.identificadorExterno?.trim() ||
-    chat.titulo?.trim() ||
     "Conversa sem identificacao"
   );
 }
@@ -154,6 +174,7 @@ function formatDisplayPhone(value: string | null | undefined) {
 
 function getChatPhone(chat: ChatRecord) {
   return (
+    formatDisplayPhone(chat.contatoTelefone) ||
     formatDisplayPhone(chat.contexto?.lead?.telefone) ||
     formatDisplayPhone(chat.contexto?.whatsapp?.remotePhone) ||
     formatDisplayPhone(chat.identificadorExterno) ||
@@ -162,8 +183,38 @@ function getChatPhone(chat: ChatRecord) {
 }
 
 function getChatAvatarUrl(chat: ChatRecord) {
-  const value = chat.contexto?.whatsapp?.profilePicUrl;
+  const value = chat.contatoAvatarUrl || chat.contexto?.whatsapp?.profilePicUrl;
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function getChatSubtitle(chat: ChatRecord) {
+  const title = getChatTitle(chat);
+  const phone = getChatPhone(chat);
+
+  if (phone && phone !== title) {
+    return phone;
+  }
+
+  if (chat.identificadorExterno?.trim() && chat.identificadorExterno.trim() !== title) {
+    return chat.identificadorExterno.trim();
+  }
+
+  return null;
+}
+
+function getAvatarFallbackLabel(chat: ChatRecord) {
+  const title = getChatTitle(chat);
+  const normalized = title.trim();
+  if (!normalized) {
+    return "?";
+  }
+
+  const parts = normalized.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 }
 
 function isChatUnderHumanHandoff(chat: ChatRecord | null | undefined) {
@@ -1113,7 +1164,8 @@ export default function AdminAtendimentoPage() {
                 {chats.map((chat) => {
                   const active = selectedChatId === chat.id;
                   const chatAvatarUrl = getChatAvatarUrl(chat);
-                  const chatPhone = getChatPhone(chat);
+                  const chatSubtitle = getChatSubtitle(chat);
+                  const chatTitle = getChatTitle(chat);
 
                   return (
                     <button
@@ -1133,16 +1185,18 @@ export default function AdminAtendimentoPage() {
                             : "border-white/10 bg-slate-900/70 text-slate-300"
                         }`}>
                           {chatAvatarUrl ? (
-                            <img src={chatAvatarUrl} alt={getChatTitle(chat)} className="h-full w-full object-cover" />
+                            <img src={chatAvatarUrl} alt={chatTitle} className="h-full w-full object-cover" />
                           ) : (
-                            <UserRound size={14} />
+                            <span className="text-[10px] font-bold uppercase tracking-[0.12em]">
+                              {getAvatarFallbackLabel(chat)}
+                            </span>
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <p className="truncate text-[12px] font-semibold leading-4 text-white">{getChatTitle(chat)}</p>
-                              {chatPhone ? <p className="mt-0.5 truncate text-[10px] leading-4 text-slate-400">{chatPhone}</p> : null}
+                              <p className="truncate text-[12px] font-semibold leading-4 text-white">{chatTitle}</p>
+                              {chatSubtitle ? <p className="mt-0.5 truncate text-[10px] leading-4 text-slate-400">{chatSubtitle}</p> : null}
                               <div className="mt-1 flex items-center gap-1.5">
                                 <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(chat.canal)}`}>
                                   {getChatChannelLabel(chat.canal)}
@@ -1188,13 +1242,17 @@ export default function AdminAtendimentoPage() {
                       >
                         <ArrowLeft size={14} />
                       </button>
-                      {getChatAvatarUrl(selectedChat) ? (
-                        <img
-                          src={getChatAvatarUrl(selectedChat) || ""}
-                          alt={getChatTitle(selectedChat)}
-                          className="h-8 w-8 rounded-full border border-white/10 object-cover"
-                        />
-                      ) : null}
+                      <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-200">
+                        {getChatAvatarUrl(selectedChat) ? (
+                          <img
+                            src={getChatAvatarUrl(selectedChat) || ""}
+                            alt={getChatTitle(selectedChat)}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          getAvatarFallbackLabel(selectedChat)
+                        )}
+                      </div>
                       <p className="truncate text-sm font-bold text-white sm:text-base">{getChatTitle(selectedChat)}</p>
                       <span className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(selectedChat.canal)}`}>
                         {getChatChannelLabel(selectedChat.canal)}
