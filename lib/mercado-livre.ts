@@ -53,6 +53,7 @@ type MercadoLivreSearchItem = {
   price?: number;
   thumbnail?: string;
   permalink?: string;
+  catalog_product_id?: string;
   date_created?: string;
   start_time?: string;
   stop_time?: string;
@@ -73,19 +74,81 @@ function normalizeSearchText(value: string) {
     .trim();
 }
 
-function buildMercadoLivreCanonicalLink(itemId?: string | null, permalink?: string | null) {
-  const normalizedItemId = typeof itemId === "string" && itemId.trim() ? itemId.trim().toUpperCase() : null;
-  const normalizedPermalink = typeof permalink === "string" ? permalink.trim() : "";
+function slugifyMercadoLivreTitle(value: string | null | undefined) {
+  const normalized = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
-  if (normalizedPermalink && !/mercadoshops\.com\.br|internal-shop/i.test(normalizedPermalink)) {
+  return normalized || null;
+}
+
+function buildMercadoLivrePublicFallbackLink(itemId?: string | null, title?: string | null) {
+  const normalizedItemId = typeof itemId === "string" && itemId.trim() ? itemId.trim().toUpperCase() : null;
+  if (!normalizedItemId) {
+    return "";
+  }
+
+  const itemIdWithDash = normalizedItemId.replace(/^([A-Z]+)(\d+)$/, "$1-$2");
+  const slug = slugifyMercadoLivreTitle(title);
+
+  if (slug) {
+    return `https://produto.mercadolivre.com.br/${itemIdWithDash}-${slug}-_JM`;
+  }
+
+  return `https://produto.mercadolivre.com.br/${itemIdWithDash}-_JM`;
+}
+
+function buildMercadoLivreCatalogLink(
+  itemId?: string | null,
+  title?: string | null,
+  catalogProductId?: string | null,
+) {
+  const normalizedItemId = typeof itemId === "string" && itemId.trim() ? itemId.trim().toUpperCase() : null;
+  const normalizedCatalogId =
+    typeof catalogProductId === "string" && catalogProductId.trim() ? catalogProductId.trim().toUpperCase() : null;
+  const slug = slugifyMercadoLivreTitle(title);
+
+  if (!normalizedItemId || !normalizedCatalogId || !slug) {
+    return "";
+  }
+
+  return `https://www.mercadolivre.com.br/${slug}/up/${normalizedCatalogId}?pdp_filters=item_id:${normalizedItemId}`;
+}
+
+function normalizeMercadoLivrePermalink(permalink?: string | null) {
+  const normalizedPermalink = typeof permalink === "string" ? permalink.trim() : "";
+  if (!normalizedPermalink) {
+    return "";
+  }
+
+  if (/mercadoshops\.com\.br|internal-shop/i.test(normalizedPermalink)) {
+    return "";
+  }
+
+  return normalizedPermalink;
+}
+
+function buildMercadoLivreCanonicalLink(
+  itemId?: string | null,
+  permalink?: string | null,
+  title?: string | null,
+  catalogProductId?: string | null,
+) {
+  const normalizedPermalink = normalizeMercadoLivrePermalink(permalink);
+  const catalogLink = buildMercadoLivreCatalogLink(itemId, title, catalogProductId);
+
+  if (catalogLink) {
+    return catalogLink;
+  }
+
+  if (normalizedPermalink) {
     return normalizedPermalink;
   }
 
-  if (normalizedItemId) {
-    return `https://produto.mercadolivre.com.br/${normalizedItemId}`;
-  }
-
-  return normalizedPermalink || "";
+  return buildMercadoLivrePublicFallbackLink(itemId, title);
 }
 
 function buildSearchTokens(value: string) {
@@ -196,7 +259,12 @@ function normalizeProduto(item: MercadoLivreSearchItem): ProdutoPadronizado | nu
     nome: item.title,
     preco: item.price,
     imagem: item.thumbnail,
-    link: buildMercadoLivreCanonicalLink(typeof item.id === "string" ? item.id : null, item.permalink),
+    link: buildMercadoLivreCanonicalLink(
+      typeof item.id === "string" ? item.id : null,
+      item.permalink,
+      item.title,
+      typeof item.catalog_product_id === "string" ? item.catalog_product_id : null,
+    ),
     publicadoEm:
       (typeof item.date_created === "string" && item.date_created.trim()) ||
       (typeof item.start_time === "string" && item.start_time.trim()) ||
@@ -443,6 +511,7 @@ type MercadoLivreItemResponse = {
   price?: number;
   thumbnail?: string;
   permalink?: string;
+  catalog_product_id?: string;
   date_created?: string;
   start_time?: string;
   last_updated?: string;
@@ -478,6 +547,7 @@ function normalizeProdutoDetalhado(item: MercadoLivreItemResponse, descricao?: s
 
   return {
     ...base,
+    link: buildMercadoLivreCanonicalLink(item.id, item.permalink, item.title, item.catalog_product_id),
     descricao: descricao?.trim() || null,
     condicao: typeof item.condition === "string" ? item.condition.trim() || null : null,
     garantia: typeof item.warranty === "string" ? item.warranty.trim() || null : null,
