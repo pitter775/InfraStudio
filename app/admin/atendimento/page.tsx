@@ -910,7 +910,7 @@ export default function AdminAtendimentoPage() {
   return (
     <>
     <main className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
-      <section className="px-1 pt-1">
+      <section className={`px-1 pt-1 ${mobileConversationOpen ? "hidden xl:block" : ""}`}>
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">
           <MessageCircleMore size={14} />
           Atendimento
@@ -980,9 +980,9 @@ export default function AdminAtendimentoPage() {
         </div>
       </section>
 
-      {feedback ? <section className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{feedback}</section> : null}
+      {feedback ? <section className={`rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100 ${mobileConversationOpen ? "hidden xl:block" : ""}`}>{feedback}</section> : null}
 
-      <section className="rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-2 shadow-[0_16px_34px_rgba(2,8,23,0.18)]">
+      <section className={`rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-2 shadow-[0_16px_34px_rgba(2,8,23,0.18)] ${mobileConversationOpen ? "hidden xl:block" : ""}`}>
         <button
           type="button"
           onClick={() => setSummaryExpanded((current) => !current)}
@@ -1092,7 +1092,7 @@ export default function AdminAtendimentoPage() {
         ) : null}
       </section>
 
-      <section className="grid min-h-0 flex-1 items-stretch gap-3 overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)]">
+      <section className={`grid min-h-0 flex-1 items-stretch gap-3 overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)] ${mobileConversationOpen ? "xl:grid-cols-[280px_minmax(0,1fr)]" : ""}`}>
         <div className={`flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)] ${mobileConversationOpen ? "hidden xl:flex" : ""}`}>
           <div className="shrink-0 border-b border-white/10 px-3 py-2.5">
             <p className="text-sm font-bold text-white">Conversas do projeto</p>
@@ -1167,7 +1167,13 @@ export default function AdminAtendimentoPage() {
           </div>
         </div>
 
-        <div className={`grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)] ${mobileConversationOpen ? "grid xl:grid" : "hidden xl:grid"}`}>
+        <div
+          className={`grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)] ${
+            mobileConversationOpen
+              ? "fixed inset-0 z-40 rounded-none bg-[#07111f] xl:relative xl:inset-auto xl:z-auto xl:rounded-[22px] xl:bg-white/[0.02]"
+              : "hidden rounded-[22px] xl:grid"
+          }`}
+        >
           {selectedChat ? (
             <>
               <div className="shrink-0 border-b border-white/10 px-3 py-2.5 sm:px-4">
