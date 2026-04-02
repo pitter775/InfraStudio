@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -636,7 +636,7 @@ function stripDecorativeCharacters(value: string) {
   return value
     .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
     .replace(/[\u2600-\u27BF]/gu, "")
-    .replace(/[✓✔✕✖✳⭐🔥💬📌🎯⚙️❓🔁]/gu, "")
+    .replace(/[âœ“âœ”âœ•âœ–âœ³â­ðŸ”¥ðŸ’¬ðŸ“ŒðŸŽ¯âš™ï¸â“ðŸ”]/gu, "")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
@@ -2629,7 +2629,7 @@ function AgenteModal({
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{asset.nome}</p>
                           <p className="text-xs text-slate-400">
-                            {asset.arquivoNome} • {formatFileSize(asset.tamanhoBytes)}
+                            {asset.arquivoNome} â€¢ {formatFileSize(asset.tamanhoBytes)}
                           </p>
                           <a
                             href={asset.publicUrl}
@@ -2675,7 +2675,7 @@ function AgenteModal({
                         <AgenteAssetPreview categoria={item.file.type.startsWith("image/") ? "image" : "file"} file={item.file} alt={item.file.name} />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{item.file.name}</p>
-                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} • aguardando upload</p>
+                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} â€¢ aguardando upload</p>
                         </div>
                       </div>
                       <button
@@ -2830,7 +2830,7 @@ function AgenteModal({
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{asset.nome}</p>
                           <p className="text-xs text-slate-400">
-                            {asset.arquivoNome} • {formatFileSize(asset.tamanhoBytes)}
+                            {asset.arquivoNome} â€¢ {formatFileSize(asset.tamanhoBytes)}
                           </p>
                           <a
                             href={asset.publicUrl}
@@ -2875,7 +2875,7 @@ function AgenteModal({
                         <AgenteAssetPreview categoria={item.file.type.startsWith("image/") ? "image" : "file"} file={item.file} alt={item.file.name} />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{item.file.name}</p>
-                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} • aguardando upload</p>
+                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} â€¢ aguardando upload</p>
                         </div>
                       </div>
                       <button
@@ -3307,10 +3307,8 @@ function ConnectorModal({
   agentes,
   saving,
   feedback,
-  copiedTutorial,
   onClose,
   onChange,
-  onCopyTutorial,
   onSubmit,
 }: {
   open: boolean;
@@ -3318,14 +3316,10 @@ function ConnectorModal({
   agentes: Agente[];
   saving: boolean;
   feedback: string | null;
-  copiedTutorial: boolean;
   onClose: () => void;
   onChange: (next: Partial<ConnectorFormState>) => void;
-  onCopyTutorial: () => void;
   onSubmit: () => void;
 }) {
-  const [tutorialOpen, setTutorialOpen] = useState(false);
-
   if (!open) {
     return null;
   }
@@ -3444,82 +3438,10 @@ function ConnectorModal({
               </div>
             ) : null}
             <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-white">Cadastro guiado do app Mercado Livre</p>
-                  <p className="mt-1 text-xs text-cyan-100/80">Abra o mini tutorial para ver os links, campos e permissoes que o usuario precisa preencher.</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setTutorialOpen((current) => !current)}
-                    className={primaryActionButtonClass}
-                  >
-                    {tutorialOpen ? <Minimize2 size={14} /> : <Expand size={14} />}
-                    {tutorialOpen ? "Fechar tutorial" : "Mini tutorial"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onCopyTutorial}
-                    className={primaryActionButtonClass}
-                  >
-                    {copiedTutorial ? <CheckCircle2 size={14} /> : <Copy size={14} />}
-                    {copiedTutorial ? "Copiado" : "Copiar tutorial"}
-                  </button>
-                </div>
-              </div>
-              {tutorialOpen ? <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4 text-xs leading-6 text-slate-200">
-                <p>Abre esse link:</p>
-                <p className="font-semibold text-white">https://developers.mercadolivre.com.br/apps</p>
-                <p className="mt-3">Clica em “Criar aplicação”</p>
-                <p className="mt-3">Preenche assim:</p>
-                <p>Nome: InfraStudio</p>
-                <p>Tipo: Web</p>
-                <p>URL de retorno OAuth:</p>
-                <p className="font-semibold text-white">https://infrastudio.vercel.app/api/admin/conectores/mercado-livre/callback</p>
-                <p className="mt-3">Callback URL Notifications / webhook:</p>
-                <p className="font-semibold text-white">https://infrastudio.vercel.app/api/mercado-livre/webhook</p>
-                <p className="mt-3">Fluxos OAuth:</p>
-                <p>Authorization Code: ativo</p>
-                <p>Refresh Token: ativo</p>
-                <p>PKCE necessario: ativo</p>
-                <p className="mt-3">Permissoes do app:</p>
-                <p>Usuarios: Leitura e escrita</p>
-                <p>Publicacao e sincronizacao: Leitura e escrita</p>
-                <p>Metricas do negocio: Leitura</p>
-                <p className="mt-3">Negocio liberado:</p>
-                <p>Mercado Livre: marcado</p>
-                <p className="mt-3">Depois de criar, vao aparecer 2 codigos na tela:</p>
-                <p>APP ID</p>
-                <p>CLIENT SECRET</p>
-                <p className="mt-3">Envie esses dois dados para configurar a integracao da loja.</p>
-                <p className="mt-3">Se aparecer botao de “autorizar” ou “permitir”, pode seguir normalmente.</p>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-3 text-emerald-50">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100">Obrigatorio agora</p>
-                    <p className="mt-2">Tipo do app: Web</p>
-                    <p>URL de retorno OAuth configurada</p>
-                    <p>PKCE ativo</p>
-                    <p>Publicacao e sincronizacao: Leitura e escrita</p>
-                    <p>APP ID</p>
-                    <p>CLIENT SECRET</p>
-                  </div>
-                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-3 text-amber-50">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-100">Links para cadastro</p>
-                    <p className="mt-2">OAuth callback:</p>
-                    <p className="font-semibold text-white">https://infrastudio.vercel.app/api/admin/conectores/mercado-livre/callback</p>
-                    <p className="mt-2">Webhook de notificacoes:</p>
-                    <p className="font-semibold text-white">https://infrastudio.vercel.app/api/mercado-livre/webhook</p>
-                  </div>
-                </div>
-                <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Permissoes e marcacoes</p>
-                  <p className="mt-2">Permita a autorizacao da conta quando o Mercado Livre pedir o consentimento.</p>
-                  <p>Se houver secao de notificacoes ou Callback URL Notifications, cole a URL de webhook acima.</p>
-                  <p>Se mudar as permissoes do app depois, desvincule a autorizacao anterior e conecte novamente no InfraStudio.</p>
-                  <p>Para a integracao atual do InfraStudio, o essencial e concluir o OAuth, ativar Publicacao e sincronizacao e informar APP ID + CLIENT SECRET.</p>
-                </div>
-              </div> : null}
+              <p className="text-sm font-semibold text-white">Cadastro da integracao</p>
+              <p className="mt-1 text-xs leading-6 text-cyan-100/80">
+                Preencha aqui apenas os dados da loja. O passo a passo com callback, webhook e permissoes fica no tutorial da lateral direita da aba Mercado Livre.
+              </p>
             </div>
             <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
               <input type="checkbox" checked={form.ativo} onChange={(event) => onChange({ ativo: event.target.checked })} />
@@ -6972,7 +6894,7 @@ export default function AdminProjetoDetalhePage() {
                 ].filter(Boolean);
                 const miniSummary = miniSummaryParts.length
                   ? `Configurado com ${miniSummaryParts.join(", ")}.`
-                  : "Ainda sem canais, APIs ou integrações vinculadas.";
+                  : "Ainda sem canais, APIs ou integraÃ§Ãµes vinculadas.";
                 const agentCardPreview = (() => {
                   const source = normalizeAgentText(agente.promptBase || agente.descricao || "");
                   if (!source) {
@@ -7054,7 +6976,7 @@ export default function AdminProjetoDetalhePage() {
                             {agente.ativo ? "ativo" : "inativo"}
                           </span>
                         </div>
-                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descrição."}</p>
+                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descriÃ§Ã£o."}</p>
                       </div>
                     </div>
 
@@ -7130,7 +7052,7 @@ export default function AdminProjetoDetalhePage() {
                                   diagnostic.connections.whatsappChannels.length ? `${diagnostic.connections.whatsappChannels.length} WhatsApp` : null,
                                   diagnostic.connections.connectors.length ? `${diagnostic.connections.connectors.length} fonte(s)` : null,
                                   diagnostic.connections.apis.length ? `${diagnostic.connections.apis.length} API(s)` : null,
-                                ].filter(Boolean).join(" | ") || "sem vínculos diretos"}
+                                ].filter(Boolean).join(" | ") || "sem vÃ­nculos diretos"}
                               </span>
                             </p>
                             {diagnostic.warnings.length ? (
@@ -7405,33 +7327,12 @@ export default function AdminProjetoDetalhePage() {
         onSubmit={() => void handleApiSubmit()}
         onTest={() => void handleTestApi()}
       />
-      <WidgetModal
-        open={widgetModalOpen}
-        form={widgetForm}
-        agentes={data.agentes}
-        saving={savingWidget}
-        feedback={feedbackWidget}
-        onClose={() => {
-          setWidgetModalOpen(false);
-          resetWidgetForm();
-        }}
-        onChange={(next) =>
-          setWidgetForm((prev) => ({
-            ...prev,
-            ...next,
-            whatsappCelular: next.whatsappCelular !== undefined ? next.whatsappCelular : prev.whatsappCelular,
-            projetoId: params.id,
-          }))
-        }
-        onSubmit={() => void handleWidgetSubmit()}
-      />
       <ConnectorModal
         open={connectorModalOpen}
         form={connectorForm}
         agentes={data.agentes}
         saving={savingConnector}
         feedback={feedbackConnector}
-        copiedTutorial={copiedSnippetKey === "mercado-livre-oauth-tutorial"}
         onClose={handleCloseConnectorModal}
         onChange={(next) =>
           setConnectorForm((prev) => ({
@@ -7439,53 +7340,6 @@ export default function AdminProjetoDetalhePage() {
             ...next,
             projetoId: params.id,
           }))
-        }
-        onCopyTutorial={() =>
-          void handleCopySnippet(
-            "mercado-livre-oauth-tutorial",
-            [
-              "Abre esse link:",
-              "https://developers.mercadolivre.com.br/apps",
-              "",
-              "Clica em \"Criar aplicação\"",
-              "",
-              "Preenche assim:",
-              "Nome: InfraStudio",
-              "Tipo: Web",
-              "URL de retorno OAuth:",
-              "https://infrastudio.vercel.app/api/admin/conectores/mercado-livre/callback",
-              "",
-              "Callback URL Notifications / webhook:",
-              "https://infrastudio.vercel.app/api/mercado-livre/webhook",
-              "",
-              "Fluxos OAuth:",
-              "- Authorization Code: ativo",
-              "- Refresh Token: ativo",
-              "- PKCE necessario: ativo",
-              "",
-              "Permissoes do app:",
-              "- Usuarios: Leitura e escrita",
-              "- Publicacao e sincronizacao: Leitura e escrita",
-              "- Metricas do negocio: Leitura",
-              "",
-              "Negocio liberado:",
-              "- Mercado Livre: marcado",
-              "",
-              "Permissoes e marcacoes:",
-              "- Permita a autorizacao da conta quando o Mercado Livre pedir",
-              "- Se houver secao de notificacoes ou Callback URL Notifications, cole a URL de webhook acima",
-              "- Se mudar as permissoes do app depois, desvincule a autorizacao anterior e conecte novamente no InfraStudio",
-              "- Para a integracao atual do InfraStudio, o essencial e concluir o OAuth, ativar Publicacao e sincronizacao e pegar APP ID + CLIENT SECRET",
-              "",
-              "Depois de criar, vao aparecer 2 codigos na tela:",
-              "APP ID",
-              "CLIENT SECRET",
-              "",
-              "Envie esses dois dados para configurar a integracao da loja.",
-              "",
-              "Se aparecer botao de \"autorizar\" ou \"permitir\", pode seguir normalmente.",
-            ].join("\n"),
-          )
         }
         onSubmit={() => void handleConnectorSubmit()}
       />
