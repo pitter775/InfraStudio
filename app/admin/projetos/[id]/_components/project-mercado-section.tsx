@@ -60,14 +60,14 @@ export function ProjectMercadoSection({
             <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Cable size={18} className="text-violet-200" />Mercado Livre</h3>
             <p className="mt-1 text-sm text-slate-400">Gerencie aqui as lojas e credenciais do Mercado Livre deste projeto.</p>
           </div>
-          <button type="button" onClick={onOpenNewConnector} className={createButtonClass}>
+          <button type="button" onClick={onOpenNewConnector} className={`${createButtonClass} w-auto self-start lg:self-auto`}>
             <Plus size={16} />
             Nova loja
           </button>
         </div>
 
-        <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1.1fr),360px]">
-          <div className="space-y-3">
+        <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1.22fr),360px] xl:items-start">
+          <div className="space-y-3 xl:min-w-0">
             {connectors.length ? (
               connectors.map((connector) => {
                 const agente = onResolveConnectorAgent(connector);
@@ -142,7 +142,7 @@ export function ProjectMercadoSection({
             )}
           </div>
 
-          <aside className="rounded-2xl border border-amber-400/14 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(15,23,42,0.22))] p-5 shadow-[0_18px_36px_rgba(2,8,23,0.18)] xl:sticky xl:top-6">
+          <aside className="rounded-2xl border border-amber-400/14 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(15,23,42,0.22))] p-5 shadow-[0_18px_36px_rgba(2,8,23,0.18)] xl:sticky xl:top-6 xl:max-w-[360px] xl:justify-self-end">
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-100/85">Tutorial rapido</p>
             <h4 className="mt-2 text-lg font-bold text-white">Como conectar o Mercado Livre</h4>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">Como agora fica uma loja por projeto, deixei aqui o passo a passo rapido com os dados principais para o usuario concluir o app e o OAuth sem precisar sair copiando link quebrado.</p>
