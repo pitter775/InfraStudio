@@ -933,6 +933,9 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
         contactName: inboundWhatsappContext?.contactName ?? null,
         profilePicUrl: inboundWhatsappContext?.profilePicUrl ?? null,
         profilePicUrlPresent: Boolean(inboundWhatsappContext?.profilePicUrl),
+        rawContact: isPlainObject(inboundWhatsappContext?.rawContact)
+          ? inboundWhatsappContext.rawContact
+          : null,
         rawWhatsappContext: inboundWhatsappContext,
         rawLeadContext: inboundLeadContext,
         resolvedSnapshot: inboundContactSnapshot,
