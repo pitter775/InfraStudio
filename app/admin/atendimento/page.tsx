@@ -36,6 +36,9 @@ type ChatRecord = {
       contactName?: string | null;
       remotePhone?: string | null;
       profilePicUrl?: string | null;
+      rawContact?: {
+        profilePicUrl?: string | null;
+      } | null;
     } | null;
   } | null;
   handoff?: {
@@ -208,7 +211,10 @@ function getChatPhone(chat: ChatRecord) {
 }
 
 function getChatAvatarUrl(chat: ChatRecord) {
-  const value = chat.contatoAvatarUrl || chat.contexto?.whatsapp?.profilePicUrl;
+  const value =
+    chat.contatoAvatarUrl ||
+    chat.contexto?.whatsapp?.profilePicUrl ||
+    chat.contexto?.whatsapp?.rawContact?.profilePicUrl;
   const normalized = typeof value === "string" ? value.trim() : "";
   if (!normalized) {
     return null;

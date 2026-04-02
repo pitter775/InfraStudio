@@ -33,6 +33,7 @@ export async function POST(request: Request) {
         chatId: result.chatId,
         reply: result.reply,
         followUpReply: result.followUpReply ?? "",
+        messageSequence: Array.isArray(result.messageSequence) ? result.messageSequence : [],
         assets: result.assets,
         whatsapp: result.whatsapp,
       },

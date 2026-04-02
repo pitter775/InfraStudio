@@ -107,6 +107,9 @@ function extractChatContactSnapshot(
           remotePhone?: string | null;
           remetente?: string | null;
           profilePicUrl?: string | null;
+          rawContact?: {
+            profilePicUrl?: string | null;
+          } | null;
         })
       : null;
 
@@ -117,7 +120,9 @@ function extractChatContactSnapshot(
       normalizeOptionalText(whatsapp?.remotePhone) ??
       normalizeOptionalText(whatsapp?.remetente) ??
       normalizeOptionalText(fallbackExternalIdentifier),
-    contatoAvatarUrl: normalizeOptionalText(whatsapp?.profilePicUrl),
+    contatoAvatarUrl:
+      normalizeOptionalText(whatsapp?.profilePicUrl) ??
+      normalizeOptionalText(whatsapp?.rawContact?.profilePicUrl),
   };
 }
 

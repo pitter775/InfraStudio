@@ -120,7 +120,13 @@ function getWhatsAppContactAvatarFromContext(context: Record<string, unknown> | 
   }
 
   const value = context.whatsapp.profilePicUrl;
-  return typeof value === "string" && value.trim() ? value.trim() : null;
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  const rawContact = isPlainObject(context.whatsapp.rawContact) ? context.whatsapp.rawContact : null;
+  const fallbackValue = rawContact?.profilePicUrl;
+  return typeof fallbackValue === "string" && fallbackValue.trim() ? fallbackValue.trim() : null;
 }
 
 function resolveChatContactSnapshot(
@@ -154,6 +160,7 @@ function buildSilentChatResult(chatId?: string | null) {
     chatId: chatId ?? "",
     reply: "",
     followUpReply: "",
+    messageSequence: [],
     assets: [],
     whatsapp: null,
   };
@@ -338,11 +345,64 @@ function stripAssistantMetaReply(reply: string, channelKind: ChatChannelKind) {
   return channelKind === "whatsapp" ? formatWhatsAppOutboundText(sanitized) : sanitized;
 }
 
+function buildWhatsAppMessageSequence(
+  reply: string,
+  assets: unknown,
+  followUpReply?: string | null,
+) {
+  const messages: string[] = [];
+  const intro = formatWhatsAppOutboundText(reply);
+  if (intro) {
+    messages.push(intro);
+  }
+
+  if (Array.isArray(assets)) {
+    for (const asset of assets.slice(0, 3)) {
+      if (!asset || typeof asset !== "object" || Array.isArray(asset)) {
+        continue;
+      }
+
+      const targetUrl = "targetUrl" in asset ? String((asset as { targetUrl?: string | null }).targetUrl || "").trim() : "";
+      const whatsappText = "whatsappText" in asset ? String((asset as { whatsappText?: string | null }).whatsappText || "").trim() : "";
+      const descricao = "descricao" in asset ? String((asset as { descricao?: string | null }).descricao || "").trim() : "";
+      const supportText = whatsappText || descricao;
+
+      if (!targetUrl && !supportText) {
+        continue;
+      }
+
+      const parts = [];
+      if (targetUrl) {
+        parts.push(targetUrl);
+      }
+      if (supportText) {
+        if (parts.length) {
+          parts.push("");
+        }
+        parts.push(supportText);
+      }
+
+      const message = formatWhatsAppOutboundText(parts.join("\n").trim());
+      if (message) {
+        messages.push(message);
+      }
+    }
+  }
+
+  const followUp = formatWhatsAppOutboundText(String(followUpReply || ""));
+  if (followUp) {
+    messages.push(followUp);
+  }
+
+  return messages;
+}
+
 function buildBillingBlockedResult(chatId: string, message: string) {
   return {
     chatId,
     reply: message,
     followUpReply: "",
+    messageSequence: [],
     assets: [],
     whatsapp: null,
   };
@@ -1421,6 +1481,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     chatId: chat.id,
     reply: assistantMessage.conteudo ?? primaryReply,
     followUpReply,
+    messageSequence: channelKind === "whatsapp" ? buildWhatsAppMessageSequence(primaryReply, ai.assets ?? [], followUpReply) : [],
     assets: ai.assets ?? [],
     whatsapp,
   };
