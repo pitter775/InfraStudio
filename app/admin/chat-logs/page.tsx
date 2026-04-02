@@ -100,6 +100,18 @@ function buildCompactDetails(log: SystemLog) {
   return details.join(" | ");
 }
 
+function formatPayloadPreview(payload: Record<string, unknown> | null) {
+  if (!payload) {
+    return null;
+  }
+
+  try {
+    return JSON.stringify(payload, null, 2);
+  } catch {
+    return null;
+  }
+}
+
 export default function AdminChatLogsPage() {
   const router = useRouter();
   const [logs, setLogs] = useState<SystemLog[]>([]);
@@ -213,6 +225,7 @@ export default function AdminChatLogsPage() {
       <section className="space-y-2">
         {logs.map((log, index) => {
           const compactDetails = buildCompactDetails(log);
+          const payloadPreview = formatPayloadPreview(log.payload);
           const lineClass =
             log.level === "error"
               ? "border-red-500/35 bg-[linear-gradient(90deg,rgba(239,68,68,0.2),rgba(127,29,29,0.16))] text-red-100 shadow-[inset_3px_0_0_rgba(248,113,113,0.85)]"
@@ -250,6 +263,11 @@ export default function AdminChatLogsPage() {
                   </>
                 ) : null}
               </p>
+              {payloadPreview ? (
+                <pre className={`mt-2 overflow-x-auto rounded-xl border px-3 py-2 text-[10px] leading-5 ${log.level === "error" ? "border-red-400/20 bg-red-950/20 text-red-100/90" : "border-white/10 bg-slate-950/30 text-slate-300"}`}>
+                  {payloadPreview}
+                </pre>
+              ) : null}
             </article>
           );
         })}
