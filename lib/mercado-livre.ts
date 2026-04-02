@@ -54,10 +54,18 @@ type MercadoLivreSearchItem = {
   thumbnail?: string;
   permalink?: string;
   catalog_product_id?: string;
+  status?: string;
   date_created?: string;
   start_time?: string;
   stop_time?: string;
   last_updated?: string;
+};
+
+type MercadoLivrePermalinksResponse = {
+  Permalinks?: Array<{
+    channel?: string;
+    permalink?: string;
+  }>;
 };
 
 type MercadoLivreSearchResponse = {
@@ -229,11 +237,14 @@ function buildSearchVariants(value: string) {
 }
 
 function normalizeProduto(item: MercadoLivreSearchItem): ProdutoPadronizado | null {
+  if (typeof item.status === "string" && item.status.trim().toLowerCase() !== "active") {
+    return null;
+  }
+
   if (
     typeof item.title !== "string" ||
     typeof item.price !== "number" ||
-    typeof item.thumbnail !== "string" ||
-    typeof item.permalink !== "string"
+    typeof item.thumbnail !== "string"
   ) {
     return null;
   }
@@ -274,7 +285,11 @@ function extractMercadoLivreItemId(value: string | null | undefined) {
 function dedupeProdutos(produtos: ProdutoPadronizado[]) {
   const seen = new Set<string>();
   return produtos.filter((produto) => {
-    const key = produto.link.trim().toLowerCase();
+    const key = (
+      String(produto.id || "").trim().toLowerCase() ||
+      String(produto.link || "").trim().toLowerCase() ||
+      `${normalizeSearchText(produto.nome)}|${produto.preco}|${String(produto.imagem || "").trim().toLowerCase()}`
+    ).trim();
     if (!key || seen.has(key)) {
       return false;
     }
@@ -313,6 +328,36 @@ function truncateText(value: string, max = 280) {
   return `${normalized.slice(0, max)}...`;
 }
 
+function buildMercadoLivreProductLogSample(products: Array<{
+  id?: string | null;
+  title?: string | null;
+  price?: number | null;
+  status?: string | null;
+  permalink?: string | null;
+  catalogProductId?: string | null;
+  marketplacePermalink?: string | null;
+  finalLink?: string | null;
+}>) {
+  return products.slice(0, 8).map((product) => ({
+    id: product.id ?? null,
+    title: product.title ?? null,
+    price: typeof product.price === "number" ? product.price : null,
+    status: product.status ?? null,
+    permalink: product.permalink ?? null,
+    catalogProductId: product.catalogProductId ?? null,
+    marketplacePermalink: product.marketplacePermalink ?? null,
+    finalLink: product.finalLink ?? null,
+  }));
+}
+
+function extractMarketplacePermalink(payload: MercadoLivrePermalinksResponse) {
+  const marketplaceEntry = (payload.Permalinks ?? []).find(
+    (entry) => typeof entry.channel === "string" && entry.channel.trim().toLowerCase() === "marketplace",
+  );
+
+  return normalizeMercadoLivrePermalink(marketplaceEntry?.permalink);
+}
+
 function buildMercadoLivreFriendlyError(message: string) {
   if (/PA_UNAUTHORIZED_RESULT_FROM_POLICIES|PolicyAgent/i.test(message)) {
     if (/listar itens do seller|carregar detalhes dos itens|\/items/i.test(message)) {
@@ -334,6 +379,7 @@ async function fetchMercadoLivreProducts(input: {
 }) {
   const endpoint = new URL("/sites/MLB/search", input.endpointBase);
   endpoint.searchParams.set("q", input.termo);
+  endpoint.searchParams.set("limit", String(Math.max(12, Math.min(input.limit ?? 12, 50))));
 
   if (input.sellerId) {
     endpoint.searchParams.set("seller_id", input.sellerId);
@@ -358,16 +404,46 @@ async function fetchMercadoLivreProducts(input: {
     }
 
     const payload = (await response.json()) as MercadoLivreSearchResponse;
-    const products = (payload.results ?? [])
-      .map((item) => normalizeProduto(item))
-      .filter(Boolean)
-      .slice(0, input.limit ?? 12) as ProdutoPadronizado[];
-
-    return await enrichMercadoLivreProductsWithDetails({
+    const rawResults = (payload.results ?? []).slice(0, Math.max(12, Math.min(input.limit ?? 12, 50)));
+    const products = rawResults.map((item) => normalizeProduto(item)).filter(Boolean).slice(0, input.limit ?? 12) as ProdutoPadronizado[];
+    const enrichedProducts = await enrichMercadoLivreProductsWithDetails({
       endpointBase: input.endpointBase,
       accessToken: input.accessToken,
       products,
     });
+
+    await appendSystemLog({
+      tipo: "mercado_livre_search_payload_debug",
+      origem: "mercado_livre",
+      descricao: "Diagnostico do payload de busca do Mercado Livre.",
+      skipErrorGate: true,
+      payload: {
+        termo: input.termo,
+        sellerId: input.sellerId ?? null,
+        totalResultadosBusca: payload.results?.length ?? 0,
+        sampleSearchResults: buildMercadoLivreProductLogSample(
+          rawResults.map((item, index) => ({
+            id: typeof item.id === "string" ? item.id : null,
+            title: typeof item.title === "string" ? item.title : null,
+            price: typeof item.price === "number" ? item.price : null,
+            status: typeof item.status === "string" ? item.status : null,
+            permalink: typeof item.permalink === "string" ? item.permalink : null,
+            catalogProductId: typeof item.catalog_product_id === "string" ? item.catalog_product_id : null,
+            finalLink: enrichedProducts[index]?.link || products[index]?.link || null,
+          })),
+        ),
+        sampleNormalizedProducts: buildMercadoLivreProductLogSample(
+          enrichedProducts.map((product) => ({
+            id: product.id,
+            title: product.nome,
+            price: product.preco,
+            finalLink: product.link || null,
+          })),
+        ),
+      },
+    });
+
+    return enrichedProducts;
   } catch (error) {
     if ((error as Error).name !== "AbortError") {
       console.error("[mercado-livre] failed to fetch products", error);
@@ -420,7 +496,7 @@ async function enrichMercadoLivreProductsWithDetails(input: {
       }
     }
 
-    return input.products.map((product) => {
+    const enrichedProducts = input.products.map((product) => {
       const itemId = typeof product.id === "string" ? product.id.trim().toUpperCase() : "";
       const detailed = itemId ? detailedById.get(itemId) : null;
       return detailed
@@ -431,9 +507,96 @@ async function enrichMercadoLivreProductsWithDetails(input: {
           }
         : product;
     });
+
+    const productsMissingLink = enrichedProducts.filter((product) => !String(product.link || "").trim());
+    if (!productsMissingLink.length) {
+      return enrichedProducts;
+    }
+
+    const permalinksById = await fetchMercadoLivrePermalinks({
+      endpointBase: input.endpointBase,
+      accessToken: input.accessToken,
+      itemIds: productsMissingLink
+        .map((product) => (typeof product.id === "string" ? product.id.trim().toUpperCase() : ""))
+        .filter(Boolean),
+    });
+
+    const productsWithPermalinks = enrichedProducts.map((product) => {
+      const itemId = typeof product.id === "string" ? product.id.trim().toUpperCase() : "";
+      const marketplacePermalink = itemId ? permalinksById.get(itemId) || "" : "";
+
+      return marketplacePermalink
+        ? {
+            ...product,
+            link: marketplacePermalink,
+          }
+        : product;
+    });
+
+    await appendSystemLog({
+      tipo: "mercado_livre_permalink_resolution_debug",
+      origem: "mercado_livre",
+      descricao: "Diagnostico da resolucao de links do Mercado Livre.",
+      skipErrorGate: true,
+      payload: {
+        totalProducts: input.products.length,
+        totalMissingLinkBeforePermalinks: productsMissingLink.length,
+        totalResolvedWithFinalLink: productsWithPermalinks.filter((product) => String(product.link || "").trim()).length,
+        sampleProducts: buildMercadoLivreProductLogSample(
+          productsWithPermalinks.map((product) => {
+            const itemId = typeof product.id === "string" ? product.id.trim().toUpperCase() : "";
+            return {
+              id: product.id,
+              title: product.nome,
+              price: product.preco,
+              marketplacePermalink: itemId ? permalinksById.get(itemId) || null : null,
+              finalLink: product.link || null,
+            };
+          }),
+        ),
+      },
+    });
+
+    return productsWithPermalinks;
   } catch {
     return input.products;
   }
+}
+
+async function fetchMercadoLivrePermalinks(input: {
+  endpointBase: string;
+  accessToken?: string;
+  itemIds: string[];
+}) {
+  const results = new Map<string, string>();
+
+  for (const itemId of input.itemIds.slice(0, 20)) {
+    try {
+      const endpoint = new URL(`/items/${itemId}/permalinks`, input.endpointBase);
+      const response = await fetch(endpoint.toString(), {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          ...(input.accessToken ? { Authorization: `Bearer ${input.accessToken}` } : {}),
+        },
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        continue;
+      }
+
+      const payload = (await response.json()) as MercadoLivrePermalinksResponse;
+      const marketplacePermalink = extractMarketplacePermalink(payload);
+      if (marketplacePermalink) {
+        results.set(itemId, marketplacePermalink);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return results;
 }
 
 function rankProdutosByTermo(produtos: ProdutoPadronizado[], termo: string) {
@@ -540,6 +703,8 @@ type MercadoLivreItemDetailsResponse = Array<{
     price?: number;
     thumbnail?: string;
     permalink?: string;
+    catalog_product_id?: string;
+    status?: string;
     date_created?: string;
     start_time?: string;
     last_updated?: string;
@@ -560,6 +725,7 @@ type MercadoLivreItemResponse = {
   thumbnail?: string;
   permalink?: string;
   catalog_product_id?: string;
+  status?: string;
   date_created?: string;
   start_time?: string;
   last_updated?: string;
@@ -615,7 +781,8 @@ async function fetchMercadoLivreLatestProducts(input: {
   connector?: ConnectorRecord | null;
 }) {
   const searchEndpoint = new URL(`/users/${input.sellerId}/items/search`, input.endpointBase);
-  searchEndpoint.searchParams.set("limit", String(input.limit ?? 5));
+  searchEndpoint.searchParams.set("limit", String(input.limit ?? 20));
+  searchEndpoint.searchParams.set("orders", "last_updated_desc");
 
   const searchResponse = await fetch(searchEndpoint.toString(), {
     method: "GET",
@@ -687,7 +854,13 @@ async function fetchMercadoLivreLatestProducts(input: {
 
   const detailsPayload = (await detailsResponse.json()) as MercadoLivreItemDetailsResponse;
   return detailsPayload
-    .map((entry) => (entry.body ? normalizeProduto(entry.body) : null))
+    .map((entry) =>
+      entry.body && typeof entry.body.status === "string" && entry.body.status.trim().toLowerCase() !== "active"
+        ? null
+        : entry.body
+          ? normalizeProduto(entry.body)
+          : null,
+    )
     .filter(Boolean) as ProdutoPadronizado[];
 }
 
@@ -798,6 +971,14 @@ export async function buscarProdutosMercadoLivrePorAgente(
         excludeRefs: options?.excludeRefs ?? [],
         limit: options?.limit ?? 3,
         connectorIds: conectores.map((connector) => connector.id),
+        sampleProdutos: buildMercadoLivreProductLogSample(
+          produtos.map((produto) => ({
+            id: produto.id,
+            title: produto.nome,
+            price: produto.preco,
+            finalLink: produto.link || null,
+          })),
+        ),
       },
     });
 
