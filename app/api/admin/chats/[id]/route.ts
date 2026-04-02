@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { canAccessAdmin, canAccessProject } from "@/lib/access";
 import { appendSystemLog } from "@/lib/chat-logs";
 import { claimHumanHandoff, getChatHandoffByChatId } from "@/lib/chat-handoffs";
-import { appendMessage, getChatById, listChatMessages, touchChatUpdatedAt } from "@/lib/chats";
+import { appendMessage, deleteChatConversation, getChatById, listChatMessages, touchChatUpdatedAt } from "@/lib/chats";
 import { getSessionUser } from "@/lib/session";
 import { sendWhatsAppServiceMessage } from "@/lib/whatsapp-service";
 
@@ -175,4 +175,44 @@ export async function POST(request: Request, context: RouteContext) {
 
   await touchChatUpdatedAt(chat.id);
   return NextResponse.json({ message }, { status: 201 });
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  const user = await getSessionUser();
+
+  if (!canAccessAdmin(user)) {
+    return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+  }
+
+  const { id } = await context.params;
+  const chat = await getChatById(id);
+
+  if (!chat) {
+    return NextResponse.json({ error: "Conversa nao encontrada." }, { status: 404 });
+  }
+
+  if (!user?.isMaster && !canAccessProject(user, chat.projetoId)) {
+    return NextResponse.json({ error: "Acesso negado para esta conversa." }, { status: 403 });
+  }
+
+  const result = await deleteChatConversation(chat.id);
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error ?? "Nao foi possivel remover a conversa." }, { status: 500 });
+  }
+
+  await appendSystemLog({
+    projetoId: chat.projetoId,
+    tipo: "chat_deleted",
+    origem: "admin_chat",
+    descricao: "Conversa removida manualmente pelo modulo de atendimento.",
+    payload: {
+      chatId: chat.id,
+      canal: chat.canal,
+      identificadorExterno: chat.identificadorExterno,
+      removedByUsuarioId: user?.id ?? null,
+    },
+    skipErrorGate: true,
+  });
+
+  return NextResponse.json({ ok: true }, { status: 200 });
 }

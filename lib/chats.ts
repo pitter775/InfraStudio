@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { deleteChatAttachmentsByStoragePaths } from "@/lib/chat-attachments";
 
 export type ChatMessageRole = "user" | "assistant" | "system";
 export type ChatChannelKind = "web" | "whatsapp" | string;
@@ -508,4 +509,75 @@ export async function listChatMessages(chatId: string) {
   }
 
   return data.map((row) => mapMensagem(row as MensagemRow));
+}
+
+function extractAttachmentStoragePaths(metadata: Record<string, unknown> | null | undefined) {
+  const attachments =
+    metadata && Array.isArray(metadata.attachments)
+      ? metadata.attachments
+      : [];
+
+  return attachments
+    .map((attachment) => {
+      if (!attachment || typeof attachment !== "object" || Array.isArray(attachment)) {
+        return "";
+      }
+
+      const storagePath = "storagePath" in attachment ? String((attachment as { storagePath?: string | null }).storagePath || "").trim() : "";
+      return storagePath;
+    })
+    .filter(Boolean);
+}
+
+export async function deleteChatConversation(chatId: string) {
+  const supabase = getSupabaseAdminClient();
+  const chat = await getChatById(chatId);
+
+  if (!chat) {
+    return { ok: false, error: "Conversa nao encontrada." };
+  }
+
+  const { data: messagesData, error: messagesReadError } = await supabase
+    .from("mensagens")
+    .select("id, metadata")
+    .eq("chat_id", chatId);
+
+  if (messagesReadError) {
+    console.error("[chats] failed to read chat messages before delete", messagesReadError);
+    return { ok: false, error: "Nao foi possivel carregar as mensagens da conversa." };
+  }
+
+  const storagePaths = ((messagesData ?? []) as Array<{ metadata?: Record<string, unknown> | null }>)
+    .flatMap((message) => extractAttachmentStoragePaths(message.metadata))
+    .filter(Boolean);
+
+  if (storagePaths.length) {
+    await deleteChatAttachmentsByStoragePaths(storagePaths);
+  }
+
+  const { error: handoffEventsError } = await supabase.from("chat_handoff_eventos").delete().eq("chat_id", chatId);
+  if (handoffEventsError) {
+    console.error("[chats] failed to delete chat handoff events", handoffEventsError);
+    return { ok: false, error: "Nao foi possivel limpar os eventos de atendimento humano." };
+  }
+
+  const { error: handoffError } = await supabase.from("chat_handoffs").delete().eq("chat_id", chatId);
+  if (handoffError) {
+    console.error("[chats] failed to delete chat handoff", handoffError);
+    return { ok: false, error: "Nao foi possivel limpar o estado de atendimento humano." };
+  }
+
+  const { error: messagesDeleteError } = await supabase.from("mensagens").delete().eq("chat_id", chatId);
+  if (messagesDeleteError) {
+    console.error("[chats] failed to delete chat messages", messagesDeleteError);
+    return { ok: false, error: "Nao foi possivel remover as mensagens da conversa." };
+  }
+
+  const { error: chatDeleteError } = await supabase.from("chats").delete().eq("id", chatId);
+  if (chatDeleteError) {
+    console.error("[chats] failed to delete chat", chatDeleteError);
+    return { ok: false, error: "Nao foi possivel remover a conversa." };
+  }
+
+  return { ok: true };
 }

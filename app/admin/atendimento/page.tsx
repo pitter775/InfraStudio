@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, ExternalLink, LoaderCircle, MessageCircleMore, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, X } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, ExternalLink, LoaderCircle, MessageCircleMore, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, Trash2, X } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -445,6 +445,7 @@ export default function AdminAtendimentoPage() {
   const [loadingChats, setLoadingChats] = useState(false);
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [deletingChat, setDeletingChat] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>("");
   const [chats, setChats] = useState<ChatRecord[]>([]);
@@ -749,6 +750,30 @@ export default function AdminAtendimentoPage() {
   }, [messagesByChatId, selectedChatId]);
 
   useEffect(() => {
+    if (!activeProjectId) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void loadChats(activeProjectId);
+    }, 10000);
+
+    return () => window.clearInterval(intervalId);
+  }, [activeProjectId]);
+
+  useEffect(() => {
+    if (!selectedChatId) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void loadConversation(selectedChatId);
+    }, 6000);
+
+    return () => window.clearInterval(intervalId);
+  }, [selectedChatId]);
+
+  useEffect(() => {
     if (!selectedChatId) {
       return;
     }
@@ -964,6 +989,55 @@ export default function AdminAtendimentoPage() {
     } catch {
       setFeedback("Nao foi possivel enviar a mensagem.");
       setSendingMessage(false);
+    }
+  };
+
+  const handleDeleteChat = async () => {
+    if (!selectedChatId || !activeProjectId || deletingChat) {
+      return;
+    }
+
+    const chatName = selectedChat ? getChatTitle(selectedChat) : "esta conversa";
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(`Remover todo o historico de ${chatName}? Essa limpeza apaga mensagens, handoff e anexos desta conversa no banco, mas mantem os dados de uso de tokens.`);
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setDeletingChat(true);
+    setFeedback(null);
+
+    try {
+      const deletedChatId = selectedChatId;
+      const response = await fetch(`/api/admin/chats/${deletedChatId}`, {
+        method: "DELETE",
+      });
+      const payload = (await response.json()) as { error?: string; ok?: boolean };
+
+      if (!response.ok) {
+        setFeedback(payload.error ?? "Nao foi possivel remover a conversa.");
+        setDeletingChat(false);
+        return;
+      }
+
+      setMessagesByChatId((current) => {
+        const next = { ...current };
+        delete next[deletedChatId];
+        return next;
+      });
+      setSelectedAttachments([]);
+      setReplyText("");
+      setMediaModalOpen(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      await loadChats(activeProjectId);
+      setFeedback("Conversa removida com sucesso.");
+      setDeletingChat(false);
+    } catch {
+      setFeedback("Nao foi possivel remover a conversa.");
+      setDeletingChat(false);
     }
   };
 
@@ -1371,6 +1445,16 @@ export default function AdminAtendimentoPage() {
                     <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${isChatUnderHumanHandoff(selectedChat) ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}`}>
                       {isChatUnderHumanHandoff(selectedChat) ? "Voce esta atendendo" : "IA atendendo"}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteChat()}
+                      disabled={deletingChat}
+                      className={`${compactButtonClass} border-rose-500/20 bg-rose-500/10 text-rose-100 hover:border-rose-400/30 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60`}
+                      title="Remover conversa"
+                    >
+                      {deletingChat ? <LoaderCircle size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                      Limpar conversa
+                    </button>
                     <button
                       type="button"
                       onClick={() => setMediaModalOpen(true)}
