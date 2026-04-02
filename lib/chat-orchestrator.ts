@@ -1355,9 +1355,50 @@ function shouldSearchProducts(message: string) {
   return /\btem\b.+\b(produt|item|modelo|cor|tamanho|sku|na loja)\b/.test(normalized);
 }
 
+function isGreetingOrAckMessage(message: string) {
+  const normalized = normalizeText(message)
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) {
+    return false;
+  }
+
+  return [
+    "oi",
+    "ola",
+    "opa",
+    "e ai",
+    "ei",
+    "bom dia",
+    "boa tarde",
+    "boa noite",
+    "obrigado",
+    "obrigada",
+    "valeu",
+    "blz",
+    "beleza",
+    "tudo bem",
+    "ok",
+    "okay",
+    "show",
+    "top",
+    "perfeito",
+    "entendi",
+    "certo",
+    "sim",
+    "nao",
+  ].includes(normalized);
+}
+
 function shouldContinueProductSearch(history: ConversationMessage[], latestUserMessage: string, context?: ConversationContext) {
   const normalized = normalizeText(latestUserMessage).trim();
   if (!normalized) {
+    return false;
+  }
+
+  if (isGreetingOrAckMessage(latestUserMessage)) {
     return false;
   }
 
@@ -1464,7 +1505,19 @@ const PRODUCT_SEARCH_STOPWORDS = new Set([
 ]);
 
 function buildProductSearchCandidates(message: string) {
+  if (isGreetingOrAckMessage(message)) {
+    return [];
+  }
+
   const baseTerm = extractProductSearchTerm(message);
+  if (isGreetingOrAckMessage(baseTerm)) {
+    return [];
+  }
+
+  if (baseTerm.trim().length <= 2) {
+    return [];
+  }
+
   const normalized = normalizeText(baseTerm).replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
   const tokens = normalized
     .split(/\s+/)
@@ -1621,9 +1674,7 @@ function shouldUseMercadoLivreConnectorFallback(
     return false;
   }
 
-  if (
-    /^(oi|ola|opa|bom dia|boa tarde|boa noite|obrigado|obrigada|valeu|blz|beleza|tudo bem)\b/.test(normalized)
-  ) {
+  if (isGreetingOrAckMessage(latestUserMessage)) {
     return false;
   }
 
@@ -2447,17 +2498,51 @@ export async function generateSalesReply(history: ConversationMessage[], context
           .flatMap((item) => [typeof item.id === "string" ? item.id : null, typeof item.link === "string" ? item.link : null])
           .filter((item): item is string => Boolean(item))
       : [];
+    const aggregatedProducts: ProdutoPadronizado[] = [];
+    const seenProductRefs = new Set<string>();
+
     for (const candidate of productSearchCandidates) {
       const currentProducts = await buscarProdutosMercadoLivrePorAgente(agent.id, candidate, {
-        excludeRefs: excludedProductRefs,
+        excludeRefs: [
+          ...excludedProductRefs,
+          ...aggregatedProducts.flatMap((item) => [typeof item.id === "string" ? item.id : null, typeof item.link === "string" ? item.link : null]),
+        ].filter((item): item is string => Boolean(item)),
         limit: 3,
       });
-      if (currentProducts.length) {
-        mercadoLivreProducts = currentProducts;
+
+      if (!currentProducts.length) {
+        continue;
+      }
+
+      if (!resolvedProductSearchTerm) {
         resolvedProductSearchTerm = candidate;
+      }
+
+      for (const product of currentProducts) {
+        const ref = (
+          String(product.id || "").trim().toLowerCase() ||
+          String(product.link || "").trim().toLowerCase() ||
+          `${normalizeText(product.nome)}|${product.preco}`
+        ).trim();
+
+        if (!ref || seenProductRefs.has(ref)) {
+          continue;
+        }
+
+        seenProductRefs.add(ref);
+        aggregatedProducts.push(product);
+      }
+
+      if (!resolvedProductSearchTerm && aggregatedProducts.length) {
+        resolvedProductSearchTerm = candidate;
+      }
+
+      if (aggregatedProducts.length >= 3) {
         break;
       }
     }
+
+    mercadoLivreProducts = aggregatedProducts.slice(0, 3);
   }
   const enrichMercadoLivreProductsForWhatsApp = async (products: ProdutoPadronizado[]) => {
     if (!isWhatsAppChannel(context) || !agent?.id || !products.length) {

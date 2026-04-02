@@ -325,6 +325,25 @@ function formatWhatsAppOutboundText(reply: string) {
     .trim();
 }
 
+function formatWhatsAppOutboundTextSafe(reply: string) {
+  return String(reply || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\*\*(.+?)\*\*/g, "*$1*")
+    .replace(/__(.+?)__/g, "*$1*")
+    .replace(/^[\-\*]\s+/gm, "â€¢ ")
+    .replace(/^(\d+)\)\s+/gm, "$1. ")
+    .replace(/^([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s]{1,28}):\s*/gm, (match, label: string) => {
+      const normalizedLabel = String(label || "").trim().toLowerCase();
+      if (["http", "https", "www"].includes(normalizedLabel)) {
+        return match;
+      }
+
+      return `*${String(label || "").trim()}:* `;
+    })
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function stripAssistantMetaReply(reply: string, channelKind: ChatChannelKind) {
   let sanitized = String(reply || "");
 
@@ -342,7 +361,7 @@ function stripAssistantMetaReply(reply: string, channelKind: ChatChannelKind) {
   }
 
   sanitized = sanitized.replace(/\n{3,}/g, "\n\n").trim();
-  return channelKind === "whatsapp" ? formatWhatsAppOutboundText(sanitized) : sanitized;
+  return channelKind === "whatsapp" ? formatWhatsAppOutboundTextSafe(sanitized) : sanitized;
 }
 
 function buildWhatsAppMessageSequence(
@@ -351,7 +370,7 @@ function buildWhatsAppMessageSequence(
   followUpReply?: string | null,
 ) {
   const messages: string[] = [];
-  const intro = formatWhatsAppOutboundText(reply);
+  const intro = formatWhatsAppOutboundTextSafe(reply);
   if (intro) {
     messages.push(intro);
   }
@@ -382,14 +401,14 @@ function buildWhatsAppMessageSequence(
         parts.push(supportText);
       }
 
-      const message = formatWhatsAppOutboundText(parts.join("\n").trim());
+      const message = formatWhatsAppOutboundTextSafe(parts.join("\n").trim());
       if (message) {
         messages.push(message);
       }
     }
   }
 
-  const followUp = formatWhatsAppOutboundText(String(followUpReply || ""));
+  const followUp = formatWhatsAppOutboundTextSafe(String(followUpReply || ""));
   if (followUp) {
     messages.push(followUp);
   }
