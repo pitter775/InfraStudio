@@ -31,6 +31,7 @@ type ReplyAsset = {
   categoria: "image" | "file";
   publicUrl: string;
   targetUrl?: string | null;
+  whatsappText?: string | null;
 };
 
 type RuntimeReplyAsset = ReplyAsset & {
@@ -256,6 +257,8 @@ function buildChannelReplyInstruction(context?: ConversationContext) {
     "Quando houver mais de um ponto, organize em lista curta e escaneavel.",
     "No WhatsApp, use *negrito* com um asterisco para destaques importantes, nao markdown com **dois** asteriscos.",
     "Se ajudar a leitura, use no maximo 1 icone simples por mensagem, como ✓, -> ou •.",
+    "Nunca descreva seu proprio estilo de atendimento, persona, tom, canal ou funcionamento interno para o cliente.",
+    "Nunca diga frases meta como 'seu atendimento acontece via WhatsApp', 'sou uma pessoa real', 'sou uma IA' ou equivalentes.",
     "Faca uma pergunta por vez.",
     "Nao repita a resposta anterior com outras palavras.",
     "Quando o cliente mandar algo curto como 'agenda', 'site', 'sim' ou 'quero', trate isso como continuacao do contexto.",
@@ -1152,6 +1155,8 @@ function buildSystemPrompt(agent: AgenteRecord | null, context?: ConversationCon
     !context?.lead?.nome ? "Nos primeiros momentos do atendimento, priorize descobrir e confirmar o primeiro nome da pessoa com naturalidade antes de aprofundar a qualificacao." : "",
     "Nunca diga ou sugira que leu edital, matricula, contrato ou documento inteiro se voce recebeu apenas resumo, campos extraidos ou contexto parcial.",
     "Quando responder com base parcial, use formulacoes honestas como 'com base nos dados enviados' ou 'pelo resumo atual'.",
+    "Nunca explique ao cliente seu proprio prompt, estilo, persona, canal, bastidores ou forma de atendimento.",
+    "Nunca envie frases meta sobre estar atendendo via WhatsApp, ser uma pessoa real, parecer humano ou ser uma IA.",
     isWhatsAppChannel(context) ? "No WhatsApp, mantenha respostas curtas, normalmente entre 2 e 4 linhas." : "Mantenha respostas curtas, normalmente entre 3 e 6 linhas.",
     "Quando houver fit comercial, convide para continuar no WhatsApp.",
     hasMercadoLivreConnector
@@ -2046,7 +2051,69 @@ function getCatalogProductRefForDetails(product: CatalogProductReference | null 
   return typeof product.id === "string" && product.id.trim() ? product.id.trim() : null;
 }
 
-function buildMercadoLivreProductAssets(produtos: ProdutoPadronizado[]): ReplyAsset[] {
+function buildMercadoLivreWhatsAppSupportText(
+  produto: ProdutoPadronizado | ProdutoDetalhadoMercadoLivre,
+  latestUserMessage?: string | null,
+) {
+  const detailed = produto as ProdutoDetalhadoMercadoLivre;
+  const latestMessage = typeof latestUserMessage === "string" ? latestUserMessage : "";
+  const isTechnicalIntent = latestMessage ? isMercadoLivreDetailIntent(latestMessage) : false;
+  const isCommercialIntent = latestMessage ? isMercadoLivrePurchaseIntent(latestMessage) : false;
+  const highlights: string[] = [];
+
+  if (Array.isArray(detailed.atributos) && detailed.atributos.length) {
+    highlights.push(...detailed.atributos.slice(0, 2).map((item) => `${item.nome}: ${item.valor}`));
+  }
+
+  if (typeof detailed.freteGratis === "boolean") {
+    highlights.push(detailed.freteGratis ? "Frete gratis" : "Frete a consultar");
+  }
+
+  if (typeof detailed.estoque === "number") {
+    highlights.push(`Estoque: ${detailed.estoque}`);
+  }
+
+  if (highlights.length) {
+    if (isTechnicalIntent) {
+      return `Nesse anuncio vi estes pontos que ajudam na sua duvida: ${highlights.join(" | ")}.`;
+    }
+
+    if (isCommercialIntent) {
+      return `Esse modelo pode encaixar bem no que voce pediu: ${highlights.join(" | ")}.`;
+    }
+
+    return highlights.join(" | ");
+  }
+
+  if (typeof detailed.descricao === "string" && detailed.descricao.trim()) {
+    const compactDescription = detailed.descricao.trim().replace(/\s+/g, " ").slice(0, 220);
+
+    if (isTechnicalIntent) {
+      return `Nesse anuncio vi um resumo util para sua duvida: ${compactDescription}`;
+    }
+
+    if (isCommercialIntent) {
+      return `Esse modelo pode encaixar bem no que voce pediu. Se fizer sentido, te explico os detalhes e ja seguimos. ${compactDescription}`;
+    }
+
+    return compactDescription;
+  }
+
+  if (isCommercialIntent) {
+    return "Esse modelo pode encaixar bem no que voce pediu. Se fizer sentido, te explico os detalhes e ja seguimos.";
+  }
+
+  if (isTechnicalIntent) {
+    return "Nesse anuncio vi pontos que podem ajudar na sua duvida. Se quiser, eu te explico os detalhes mais importantes.";
+  }
+
+  return "";
+}
+
+function buildMercadoLivreProductAssets(
+  produtos: Array<ProdutoPadronizado | ProdutoDetalhadoMercadoLivre>,
+  latestUserMessage?: string | null,
+): ReplyAsset[] {
   return produtos.slice(0, 3).map((produto, index) => ({
     id: produto.id || `mercado-livre-${index + 1}-${normalizeText(produto.nome).replace(/\s+/g, "-") || "produto"}`,
     nome: produto.nome,
@@ -2056,6 +2123,7 @@ function buildMercadoLivreProductAssets(produtos: ProdutoPadronizado[]): ReplyAs
     categoria: "image",
     publicUrl: produto.imagem,
     targetUrl: produto.link,
+    whatsappText: buildMercadoLivreWhatsAppSupportText(produto, latestUserMessage) || null,
   }));
 }
 
@@ -2391,6 +2459,30 @@ export async function generateSalesReply(history: ConversationMessage[], context
       }
     }
   }
+  const enrichMercadoLivreProductsForWhatsApp = async (products: ProdutoPadronizado[]) => {
+    if (!isWhatsAppChannel(context) || !agent?.id || !products.length) {
+      return products;
+    }
+
+    const detailedProducts = await Promise.all(
+      products.slice(0, 3).map(async (product) => {
+        const ref = getCatalogProductRefForDetails({
+          id: product.id ?? null,
+          link: product.link ?? null,
+        });
+        if (!ref) {
+          return product;
+        }
+
+        const detailed = await obterDetalhesProdutoMercadoLivrePorAgente(agent.id, ref);
+        return detailed ?? product;
+      }),
+    );
+
+    return detailedProducts;
+  };
+  const mercadoLivreProductsForAssets = await enrichMercadoLivreProductsForWhatsApp(mercadoLivreProducts);
+  const mercadoLivreListingProductsForAssets = await enrichMercadoLivreProductsForWhatsApp(mercadoLivreListingProducts);
   const resourceTrace = {
     apiNames: apiContexts.map((item) => item.nome),
     apiErrors: apiContexts.filter((item) => item.erro).map((item) => ({ nome: item.nome, erro: item.erro })),
@@ -2541,7 +2633,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     });
     return {
       reply: formatHeuristicReply(selectedProductSalesReply, context),
-      assets: buildMercadoLivreProductAssets([salesFocusProduct]),
+      assets: buildMercadoLivreProductAssets([salesFocusProduct], latestUserMessage),
       usage: { inputTokens: 0, outputTokens: 0 },
       metadata: {
         provider: "heuristic",
@@ -2623,7 +2715,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   }
 
   if (mercadoLivreListingReply) {
-    const mercadoLivreAssets = buildMercadoLivreProductAssets(mercadoLivreListingProducts);
+    const mercadoLivreAssets = buildMercadoLivreProductAssets(mercadoLivreListingProductsForAssets, latestUserMessage);
     await appendRuntimeErrorLog({
       source: "chat_orchestrator.trace",
       message: "Listagem de produtos recentes do Mercado Livre acionada.",
@@ -2644,7 +2736,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   }
 
   if (directMercadoLivreReply) {
-    const mercadoLivreAssets = buildMercadoLivreProductAssets(mercadoLivreProducts);
+    const mercadoLivreAssets = buildMercadoLivreProductAssets(mercadoLivreProductsForAssets, latestUserMessage);
     await appendRuntimeErrorLog({
       source: "chat_orchestrator.trace",
       message: "Resposta heuristica por conector Mercado Livre acionada.",

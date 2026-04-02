@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, ExternalLink, LoaderCircle, MessageCircleMore, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, Trash2, X } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, ExternalLink, LoaderCircle, MessageCircleMore, MoreHorizontal, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, Trash2, X } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -458,6 +458,7 @@ export default function AdminAtendimentoPage() {
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
+  const [mobileHeaderMenuOpen, setMobileHeaderMenuOpen] = useState(false);
   const availableProjects = useMemo(() => {
     if (projects.length) {
       return projects;
@@ -874,6 +875,7 @@ export default function AdminAtendimentoPage() {
 
   const handleSelectChat = (chatId: string) => {
     setSelectedChatId(chatId);
+    setMobileHeaderMenuOpen(false);
 
     if (typeof window !== "undefined" && window.innerWidth < 1280) {
       setMobileConversationOpen(true);
@@ -885,6 +887,7 @@ export default function AdminAtendimentoPage() {
       return;
     }
 
+    setMobileHeaderMenuOpen(false);
     setFeedback(null);
 
     try {
@@ -1019,6 +1022,7 @@ export default function AdminAtendimentoPage() {
       return;
     }
 
+    setMobileHeaderMenuOpen(false);
     const chatName = selectedChat ? getChatTitle(selectedChat) : "esta conversa";
     if (typeof window !== "undefined") {
       const confirmed = window.confirm(`Remover todo o historico de ${chatName}? Essa limpeza apaga mensagens, handoff e anexos desta conversa no banco, mas mantem os dados de uso de tokens.`);
@@ -1432,13 +1436,13 @@ export default function AdminAtendimentoPage() {
           {selectedChat ? (
             <>
               <div className="shrink-0 border-b border-white/10 px-3 py-2.5 sm:px-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-3">
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-start gap-2">
                       <button
                         type="button"
                         onClick={() => setMobileConversationOpen(false)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white xl:hidden"
+                        className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white xl:hidden"
                         aria-label="Voltar para conversas"
                       >
                         <ArrowLeft size={14} />
@@ -1454,54 +1458,111 @@ export default function AdminAtendimentoPage() {
                           getAvatarFallbackLabel(selectedChat)
                         )}
                       </div>
-                      <p className="truncate text-sm font-bold text-white sm:text-base">{getChatTitle(selectedChat)}</p>
-                      <span className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(selectedChat.canal)}`}>
-                        {getChatChannelLabel(selectedChat.canal)}
-                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="min-w-0 break-words text-sm font-bold text-white sm:text-base">{getChatTitle(selectedChat)}</p>
+                          <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${getChatChannelTone(selectedChat.canal)}`}>
+                            {getChatChannelLabel(selectedChat.canal)}
+                          </span>
+                        </div>
+                        <p className="mt-1 break-words text-[11px] text-slate-400 sm:text-xs">
+                          {getChatPhone(selectedChat) ? `${getChatPhone(selectedChat)} • ` : ""}Ultima atividade em {formatFullDateTime(selectedChat.updatedAt)}
+                        </p>
+                      </div>
                     </div>
-                    <p className="mt-1 text-[11px] text-slate-400 sm:text-xs">
-                      {getChatPhone(selectedChat) ? `${getChatPhone(selectedChat)} • ` : ""}Ultima atividade em {formatFullDateTime(selectedChat.updatedAt)}
-                    </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                     <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${isChatUnderHumanHandoff(selectedChat) ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}`}>
                       {isChatUnderHumanHandoff(selectedChat) ? "Voce esta atendendo" : "IA atendendo"}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteChat()}
-                      disabled={deletingChat}
-                      className={`${compactButtonClass} border-rose-500/20 bg-rose-500/10 text-rose-100 hover:border-rose-400/30 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60`}
-                      title="Remover conversa"
-                    >
-                      {deletingChat ? <LoaderCircle size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                      Limpar conversa
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMediaModalOpen(true)}
-                      className={`${compactButtonClass} border-white/10 bg-white/5 text-slate-100 hover:border-white/20 hover:bg-white/10`}
-                    >
-                      <Paperclip size={14} />
-                      Midias
-                    </button>
-                    {!isChatUnderHumanHandoff(selectedChat) ? (
+                    <div className="relative xl:hidden">
                       <button
                         type="button"
-                        onClick={() => void handleHandoffAction("claim")}
-                        className={`${compactButtonClass} border-emerald-500/20 bg-emerald-500/10 text-emerald-100 hover:border-emerald-400/30 hover:bg-emerald-500/15`}
+                        onClick={() => setMobileHeaderMenuOpen((current) => !current)}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-100 transition-colors hover:border-white/20 hover:bg-white/10"
+                        aria-label="Mais acoes"
                       >
-                        Assumir atendimento
+                        <MoreHorizontal size={16} />
                       </button>
-                    ) : (
+                      {mobileHeaderMenuOpen ? (
+                        <div className="absolute right-0 top-11 z-20 min-w-[220px] rounded-2xl border border-white/10 bg-[#091321] p-2 shadow-2xl">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMobileHeaderMenuOpen(false);
+                              setMediaModalOpen(true);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-slate-100 transition-colors hover:bg-white/5"
+                          >
+                            <Paperclip size={14} />
+                            Midias
+                          </button>
+                          {!isChatUnderHumanHandoff(selectedChat) ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleHandoffAction("claim")}
+                              className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-emerald-100 transition-colors hover:bg-emerald-500/10"
+                            >
+                              Assumir atendimento
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void handleHandoffAction("release")}
+                              className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-amber-50 transition-colors hover:bg-amber-500/10"
+                            >
+                              Liberar para IA
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteChat()}
+                            disabled={deletingChat}
+                            className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-rose-100 transition-colors hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {deletingChat ? <LoaderCircle size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            Limpar conversa
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="hidden flex-wrap items-center gap-2 xl:flex">
                       <button
                         type="button"
-                        onClick={() => void handleHandoffAction("release")}
-                        className={`${compactButtonClass} border-amber-400/20 bg-amber-500/10 text-amber-50 hover:border-amber-300/30 hover:bg-amber-500/15`}
+                        onClick={() => void handleDeleteChat()}
+                        disabled={deletingChat}
+                        className={`${compactButtonClass} border-rose-500/20 bg-rose-500/10 text-rose-100 hover:border-rose-400/30 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60`}
+                        title="Remover conversa"
                       >
-                        Liberar para IA
+                        {deletingChat ? <LoaderCircle size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                        Limpar conversa
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => setMediaModalOpen(true)}
+                        className={`${compactButtonClass} border-white/10 bg-white/5 text-slate-100 hover:border-white/20 hover:bg-white/10`}
+                      >
+                        <Paperclip size={14} />
+                        Midias
+                      </button>
+                      {!isChatUnderHumanHandoff(selectedChat) ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleHandoffAction("claim")}
+                          className={`${compactButtonClass} border-emerald-500/20 bg-emerald-500/10 text-emerald-100 hover:border-emerald-400/30 hover:bg-emerald-500/15`}
+                        >
+                          Assumir atendimento
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void handleHandoffAction("release")}
+                          className={`${compactButtonClass} border-amber-400/20 bg-amber-500/10 text-amber-50 hover:border-amber-300/30 hover:bg-amber-500/15`}
+                        >
+                          Liberar para IA
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

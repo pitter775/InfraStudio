@@ -318,6 +318,26 @@ function formatWhatsAppOutboundText(reply: string) {
     .trim();
 }
 
+function stripAssistantMetaReply(reply: string, channelKind: ChatChannelKind) {
+  let sanitized = String(reply || "");
+
+  const forbiddenPatterns = [
+    /Seu atendimento acontece exclusivamente via WhatsApp[^\n]*?/gi,
+    /Seu atendimento ocorre exclusivamente via WhatsApp[^\n]*?/gi,
+    /de forma natural,\s*simpatica e acolhedora[^\n]*?/gi,
+    /como se fosse uma pessoa real atendendo[^\n]*?/gi,
+    /voce esta falando com (uma )?ia[^\n]*?/gi,
+    /minha funcao aqui e te atender[^\n]*?/gi,
+  ];
+
+  for (const pattern of forbiddenPatterns) {
+    sanitized = sanitized.replace(pattern, "");
+  }
+
+  sanitized = sanitized.replace(/\n{3,}/g, "\n\n").trim();
+  return channelKind === "whatsapp" ? formatWhatsAppOutboundText(sanitized) : sanitized;
+}
+
 function buildBillingBlockedResult(chatId: string, message: string) {
   return {
     chatId,
@@ -1216,8 +1236,8 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     channelKind === "whatsapp" ? splitCatalogReplyForWhatsApp(ai.reply, Array.isArray(ai.assets) && ai.assets.length > 0) : null;
   const primaryReplyRaw = splitReply?.mainReply || ai.reply;
   const followUpReplyRaw = splitReply?.followUpReply || "";
-  const primaryReply = channelKind === "whatsapp" ? formatWhatsAppOutboundText(primaryReplyRaw) : primaryReplyRaw;
-  const followUpReply = channelKind === "whatsapp" ? formatWhatsAppOutboundText(followUpReplyRaw) : followUpReplyRaw;
+  const primaryReply = stripAssistantMetaReply(primaryReplyRaw, channelKind);
+  const followUpReply = stripAssistantMetaReply(followUpReplyRaw, channelKind);
 
   const assistantMessage = await appendMessage({
     chatId: chat.id,
