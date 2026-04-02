@@ -98,10 +98,12 @@ export function ProjectMercadoSection({
             <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Cable size={18} className="text-violet-200" />Mercado Livre</h3>
             <p className="mt-1 text-sm text-slate-400">Gerencie aqui as lojas e credenciais do Mercado Livre deste projeto.</p>
           </div>
-          <button type="button" onClick={onOpenNewConnector} className={`${createButtonClass} w-auto self-start lg:self-auto`}>
-            <Plus size={16} />
-            Nova loja
-          </button>
+          {!connectors.length ? (
+            <button type="button" onClick={onOpenNewConnector} className={`${createButtonClass} w-auto self-start lg:self-auto`}>
+              <Plus size={16} />
+              Nova loja
+            </button>
+          ) : null}
         </div>
 
         <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,0.88fr)_minmax(420px,1.12fr)] xl:items-start">

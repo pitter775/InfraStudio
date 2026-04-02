@@ -56,6 +56,8 @@ type WhatsAppHandoffContactFormState = {
 
 type ProjectWhatsAppSectionProps = {
   whatsappServiceEnabled: boolean;
+  whatsappServiceHealthMessage: string | null;
+  whatsappServiceHealthTone: "online" | "offline" | "checking";
   primaryChannel: WhatsAppChannel | null;
   totalChannels: number;
   agentes: AgenteSummary[];
@@ -217,6 +219,8 @@ function BusyIcon() {
 
 export function ProjectWhatsAppSection({
   whatsappServiceEnabled,
+  whatsappServiceHealthMessage,
+  whatsappServiceHealthTone,
   primaryChannel,
   totalChannels,
   agentes,
@@ -245,6 +249,12 @@ export function ProjectWhatsAppSection({
   onDeleteHandoffContact,
 }: ProjectWhatsAppSectionProps) {
   const activeHandoffContacts = handoffContacts.filter((contact) => contact.ativo && contact.receberAlertas);
+  const whatsAppServiceHealthClass =
+    whatsappServiceHealthTone === "online"
+      ? "text-emerald-300"
+      : whatsappServiceHealthTone === "offline"
+        ? "text-rose-300"
+        : "text-amber-200";
 
   return (
     <div className="space-y-4">
@@ -252,6 +262,9 @@ export function ProjectWhatsAppSection({
         <div className="px-1 py-1">
           <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Waypoints size={18} className="text-cyan-100" />WhatsApp do projeto</h3>
           <p className="mt-2 max-w-3xl text-sm text-cyan-50/80">Conecte, acompanhe e ajuste o numero principal que atende seus clientes.</p>
+          {whatsappServiceHealthMessage ? (
+            <p className={`mt-2 text-sm font-semibold ${whatsAppServiceHealthClass}`}>{whatsappServiceHealthMessage}</p>
+          ) : null}
           {!whatsappServiceEnabled ? (
             <p className="mt-3 text-xs text-amber-200/90">A conexao do WhatsApp ainda nao esta disponivel neste ambiente.</p>
           ) : null}
@@ -260,7 +273,7 @@ export function ProjectWhatsAppSection({
           {primaryChannel ? (() => {
             const channel = primaryChannel;
             const agente = channel.agenteId ? agentes.find((item) => item.id === channel.agenteId) ?? null : agenteAtivo;
-            const runtimeStatus = serviceStatusByChannel[channel.id] ?? getChannelStatusLabel(channel.sessionData?.connectionStatus);
+            const runtimeStatus = serviceStatusByChannel[channel.id] ?? "desconectado";
             const qrImage = serviceQrByChannel[channel.id] ?? channel.sessionData?.qrCodeDataUrl ?? channel.sessionData?.qrCodeUrl ?? null;
             const isConnected = runtimeStatus === "conectado" || runtimeStatus === "online";
             const isWaitingQr = runtimeStatus === "aguardando_qr" && Boolean(qrImage);

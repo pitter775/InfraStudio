@@ -400,6 +400,7 @@ type PendingAgenteArquivo = {
 };
 
 const ACTIVE_PROJECT_STORAGE_KEY = "projeto_ativo";
+const ACTIVE_WHATSAPP_QR_MODAL_STORAGE_KEY = "projeto_whatsapp_qr_modal";
 
 function sanitizePhoneDigits(value: string) {
   const digits = value.replace(/\D/g, "");
@@ -444,6 +445,11 @@ function getWhatsAppServiceUrl(pathname: string, channelId: string) {
 
   const normalizedBase = baseUrl.replace(/\/$/, "");
   return `${normalizedBase}${pathname}?channelId=${encodeURIComponent(channelId)}`;
+}
+
+function getWhatsAppServiceBaseUrl() {
+  const baseUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL?.trim();
+  return baseUrl ? baseUrl.replace(/\/$/, "") : null;
 }
 
 function getChannelStatusTone(status: string) {
@@ -1381,6 +1387,37 @@ type AgenteFormState = {
   arquivoIdsRemovidos: string[];
 };
 
+function buildAgenteDraftSnapshot(form: AgenteFormState, pendingArquivos: PendingAgenteArquivo[]) {
+  return JSON.stringify({
+    id: form.id ?? null,
+    projetoId: form.projetoId,
+    slug: form.slug.trim(),
+    nome: form.nome.trim(),
+    descricao: form.descricao.trim(),
+    promptBase: normalizeAgentText(form.promptBase),
+    configuracoes: form.configuracoes.trim(),
+    ativo: form.ativo,
+    apiIds: [...form.apiIds].sort((left, right) => left.localeCompare(right, "pt-BR")),
+    arquivos: form.arquivos
+      .map((arquivo) => ({
+        id: arquivo.id,
+        nome: arquivo.nome,
+        arquivoNome: arquivo.arquivoNome,
+        storagePath: arquivo.storagePath,
+      }))
+      .sort((left, right) => left.id.localeCompare(right.id, "pt-BR")),
+    arquivoIdsRemovidos: [...form.arquivoIdsRemovidos].sort((left, right) => left.localeCompare(right, "pt-BR")),
+    pendingArquivos: pendingArquivos
+      .map((item) => ({
+        id: item.id,
+        name: item.file.name,
+        size: item.file.size,
+        type: item.file.type,
+      }))
+      .sort((left, right) => left.id.localeCompare(right.id, "pt-BR")),
+  });
+}
+
 type ApiFormState = {
   id?: string;
   nome: string;
@@ -1986,6 +2023,8 @@ function WhatsAppQrCodeModal({
   qrCodeDataUrl,
   runtimeStatus,
   loading,
+  refreshing,
+  onRefresh,
   onClose,
 }: {
   open: boolean;
@@ -1993,6 +2032,8 @@ function WhatsAppQrCodeModal({
   qrCodeDataUrl: string | null;
   runtimeStatus: string;
   loading: boolean;
+  refreshing: boolean;
+  onRefresh: () => void;
   onClose: () => void;
 }) {
   if (!open) {
@@ -2015,14 +2056,25 @@ function WhatsAppQrCodeModal({
               Canal: <span className="font-semibold text-white">{channelNumber}</span>
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className={`${neutralActionButtonClass} px-3`}
-            aria-label="Fechar modal"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={refreshing}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-50 transition-colors hover:bg-cyan-500/18 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {refreshing ? <BusyIcon /> : <Activity size={16} />}
+              {refreshing ? "Gerando novo QR..." : "Mudar QR Code"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className={`${neutralActionButtonClass} px-3`}
+              aria-label="Fechar modal"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="space-y-5 px-6 py-6">
@@ -2351,13 +2403,15 @@ function AgenteModal({
   const [apisExpanded, setApisExpanded] = useState(false);
   const promptRef = useRef<HTMLDivElement | null>(null);
   const lastPromptSyncRef = useRef("");
+  const initialDraftSnapshotRef = useRef("");
 
   useEffect(() => {
     if (open) {
       setShowRawConfig(false);
       setPromptExpanded(true);
-      setConnectionsExpanded(false);
+      setConnectionsExpanded(true);
       setApisExpanded(false);
+      initialDraftSnapshotRef.current = buildAgenteDraftSnapshot(form, pendingArquivos);
     }
   }, [open]);
 
@@ -2528,6 +2582,24 @@ function AgenteModal({
     onChange({ promptBase: nextPrompt });
   };
 
+  const handleRequestClose = () => {
+    const currentSnapshot = buildAgenteDraftSnapshot(form, pendingArquivos);
+    const hasUnsavedChanges = currentSnapshot !== initialDraftSnapshotRef.current;
+
+    if (!hasUnsavedChanges) {
+      onClose();
+      return;
+    }
+
+    const shouldCloseWithoutSaving = window.confirm(
+      "Existem alteracoes nao salvas neste agente. Fechar agora vai descartar essas mudancas. Deseja fechar sem salvar?",
+    );
+
+    if (shouldCloseWithoutSaving) {
+      onClose();
+    }
+  };
+
   const applyPromptFormat = (mode: "bold" | "title" | "bullet" | "numbered") => {
     const element = promptRef.current;
     if (!element) {
@@ -2564,19 +2636,34 @@ function AgenteModal({
             <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar agente" : "Novo agente"}</h2>
             <p className="mt-1 text-sm text-slate-400">Defina o agente e selecione quais APIs deste projeto ele pode usar.</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className={`${neutralActionButtonClass} px-3`}
-            aria-label="Fechar modal"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onChange({ ativo: !form.ativo })}
+              disabled={saving}
+              className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold ${
+                form.ativo
+                  ? "border-amber-400/20 bg-amber-500/10 text-amber-50 hover:border-amber-300/30 hover:bg-amber-500/14"
+                  : "border-emerald-400/20 bg-emerald-500/10 text-emerald-50 hover:border-emerald-300/30 hover:bg-emerald-500/14"
+              } disabled:cursor-not-allowed disabled:opacity-60`}
+            >
+              <Power size={16} />
+              {form.ativo ? "Desativar agente" : "Ativar agente"}
+            </button>
+            <button
+              type="button"
+              onClick={handleRequestClose}
+              className={`${neutralActionButtonClass} px-3`}
+              aria-label="Fechar modal"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="flex max-h-[calc(92vh-88px)] flex-col">
-          <div className={`grid flex-1 gap-0 overflow-x-hidden overflow-y-auto ${connectionsExpanded ? "lg:grid-cols-[1.05fr_0.95fr]" : "lg:grid-cols-[minmax(0,1fr)_112px]"}`}>
-          <div className="min-w-0 space-y-4 p-6 pb-8">
+          <div className={`grid flex-1 gap-0 overflow-hidden ${connectionsExpanded ? "lg:grid-cols-[1.05fr_0.95fr]" : "lg:grid-cols-[minmax(0,1fr)_112px]"}`}>
+          <div className="min-w-0 space-y-4 overflow-y-auto p-6 pb-8 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <div>
               <FormLabel>Nome do agente</FormLabel>
               <input value={form.nome} onChange={(event) => onChange({ nome: event.target.value })} placeholder="Agente comercial principal" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
@@ -2770,7 +2857,7 @@ function AgenteModal({
             </div>
           </div>
 
-          <div className={`min-w-0 border-t border-white/10 bg-white/[0.03] transition-all duration-300 lg:border-t-0 ${connectionsExpanded ? "p-6 pb-8 lg:border-l" : "p-4 lg:border-l lg:px-3 lg:py-4"}`}>
+          <div className={`min-w-0 overflow-y-auto border-t border-white/10 bg-white/[0.03] transition-all duration-300 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden lg:border-t-0 ${connectionsExpanded ? "p-6 pb-8 lg:border-l" : "p-4 lg:border-l lg:px-3 lg:py-4"}`}>
             <div className={`flex gap-3 ${connectionsExpanded ? "items-start justify-between" : "justify-end"}`}>
               {connectionsExpanded ? (
                 <div className="min-w-0">
@@ -3003,24 +3090,12 @@ function AgenteModal({
           </div>
         </div>
           <ModalStickyFooter feedback={feedback}>
-            <button
-              type="button"
-              onClick={() => onChange({ ativo: !form.ativo })}
-              disabled={saving}
-              className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold ${
-                form.ativo
-                  ? "border-amber-400/20 bg-amber-500/10 text-amber-50 hover:border-amber-300/30 hover:bg-amber-500/14"
-                  : "border-emerald-400/20 bg-emerald-500/10 text-emerald-50 hover:border-emerald-300/30 hover:bg-emerald-500/14"
-              } disabled:cursor-not-allowed disabled:opacity-60`}
-            >
-              <Power size={16} />
-              {form.ativo ? "Desativar agente" : "Ativar agente"}
-            </button>
-            <button type="button" onClick={onSubmit} disabled={saving} className={`${primaryActionButtonClass} flex-1`}>
+            <button type="button" onClick={onSubmit} disabled={saving} className={primaryActionButtonClass}>
               {saving ? <BusyIcon /> : form.id ? <Pencil size={16} /> : <Plus size={16} />}
               {form.id ? "Salvar" : "Criar"}
             </button>
-            <button type="button" onClick={onClose} className={neutralActionButtonClass}>
+            <button type="button" onClick={handleRequestClose} className={neutralActionButtonClass}>
+              <X size={16} />
               Cancelar
             </button>
           </ModalStickyFooter>
@@ -4193,7 +4268,6 @@ export default function AdminProjetoDetalhePage() {
   const [handoffFeedback, setHandoffFeedback] = useState<string | null>(null);
   const [handoffFeedbackTone, setHandoffFeedbackTone] = useState<"success" | "error">("success");
   const [whatsAppQrModalChannelId, setWhatsAppQrModalChannelId] = useState<string | null>(null);
-  const [whatsAppQrModalCanAutoClose, setWhatsAppQrModalCanAutoClose] = useState(false);
   const [whatsappHandoffContacts, setWhatsAppHandoffContacts] = useState<WhatsAppHandoffContact[]>([]);
   const [whatsappHandoffContactForm, setWhatsAppHandoffContactForm] = useState<WhatsAppHandoffContactFormState>(emptyWhatsAppHandoffContactForm);
   const [loadingWhatsAppHandoffContacts, setLoadingWhatsAppHandoffContacts] = useState(false);
@@ -4217,6 +4291,17 @@ export default function AdminProjetoDetalhePage() {
   const [widgetCodeModalState, setWidgetCodeModalState] = useState<WidgetCodeModalState | null>(null);
   const [serviceStatusByChannel, setServiceStatusByChannel] = useState<Record<string, string>>({});
   const [serviceQrByChannel, setServiceQrByChannel] = useState<Record<string, string | null>>({});
+  const [whatsAppServiceHealth, setWhatsAppServiceHealth] = useState<{
+    available: boolean;
+    checking: boolean;
+    message: string;
+  }>({
+    available: Boolean(process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL),
+    checking: Boolean(process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL),
+    message: process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL
+      ? "Verificando servidor do WhatsApp..."
+      : "Servidor do WhatsApp nao configurado neste ambiente.",
+  });
   const [agentDiagnosticsById, setAgentDiagnosticsById] = useState<Record<string, AgentDiagnosticsOverview>>({});
   const [runningAgentDiagnosticId, setRunningAgentDiagnosticId] = useState<string | null>(null);
   const [latestAgentDiagnosticById, setLatestAgentDiagnosticById] = useState<Record<string, AgentDiagnosticRun>>({});
@@ -4347,6 +4432,48 @@ export default function AdminProjetoDetalhePage() {
   }, [params.id]);
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const storedChannelId = window.sessionStorage.getItem(`${ACTIVE_WHATSAPP_QR_MODAL_STORAGE_KEY}:${params.id}`);
+    if (storedChannelId) {
+      setWhatsAppQrModalChannelId(storedChannelId);
+    }
+  }, [params.id]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const storageKey = `${ACTIVE_WHATSAPP_QR_MODAL_STORAGE_KEY}:${params.id}`;
+    if (whatsAppQrModalChannelId) {
+      window.sessionStorage.setItem(storageKey, whatsAppQrModalChannelId);
+      return;
+    }
+
+    window.sessionStorage.removeItem(storageKey);
+  }, [params.id, whatsAppQrModalChannelId]);
+
+  useEffect(() => {
+    if (!whatsAppQrModalChannelId) {
+      return;
+    }
+
+    const runtimeStatus = serviceStatusByChannel[whatsAppQrModalChannelId] ?? "desconectado";
+    if (runtimeStatus !== "conectado" && runtimeStatus !== "online") {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setWhatsAppQrModalChannelId(null);
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, [serviceStatusByChannel, whatsAppQrModalChannelId]);
+
+  useEffect(() => {
     if (activeTab !== "agentes" || !data?.agentes.length) {
       return;
     }
@@ -4442,6 +4569,83 @@ export default function AdminProjetoDetalhePage() {
     };
   }, [activeTab, connectingWhatsAppChannelId, data?.whatsappChannels, disconnectingWhatsAppChannelId]);
 
+  const checkWhatsAppServiceHealth = async () => {
+    const baseUrl = getWhatsAppServiceBaseUrl();
+    if (!baseUrl) {
+      setWhatsAppServiceHealth({
+        available: false,
+        checking: false,
+        message: "Servidor do WhatsApp nao configurado neste ambiente.",
+      });
+      return false;
+    }
+
+    setWhatsAppServiceHealth((current) => ({
+      ...current,
+      checking: true,
+    }));
+
+    try {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 4000);
+      const response = await fetch(`${baseUrl}/health`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      window.clearTimeout(timeout);
+
+      if (!response.ok) {
+        throw new Error("health_unavailable");
+      }
+
+      setWhatsAppServiceHealth({
+        available: true,
+        checking: false,
+        message: "Servidor do WhatsApp online.",
+      });
+      return true;
+    } catch {
+      setWhatsAppServiceHealth({
+        available: false,
+        checking: false,
+        message: "Servidor do WhatsApp offline ou instavel.",
+      });
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== "whatsapp") {
+      return;
+    }
+
+    void checkWhatsAppServiceHealth();
+    const timer = window.setInterval(() => {
+      void checkWhatsAppServiceHealth();
+    }, 15000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!whatsAppQrModalChannelId) {
+      return;
+    }
+
+    const sync = () => {
+      void refreshWhatsAppRuntime(whatsAppQrModalChannelId);
+    };
+
+    sync();
+    const timer = window.setInterval(sync, 3000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [whatsAppQrModalChannelId]);
+
   useEffect(() => {
     if (activeTab !== "whatsapp") {
       return;
@@ -4470,31 +4674,6 @@ export default function AdminProjetoDetalhePage() {
 
     return () => window.clearTimeout(timer);
   }, [handoffFeedback]);
-
-  useEffect(() => {
-    if (!whatsAppQrModalChannelId) {
-      setWhatsAppQrModalCanAutoClose(false);
-      return;
-    }
-
-    const status = serviceStatusByChannel[whatsAppQrModalChannelId] ?? "desconectado";
-    const qrReady = Boolean(serviceQrByChannel[whatsAppQrModalChannelId]);
-    const isPendingConnection = status === "aguardando_qr" || status === "connecting" || qrReady;
-
-    if (isPendingConnection) {
-      setWhatsAppQrModalCanAutoClose(true);
-      return;
-    }
-
-    if (whatsAppQrModalCanAutoClose && (status === "conectado" || status === "online")) {
-      const timer = window.setTimeout(() => {
-        setWhatsAppQrModalChannelId(null);
-        setWhatsAppQrModalCanAutoClose(false);
-      }, 1200);
-
-      return () => window.clearTimeout(timer);
-    }
-  }, [whatsAppQrModalChannelId, whatsAppQrModalCanAutoClose, serviceQrByChannel, serviceStatusByChannel]);
 
   const resetAgenteForm = () => {
     setAgenteForm({
@@ -4608,6 +4787,11 @@ export default function AdminProjetoDetalhePage() {
       const statusResponse = await fetch(statusUrl, { cache: "no-store" });
       const statusPayload = (await statusResponse.json()) as { status?: string };
       if (statusResponse.ok) {
+        setWhatsAppServiceHealth({
+          available: true,
+          checking: false,
+          message: "Servidor do WhatsApp online.",
+        });
         const normalizedStatus = getChannelStatusLabel(statusPayload.status);
         setServiceStatusByChannel((current) => ({
           ...current,
@@ -4634,6 +4818,11 @@ export default function AdminProjetoDetalhePage() {
         }));
       }
     } catch {
+      setWhatsAppServiceHealth({
+        available: false,
+        checking: false,
+        message: "Servidor do WhatsApp offline ou instavel.",
+      });
       setServiceStatusByChannel((current) => ({
         ...current,
         [channelId]: "desconectado",
@@ -5830,6 +6019,48 @@ export default function AdminProjetoDetalhePage() {
     resetWhatsAppChannelForm();
   };
 
+  const resetWhatsAppChannelSession = async (channel: WhatsAppChannel, serviceUrl?: string | null) => {
+    const normalizedServiceUrl = serviceUrl?.replace(/\/$/, "") ?? null;
+
+    if (normalizedServiceUrl) {
+      await fetch(`${normalizedServiceUrl}/purge`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          channelId: channel.id,
+        }),
+      });
+    }
+
+    await fetch(`/api/admin/whatsapp-canais/${channel.id}/disconnect`, { method: "POST" });
+    setServiceQrByChannel((current) => ({
+      ...current,
+      [channel.id]: null,
+    }));
+    setServiceStatusByChannel((current) => ({
+      ...current,
+      [channel.id]: "desconectado",
+    }));
+    updateProjetoData((current) => ({
+      ...current,
+      whatsappChannels: current.whatsappChannels.map((entry) =>
+        entry.id === channel.id
+          ? {
+              ...entry,
+              sessionData: {
+                ...entry.sessionData,
+                connectionStatus: "offline",
+                qrCodeDataUrl: null,
+                qrCodeUrl: null,
+              },
+            }
+          : entry,
+      ),
+    }));
+  };
+
   const handleConnectWhatsAppChannel = async (channel: WhatsAppChannel, options?: { refreshQr?: boolean }) => {
     const serviceUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL?.trim();
     if (!serviceUrl) {
@@ -5840,30 +6071,14 @@ export default function AdminProjetoDetalhePage() {
     setConnectingWhatsAppChannelId(channel.id);
     setFeedbackWhatsApp(null);
     setWhatsAppQrModalChannelId(channel.id);
-    setWhatsAppQrModalCanAutoClose(false);
 
     try {
-      if (options?.refreshQr) {
-        await fetch(`${serviceUrl.replace(/\/$/, "")}/purge`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            channelId: channel.id,
-          }),
-        });
-
-        await fetch(`/api/admin/whatsapp-canais/${channel.id}/disconnect`, { method: "POST" });
-        setServiceQrByChannel((current) => ({
-          ...current,
-          [channel.id]: null,
-        }));
-        setServiceStatusByChannel((current) => ({
-          ...current,
-          [channel.id]: "desconectado",
-        }));
+      const serviceHealthy = await checkWhatsAppServiceHealth();
+      if (!serviceHealthy) {
+        throw new Error("O servidor do WhatsApp nao respondeu. Verifique se o worker Node esta online antes de gerar um novo QR Code.");
       }
+
+      await resetWhatsAppChannelSession(channel, serviceUrl);
 
       const connectResponse = await fetch(`${serviceUrl.replace(/\/$/, "")}/connect`, {
         method: "POST",
@@ -5878,7 +6093,7 @@ export default function AdminProjetoDetalhePage() {
         }),
       });
 
-      const connectPayload = (await connectResponse.json()) as { error?: string };
+      const connectPayload = (await connectResponse.json().catch(() => ({}))) as { error?: string };
       if (!connectResponse.ok) {
         throw new Error(connectPayload.error ?? "Nao foi possivel iniciar o whatsapp-service.");
       }
@@ -5904,13 +6119,16 @@ export default function AdminProjetoDetalhePage() {
       }, 1800);
       setFeedbackWhatsApp(
         options?.refreshQr
-          ? `Novo QR solicitado para ${formatWhatsAppPhone(channel.numero)}. A sessao anterior foi limpa antes da reconexao.`
-          : `Geracao do QR iniciada para ${formatWhatsAppPhone(channel.numero)}. A sessao anterior foi limpa antes da reconexao.`,
+          ? `Novo QR solicitado para ${formatWhatsAppPhone(channel.numero)}. A sessao anterior foi removida e o canal iniciou uma nova conexao limpa.`
+          : `Geracao do QR iniciada para ${formatWhatsAppPhone(channel.numero)}. A sessao anterior foi removida e o canal iniciou uma nova conexao limpa.`,
       );
     } catch (error) {
-      setWhatsAppQrModalChannelId(null);
-      setWhatsAppQrModalCanAutoClose(false);
-      setFeedbackWhatsApp(error instanceof Error ? error.message : "Nao foi possivel conectar o WhatsApp.");
+      const message = error instanceof Error ? error.message : "Nao foi possivel conectar o WhatsApp.";
+      setFeedbackWhatsApp(
+        message.includes("Failed to fetch") || message.includes("NetworkError")
+          ? "Nao foi possivel falar com o servidor do WhatsApp. Confirme se o worker Node esta online e tente novamente."
+          : message,
+      );
     } finally {
       setConnectingWhatsAppChannelId(null);
     }
@@ -6633,13 +6851,13 @@ export default function AdminProjetoDetalhePage() {
   const whatsAppQrModalChannel = whatsAppQrModalChannelId
     ? data.whatsappChannels.find((channel) => channel.id === whatsAppQrModalChannelId) ?? null
     : null;
-  const whatsAppQrModalStatus = whatsAppQrModalChannel
-    ? serviceStatusByChannel[whatsAppQrModalChannel.id] ?? getChannelStatusLabel(whatsAppQrModalChannel.sessionData?.connectionStatus)
+  const whatsAppQrModalStatus = whatsAppQrModalChannelId
+    ? serviceStatusByChannel[whatsAppQrModalChannelId] ?? "desconectado"
     : "desconectado";
-  const whatsAppQrModalImage = whatsAppQrModalChannel
-    ? serviceQrByChannel[whatsAppQrModalChannel.id] ??
-      whatsAppQrModalChannel.sessionData?.qrCodeDataUrl ??
-      whatsAppQrModalChannel.sessionData?.qrCodeUrl ??
+  const whatsAppQrModalImage = whatsAppQrModalChannelId
+    ? serviceQrByChannel[whatsAppQrModalChannelId] ??
+      whatsAppQrModalChannel?.sessionData?.qrCodeDataUrl ??
+      whatsAppQrModalChannel?.sessionData?.qrCodeUrl ??
       null
     : null;
   const projectTabs = [
@@ -6989,14 +7207,16 @@ export default function AdminProjetoDetalhePage() {
               <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Bot size={18} className="text-cyan-200" />Agentes do projeto</h3>
               <p className="mt-1 text-sm text-slate-400">O agente ativo atende este projeto e pode consumir as APIs marcadas.</p>
             </div>
-            <button
-              type="button"
-              onClick={openNewAgenteModal}
-              className={`inline-flex items-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14 ${premiumInteractiveClass}`}
-            >
-              <Plus size={16} />
-              Novo agente
-            </button>
+            {!data.agentes.length ? (
+              <button
+                type="button"
+                onClick={openNewAgenteModal}
+                className={`inline-flex items-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14 ${premiumInteractiveClass}`}
+              >
+                <Plus size={16} />
+                Novo agente
+              </button>
+            ) : null}
           </div>
           {renderedTab === "agentes" && activeAgentTestTarget ? (
             <EmbeddedAgentTestChat
@@ -7343,6 +7563,10 @@ export default function AdminProjetoDetalhePage() {
       <section className={`${renderedTab === "whatsapp" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
         <ProjectWhatsAppSection
           whatsappServiceEnabled={Boolean(process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL)}
+          whatsappServiceHealthMessage={whatsAppServiceHealth.message}
+          whatsappServiceHealthTone={
+            whatsAppServiceHealth.checking ? "checking" : whatsAppServiceHealth.available ? "online" : "offline"
+          }
           primaryChannel={primaryWhatsAppChannel}
           totalChannels={data.whatsappChannels.length}
           agentes={data.agentes}
@@ -7490,15 +7714,18 @@ export default function AdminProjetoDetalhePage() {
         onSubmit={() => void handleConnectorSubmit()}
       />
       <WhatsAppQrCodeModal
-        open={Boolean(whatsAppQrModalChannel)}
+        open={Boolean(whatsAppQrModalChannelId)}
         channelNumber={whatsAppQrModalChannel ? formatWhatsAppPhone(whatsAppQrModalChannel.numero) : ""}
         qrCodeDataUrl={whatsAppQrModalImage}
         runtimeStatus={whatsAppQrModalStatus}
-        loading={Boolean(whatsAppQrModalChannel) && !whatsAppQrModalImage && whatsAppQrModalStatus !== "conectado" && whatsAppQrModalStatus !== "online"}
-        onClose={() => {
-          setWhatsAppQrModalChannelId(null);
-          setWhatsAppQrModalCanAutoClose(false);
+        loading={Boolean(whatsAppQrModalChannelId) && !whatsAppQrModalImage && whatsAppQrModalStatus !== "conectado" && whatsAppQrModalStatus !== "online"}
+        refreshing={Boolean(whatsAppQrModalChannelId) && connectingWhatsAppChannelId === whatsAppQrModalChannelId}
+        onRefresh={() => {
+          if (whatsAppQrModalChannel) {
+            void handleConnectWhatsAppChannel(whatsAppQrModalChannel, { refreshQr: true });
+          }
         }}
+        onClose={() => setWhatsAppQrModalChannelId(null)}
       />
       <WhatsAppChannelModal
         open={whatsAppChannelModalOpen}
