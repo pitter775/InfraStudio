@@ -70,6 +70,7 @@ type ProjectWhatsAppSectionProps = {
   loadingHandoffContacts: boolean;
   savingHandoffContact: boolean;
   updatingHandoffContactId: string | null;
+  handoffFeedback: string | null;
   actionButtonClass: string;
   onOpenNewChannel: () => void;
   onConnectChannel: (channel: WhatsAppChannel, options?: { refreshQr?: boolean }) => void;
@@ -245,6 +246,7 @@ export function ProjectWhatsAppSection({
   loadingHandoffContacts,
   savingHandoffContact,
   updatingHandoffContactId,
+  handoffFeedback,
   actionButtonClass,
   onOpenNewChannel,
   onConnectChannel,
@@ -452,10 +454,6 @@ export function ProjectWhatsAppSection({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Atendimento humano</p>
-                  <h4 className="mt-2 text-lg font-bold text-white">Quem recebe o aviso no WhatsApp</h4>
-                  <p className="mt-2 max-w-xl text-sm text-slate-400">
-                    Quando o cliente pedir para falar com uma pessoa, o sistema avisa estes numeros e abre um link direto para a conversa no painel.
-                  </p>
                 </div>
                 {totalChannels > 1 ? (
                   <p className="text-xs text-amber-100/80">Existem {totalChannels} canais cadastrados. A interface esta priorizando o primeiro.</p>
@@ -464,8 +462,7 @@ export function ProjectWhatsAppSection({
               <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Atendimento humano</p>
-                    <h5 className="mt-2 text-base font-bold text-white">Quem recebe o aviso no WhatsApp</h5>
+                    <h5 className="text-base font-bold text-white">Quem recebe o aviso no WhatsApp</h5>
                     <p className="mt-2 max-w-xl text-sm text-slate-400">
                       Quando o cliente pedir para falar com uma pessoa, o sistema avisa estes numeros e abre um link direto para a conversa no painel.
                     </p>
@@ -531,6 +528,12 @@ export function ProjectWhatsAppSection({
                     O aviso vai no mesmo canal oficial conectado acima.
                   </p>
                 </div>
+
+                {handoffFeedback ? (
+                  <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+                    {handoffFeedback}
+                  </div>
+                ) : null}
 
                 <div className="mt-5">
                   {loadingHandoffContacts && !handoffContacts.length ? (

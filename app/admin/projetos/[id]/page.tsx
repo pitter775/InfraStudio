@@ -5959,7 +5959,7 @@ export default function AdminProjetoDetalhePage() {
         throw new Error(payload.error ?? "Nao foi possivel salvar o contato de aviso.");
       }
 
-      setWhatsAppHandoffContacts((current) => [...current, payload.contact!].sort((left, right) => left.nome.localeCompare(right.nome, "pt-BR")));
+      await loadWhatsAppHandoffContacts(primaryWhatsAppChannel.id, { silent: true });
       resetWhatsAppHandoffContactForm();
       setFeedbackWhatsApp(`Contato ${payload.contact.nome} configurado para receber alertas de atendimento humano.`);
     } catch (error) {
@@ -6006,11 +6006,8 @@ export default function AdminProjetoDetalhePage() {
         throw new Error(payload.error ?? "Nao foi possivel atualizar o contato.");
       }
 
-      setWhatsAppHandoffContacts((current) =>
-        current
-          .map((entry) => (entry.id === payload.contact!.id ? payload.contact! : entry))
-          .sort((left, right) => left.nome.localeCompare(right.nome, "pt-BR")),
-      );
+      await loadWhatsAppHandoffContacts(primaryWhatsAppChannel.id, { silent: true });
+      setFeedbackWhatsApp(`Contato ${payload.contact.nome} atualizado com sucesso.`);
     } catch (error) {
       setFeedbackWhatsApp(error instanceof Error ? error.message : "Nao foi possivel atualizar o contato.");
     } finally {
@@ -6052,7 +6049,7 @@ export default function AdminProjetoDetalhePage() {
         throw new Error(payload.error ?? "Nao foi possivel remover o contato.");
       }
 
-      setWhatsAppHandoffContacts((current) => current.filter((entry) => entry.id !== contact.id));
+      await loadWhatsAppHandoffContacts(primaryWhatsAppChannel.id, { silent: true });
       setFeedbackWhatsApp(`Contato ${contact.nome} removido da lista de aviso.`);
     } catch (error) {
       setFeedbackWhatsApp(error instanceof Error ? error.message : "Nao foi possivel remover o contato.");
@@ -7293,6 +7290,7 @@ export default function AdminProjetoDetalhePage() {
           loadingHandoffContacts={loadingWhatsAppHandoffContacts}
           savingHandoffContact={savingWhatsAppHandoffContact}
           updatingHandoffContactId={updatingWhatsAppHandoffContactId}
+          handoffFeedback={feedbackWhatsApp}
           actionButtonClass={headerActionButtonClass}
           onOpenNewChannel={openNewWhatsAppChannelModal}
           onConnectChannel={(channel, options) => void handleConnectWhatsAppChannel(channel, options)}

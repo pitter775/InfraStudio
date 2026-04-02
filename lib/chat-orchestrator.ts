@@ -2328,10 +2328,20 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const recentCatalogProducts = normalizeRecentCatalogProducts(context);
   const loadMoreCatalogRequested = hasMercadoLivreConnector && !leadNameReplyDetected && isCatalogLoadMoreIntent(latestUserMessage, context);
   const previousCatalogSearchTerm = typeof context?.catalogo?.ultimaBusca === "string" ? context.catalogo.ultimaBusca.trim() : "";
+  const preResolvedCatalogReferences =
+    hasMercadoLivreConnector && !leadNameReplyDetected && recentCatalogProducts.length
+      ? resolveRecentCatalogProductReference(latestUserMessage, context)
+      : [];
+  const explicitCatalogReferenceRequested =
+    hasMercadoLivreConnector &&
+    !leadNameReplyDetected &&
+    !loadMoreCatalogRequested &&
+    (preResolvedCatalogReferences.length > 0 || isRecentCatalogReferenceAttempt(latestUserMessage, context));
   const genericMercadoLivreListingRequested =
     hasMercadoLivreConnector && isMercadoLivreListingIntent(latestUserMessage) && !leadNameReplyDetected && !loadMoreCatalogRequested;
   const productSearchRequested =
     !genericMercadoLivreListingRequested &&
+    !explicitCatalogReferenceRequested &&
     !leadNameReplyDetected &&
     (loadMoreCatalogRequested ||
       detectedProductSearch ||
@@ -2397,7 +2407,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     extractedLeadName ? buildLeadNameAcknowledgementReply(extractedLeadName, hasMercadoLivreConnector, context) : null;
   const referencedCatalogProducts =
     hasMercadoLivreConnector && !leadNameReplyDetected && !productSearchRequested && !genericMercadoLivreListingRequested
-      ? resolveRecentCatalogProductReference(latestUserMessage, context)
+      ? preResolvedCatalogReferences
       : [];
   const referencedCatalogReply = buildReferencedCatalogReply(referencedCatalogProducts, context);
   const currentCatalogProduct =
