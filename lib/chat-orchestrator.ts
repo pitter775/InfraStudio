@@ -425,6 +425,7 @@ async function resolveOpenAiStageReply(input: {
   traceBase: TraceBase;
   resourceTrace: Record<string, unknown>;
   scopedRecoveryReply: string;
+  apiFallbackReply?: string | null;
   agentId: string | null;
   agentName: string | null;
 }) {
@@ -469,11 +470,13 @@ async function resolveOpenAiStageReply(input: {
           ...input.resourceTrace,
           mode: "fail_closed_after_openai_error",
           openaiError: payload.error?.message ?? null,
+          openaiStatus: response.status,
+          hasApiFallbackReply: Boolean(input.apiFallbackReply),
         },
       });
-      return buildZeroUsageReply(input.scopedRecoveryReply, [], {
+      return buildZeroUsageReply(input.apiFallbackReply || input.scopedRecoveryReply, [], {
         provider: "agent_scoped_recovery",
-        model: "fail_closed_after_openai_error",
+        model: input.apiFallbackReply ? "fail_closed_after_openai_error_api_fallback" : "fail_closed_after_openai_error",
         agenteId: input.agentId,
         agenteNome: input.agentName,
         routeStage: "openai",
@@ -517,16 +520,17 @@ async function resolveOpenAiStageReply(input: {
       source: "chat_orchestrator.guardrail",
       message: "Excecao ao chamar OpenAI. Resposta bloqueada por fail-closed.",
       ...input.traceBase,
-      payload: {
-        ...input.traceBase.payload,
-        ...input.resourceTrace,
-        mode: "fail_closed_after_exception",
-        error: error instanceof Error ? error.message : "unknown",
-      },
-    });
-    return buildZeroUsageReply(input.scopedRecoveryReply, [], {
+        payload: {
+          ...input.traceBase.payload,
+          ...input.resourceTrace,
+          mode: "fail_closed_after_exception",
+          error: error instanceof Error ? error.message : "unknown",
+          hasApiFallbackReply: Boolean(input.apiFallbackReply),
+        },
+      });
+    return buildZeroUsageReply(input.apiFallbackReply || input.scopedRecoveryReply, [], {
       provider: "agent_scoped_recovery",
-      model: "fail_closed_after_exception",
+      model: input.apiFallbackReply ? "fail_closed_after_exception_api_fallback" : "fail_closed_after_exception",
       agenteId: input.agentId,
       agenteNome: input.agentName,
       routeStage: "openai",
@@ -543,6 +547,7 @@ async function resolveGuardrailStageReply(input: {
   traceBase: TraceBase;
   resourceTrace?: Record<string, unknown>;
   scopedRecoveryReply?: string;
+  apiFallbackReply?: string | null;
   agentId: string | null;
   agentName: string | null;
 }) {
@@ -565,14 +570,19 @@ async function resolveGuardrailStageReply(input: {
 
   if (input.stage === "guardrail_no_openai") {
     await appendRuntimeErrorLog({
-      source: "chat_orchestrator.guardrail",
-      message: "OpenAI indisponivel. Resposta bloqueada por fail-closed.",
-      ...input.traceBase,
-      payload: { ...input.traceBase.payload, ...(input.resourceTrace ?? {}), mode: "fail_closed_no_openai_key" },
-    });
-    return buildZeroUsageReply(input.scopedRecoveryReply ?? "", [], {
+        source: "chat_orchestrator.guardrail",
+        message: "OpenAI indisponivel. Resposta bloqueada por fail-closed.",
+        ...input.traceBase,
+        payload: {
+          ...input.traceBase.payload,
+          ...(input.resourceTrace ?? {}),
+          mode: "fail_closed_no_openai_key",
+          hasApiFallbackReply: Boolean(input.apiFallbackReply),
+        },
+      });
+    return buildZeroUsageReply(input.apiFallbackReply || input.scopedRecoveryReply || "", [], {
       provider: "agent_scoped_recovery",
-      model: "fail_closed_no_openai_key",
+      model: input.apiFallbackReply ? "fail_closed_no_openai_key_api_fallback" : "fail_closed_no_openai_key",
       agenteId: input.agentId,
       agenteNome: input.agentName,
       routeStage: "guardrail_no_openai",
@@ -756,9 +766,15 @@ export async function generateSalesReply(history: ConversationMessage[], context
         focusedApiContextInstructions: focusedApiContext.instructions,
       })
     : null;
+  const apiFallbackReply = buildApiFallbackReply(latestUserMessage, apiContexts, {
+    normalizeText,
+    buildSearchTokens,
+    singularizeToken,
+  });
   const resourceTrace = {
     apiNames: apiContexts.map((item) => item.nome),
     apiErrors: apiContexts.filter((item) => item.erro).map((item) => ({ nome: item.nome, erro: item.erro })),
+    hasApiFallbackReply: Boolean(apiFallbackReply),
     mercadoLivreRequested: productSearchRequested,
     mercadoLivreLoadMoreRequested: loadMoreCatalogRequested,
     mercadoLivreConnectorActive: hasMercadoLivreConnector,
@@ -916,11 +932,12 @@ export async function generateSalesReply(history: ConversationMessage[], context
       stage: "guardrail_no_openai",
       conversationDomainStage,
       traceBase,
-      resourceTrace,
-      scopedRecoveryReply,
-      agentId: activeAgent.id ?? null,
-      agentName: activeAgent.nome ?? null,
-    });
+        resourceTrace,
+        scopedRecoveryReply,
+        apiFallbackReply,
+        agentId: activeAgent.id ?? null,
+        agentName: activeAgent.nome ?? null,
+      });
   }
 
   if (orchestratorRouteStage === "openai") {
@@ -941,22 +958,24 @@ export async function generateSalesReply(history: ConversationMessage[], context
       mercadoLivreDetailPromptContext,
       runtimeAssets,
       traceBase,
-      resourceTrace,
-      scopedRecoveryReply,
-      agentId: activeAgent.id ?? null,
-      agentName: activeAgent.nome ?? null,
-    });
+        resourceTrace,
+        scopedRecoveryReply,
+        apiFallbackReply,
+        agentId: activeAgent.id ?? null,
+        agentName: activeAgent.nome ?? null,
+      });
   }
 
   return resolveGuardrailStageReply({
     stage: "unexpected_route_fallback",
     conversationDomainStage,
     traceBase,
-    resourceTrace,
-    scopedRecoveryReply,
-    agentId: activeAgent.id ?? null,
-    agentName: activeAgent.nome ?? null,
-  });
+      resourceTrace,
+      scopedRecoveryReply,
+      apiFallbackReply,
+      agentId: activeAgent.id ?? null,
+      agentName: activeAgent.nome ?? null,
+    });
 }
 
 function extractPhone(message: string) {

@@ -13,6 +13,7 @@ import { resolveConversationDomainSupportState } from "@/lib/chat-domain-stage";
 import { classifyConversationDomainStage, classifyHeuristicIntentStage, classifyOrchestratorRouteStage } from "@/lib/chat-intent-classifier";
 import { buildOpenAiStageRequestPayload } from "@/lib/chat-openai-stage";
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
+import { buildAgentScopedRecoveryReply } from "@/lib/chat-recovery-stage";
 import { buildWhatsAppMessageSequence, resolveCanonicalWhatsAppExternalIdentifier, sanitizeWhatsAppCustomerFacingReply } from "@/lib/chat-service";
 import { buildCatalogDecisionFromSemanticIntent, shouldBypassCatalogHeuristicFallback } from "@/lib/chat-semantic-intent-stage";
 import { shouldRefreshSummary } from "@/lib/chat-summary-stage";
@@ -105,6 +106,22 @@ const tests: TestCase[] = [
 
       assert.doesNotMatch(sanitized, /vou verificar|status/i);
       assert.match(sanitized, /bom acabamento/i);
+    },
+  },
+  {
+    name: "recovery do agente usa fallback factual da API sem depender de palavra gatilho estreita",
+    run: () => {
+      const reply = buildAgentScopedRecoveryReply({
+        message: "qual o preco do produto?",
+        context: {
+          channel: { kind: "external_widget" },
+        } as ConversationContext,
+        agent: null,
+        apiContexts: apiRuntimeFixture.apis,
+        hasMercadoLivreConnector: false,
+      });
+
+      assert.match(reply, /preco|250/i);
     },
   },
   {

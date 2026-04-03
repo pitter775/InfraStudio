@@ -1108,3 +1108,22 @@ Objetivo pratico:
 - evitar que a mesma cliente pareca "nova" por divergencia de identificador
 - garantir que a lista continue convidando o cliente a responder livremente
 
+## Fallback Factual de API quando OpenAI falha
+
+Foi reforcado o comportamento do orquestrador e do recovery para nao abandonar perguntas factuais de API quando a chamada principal ao OpenAI falhar.
+
+Arquivos envolvidos:
+- `C:\Projetos\infrastudio\lib\chat-orchestrator.ts`
+- `C:\Projetos\infrastudio\lib\chat-recovery-stage.ts`
+- `C:\Projetos\infrastudio\tests\chat-intelligence.smoke.ts`
+
+Mudanca:
+- o recovery contextual agora sempre tenta `buildApiFallbackReply(...)` quando existirem campos relevantes de API, sem depender apenas de regex estreita como `status`, `codigo` ou `consulta`
+- o fail-closed do OpenAI passou a registrar melhor se havia fallback factual de API disponivel
+- quando houver fallback factual utilizavel, ele pode ser preferido ao recovery generico
+
+Objetivo pratico:
+- reduzir a sensacao de que o agente "nao acessou a API"
+- manter respostas factuais uteis mesmo em queda da camada OpenAI
+- aumentar a capacidade de diagnosticar se a falha real estava na API, no OpenAI ou no payload
+

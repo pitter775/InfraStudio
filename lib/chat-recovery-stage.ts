@@ -150,6 +150,12 @@ export function buildAgentScopedRecoveryReply(input: {
     return formatHeuristicReply(firstPartyFallback, input.context);
   }
 
+  const apiReply = buildApiFallbackReply(input.message, input.apiContexts, {
+    normalizeText,
+    buildSearchTokens,
+    singularizeToken,
+  });
+
   const runtime = normalizeAgentRuntimeConfig(input.agent?.configuracoes?.runtime);
   const objective =
     runtime?.overview.objetivo?.trim() ||
@@ -164,14 +170,6 @@ export function buildAgentScopedRecoveryReply(input: {
       `Me diga o ponto exato que voce quer validar em ${objective}: valor, detalhes, documentos ou o que mais pesa na sua decisao.`,
     ].join("\n\n");
 
-    const apiReply = /codigo|status|consulta|buscar|verifica|api|integr/i.test(normalizeText(input.message))
-      ? buildApiFallbackReply(input.message, input.apiContexts, {
-          normalizeText,
-          buildSearchTokens,
-          singularizeToken,
-        })
-      : null;
-
     return apiReply ? formatHeuristicReply(apiReply, input.context) : baseReply;
   }
 
@@ -183,14 +181,6 @@ export function buildAgentScopedRecoveryReply(input: {
         `Me diga o ponto exato que voce quer validar em ${objective}: valor, detalhes, documentos ou o que mais pesa na sua decisao.`,
       ].join("\n\n")
     : mercadoLivreFallbackReply;
-
-  const apiReply = /codigo|status|consulta|buscar|verifica|api|integr/i.test(normalizeText(input.message))
-    ? buildApiFallbackReply(input.message, input.apiContexts, {
-        normalizeText,
-        buildSearchTokens,
-        singularizeToken,
-      })
-    : null;
 
   return apiReply ? formatHeuristicReply(apiReply, input.context) : baseReply;
 }
