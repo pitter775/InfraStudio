@@ -509,22 +509,53 @@ function getAdminTestProjectId(body: ChatRequestBody) {
     : null;
 }
 
-function buildContinuationMessage(input: {
+function formatContinuationSummary(rawSummary?: string | null) {
+  const summaryText = String(rawSummary || "").trim();
+  if (!summaryText) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(summaryText) as Record<string, unknown>;
+    const snippets: string[] = [];
+    const objetivo = typeof parsed.objetivo === "string" ? parsed.objetivo.trim() : "";
+    const proximoPasso = typeof parsed.proximo_passo === "string" ? parsed.proximo_passo.trim() : "";
+    const restricoes = typeof parsed.restricoes === "string" ? parsed.restricoes.trim() : "";
+    const dorPrincipal = typeof parsed.dor_principal === "string" ? parsed.dor_principal.trim() : "";
+
+    if (objetivo) snippets.push(`objetivo: ${objetivo}`);
+    if (dorPrincipal) snippets.push(`dor: ${dorPrincipal}`);
+    if (restricoes) snippets.push(`pontos de atencao: ${restricoes}`);
+    if (proximoPasso) snippets.push(`proximo passo: ${proximoPasso}`);
+
+    const compact = snippets.join(" | ").trim();
+    if (compact) {
+      return compact.slice(0, 280);
+    }
+  } catch {
+    // fallback para texto livre
+  }
+
+  return summaryText.replace(/\s+/g, " ").trim().slice(0, 280);
+}
+
+export function buildContinuationMessage(input: {
   projetoNome?: string | null;
   agenteNome?: string | null;
   resumo?: string | null;
+  produtoAtual?: string | null;
   ultimaMensagem: string;
 }) {
-  const resumoLimpo = String(input.resumo || "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 280);
+  const resumoLimpo = formatContinuationSummary(input.resumo);
+  const produtoAtual = String(input.produtoAtual || "").trim();
+  const ultimaMensagem = String(input.ultimaMensagem || "").replace(/\s+/g, " ").trim().slice(0, 220);
 
   return [
     `Ola! Vim do chat do site${input.projetoNome ? ` do projeto ${input.projetoNome}` : ""}.`,
     input.agenteNome ? `Agente de referencia: ${input.agenteNome}.` : "",
-    resumoLimpo ? `Contexto resumido: ${resumoLimpo}` : "",
-    `Ultima mensagem: ${input.ultimaMensagem}`,
+    produtoAtual ? `Produto em foco: ${produtoAtual}.` : "",
+    resumoLimpo ? `Resumo para continuidade: ${resumoLimpo}` : "",
+    ultimaMensagem ? `Ultima mensagem do cliente: ${ultimaMensagem}` : "",
   ]
     .filter(Boolean)
     .join("\n\n")
@@ -1621,6 +1652,22 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     const isFocusedMercadoLivreConversation =
       ai.metadata?.model === "mercado_livre_product_sales" &&
       Boolean(ai.metadata && "catalogoProdutoAtual" in ai.metadata && ai.metadata.catalogoProdutoAtual);
+    const contextCatalogProductName =
+      nextContext.catalogo?.produtoAtual &&
+      typeof nextContext.catalogo.produtoAtual === "object" &&
+      "nome" in nextContext.catalogo.produtoAtual &&
+      typeof nextContext.catalogo.produtoAtual.nome === "string"
+        ? nextContext.catalogo.produtoAtual.nome
+        : null;
+    const metadataCatalogProductName =
+      ai.metadata &&
+      "catalogoProdutoAtual" in ai.metadata &&
+      ai.metadata.catalogoProdutoAtual &&
+      typeof ai.metadata.catalogoProdutoAtual === "object" &&
+      "nome" in ai.metadata.catalogoProdutoAtual &&
+      typeof ai.metadata.catalogoProdutoAtual.nome === "string"
+        ? ai.metadata.catalogoProdutoAtual.nome
+        : null;
     const shouldOfferCommercialCta =
       /whats\s?app/i.test(ai.reply) ||
       /estimativa|orcamento|orÃ§amento|proximo passo|pr[oÃ³]ximo passo|encaixe inicial|fecharmos/i.test(ai.reply);
@@ -1639,6 +1686,12 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
             projetoNome: nextContext.projeto?.nome ? String(nextContext.projeto.nome) : null,
             agenteNome: nextContext.agente?.nome ? String(nextContext.agente.nome) : null,
             resumo: typeof nextContext.memoria?.resumo === "string" ? nextContext.memoria.resumo : null,
+            produtoAtual:
+              metadataCatalogProductName
+                ? String(metadataCatalogProductName)
+                : contextCatalogProductName
+                ? String(contextCatalogProductName)
+                : null,
             ultimaMensagem: message,
           }),
         ),

@@ -16,7 +16,7 @@ import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage
 import { buildSystemPrompt } from "@/lib/chat-prompt-builders";
 import { buildAgentScopedRecoveryReply } from "@/lib/chat-recovery-stage";
 import { isLikelyLeadNameReply } from "@/lib/chat-lead-stage";
-import { buildWhatsAppMessageSequence, resolveCanonicalWhatsAppExternalIdentifier, sanitizeWhatsAppCustomerFacingReply } from "@/lib/chat-service";
+import { buildContinuationMessage, buildWhatsAppMessageSequence, resolveCanonicalWhatsAppExternalIdentifier, sanitizeWhatsAppCustomerFacingReply } from "@/lib/chat-service";
 import { buildCatalogDecisionFromSemanticIntent, shouldBypassCatalogHeuristicFallback } from "@/lib/chat-semantic-intent-stage";
 import { shouldRefreshSummary } from "@/lib/chat-summary-stage";
 import { buildChatUsageOrigin, buildChatUsageTelemetry, describeChatUsageOrigin, readChatUsageTelemetry } from "@/lib/chat-usage-metrics";
@@ -423,6 +423,23 @@ const tests: TestCase[] = [
 
       assert.equal(firstId, "5511978510655");
       assert.equal(secondId, "5511978510655");
+    },
+  },
+  {
+    name: "mensagem de continuidade para whatsapp prioriza produto em foco e resumo limpo",
+    run: () => {
+      const message = buildContinuationMessage({
+        projetoNome: "Reliquia de familia",
+        agenteNome: "Agent 17",
+        produtoAtual: "Jogo De Jantar Porcelana Floral Filete Dourado 41 Pecas Branco Florido",
+        resumo: '{"objetivo":"avaliar se vale a pena","proximo_passo":"validar frete e material","restricoes":"produto vintage"}',
+        ultimaMensagem: "Pelo valor dele sera que vale apena",
+      });
+
+      assert.match(message, /Produto em foco: Jogo De Jantar/i);
+      assert.match(message, /Resumo para continuidade: objetivo: avaliar se vale a pena/i);
+      assert.match(message, /Ultima mensagem do cliente: Pelo valor dele sera que vale apena/i);
+      assert.doesNotMatch(message, /Contexto resumido:/i);
     },
   },
   {
