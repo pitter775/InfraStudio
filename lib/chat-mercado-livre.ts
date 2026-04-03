@@ -91,6 +91,25 @@ type MercadoLivreDeps = {
   isWhatsAppChannel: (context?: ConversationContext) => boolean;
 };
 
+function extractExplicitMercadoLivreProductRef(message: string) {
+  const raw = String(message ?? "").trim();
+  if (!raw) {
+    return null;
+  }
+
+  const mlbMatch = raw.match(/\bMLB[- ]?(\d{6,})\b/i);
+  if (mlbMatch?.[1]) {
+    return `MLB${mlbMatch[1]}`;
+  }
+
+  const linkMatch = raw.match(/https?:\/\/\S*mercadolivre\.com\.br\/\S+/i);
+  if (linkMatch?.[0]) {
+    return linkMatch[0];
+  }
+
+  return null;
+}
+
 export function isMercadoLivrePurchaseIntent(message: string, deps: MercadoLivreDeps) {
   const normalized = deps.normalizeText(message);
   return /\b(gostei|quero|comprar|levar|fechar|pedido|interesse|tenho interesse|vou querer|separa|reservar|manda o link|me passa o link)\b/.test(
@@ -778,9 +797,10 @@ export async function resolveMercadoLivreHeuristicState(input: {
 }) {
   const selectedCatalogProduct =
     input.referencedCatalogProducts.length === 1 ? input.referencedCatalogProducts[0] : input.currentCatalogProduct;
+  const explicitProductRefFromMessage = extractExplicitMercadoLivreProductRef(input.latestUserMessage);
   const linkedProductDetails =
-    !input.productSearchRequested && input.agentId
-      ? await obterDetalhesProdutoMercadoLivrePorAgente(input.agentId, input.latestUserMessage)
+    !input.productSearchRequested && input.agentId && explicitProductRefFromMessage
+      ? await obterDetalhesProdutoMercadoLivrePorAgente(input.agentId, explicitProductRefFromMessage)
       : null;
   const purchaseOrDetailIntent =
     isMercadoLivrePurchaseIntent(input.latestUserMessage, input.deps) ||

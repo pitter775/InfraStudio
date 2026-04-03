@@ -502,6 +502,84 @@ async function analyzeAgentTestShoppingBriefScenario(title: string): Promise<Sce
   };
 }
 
+async function analyzeAgentTestSameProductDetailsScenario(title: string): Promise<ScenarioResult> {
+  const focusContext: ConversationContext = {
+    ...baseContext,
+    channel: { kind: "admin_agent_test" },
+    catalogo: {
+      ...baseContext.catalogo!,
+      ultimaBusca: "jogo de jantar completo",
+      produtoAtual: {
+        id: "MLB1",
+        nome: "Jogo De Jantar Porcelana Floral Filete Dourado 41 Pecas Branco Florido",
+        descricao: "R$ 2990",
+        preco: 2990,
+        link: "https://produto.mercadolivre.com.br/MLB-4574498811-jogo-de-jantar-porcelana-floral-filete-dourado-41-pecas-branco-florido-_JM",
+        imagem: "https://example.com/jantar.jpg",
+        cardIndex: 0,
+      },
+      ultimosProdutos: [
+        {
+          id: "MLB1",
+          nome: "Jogo De Jantar Porcelana Floral Filete Dourado 41 Pecas Branco Florido",
+          descricao: "R$ 2990",
+          preco: 2990,
+          link: "https://produto.mercadolivre.com.br/MLB-4574498811-jogo-de-jantar-porcelana-floral-filete-dourado-41-pecas-branco-florido-_JM",
+          imagem: "https://example.com/jantar.jpg",
+          cardIndex: 0,
+        },
+        {
+          id: "MLB3",
+          nome: "Conjunto Bules Inox Meridional Com Bandeja Vintage Prateado",
+          descricao: "R$ 290",
+          preco: 290,
+          link: "https://produto.mercadolivre.com.br/MLB-123-bules-_JM",
+          imagem: "https://example.com/bules.jpg",
+          cardIndex: 1,
+        },
+      ],
+    },
+  };
+
+  const state = await resolveMercadoLivreHeuristicState({
+    agentId: null,
+    latestUserMessage: "Vc tem mais detalhes dele",
+    context: focusContext,
+    hasMercadoLivreConnector: true,
+    leadNameReplyDetected: false,
+    hasReferencedCatalogReply: false,
+    productSearchRequested: false,
+    genericMercadoLivreListingRequested: false,
+    mercadoLivreListingProducts: [],
+    mercadoLivreProducts: [],
+    resolvedProductSearchTerm: "",
+    productSearchTerm: "",
+    loadMoreCatalogRequested: false,
+    referencedCatalogProducts: [],
+    currentCatalogProduct: focusContext.catalogo?.produtoAtual ?? null,
+    catalogFollowUpDecision: null,
+    lojaCta: null,
+    deps: {
+      normalizeText: normalizeFixtureText,
+      isWhatsAppChannel: () => false,
+    },
+  });
+
+  const reply = state.selectedProductSalesReply ?? "";
+
+  return {
+    category: "mercado_livre",
+    title,
+    input: "Gostei do jogo de jantar completo -> Vc tem mais detalhes dele",
+    observations: [
+      `agent_test.same_product_details_reply_present=${reply ? "yes" : "no"}`,
+      `agent_test.same_product_mentions_jantar=${/jogo de jantar|41 pecas|2990/i.test(reply) ? "yes" : "no"}`,
+      `agent_test.same_product_avoids_other_item=${/bules inox|meridional|290/i.test(reply) ? "no" : "yes"}`,
+      `agent_test.same_product_focus_name=${state.salesFocusProduct?.nome ?? "none"}`,
+    ],
+  };
+}
+
 async function analyzeMercadoLivreListingCopyScenario(title: string, context: ConversationContext): Promise<ScenarioResult> {
   const reply = buildMercadoLivreReply(loadCatalogProductsFromContext(context), context, {
     normalizeText: normalizeFixtureText,
@@ -925,6 +1003,7 @@ async function main() {
   scenarios.push(await analyzeAgentTestFocusedProductScenario("Agent test: pergunta tecnica sobre produto em foco nao entra em loop", "ela e resistente vc sabe o material dela"));
   scenarios.push(await analyzeAgentTestFocusedProductScenario("Agent test: pergunta de uso diario mantem venda consultiva", "serve para uso diario?"));
   scenarios.push(await analyzeAgentTestPostSingleProductDeliveryScenario("Agent test: apos entregar produto unico o follow-up tecnico nao se perde"));
+  scenarios.push(await analyzeAgentTestSameProductDetailsScenario("Agent test: pedir mais detalhes depois do produto escolhido mantem o mesmo item"));
   scenarios.push(await analyzeAgentTestShoppingBriefScenario("Agent test: contexto curto de compra vira brief comercial"));
   scenarios.push(await analyzeAgentTestConversationDiagnosticScenario("Agent test: diagnostico do papo real de sopeira"));
   scenarios.push(await analyzeMercadoLivreListingCopyScenario("Fluxo ML: copy humana apos envio de lista", baseContext));

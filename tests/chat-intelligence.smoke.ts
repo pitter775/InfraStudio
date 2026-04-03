@@ -953,6 +953,77 @@ const tests: TestCase[] = [
     },
   },
   {
+    name: "follow-up de detalhes com pronome mantem o mesmo produto em foco",
+    run: async () => {
+      const focusContext: ConversationContext = {
+        ...recentCatalogContext,
+        channel: { kind: "admin_agent_test" },
+        catalogo: {
+          ...recentCatalogContext.catalogo!,
+          ultimaBusca: "jogo de jantar completo",
+          produtoAtual: {
+            id: "MLB1",
+            nome: "Jogo De Jantar Porcelana Floral Filete Dourado 41 Pecas Branco Florido",
+            descricao: "R$ 2990",
+            preco: 2990,
+            link: "https://produto.mercadolivre.com.br/MLB-4574498811-jogo-de-jantar-porcelana-floral-filete-dourado-41-pecas-branco-florido-_JM",
+            imagem: "https://example.com/jantar.jpg",
+            cardIndex: 0,
+          },
+          ultimosProdutos: [
+            {
+              id: "MLB1",
+              nome: "Jogo De Jantar Porcelana Floral Filete Dourado 41 Pecas Branco Florido",
+              descricao: "R$ 2990",
+              preco: 2990,
+              link: "https://produto.mercadolivre.com.br/MLB-4574498811-jogo-de-jantar-porcelana-floral-filete-dourado-41-pecas-branco-florido-_JM",
+              imagem: "https://example.com/jantar.jpg",
+              cardIndex: 0,
+            },
+            {
+              id: "MLB3",
+              nome: "Conjunto Bules Inox Meridional Com Bandeja Vintage Prateado",
+              descricao: "R$ 290",
+              preco: 290,
+              link: "https://produto.mercadolivre.com.br/MLB-123-bules-_JM",
+              imagem: "https://example.com/bules.jpg",
+              cardIndex: 1,
+            },
+          ],
+        },
+      };
+
+      const state = await resolveMercadoLivreHeuristicState({
+        agentId: null,
+        latestUserMessage: "vc tem mais detalhes dele",
+        context: focusContext,
+        hasMercadoLivreConnector: true,
+        leadNameReplyDetected: false,
+        hasReferencedCatalogReply: false,
+        productSearchRequested: false,
+        genericMercadoLivreListingRequested: false,
+        mercadoLivreListingProducts: [],
+        mercadoLivreProducts: [],
+        resolvedProductSearchTerm: "",
+        productSearchTerm: "",
+        loadMoreCatalogRequested: false,
+        referencedCatalogProducts: [],
+        currentCatalogProduct: focusContext.catalogo?.produtoAtual ?? null,
+        catalogFollowUpDecision: null,
+        lojaCta: null,
+        deps: {
+          normalizeText: normalizeFixtureText,
+          isWhatsAppChannel: () => false,
+        },
+      });
+
+      assert.ok(state.selectedProductSalesReply);
+      assert.match(state.selectedProductSalesReply ?? "", /jogo de jantar|41 pecas|2990/i);
+      assert.doesNotMatch(state.selectedProductSalesReply ?? "", /bules inox|meridional|290/i);
+      assert.equal(state.salesFocusProduct?.nome, "Jogo De Jantar Porcelana Floral Filete Dourado 41 Pecas Branco Florido");
+    },
+  },
+  {
     name: "telemetria de uso classifica origem com canal provider rota e dominio",
     run: () => {
       const origin = buildChatUsageOrigin({
