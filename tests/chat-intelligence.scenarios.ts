@@ -318,6 +318,57 @@ async function analyzeAgentTestFocusedProductScenario(title: string, input: stri
   };
 }
 
+async function analyzeAgentTestPostSingleProductDeliveryScenario(title: string): Promise<ScenarioResult> {
+  const agentTestContext: ConversationContext = {
+    ...baseContext,
+    channel: { kind: "admin_agent_test" },
+    catalogo: {
+      ...baseContext.catalogo!,
+      ultimaBusca: "sopeira",
+      produtoAtual: baseContext.catalogo?.ultimosProdutos?.[1],
+      ultimosProdutos: [baseContext.catalogo?.ultimosProdutos?.[1]].filter(Boolean) as NonNullable<ConversationContext["catalogo"]>["ultimosProdutos"],
+    },
+  };
+
+  const singleProductReply = buildMercadoLivreSingleResultReply(
+    mercadoLivreFocusProduct,
+    agentTestContext,
+    null,
+    {
+      normalizeText: normalizeFixtureText,
+      isWhatsAppChannel: () => false,
+    },
+  );
+
+  const followUpReply = buildMercadoLivreSalesReply(
+    mercadoLivreFocusProduct,
+    "gostei vc sabe o material dele",
+    agentTestContext,
+    null,
+    {
+      normalizeText: normalizeFixtureText,
+      isWhatsAppChannel: () => false,
+    },
+  );
+
+  const repeatedNameCount = (followUpReply.match(/Jogo De Sopeira Com Consumes Ceramica Decorada Vintage Branco/gi) ?? []).length;
+
+  return {
+    category: "mercado_livre",
+    title,
+    input: "preciso de uma sopeira -> [produto unico entregue] -> gostei vc sabe o material dele",
+    observations: [
+      `agent_test.single_product_delivery_is_commercial=${/Encontrei um produto que combina com a busca/i.test(singleProductReply) ? "yes" : "no"}`,
+      `agent_test.single_product_delivery_uses_description=${/No anuncio ele aparece assim:/i.test(singleProductReply) ? "yes" : "no"}`,
+      `agent_test.follow_up_mentions_material=${/ceramica esmaltada/i.test(followUpReply) ? "yes" : "no"}`,
+      `agent_test.follow_up_mentions_state=${/bom estado geral|sem trincas|sem quebras/i.test(followUpReply) ? "yes" : "no"}`,
+      `agent_test.follow_up_avoids_restart=${/Sigo por aqui no contexto|Me diga o ponto exato que voce quer validar/i.test(followUpReply) ? "no" : "yes"}`,
+      `agent_test.follow_up_avoids_relisting=${/Acredito que voce esteja falando|buscar opcoes parecidas|mostrar mais detalhes/i.test(followUpReply) ? "no" : "yes"}`,
+      `agent_test.follow_up_product_name_repetitions=${repeatedNameCount}`,
+    ],
+  };
+}
+
 async function analyzeAgentTestConversationDiagnosticScenario(title: string): Promise<ScenarioResult> {
   const agentTestContext: ConversationContext = {
     ...baseContext,
@@ -836,6 +887,7 @@ async function main() {
   scenarios.push(await analyzeMercadoLivreCommercialScenario("Fluxo ML: produto em foco vira conversa consultiva", "acho que combina comigo", baseContext));
   scenarios.push(await analyzeAgentTestFocusedProductScenario("Agent test: pergunta tecnica sobre produto em foco nao entra em loop", "ela e resistente vc sabe o material dela"));
   scenarios.push(await analyzeAgentTestFocusedProductScenario("Agent test: pergunta de uso diario mantem venda consultiva", "serve para uso diario?"));
+  scenarios.push(await analyzeAgentTestPostSingleProductDeliveryScenario("Agent test: apos entregar produto unico o follow-up tecnico nao se perde"));
   scenarios.push(await analyzeAgentTestConversationDiagnosticScenario("Agent test: diagnostico do papo real de sopeira"));
   scenarios.push(await analyzeMercadoLivreListingCopyScenario("Fluxo ML: copy humana apos envio de lista", baseContext));
   scenarios.push(await analyzeWhatsAppScenario("WhatsApp: identidade canonica e lista inicial com frase humana", whatsappContext));

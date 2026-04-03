@@ -354,13 +354,15 @@ function formatWhatsAppOutboundTextSafe(reply: string) {
     .trim();
 }
 
-function stripAssistantMetaReply(reply: string, channelKind: ChatChannelKind) {
+function stripAssistantMetaArtifacts(reply: string) {
   let sanitized = String(reply || "");
 
   const forbiddenPatterns = [
     /Seu atendimento acontece exclusivamente via WhatsApp[^\n]*?/gi,
     /Seu atendimento ocorre exclusivamente via WhatsApp[^\n]*?/gi,
-    /de forma natural,\s*simpatica e acolhedora[^\n]*?/gi,
+    /de forma natural,\s*simp[aá]t(?:i|í)ca e acolhedora[^\n]*?/gi,
+    /de forma natural,\s*simpat(?:i|í)ca e acolhedora[^\n]*?/gi,
+    /de forma natural[^\n]*?acolhedora[^\n]*?/gi,
     /como se fosse uma pessoa real atendendo[^\n]*?/gi,
     /voce esta falando com (uma )?ia[^\n]*?/gi,
     /minha funcao aqui e te atender[^\n]*?/gi,
@@ -370,12 +372,23 @@ function stripAssistantMetaReply(reply: string, channelKind: ChatChannelKind) {
     sanitized = sanitized.replace(pattern, "");
   }
 
-  sanitized = sanitized.replace(/\n{3,}/g, "\n\n").trim();
+  return sanitized
+    .replace(/\s+,/g, ",")
+    .replace(/,\s*,+/g, ", ")
+    .replace(/,\s*\./g, ".")
+    .replace(/\.\s*,/g, ".")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function stripAssistantMetaReply(reply: string, channelKind: ChatChannelKind) {
+  const sanitized = stripAssistantMetaArtifacts(reply);
   return channelKind === "whatsapp" ? formatWhatsAppOutboundTextSafe(sanitized) : sanitized;
 }
 
 export function sanitizeWhatsAppCustomerFacingReply(reply: string) {
-  let sanitized = String(reply || "");
+  let sanitized = stripAssistantMetaArtifacts(reply);
 
   const promisePatterns = [
     /\b(?:deixa|deixe)\s+eu\s+(?:ver|verificar|consultar|olhar)\b[^.!?\n]*[.!?]?/gi,

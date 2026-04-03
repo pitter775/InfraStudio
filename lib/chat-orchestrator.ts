@@ -863,7 +863,13 @@ export async function generateSalesReply(history: ConversationMessage[], context
       isWhatsAppChannel,
     },
   });
-  const catalogReferenceHeuristicReply = resolveCatalogReferenceHeuristicReply({
+  const shouldBypassCatalogReferenceReply =
+    Boolean(currentCatalogProduct) &&
+    Boolean(semanticIntentStage) &&
+    (semanticIntentStage?.intent === "product_interest" || semanticIntentStage?.intent === "product_question");
+  const catalogReferenceHeuristicReply = shouldBypassCatalogReferenceReply
+    ? null
+    : resolveCatalogReferenceHeuristicReply({
     context,
     agentId: activeAgent.id ?? null,
     agentName: activeAgent.nome ?? null,

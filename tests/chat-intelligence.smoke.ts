@@ -114,6 +114,18 @@ const tests: TestCase[] = [
     },
   },
   {
+    name: "sanitizacao remove vazamento de instrucao de estilo com acento e pontuacao solta",
+    run: () => {
+      const sanitized = sanitizeWhatsAppCustomerFacingReply(
+        "Encontrei um produto interessante para voce, de forma natural, simpática e acolhedora, .",
+      );
+
+      assert.doesNotMatch(sanitized, /de forma natural|simpática e acolhedora|simpatica e acolhedora/i);
+      assert.doesNotMatch(sanitized, /,\s*\./);
+      assert.match(sanitized, /Encontrei um produto interessante para voce/i);
+    },
+  },
+  {
     name: "recovery do agente usa fallback factual da API sem depender de palavra gatilho estreita",
     run: () => {
       const reply = buildAgentScopedRecoveryReply({
@@ -450,7 +462,7 @@ const tests: TestCase[] = [
     },
   },
   {
-    name: "semantic stage direciona interesse para produto em foco",
+    name: "semantic stage segura interesse no produto em foco sem voltar para referencia de catalogo",
     run: () => {
       const decision = buildCatalogDecisionFromSemanticIntent({
         semanticIntent: {
@@ -464,9 +476,127 @@ const tests: TestCase[] = [
       });
 
       assert.ok(decision);
-      assert.equal(decision?.kind, "recent_product_reference");
+      assert.equal(decision?.kind, "non_catalog_message");
       assert.equal(decision?.matchedProducts[0]?.id, "MLB2");
       assert.equal(decision?.usedLlm, true);
+      assert.equal(decision?.shouldBlockNewSearch, true);
+    },
+  },
+  {
+    name: "pergunta tecnica com produto em foco prioriza mercado livre em vez de catalog reference",
+    async run() {
+      const semanticDecision = buildCatalogDecisionFromSemanticIntent({
+        semanticIntent: {
+          intent: "product_question",
+          confidence: 0.92,
+          reason: "pergunta tecnica sobre o produto em foco",
+          usedLlm: true,
+        },
+        context: recentCatalogContext,
+        recentProducts: recentCatalogContext.catalogo?.ultimosProdutos ?? [],
+      });
+
+      const flow = resolveMercadoLivreFlowState({
+        latestUserMessage: "gostei vc sabe o material dele",
+        context: recentCatalogContext,
+        hasMercadoLivreConnector: true,
+        leadNameReplyDetected: false,
+        recentCatalogProducts: recentCatalogContext.catalogo?.ultimosProdutos ?? [],
+        catalogFollowUpDecision: semanticDecision,
+        detectProductSearch: () => false,
+        buildProductSearchCandidates: deps.buildProductSearchCandidates,
+        resolveRecentCatalogProductReference,
+        isRecentCatalogReferenceAttempt: (message) => /\b(esse|essa|mandou|primeiro|segundo)\b/i.test(message),
+        isMercadoLivreListingIntent: () => false,
+        shouldUseMercadoLivreConnectorFallback: () => false,
+      });
+
+      const heuristicState = await resolveMercadoLivreHeuristicState({
+        agentId: null,
+        latestUserMessage: "gostei vc sabe o material dele",
+        context: recentCatalogContext,
+        hasMercadoLivreConnector: true,
+        leadNameReplyDetected: false,
+        hasReferencedCatalogReply: false,
+        productSearchRequested: flow.productSearchRequested,
+        genericMercadoLivreListingRequested: flow.genericMercadoLivreListingRequested,
+        mercadoLivreListingProducts: [],
+        mercadoLivreProducts: [],
+        resolvedProductSearchTerm: flow.productSearchTerm,
+        productSearchTerm: flow.productSearchTerm,
+        loadMoreCatalogRequested: flow.loadMoreCatalogRequested,
+        referencedCatalogProducts: flow.referencedCatalogProducts,
+        currentCatalogProduct: flow.currentCatalogProduct,
+        catalogFollowUpDecision: semanticDecision,
+        lojaCta: null,
+        deps: {
+          normalizeText: normalizeFixtureText,
+          isWhatsAppChannel: () => false,
+        },
+      });
+
+      const mercadoLivreReply = resolveMercadoLivreHeuristicReply({
+        context: recentCatalogContext,
+        latestUserMessage: "gostei vc sabe o material dele",
+        agentId: "agent-1",
+        agentName: "Agent",
+        selectedProductSalesReply: heuristicState.selectedProductSalesReply,
+        salesFocusProduct: heuristicState.salesFocusProduct,
+        selectedCatalogProduct: heuristicState.selectedCatalogProduct,
+        mercadoLivreListingReply: heuristicState.mercadoLivreListingReply,
+        mercadoLivreListingProductsForAssets: [],
+        directMercadoLivreReply: heuristicState.directMercadoLivreReply,
+        mercadoLivreProductsForAssets: [],
+        currentProductForMetadata: heuristicState.currentProductForMetadata,
+        mercadoLivreNoResultsReply: heuristicState.mercadoLivreNoResultsReply,
+        formatReply: (reply) => reply,
+        deps: {
+          normalizeText: normalizeFixtureText,
+          isWhatsAppChannel: () => false,
+        },
+      });
+
+      const shouldBypassCatalogReferenceReply =
+        Boolean(flow.currentCatalogProduct) &&
+        (semanticDecision?.kind === "non_catalog_message");
+      const catalogReferenceReply = shouldBypassCatalogReferenceReply
+        ? null
+        : resolveCatalogReferenceHeuristicReply({
+            context: recentCatalogContext,
+            agentId: "agent-1",
+            agentName: "Agent",
+            referencedCatalogProducts: flow.referencedCatalogProducts,
+            ambiguousCatalogReferenceReply: buildAmbiguousCatalogReferenceReply(recentCatalogContext),
+            formatReply: (reply) => reply,
+          });
+
+      const stageState = resolveConversationPipelineStageState({
+        leadNameAcknowledgementReply: null,
+        hasCatalogReferenceHeuristicReply: Boolean(catalogReferenceReply),
+        hasMercadoLivreHeuristicReply: Boolean(mercadoLivreReply),
+        catalogPricingReply: null,
+        leadIdentificationReply: null,
+        hasValidAgent: true,
+        hasOpenAiKey: true,
+        hasFocusedApiContext: false,
+        latestUserMessage: "gostei vc sabe o material dele",
+        hasMemorySummary: false,
+        hasCurrentCatalogContext: true,
+        hasMercadoLivreContext: true,
+        hasLeadContext: false,
+        semanticCatalogIntentStage: {
+          intent: "product_question",
+          confidence: 0.92,
+          reason: "pergunta tecnica sobre o produto em foco",
+          usedLlm: true,
+        },
+      });
+
+      assert.equal(semanticDecision?.kind, "non_catalog_message");
+      assert.equal(Boolean(catalogReferenceReply), false);
+      assert.equal(mercadoLivreReply?.mode, "mercado_livre_product_sales");
+      assert.equal(stageState.heuristicIntentStage, "mercado_livre");
+      assert.doesNotMatch(mercadoLivreReply?.reply ?? "", /Acredito que voce esteja falando|buscar opcoes parecidas|mostrar mais detalhes/i);
     },
   },
   {
@@ -712,6 +842,34 @@ const tests: TestCase[] = [
       const repeatedNameCount = (reply.match(/Jogo De Sopeira Com Consumes Ceramica Decorada Vintage Branco/gi) ?? []).length;
       assert.ok(repeatedNameCount <= 1);
       assert.match(reply, /uso a mesa|dia a dia|servir sopas e caldos/i);
+    },
+  },
+  {
+    name: "apos entregar produto unico o follow-up tecnico nao relista nem reinicia",
+    run: () => {
+      const reply = buildMercadoLivreSalesReply(
+        mercadoLivreFocusProduct,
+        "gostei vc sabe o material dele",
+        {
+          ...recentCatalogContext,
+          channel: { kind: "admin_agent_test" },
+          catalogo: {
+            ...recentCatalogContext.catalogo!,
+            ultimaBusca: "sopeira",
+            produtoAtual: recentCatalogContext.catalogo?.ultimosProdutos?.[1],
+            ultimosProdutos: [recentCatalogContext.catalogo?.ultimosProdutos?.[1]].filter(Boolean) as NonNullable<ConversationContext["catalogo"]>["ultimosProdutos"],
+          },
+        },
+        null,
+        {
+          normalizeText: normalizeFixtureText,
+          isWhatsAppChannel: () => false,
+        },
+      );
+
+      assert.match(reply, /ceramica esmaltada|bom estado geral/i);
+      assert.doesNotMatch(reply, /Acredito que voce esteja falando|buscar opcoes parecidas|mostrar mais detalhes/i);
+      assert.doesNotMatch(reply, /Sigo por aqui no contexto|Me diga o ponto exato que voce quer validar/i);
     },
   },
   {

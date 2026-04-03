@@ -239,6 +239,17 @@ export function buildCatalogDecisionFromSemanticIntent(input: {
       return null;
     }
 
+    if (currentProduct) {
+      return {
+        kind: "non_catalog_message",
+        confidence: input.semanticIntent.confidence,
+        reason: input.semanticIntent.reason,
+        matchedProducts: [currentProduct],
+        usedLlm: input.semanticIntent.usedLlm,
+        shouldBlockNewSearch: true,
+      };
+    }
+
     return {
       kind: "recent_product_reference",
       confidence: input.semanticIntent.confidence,

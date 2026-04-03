@@ -1175,3 +1175,20 @@ Objetivo pratico:
   - `agent_test.listing_reuses_previous_search`
 - O objetivo dessa rodada foi capturar antes do teste real quando o fluxo cair cedo demais em texto generico do tipo `Como este agente esta focado na loja do Mercado Livre...`.
 - O recovery contextual do Mercado Livre agora tenta transformar pedidos claros de produto em busca guiada, inclusive com typo simples como `soperia`, em vez de abrir um formulario generico.
+
+## Atualizacao 2026-04-03 - higiene de resposta e produto em foco
+- A sanitizacao do `chat-service` ficou mais robusta para remover vazamentos de prompt/estilo que escapem para a resposta final, incluindo variantes com acento e pontuacao residual.
+- Exemplo protegido: `de forma natural, simpática e acolhedora`.
+- O `semantic_intent_stage` foi ajustado para que `product_interest` e `product_question`, quando existe `produtoAtual`, nao voltem automaticamente para `catalog_reference`.
+- Isso reduz o loop de reafirmacao do item e deixa mais espaco para a resposta consultiva baseada no produto em foco.
+
+## Atualizacao 2026-04-03 - cenario de confusao apos produto unico
+- O laboratorio agora tem um cenario explicito para o ponto em que o agente entrega um unico produto e o cliente continua com uma pergunta tecnica/comercial.
+- Sinais observados nesse novo cenario:
+  - `agent_test.single_product_delivery_is_commercial`
+  - `agent_test.single_product_delivery_uses_description`
+  - `agent_test.follow_up_mentions_material`
+  - `agent_test.follow_up_mentions_state`
+  - `agent_test.follow_up_avoids_restart`
+  - `agent_test.follow_up_avoids_relisting`
+- O objetivo dessa cobertura e impedir que o fluxo volte a repetir card, reafirmar item de forma seca ou reiniciar o atendimento apos o primeiro produto entregue.
