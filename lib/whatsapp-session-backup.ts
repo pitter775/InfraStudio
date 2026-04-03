@@ -25,6 +25,62 @@ export function getWhatsAppSessionBackupConfig() {
     bucketName: getBucketName(),
     objectPath: getObjectPath(),
     fileSizeLimit: getFileSizeLimit(),
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "",
+    supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || "",
+  };
+}
+
+export async function createWhatsAppSessionBackupUploadAccess() {
+  await ensureBackupBucket();
+
+  const supabase = getSupabaseAdminClient();
+  const { bucketName, objectPath, fileSizeLimit, supabaseUrl, supabaseAnonKey } = getWhatsAppSessionBackupConfig();
+  const { data, error } = await supabase.storage.from(bucketName).createSignedUploadUrl(objectPath, {
+    upsert: true,
+  });
+
+  if (error || !data) {
+    throw new Error(error?.message || "Falha ao criar acesso temporario de upload para o backup da sessao do WhatsApp.");
+  }
+
+  return {
+    bucketName,
+    objectPath,
+    fileSizeLimit,
+    supabaseUrl,
+    supabaseAnonKey,
+    path: data.path,
+    token: data.token,
+    signedUrl: "signedUrl" in data ? data.signedUrl : null,
+  };
+}
+
+export async function createWhatsAppSessionBackupDownloadAccess() {
+  await ensureBackupBucket();
+
+  const supabase = getSupabaseAdminClient();
+  const { bucketName, objectPath, fileSizeLimit } = getWhatsAppSessionBackupConfig();
+  const { data, error } = await supabase.storage.from(bucketName).createSignedUrl(objectPath, 60 * 30, {
+    download: "whatsapp-session-backup.zip",
+  });
+
+  if (error) {
+    if (/not found|does not exist/i.test(error.message || "")) {
+      return null;
+    }
+
+    throw new Error(error.message || "Falha ao criar URL assinada para download do backup da sessao do WhatsApp.");
+  }
+
+  if (!data?.signedUrl) {
+    return null;
+  }
+
+  return {
+    bucketName,
+    objectPath,
+    fileSizeLimit,
+    signedUrl: data.signedUrl,
   };
 }
 
