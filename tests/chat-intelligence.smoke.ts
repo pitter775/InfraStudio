@@ -196,6 +196,35 @@ const tests: TestCase[] = [
     },
   },
   {
+    name: "resposta direta de data do leilao formata data com icone",
+    run: () => {
+      const reply = buildApiFallbackReply("me passa a data do leilao", apiRuntimeRealEstateFixture.apis, {
+        normalizeText: normalizeFixtureText,
+        buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+        singularizeToken: (value) => value,
+      });
+
+      assert.ok(reply);
+      assert.match(reply ?? "", /📅/);
+      assert.match(reply ?? "", /27\/03\/2026/);
+      assert.doesNotMatch(reply ?? "", /2026-03-27T16:00:00Z/);
+    },
+  },
+  {
+    name: "analise de imovel em vale a pena inclui data normalizada quando disponivel",
+    run: () => {
+      const reply = buildApiFallbackReply("sera que vale apena", apiRuntimeRealEstateFixture.apis, {
+        normalizeText: normalizeFixtureText,
+        buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+        singularizeToken: (value) => value,
+      });
+
+      assert.ok(reply);
+      assert.match(reply ?? "", /📅/);
+      assert.match(reply ?? "", /27\/03\/2026/);
+    },
+  },
+  {
     name: "fallback de API de imovel segura follow-up curto sem depender de frase fixa",
     run: () => {
       const messages = [

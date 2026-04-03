@@ -5,6 +5,7 @@ import {
   resolveRecentCatalogProductReference,
 } from "@/lib/catalog-follow-up";
 import type { CatalogFollowUpDecision } from "@/lib/catalog-follow-up";
+import type { ConversationContext } from "@/lib/chat-context";
 import { buildApiFallbackReply, buildFocusedApiContext } from "@/lib/chat-api-runtime";
 import { buildCatalogDecisionFromSemanticIntent } from "@/lib/chat-semantic-intent-stage";
 import {
@@ -13,6 +14,7 @@ import {
   classifyHumanEscalationNeed,
   isHumanHandoffIntent,
 } from "@/lib/chat-handoff-policy";
+import { buildAgentScopedRecoveryReply } from "@/lib/chat-recovery-stage";
 import {
   buildLeadNameAcknowledgementReply,
   enrichLeadContext,
@@ -26,6 +28,7 @@ import {
   createFixtureSearchDeps,
   loadApiRuntimeErrorFixture,
   loadApiRuntimeFixture,
+  loadApiRuntimeRealEstateFixture,
   loadCatalogContextFixture,
   loadHandoffFixture,
   loadLeadContextFixture,
@@ -40,6 +43,7 @@ const catalogContext = loadCatalogContextFixture();
 const staleCatalogContext = loadStaleCatalogContextFixture();
 const apiFixture = loadApiRuntimeFixture();
 const apiErrorFixture = loadApiRuntimeErrorFixture();
+const apiRealEstateFixture = loadApiRuntimeRealEstateFixture();
 const leadContextFixture = loadLeadContextFixture();
 const handoffFixture = loadHandoffFixture();
 const mercadoLivreAmbiguousFixture = loadMercadoLivreAmbiguousFixture();
@@ -156,6 +160,52 @@ function runApiRegression(): DomainReport[] {
     report("api", "pipeline amplia dominio factual quando ha api focada", [
       `domain=${stage.conversationDomainStage}`,
       `tokens=${stage.domainSupportState.maxOutputTokens}`,
+    ]),
+  );
+
+  const dateReply = buildApiFallbackReply("me passa a data do leilao", apiRealEstateFixture.apis, {
+    normalizeText: normalizeFixtureText,
+    buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+    singularizeToken: (value) => value,
+  });
+  assert.match(dateReply ?? "", /📅/);
+  assert.match(dateReply ?? "", /27\/03\/2026/);
+  reports.push(
+    report("api", "data do leilao sai normalizada e sem iso cru", [
+      `hasIcon=${/📅/.test(dateReply ?? "") ? "yes" : "no"}`,
+      `hasNormalizedDate=${/27\/03\/2026/.test(dateReply ?? "") ? "yes" : "no"}`,
+      `hasRawIso=${/2026-03-27T16:00:00Z/.test(dateReply ?? "") ? "yes" : "no"}`,
+    ]),
+  );
+
+  const continuationReply = buildAgentScopedRecoveryReply({
+    message: "sim segue",
+    context: {
+      channel: { kind: "external_widget" },
+    } as ConversationContext,
+    agent: {
+      id: "agent-1",
+      nome: "Agente do Imovel",
+      slug: null,
+      projetoId: "proj-1",
+      modeloId: null,
+      apiIds: [],
+      configuracoes: { runtime: { overview: { objetivo: "Qualificar leads e conduzir o atendimento com contexto do negocio." } } },
+      arquivos: [],
+      promptBase: "",
+      createdAt: "",
+      updatedAt: "",
+      ativo: true,
+      descricao: null,
+    } as never,
+    apiContexts: apiRealEstateFixture.apis,
+    hasMercadoLivreConnector: false,
+  });
+  assert.doesNotMatch(continuationReply, /Sigo por aqui no contexto|Me diga o ponto exato que voce quer validar/i);
+  reports.push(
+    report("api", "follow-up curto evita reinicio generico no external widget", [
+      `avoidsRestart=${/Sigo por aqui no contexto|Me diga o ponto exato que voce quer validar/i.test(continuationReply) ? "no" : "yes"}`,
+      `hasContextualReply=${/Faz sentido olhar isso com mais calma|Leitura inicial|Motivos|riscos|cartorio|matricula/i.test(continuationReply) ? "yes" : "no"}`,
     ]),
   );
 

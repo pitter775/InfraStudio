@@ -13,6 +13,23 @@ type ApiRuntimeDeps = {
   singularizeToken: (token: string) => string;
 };
 
+function formatApiDateValue(value: string | number | boolean) {
+  const textValue = String(value).trim();
+  if (!textValue) return null;
+
+  const date = new Date(textValue);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  }).format(date);
+}
+
 const API_FIELD_INTENTS = [
   {
     triggers: ["problema", "problemas", "risco", "riscos", "alerta", "alertas", "atencao", "atencoes", "impedimento", "impedimentos", "pendencia", "pendencias", "restricao", "restricoes"],
@@ -131,6 +148,7 @@ function formatApiFieldLabel(path: string) {
 function formatDirectFieldReply(fieldName: string, value: string | number | boolean, deps: ApiRuntimeDeps) {
   const normalizedField = deps.normalizeText(fieldName);
   const textValue = String(value);
+  const formattedDate = formatApiDateValue(value);
 
   if (normalizedField.endsWith("matricula")) return `A matricula do imovel e ${textValue}.`;
   if (normalizedField.endsWith("cartorio")) return `O cartorio informado e ${textValue}.`;
@@ -138,7 +156,7 @@ function formatDirectFieldReply(fieldName: string, value: string | number | bool
   if (normalizedField.endsWith("ocupacao")) return `A ocupacao informada e ${textValue}.`;
   if (normalizedField.endsWith("valor_minimo")) return `O valor minimo do imovel e ${textValue}.`;
   if (normalizedField.endsWith("valor_avaliacao")) return `O valor de avaliacao do imovel e ${textValue}.`;
-  if (normalizedField.endsWith("data_leilao")) return `A data do leilao informada e ${textValue}.`;
+  if (normalizedField.endsWith("data_leilao")) return `📅 A data do leilao informada e ${formattedDate ?? textValue}.`;
   if (normalizedField.endsWith("status")) return `O status atual do imovel e ${textValue}.`;
   if (normalizedField.endsWith("rua")) return `A rua informada e ${textValue}.`;
   if (normalizedField.endsWith("numero")) return `O numero informado e ${textValue}.`;
@@ -152,6 +170,26 @@ function formatDirectFieldReply(fieldName: string, value: string | number | bool
   if (normalizedField.endsWith("descricao") || normalizedField.endsWith("resumo_executivo") || normalizedField.endsWith("analise")) return textValue;
 
   return `${formatApiFieldLabel(fieldName)}: ${textValue}`;
+}
+
+function formatAnalyticalFieldValue(campo: ScoredApiField) {
+  if (campo.nome.endsWith("data_leilao")) {
+    return formatApiDateValue(campo.valor) ?? String(campo.valor);
+  }
+
+  return String(campo.valor);
+}
+
+function getApiFieldIcon(fieldName: string, deps: ApiRuntimeDeps) {
+  const normalizedField = deps.normalizeText(fieldName);
+
+  if (normalizedField.endsWith("data_leilao")) return "📅";
+  if (normalizedField.endsWith("riscos") || normalizedField.endsWith("risco")) return "⚠️";
+  if (normalizedField.endsWith("cartorio") || normalizedField.endsWith("matricula")) return "📄";
+  if (normalizedField.endsWith("valor_minimo") || normalizedField.endsWith("valor_avaliacao") || normalizedField.endsWith("valor_mercado") || normalizedField.endsWith("preco")) return "💰";
+  if (normalizedField.endsWith("ocupacao") || normalizedField.endsWith("status")) return "🏷️";
+
+  return "•";
 }
 
 function getApiKeywordGroups(message: string, deps: ApiRuntimeDeps) {
@@ -234,6 +272,7 @@ export function buildFocusedApiContext(message: string, apiContexts: ApiRuntimeC
     "risco",
     "cartorio",
     "matricula",
+    "data_leilao",
     "valor_minimo",
     "valor_avaliacao",
     "valor_mercado",
@@ -266,7 +305,7 @@ export function buildFocusedApiContext(message: string, apiContexts: ApiRuntimeC
       : [];
 
   const selectedFields = matches.length ? matches : fallbackFields;
-  const fieldLines = selectedFields.map((campo) => `- ${formatApiFieldLabel(campo.nome)} (${campo.nome}): ${String(campo.valor)}`);
+  const fieldLines = selectedFields.map((campo) => `- ${formatApiFieldLabel(campo.nome)} (${campo.nome}): ${formatAnalyticalFieldValue(campo)}`);
   const failedLines = failedApis.map((api) => `- API indisponivel: ${api.nome}. Motivo: ${api.erro}`);
 
   if (!selectedFields.length && !failedLines.length) {
@@ -319,7 +358,9 @@ export function buildApiFallbackReply(message: string, apiContexts: ApiRuntimeCo
   if (!focused.fields.length) return null;
 
   if (analytical) {
-    const highlights = focused.fields.slice(0, 3).map((campo) => `- **${formatApiFieldLabel(campo.nome)}:** ${String(campo.valor)}`);
+    const highlights = focused.fields
+      .slice(0, 4)
+      .map((campo) => `${getApiFieldIcon(campo.nome, deps)} **${formatApiFieldLabel(campo.nome)}:** ${formatAnalyticalFieldValue(campo)}`);
     return [
       "Faz sentido olhar isso com mais calma antes de decidir.",
       "",
@@ -344,6 +385,7 @@ export function buildApiContinuationFallbackReply(apiContexts: ApiRuntimeContext
     "risco",
     "cartorio",
     "matricula",
+    "data_leilao",
     "status",
     "valor_minimo",
     "preco",
@@ -372,7 +414,7 @@ export function buildApiContinuationFallbackReply(apiContexts: ApiRuntimeContext
 
   if (!fallbackFields.length) return null;
 
-  const highlights = fallbackFields.map((campo) => `- **${formatApiFieldLabel(campo.nome)}:** ${String(campo.valor)}`);
+  const highlights = fallbackFields.map((campo) => `${getApiFieldIcon(campo.nome, deps)} **${formatApiFieldLabel(campo.nome)}:** ${formatAnalyticalFieldValue(campo)}`);
 
   return [
     "Faz sentido olhar isso com mais calma antes de decidir.",

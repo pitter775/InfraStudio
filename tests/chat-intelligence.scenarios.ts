@@ -461,6 +461,92 @@ async function analyzeApiRealEstateScenario(title: string, input: string): Promi
       `api.real_estate_reply_kind=${/Leitura inicial|Motivos|Proximo passo/i.test(reply ?? "") ? "analytical" : reply ? "direct" : "null"}`,
       `api.real_estate_reply_empathy=${/Faz sentido olhar isso com mais calma/i.test(reply ?? "") ? "yes" : "no"}`,
       `api.real_estate_mentions_risk=${/riscos|cartorio|matricula/i.test(reply ?? "") ? "yes" : "no"}`,
+      `api.real_estate_mentions_date=${/📅|27\/03\/2026/i.test(reply ?? "") ? "yes" : "no"}`,
+      `api.real_estate_avoids_restart=${/Sigo por aqui no contexto|Me diga o ponto exato que voce quer validar/i.test(reply ?? "") ? "no" : "yes"}`,
+      `api.real_estate_avoids_raw_iso_date=${/2026-03-27T16:00:00Z/i.test(reply ?? "") ? "no" : "yes"}`,
+    ],
+  };
+}
+
+async function analyzeApiDateThenAnalysisScenario(title: string): Promise<ScenarioResult> {
+  const dateReply = buildApiFallbackReply("existe algum processo desse imovel e me passa as datas do leilao", apiRuntimeRealEstateFixture.apis, {
+    normalizeText: normalizeFixtureText,
+    buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+    singularizeToken: (value) => value,
+  });
+
+  const analysisReply = buildApiFallbackReply("sera que vale apena", apiRuntimeRealEstateFixture.apis, {
+    normalizeText: normalizeFixtureText,
+    buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+    singularizeToken: (value) => value,
+  });
+
+  const focusedContinuation = buildFocusedApiContext("sim segue", apiRuntimeRealEstateFixture.apis, {
+    normalizeText: normalizeFixtureText,
+    buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+    singularizeToken: (value) => value,
+  });
+
+  const continuationReply = buildApiContinuationFallbackReply(apiRuntimeRealEstateFixture.apis, {
+    normalizeText: normalizeFixtureText,
+    buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+    singularizeToken: (value) => value,
+  });
+
+  return {
+    category: "api",
+    title,
+    input: "datas do leilao -> sera que vale apena -> sim segue",
+    observations: [
+      `api.date_reply_has_icon=${/📅/.test(dateReply ?? "") ? "yes" : "no"}`,
+      `api.date_reply_has_normalized_date=${/27\/03\/2026/.test(dateReply ?? "") ? "yes" : "no"}`,
+      `api.analysis_reply_empathy=${/Faz sentido olhar isso com mais calma/i.test(analysisReply ?? "") ? "yes" : "no"}`,
+      `api.analysis_reply_mentions_date=${/📅|27\/03\/2026/i.test(analysisReply ?? "") ? "yes" : "no"}`,
+      `api.continuation_context_fields=${focusedContinuation.fields.length}`,
+      `api.continuation_reply_contextual=${/Faz sentido olhar isso com mais calma|Leitura inicial|Motivos/i.test(continuationReply ?? "") ? "yes" : "no"}`,
+      `api.continuation_avoids_restart=${/Sigo por aqui no contexto|Me diga o ponto exato que voce quer validar/i.test(continuationReply ?? "") ? "no" : "yes"}`,
+    ],
+  };
+}
+
+async function analyzeExternalWidgetApiSequenceScenario(title: string): Promise<ScenarioResult> {
+  const messages = [
+    "existe algum processo desse imovel e me passa as datas do leilao",
+    "sera que vale apena",
+    "sim segue",
+  ];
+
+  const replies = [
+    buildApiFallbackReply(messages[0], apiRuntimeRealEstateFixture.apis, {
+      normalizeText: normalizeFixtureText,
+      buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+      singularizeToken: (value) => value,
+    }),
+    buildApiFallbackReply(messages[1], apiRuntimeRealEstateFixture.apis, {
+      normalizeText: normalizeFixtureText,
+      buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+      singularizeToken: (value) => value,
+    }),
+    buildApiContinuationFallbackReply(apiRuntimeRealEstateFixture.apis, {
+      normalizeText: normalizeFixtureText,
+      buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+      singularizeToken: (value) => value,
+    }),
+  ];
+
+  const restartCount = replies.filter((reply) => /Sigo por aqui no contexto|Me diga o ponto exato que voce quer validar/i.test(reply ?? "")).length;
+  const empatheticCount = replies.filter((reply) => /Faz sentido olhar isso com mais calma/i.test(reply ?? "")).length;
+  const normalizedDateCount = replies.filter((reply) => /27\/03\/2026/.test(reply ?? "")).length;
+
+  return {
+    category: "api",
+    title,
+    input: messages.join(" -> "),
+    observations: [
+      `api.sequence_restart_count=${restartCount}`,
+      `api.sequence_empathy_count=${empatheticCount}`,
+      `api.sequence_normalized_date_count=${normalizedDateCount}`,
+      `api.sequence_all_contextual=${restartCount === 0 ? "yes" : "no"}`,
     ],
   };
 }
@@ -638,6 +724,8 @@ async function main() {
       "sera que vale apena",
     ),
   );
+  scenarios.push(await analyzeApiDateThenAnalysisScenario("Pipeline: data do leilao -> vale a pena -> continuidade curta mantem contexto"));
+  scenarios.push(await analyzeExternalWidgetApiSequenceScenario("Pipeline: sequencia completa do widget externo evita reinicio generico"));
   scenarios.push(
     await analyzeApiContinuationRecoveryScenario(
       "Pipeline: follow-up curto de API nao depende de frase fixa",

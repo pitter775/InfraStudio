@@ -1148,6 +1148,12 @@ Mudanca de comportamento:
 - o fallback analitico agora prioriza melhor campos de risco, cartorio, matricula e custo antes de titulo/descricao genericos
 - o recovery de API segura continuacoes curtas de forma mais contextual, sem depender de uma frase fixa especifica
 - o `buildFocusedApiContext(...)` tambem preserva contexto factual em continuacoes curtas, para o pipeline principal nao perder o fio da analise nem reiniciar o atendimento em mensagens como `sim segue`
+- datas de API, como `data_leilao`, passaram a ser normalizadas em formato humano (`dd/mm/aaaa hh:mm`) com icone `📅`, tanto em resposta direta quanto em leitura analitica
+- a suite agora mede ruido de UX no fluxo de API do widget externo, observando explicitamente:
+  - reinicio generico do atendimento
+  - ausencia de empatia
+  - data crua em ISO
+  - perda de contexto na sequencia `datas -> vale a pena -> sim segue`
 
 Objetivo pratico:
 - evitar que o chat externo se perca logo depois de uma boa resposta factual
