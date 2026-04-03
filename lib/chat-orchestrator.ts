@@ -35,6 +35,7 @@ import {
   buildCatalogDecisionFromSemanticIntent,
   classifySemanticApiIntentStage,
   classifySemanticIntentStage,
+  shouldBypassCatalogHeuristicFallback,
   type SemanticIntentStageResult,
 } from "@/lib/chat-semantic-intent-stage";
 import {
@@ -193,7 +194,9 @@ async function buildHeuristicPipelineState(input: {
     buildProductSearchCandidatesFromModule(message, { normalizeText, isGreetingOrAckMessage });
   const shouldSearchProducts = (message: string) => shouldSearchProductsFromModule(message, { normalizeText });
   const semanticIntentStage =
-    input.hasMercadoLivreConnector && !input.leadNameReplyDetected && hasRecentCatalogSnapshot(input.context)
+    input.hasMercadoLivreConnector &&
+    !input.leadNameReplyDetected &&
+    (hasRecentCatalogSnapshot(input.context) || Boolean(input.context?.catalogo?.produtoAtual))
       ? await classifySemanticIntentStage({
           openai,
           message: input.latestUserMessage,
@@ -207,7 +210,12 @@ async function buildHeuristicPipelineState(input: {
     recentProducts: recentCatalogProducts,
   });
   const fallbackCatalogDecision =
-    input.hasMercadoLivreConnector && !input.leadNameReplyDetected
+    input.hasMercadoLivreConnector &&
+    !input.leadNameReplyDetected &&
+    !shouldBypassCatalogHeuristicFallback({
+      semanticIntent: semanticIntentStage,
+      context: input.context,
+    })
       ? decideCatalogFollowUpHeuristically(input.latestUserMessage, input.context, {
           buildProductSearchCandidates,
           shouldSearchProducts,
@@ -865,6 +873,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     hasMemorySummary: Boolean(context?.memoria?.resumo),
     hasCurrentCatalogContext: Boolean(currentCatalogProduct || recentCatalogProducts.length > 0),
     semanticApiIntentStage,
+    semanticCatalogIntentStage: semanticIntentStage,
     hasMercadoLivreContext: Boolean(
       mercadoLivrePromptContext ||
         mercadoLivreDetailPromptContext ||

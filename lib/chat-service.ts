@@ -372,7 +372,38 @@ export function buildWhatsAppMessageSequence(
     messages.push(intro);
   }
 
-  return messages;
+  const assetMessages = Array.isArray(assets)
+    ? assets
+        .slice(0, 3)
+        .map((asset, index) => {
+          if (!asset || typeof asset !== "object" || Array.isArray(asset)) {
+            return "";
+          }
+
+          const nome = "nome" in asset ? String((asset as { nome?: string | null }).nome || "").trim() : "";
+          const targetUrl = "targetUrl" in asset ? String((asset as { targetUrl?: string | null }).targetUrl || "").trim() : "";
+          const whatsappText = "whatsappText" in asset ? String((asset as { whatsappText?: string | null }).whatsappText || "").trim() : "";
+          const descricao = "descricao" in asset ? String((asset as { descricao?: string | null }).descricao || "").trim() : "";
+          const supportText = whatsappText || descricao;
+
+          if (!targetUrl && !supportText) {
+            return "";
+          }
+
+          const parts = [formatWhatsAppOutboundTextSafe(`*${index + 1}. ${nome || "Produto"}*`)];
+          if (supportText) {
+            parts.push(formatWhatsAppOutboundTextSafe(supportText));
+          }
+          if (targetUrl) {
+            parts.push(targetUrl);
+          }
+
+          return parts.join("\n").trim();
+        })
+        .filter(Boolean)
+    : [];
+
+  return [...messages, ...assetMessages];
 }
 
 function buildBillingBlockedResult(chatId: string, message: string) {
@@ -1359,11 +1390,49 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     channelKind === "whatsapp" ? sanitizeWhatsAppCustomerFacingReply(primaryReplyBase) : primaryReplyBase;
   const followUpReply =
     channelKind === "whatsapp" ? sanitizeWhatsAppCustomerFacingReply(followUpReplyBase) : followUpReplyBase;
+  const whatsappEmbeddedSequence =
+    channelKind === "whatsapp" ? buildWhatsAppMessageSequence(primaryReply, ai.assets ?? [], null) : [];
+  const whatsappEmbeddedMessage = whatsappEmbeddedSequence[0] ?? "";
+
+  if (channelKind === "whatsapp" && Array.isArray(ai.assets) && ai.assets.length > 0) {
+    const embeddableAssets = ai.assets.filter(
+      (asset) =>
+        asset &&
+        typeof asset === "object" &&
+        !Array.isArray(asset) &&
+        (typeof (asset as { targetUrl?: string | null }).targetUrl === "string" ||
+          typeof (asset as { descricao?: string | null }).descricao === "string" ||
+          typeof (asset as { whatsappText?: string | null }).whatsappText === "string"),
+    );
+
+    await appendSystemLog({
+      projetoId: chat.projetoId,
+      tipo: embeddableAssets.length ? "whatsapp_catalog_delivery" : "whatsapp_catalog_delivery_warn",
+      origem: "chat_service.whatsapp_delivery",
+      descricao: embeddableAssets.length
+        ? "Mensagem de WhatsApp consolidada com lista de produtos em uma unica resposta."
+        : "WhatsApp recebeu assets, mas nenhum asset tinha dados suficientes para montar a lista na mensagem unica.",
+      payload: {
+        chatId: chat.id,
+        assetCount: ai.assets.length,
+        embeddableAssetCount: embeddableAssets.length,
+        embeddedMessageLength: whatsappEmbeddedMessage.length,
+        assetIds: ai.assets
+          .map((asset) =>
+            asset && typeof asset === "object" && !Array.isArray(asset) && typeof (asset as { id?: string | null }).id === "string"
+              ? (asset as { id?: string | null }).id
+              : null,
+          )
+          .filter(Boolean),
+      },
+      skipErrorGate: true,
+    });
+  }
 
   const assistantMessage = await appendMessage({
     chatId: chat.id,
     role: "assistant",
-    conteudo: primaryReply,
+    conteudo: channelKind === "whatsapp" ? whatsappEmbeddedMessage || primaryReply : primaryReply,
     canal: channelKind,
     identificadorExterno: normalizedExternalIdentifier,
     tokensInput: ai.usage.inputTokens,
@@ -1539,9 +1608,9 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
 
   return {
     chatId: chat.id,
-    reply: assistantMessage.conteudo ?? primaryReply,
+    reply: assistantMessage.conteudo ?? (channelKind === "whatsapp" ? whatsappEmbeddedMessage || primaryReply : primaryReply),
     followUpReply: channelKind === "whatsapp" ? "" : followUpReply,
-    messageSequence: channelKind === "whatsapp" ? buildWhatsAppMessageSequence(primaryReply, [], null) : [],
+    messageSequence: channelKind === "whatsapp" ? whatsappEmbeddedSequence : [],
     assets: channelKind === "whatsapp" ? [] : ai.assets ?? [],
     whatsapp,
   };

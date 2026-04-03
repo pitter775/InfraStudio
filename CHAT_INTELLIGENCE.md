@@ -262,6 +262,46 @@ De forma simplificada, o fluxo hoje funciona assim:
   - `ver o status`
 - isso reduz ruido operacional e evita o agente prometer ao cliente uma consulta/status que nao deve verbalizar desse jeito
 - os fallbacks de recovery tambem deixaram de sugerir `status` como topico de conversa para o cliente
+- depois do colapso da sequencia do WhatsApp para uma unica mensagem, a entrega de lista de produtos foi ajustada para incorporar os links dos itens no mesmo texto
+- essa decisao foi refinada depois: para listas de produtos no WhatsApp, o comportamento correto e enviar:
+  - uma mensagem introdutoria
+  - seguida de uma mensagem por produto
+- isso favorece o preview/card de link do proprio WhatsApp e deixa a vitrine mais utilizavel no canal
+- a persistencia interna do chat continua enxuta, sem criar varios registros desnecessarios so por causa do delivery externo
+- agora tambem existe log de diagnostico para WhatsApp quando:
+  - os assets foram incorporados com sucesso na mensagem unica
+  - os assets vieram, mas nao tinham dados suficientes para montar a lista entregavel
+
+## Evolucao da Fala Comercial em Produto em Foco
+
+- o caminho de `produto em foco` no Mercado Livre foi refinado para reduzir respostas secas e repetitivas
+- a resposta comercial agora varia melhor conforme o momento da conversa:
+  - duvida sobre garantia
+  - duvida sobre frete
+  - duvida sobre atributos/material/medidas/cor
+  - demonstracao de interesse no produto
+- em vez de sempre repetir o mesmo fechamento generico, o fluxo passou a:
+  - usar melhor o descritivo do anuncio
+  - sondar com mais contexto
+  - ajudar o cliente a comparar criterios de decisao
+  - puxar um fechamento mais consultivo quando houver interesse
+- isso melhora a sinergia comercial e reduz a sensacao de resposta robotica no atendimento focado em um item especifico
+
+## Evolucao da Camada Semantica
+
+- a `semantic_intent_stage` ganhou mais precedencia no caminho de catalogo e Mercado Livre
+- quando existe contexto real de catalogo (`produtoAtual` ou `ultimosProdutos`) e a classificacao semantica vem com confianca forte, o fallback heuristico deixa de ser o motor principal
+- isso reduz a chance de:
+  - continuidade curta ser sequestrada por heuristica
+  - respostas vagas cairem cedo demais em busca ou relistagem
+  - dominio de catalogo ser mantido apenas por palavras gatilho
+- o classificador de dominio tambem passou a considerar a intencao semantica de catalogo:
+  - se a intencao semantica indicar continuidade comercial, o dominio fica em `catalog_commerce`
+  - se a intencao semantica vier como `generic`, o dominio nao fica preso no catalogo so porque havia contexto anterior
+- na pratica, isso empurra o sistema para:
+  - menos dependecia de heuristicas
+  - mais interpretacao por contexto
+  - mais comportamento fluido no follow-up comercial
 
 ## Follow-up de Catalogo
 

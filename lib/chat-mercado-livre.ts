@@ -132,6 +132,41 @@ function buildMercadoLivreSalesClose(
   return `${fallback} Se fizer sentido para voce, eu sigo com voce nesse ${productName} e te ajudo a decidir se vale fechar agora ou comparar com outro parecido. O que mais pesa para voce nesse item: garantia, frete, estado ou preco?`;
 }
 
+function buildMercadoLivreConsultiveProbe(
+  produto: ProdutoDetalhadoMercadoLivre,
+  latestUserMessage: string,
+  deps: MercadoLivreDeps,
+) {
+  const normalized = deps.normalizeText(latestUserMessage);
+  const productName = produto.nome?.trim() || "esse item";
+
+  if (/\bgarantia\b|\bcondicao\b|\bcondição\b|\bestado\b/.test(normalized)) {
+    return `Se quiser, eu tambem posso te resumir o estado geral do anuncio e o que costuma pesar mais para decidir com seguranca nesse ${productName}.`;
+  }
+
+  if (/\bfrete\b|\bentrega\b/.test(normalized)) {
+    return `Se fizer sentido para voce, eu tambem posso te ajudar a decidir se esse ${productName} vale mais pela entrega, pelo estado ou pelo custo total.`;
+  }
+
+  if (/\bmaterial\b|\bmedida\b|\bmedidas\b|\btamanho\b|\bcapacidade\b|\bcor\b/.test(normalized)) {
+    return `Se quiser, eu tambem posso te dizer se esse ${productName} encaixa melhor no uso que voce imagina ou se vale comparar com outro parecido.`;
+  }
+
+  if (/\b(gostei|curti|interesse|quero|acho que e esse|acho que combina)\b/.test(normalized)) {
+    return `Se ele estiver perto do que voce quer, eu posso te ajudar a bater o martelo olhando os pontos que mais importam para voce nesse ${productName}.`;
+  }
+
+  return `Se fizer sentido para voce, eu sigo com voce nesse ${productName} e te ajudo a decidir se vale fechar agora ou comparar com outro parecido. O que mais pesa para voce nesse item: garantia, frete, estado ou preco?`;
+}
+
+function buildMercadoLivreDescriptionLead(compactDescription: string | null) {
+  if (!compactDescription) {
+    return null;
+  }
+
+  return `No anuncio ele aparece assim: ${compactDescription}`;
+}
+
 function buildSyntheticMercadoLivreProductDetails(product: CatalogProductReference | null | undefined) {
   if (!product?.nome) {
     return null;
@@ -237,6 +272,8 @@ export function buildMercadoLivreSalesReply(
 ) {
   const normalized = deps.normalizeText(latestUserMessage);
   const compactDescription = compactMercadoLivreDescription(produto.descricao, 260);
+  const consultiveProbe = buildMercadoLivreConsultiveProbe(produto, latestUserMessage, deps);
+  const descriptionLead = buildMercadoLivreDescriptionLead(compactDescription);
   const storeOwnershipNote =
     produto.pertenceALoja === false
       ? "Vi que esse link e de um anuncio fora da loja conectada aqui."
@@ -245,8 +282,8 @@ export function buildMercadoLivreSalesReply(
   if (/\bgarantia\b/.test(normalized)) {
     const garantia = produto.garantia?.trim() || "Nao encontrei garantia informada no anuncio";
     const baseReply = deps.isWhatsAppChannel(context)
-      ? `${produto.nome}: ${garantia}.\n\n${compactDescription ? `No anuncio ele aparece assim: ${compactDescription}\n\n` : ""}Se quiser, eu tambem posso te dizer condicao, estoque e frete para voce decidir melhor.`
-      : `**${produto.nome}**: ${garantia}.\n\n${compactDescription ? `No anuncio ele aparece assim: ${compactDescription}\n\n` : ""}Se quiser, eu tambem posso te dizer **condicao, estoque e frete** para voce decidir melhor.`;
+      ? `${produto.nome}: ${garantia}.\n\n${descriptionLead ? `${descriptionLead}\n\n` : ""}${consultiveProbe}`
+      : `**${produto.nome}**: ${garantia}.\n\n${descriptionLead ? `${descriptionLead}\n\n` : ""}${consultiveProbe}`;
     return [storeOwnershipNote, baseReply].filter(Boolean).join("\n\n");
   }
 
@@ -260,8 +297,8 @@ export function buildMercadoLivreSalesReply(
     return [
       storeOwnershipNote,
       frete,
-      compactDescription ? `Resumo do anuncio: ${compactDescription}` : null,
-      buildMercadoLivreSalesClose(produto, cta, "Se quiser, eu sigo com voce e vejo se vale a pena fechar este item"),
+      descriptionLead,
+      cta?.trim() || consultiveProbe,
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -275,8 +312,8 @@ export function buildMercadoLivreSalesReply(
     return [
       storeOwnershipNote,
       estoque,
-      compactDescription ? `Resumo do anuncio: ${compactDescription}` : null,
-      buildMercadoLivreSalesClose(produto, cta, "Se quiser, eu sigo com voce e te ajudo a decidir se vale fechar este item"),
+      descriptionLead,
+      cta?.trim() || consultiveProbe,
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -291,8 +328,8 @@ export function buildMercadoLivreSalesReply(
       return [
         storeOwnershipNote,
         `Encontrei estes detalhes no anuncio: ${summary}.`,
-        compactDescription ? `Descricao resumida: ${compactDescription}` : null,
-        buildMercadoLivreSalesClose(produto, cta, "Se quiser, eu tambem posso te falar de garantia, estoque e frete antes de voce decidir"),
+        descriptionLead,
+        cta?.trim() || consultiveProbe,
       ]
         .filter(Boolean)
         .join("\n\n");
@@ -302,7 +339,7 @@ export function buildMercadoLivreSalesReply(
       return [
         storeOwnershipNote,
         `Na descricao do anuncio encontrei isto que ajuda na sua duvida: ${compactDescription ?? produto.descricao}`,
-        buildMercadoLivreSalesClose(produto, cta, "Se quiser, eu tambem posso te resumir garantia, estoque e frete deste item"),
+        cta?.trim() || consultiveProbe,
       ]
         .filter(Boolean)
         .join("\n\n");
@@ -322,13 +359,13 @@ export function buildMercadoLivreSalesReply(
     : `**Boa escolha.** ${produto.nome} esta por **R$ ${produto.preco.toLocaleString("pt-BR")}**.`;
   const sellingPoint = highlights.length
     ? `Pelo anuncio, os pontos que mais ajudam na decisao sao: ${highlights.join(" | ")}.`
-    : compactDescription
-    ? `No anuncio ele aparece assim: ${compactDescription}`
+    : descriptionLead
+    ? descriptionLead
     : "Posso te detalhar melhor esse item e te ajudar a decidir com mais seguranca.";
   const close = buildMercadoLivreSalesClose(
     produto,
     cta,
-    "Se fizer sentido para voce, eu posso seguir com voce nesse item agora",
+    consultiveProbe,
   );
 
   return [storeOwnershipNote, leadIn, sellingPoint, close].filter(Boolean).join("\n\n");

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { API_RUNTIME_FACTUAL_SIGNALS } from "@/lib/chat-api-runtime";
-import type { ApiSemanticIntentStageResult } from "@/lib/chat-semantic-intent-stage";
+import type { ApiSemanticIntentStageResult, SemanticIntentStageResult } from "@/lib/chat-semantic-intent-stage";
 import { normalizeText } from "@/lib/chat-text-utils";
 
 export type HeuristicIntentStage =
@@ -82,6 +82,7 @@ export function classifyConversationDomainStage(input: {
   hasCurrentCatalogContext?: boolean;
   hasLeadContext?: boolean;
   semanticApiIntentStage?: ApiSemanticIntentStageResult | null;
+  semanticCatalogIntentStage?: SemanticIntentStageResult | null;
 }) {
   const normalizedMessage = normalizeText(input.latestUserMessage ?? "");
   const continuationLikeMessage = isContinuationLikeMessage(normalizedMessage);
@@ -95,7 +96,13 @@ export function classifyConversationDomainStage(input: {
     return "catalog_commerce" satisfies ConversationDomainStage;
   }
 
-  if (input.hasCurrentCatalogContext && continuationLikeMessage) {
+  if (input.hasCurrentCatalogContext && input.semanticCatalogIntentStage) {
+    if (input.semanticCatalogIntentStage.intent !== "generic") {
+      return "catalog_commerce" satisfies ConversationDomainStage;
+    }
+  }
+
+  if (input.hasCurrentCatalogContext && !input.semanticCatalogIntentStage && continuationLikeMessage) {
     return "catalog_commerce" satisfies ConversationDomainStage;
   }
 

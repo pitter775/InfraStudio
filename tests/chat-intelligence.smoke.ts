@@ -14,7 +14,7 @@ import { classifyConversationDomainStage, classifyHeuristicIntentStage, classify
 import { buildOpenAiStageRequestPayload } from "@/lib/chat-openai-stage";
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
 import { buildWhatsAppMessageSequence, sanitizeWhatsAppCustomerFacingReply } from "@/lib/chat-service";
-import { buildCatalogDecisionFromSemanticIntent } from "@/lib/chat-semantic-intent-stage";
+import { buildCatalogDecisionFromSemanticIntent, shouldBypassCatalogHeuristicFallback } from "@/lib/chat-semantic-intent-stage";
 import { shouldRefreshSummary } from "@/lib/chat-summary-stage";
 import { buildChatUsageOrigin, buildChatUsageTelemetry, describeChatUsageOrigin, readChatUsageTelemetry } from "@/lib/chat-usage-metrics";
 import {
@@ -46,22 +46,32 @@ const apiRuntimeFixture = loadApiRuntimeFixture();
 
 const tests: TestCase[] = [
   {
-    name: "whatsapp colapsa sequencia em uma unica mensagem textual",
+    name: "whatsapp entrega lista com introducao e um produto por mensagem",
     run: () => {
       const sequence = buildWhatsAppMessageSequence(
         "Encontrei algumas opcoes para voce.",
-        [
+        [          
           {
+            nome: "Produto 1",
             targetUrl: "https://example.com/produto",
             descricao: "Detalhe do produto",
             whatsappText: "Texto extra",
+          },
+          {
+            nome: "Produto 2",
+            targetUrl: "https://example.com/produto-2",
+            descricao: "Detalhe do produto 2",
           },
         ],
         "Me diga se gostou de algum.",
       );
 
-      assert.equal(sequence.length, 1);
-      assert.equal(sequence[0], "Encontrei algumas opcoes para voce.");
+      assert.equal(sequence.length, 3);
+      assert.match(sequence[0] ?? "", /Encontrei algumas opcoes para voce\./i);
+      assert.match(sequence[1] ?? "", /\*1\. Produto 1\*/i);
+      assert.match(sequence[1] ?? "", /https:\/\/example\.com\/produto/i);
+      assert.match(sequence[2] ?? "", /\*2\. Produto 2\*/i);
+      assert.match(sequence[2] ?? "", /https:\/\/example\.com\/produto-2/i);
     },
   },
   {
@@ -203,6 +213,22 @@ const tests: TestCase[] = [
     },
   },
   {
+    name: "semantic stage forte com contexto de catalogo reduz fallback heuristico",
+    run: () => {
+      const shouldBypass = shouldBypassCatalogHeuristicFallback({
+        semanticIntent: {
+          intent: "product_question",
+          confidence: 0.91,
+          reason: "quer tirar duvida sobre o item em foco",
+          usedLlm: true,
+        },
+        context: recentCatalogContext,
+      });
+
+      assert.equal(shouldBypass, true);
+    },
+  },
+  {
     name: "fixtures carregam laboratorio base de catalogo api e mercado livre",
     run: () => {
       assert.equal(recentCatalogContext.catalogo?.ultimosProdutos?.length, 3);
@@ -316,6 +342,42 @@ const tests: TestCase[] = [
 
       assert.match(reply, /o que mais pesa para voce/i);
       assert.match(reply, /No anuncio ele aparece assim:|Pelo anuncio/i);
+    },
+  },
+  {
+    name: "resposta comercial de garantia fica mais consultiva e menos seca",
+    run: () => {
+      const reply = buildMercadoLivreSalesReply(
+        mercadoLivreFixture.detailedProducts[0]!,
+        "tem garantia?",
+        recentCatalogContext,
+        null,
+        {
+          normalizeText: normalizeFixtureText,
+          isWhatsAppChannel: () => true,
+        },
+      );
+
+      assert.match(reply, /No anuncio ele aparece assim:/i);
+      assert.match(reply, /resumir o estado geral do anuncio|decidir com seguranca/i);
+      assert.doesNotMatch(reply, /condicao, estoque e frete para voce decidir melhor/i);
+    },
+  },
+  {
+    name: "resposta comercial de interesse puxa batida de martelo do produto",
+    run: () => {
+      const reply = buildMercadoLivreSalesReply(
+        mercadoLivreFixture.detailedProducts[0]!,
+        "gostei desse produto",
+        recentCatalogContext,
+        null,
+        {
+          normalizeText: normalizeFixtureText,
+          isWhatsAppChannel: () => true,
+        },
+      );
+
+      assert.match(reply, /bater o martelo|mais importam para voce/i);
     },
   },
   {
@@ -767,6 +829,44 @@ const tests: TestCase[] = [
       });
 
       assert.equal(stage, "catalog_commerce");
+    },
+  },
+  {
+    name: "classificador de dominio usa semantic catalog intent para manter contexto comercial",
+    run: () => {
+      const stage = classifyConversationDomainStage({
+        heuristicIntentStage: "none",
+        hasFocusedApiContext: false,
+        latestUserMessage: "tem garantia?",
+        hasCurrentCatalogContext: true,
+        semanticCatalogIntentStage: {
+          intent: "product_question",
+          confidence: 0.89,
+          reason: "duvida sobre o item atual",
+          usedLlm: true,
+        },
+      });
+
+      assert.equal(stage, "catalog_commerce");
+    },
+  },
+  {
+    name: "classificador de dominio nao sequestra catalogo quando semantic catalog marcar generic",
+    run: () => {
+      const stage = classifyConversationDomainStage({
+        heuristicIntentStage: "none",
+        hasFocusedApiContext: false,
+        latestUserMessage: "oi",
+        hasCurrentCatalogContext: true,
+        semanticCatalogIntentStage: {
+          intent: "generic",
+          confidence: 0.87,
+          reason: "mensagem neutra fora da decisao de compra",
+          usedLlm: true,
+        },
+      });
+
+      assert.equal(stage, "general_sales");
     },
   },
   {

@@ -280,3 +280,19 @@ export function buildCatalogDecisionFromSemanticIntent(input: {
     shouldBlockNewSearch: true,
   };
 }
+
+export function shouldBypassCatalogHeuristicFallback(input: {
+  semanticIntent: SemanticIntentStageResult | null;
+  context?: ConversationContext;
+}) {
+  if (!input.semanticIntent) {
+    return false;
+  }
+
+  const hasCatalogContext = Boolean(input.context?.catalogo?.produtoAtual) || Boolean(input.context?.catalogo?.ultimosProdutos?.length);
+  if (!hasCatalogContext) {
+    return false;
+  }
+
+  return input.semanticIntent.confidence >= 0.72;
+}
