@@ -4,6 +4,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const DEFAULT_BUCKET = "whatsapp-session-backups";
 const DEFAULT_OBJECT_PATH = "worker/latest.zip";
+const DEFAULT_FILE_SIZE_LIMIT = "512MB";
 
 let bucketReady = false;
 
@@ -15,6 +16,10 @@ function getObjectPath() {
   return process.env.WHATSAPP_SESSION_BACKUP_OBJECT_PATH?.trim() || DEFAULT_OBJECT_PATH;
 }
 
+function getFileSizeLimit() {
+  return process.env.WHATSAPP_SESSION_BACKUP_FILE_SIZE_LIMIT?.trim() || DEFAULT_FILE_SIZE_LIMIT;
+}
+
 async function ensureBackupBucket() {
   if (bucketReady) {
     return;
@@ -22,16 +27,26 @@ async function ensureBackupBucket() {
 
   const supabase = getSupabaseAdminClient();
   const bucketName = getBucketName();
+  const fileSizeLimit = getFileSizeLimit();
   const { data, error } = await supabase.storage.getBucket(bucketName);
 
   if (!error && data) {
+    const { error: updateError } = await supabase.storage.updateBucket(bucketName, {
+      public: false,
+      fileSizeLimit,
+    });
+
+    if (updateError) {
+      throw new Error(updateError.message || "Falha ao atualizar limite do bucket de backup da sessao do WhatsApp.");
+    }
+
     bucketReady = true;
     return;
   }
 
   const { error: createError } = await supabase.storage.createBucket(bucketName, {
     public: false,
-    fileSizeLimit: "100MB",
+    fileSizeLimit,
   });
 
   if (createError && !/already exists|duplicate/i.test(createError.message || "")) {
