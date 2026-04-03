@@ -130,6 +130,68 @@ const tests: TestCase[] = [
     },
   },
   {
+    name: "recovery do agente no mercado livre transforma busca inicial em busca guiada sem formulario generico",
+    run: () => {
+      const reply = buildAgentScopedRecoveryReply({
+        message: "preciso de uma sopeira",
+        context: {
+          channel: { kind: "admin_agent_test" },
+        } as ConversationContext,
+        agent: {
+          id: "agent-ml",
+          nome: "Reliquia de familia",
+          slug: null,
+          projetoId: "proj-ml",
+          modeloId: null,
+          apiIds: [],
+          configuracoes: {},
+          arquivos: [],
+          promptBase: "",
+          createdAt: "",
+          updatedAt: "",
+          ativo: true,
+          descricao: null,
+        } as never,
+        apiContexts: [],
+        hasMercadoLivreConnector: true,
+      });
+
+      assert.match(reply, /busca de .*sopeira/i);
+      assert.doesNotMatch(reply, /me diga o produto, modelo, marca, cor ou sku/i);
+    },
+  },
+  {
+    name: "recovery do agente no mercado livre recupera typo simples sem cair em fallback seco",
+    run: () => {
+      const reply = buildAgentScopedRecoveryReply({
+        message: "vc tem soperia",
+        context: {
+          channel: { kind: "admin_agent_test" },
+        } as ConversationContext,
+        agent: {
+          id: "agent-ml",
+          nome: "Reliquia de familia",
+          slug: null,
+          projetoId: "proj-ml",
+          modeloId: null,
+          apiIds: [],
+          configuracoes: {},
+          arquivos: [],
+          promptBase: "",
+          createdAt: "",
+          updatedAt: "",
+          ativo: true,
+          descricao: null,
+        } as never,
+        apiContexts: [],
+        hasMercadoLivreConnector: true,
+      });
+
+      assert.match(reply, /busca de .*sopeira/i);
+      assert.doesNotMatch(reply, /me diga o produto, modelo, marca, cor ou sku/i);
+    },
+  },
+  {
     name: "recovery do agente sustenta follow-up analitico de API como vale a pena",
     run: () => {
       const reply = buildAgentScopedRecoveryReply({

@@ -22,7 +22,12 @@ import {
 } from "@/lib/chat-lead-stage";
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
 import { resolveMercadoLivreFlowState, resolveMercadoLivreHeuristicState } from "@/lib/chat-mercado-livre";
-import { shouldContinueProductSearch, shouldUseMercadoLivreConnectorFallback } from "@/lib/chat-sales-heuristics";
+import {
+  buildProductSearchCandidates as buildProductSearchCandidatesFromModule,
+  isGreetingOrAckMessage as isGreetingOrAckMessageFromModule,
+  shouldContinueProductSearch,
+  shouldUseMercadoLivreConnectorFallback,
+} from "@/lib/chat-sales-heuristics";
 import { buildWhatsAppMessageSequence, resolveCanonicalWhatsAppExternalIdentifier } from "@/lib/chat-service";
 import {
   createFixtureSearchDeps,
@@ -302,6 +307,17 @@ function runMercadoLivreRegression(): DomainReport[] {
   reports.push(
     report("mercado_livre", "fallback solto do conector nao dispara sem contexto real de busca", [
       `connectorFallback=${noLooseFallback}`,
+    ]),
+  );
+
+  const typoCandidates = buildProductSearchCandidatesFromModule("vc tem soperia", {
+    normalizeText: normalizeFixtureText,
+    isGreetingOrAckMessage: (message) => isGreetingOrAckMessageFromModule(message, { normalizeText: normalizeFixtureText }),
+  });
+  assert.ok(typoCandidates.some((item) => /sopeira/i.test(item)));
+  reports.push(
+    report("mercado_livre", "busca inicial recupera typo simples do produto", [
+      `candidates=${typoCandidates.join(" | ") || "none"}`,
     ]),
   );
 

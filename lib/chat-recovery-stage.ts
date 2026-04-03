@@ -2,6 +2,7 @@ import { API_RUNTIME_FACTUAL_SIGNALS, buildApiContinuationFallbackReply, buildAp
 import type { ConversationContext } from "@/lib/chat-context";
 import { formatHeuristicReply } from "@/lib/chat-prompt-builders";
 import { extractName as extractNameFromModule, extractPhone as extractPhoneFromModule } from "@/lib/chat-contact-utils";
+import { buildProductSearchCandidates, isGreetingOrAckMessage, shouldSearchProducts } from "@/lib/chat-sales-heuristics";
 import { buildSearchTokens, isWhatsAppChannel, normalizeText, singularizeToken } from "@/lib/chat-text-utils";
 import { normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
 import type { AgenteRecord } from "@/lib/agentes";
@@ -127,6 +128,26 @@ export function buildMercadoLivreFocusedFallbackReply(agent: AgenteRecord | null
   ].join("\n\n");
 }
 
+function buildMercadoLivreSearchRecoveryReply(message: string, agent: AgenteRecord | null) {
+  if (!shouldSearchProducts(message, { normalizeText })) {
+    return null;
+  }
+
+  const candidates = buildProductSearchCandidates(message, {
+    normalizeText,
+    isGreetingOrAckMessage: (value) => isGreetingOrAckMessage(value, { normalizeText }),
+  });
+  const productTerm = candidates[0]?.trim();
+  if (!productTerm) {
+    return null;
+  }
+
+  return [
+    `Entendi. Vou seguir por aqui na busca de **${productTerm}** dentro da loja de ${agent?.nome ?? "atendimento"}.`,
+    "Se quiser, ja me diga tambem cor, material, tamanho, estilo ou faixa de valor para eu refinar melhor.",
+  ].join("\n\n");
+}
+
 export function isInfraStudioFirstPartyContext(context?: ConversationContext) {
   const channelKind = normalizeText(context?.channel?.kind ?? "");
   if (channelKind === "admin_agent_test") {
@@ -183,12 +204,13 @@ export function buildAgentScopedRecoveryReply(input: {
 
   const neutralFallbackReply = buildNeutralGlobalFallbackReply(input.agent, input.context);
   const mercadoLivreFallbackReply = input.hasMercadoLivreConnector ? buildMercadoLivreFocusedFallbackReply(input.agent) : neutralFallbackReply;
+  const mercadoLivreSearchRecoveryReply = input.hasMercadoLivreConnector ? buildMercadoLivreSearchRecoveryReply(input.message, input.agent) : null;
   const baseReply = isInfraStudioFirstPartyContext(input.context)
     ? [
         `Sigo por aqui no contexto de ${input.agent?.nome ?? "atendimento"}.`,
         `Me diga o ponto exato que voce quer validar em ${objective}: valor, detalhes, documentos ou o que mais pesa na sua decisao.`,
       ].join("\n\n")
-    : mercadoLivreFallbackReply;
+    : mercadoLivreSearchRecoveryReply || mercadoLivreFallbackReply;
 
   return apiReply || apiContinuationReply ? formatHeuristicReply(apiReply || apiContinuationReply || "", input.context) : baseReply;
 }

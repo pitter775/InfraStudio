@@ -1,4 +1,5 @@
-import type { ConversationContext } from "@/lib/chat-context";
+﻿import type { ConversationContext } from "@/lib/chat-context";
+import { levenshteinDistance, singularizeToken } from "@/lib/chat-text-utils";
 
 type ConversationMessage = {
   role: unknown;
@@ -69,6 +70,23 @@ const PRODUCT_SEARCH_STOPWORDS = new Set([
   "dessa",
 ]);
 
+const SEARCH_TYPO_DICTIONARY = ["sopeira", "jantar", "porcelana", "ceramica", "caneca", "canecas", "bule", "bules", "caixa", "vintage"];
+
+function recoverSearchTokenTypo(token: string) {
+  const variants = [token, singularizeToken(token)];
+
+  for (const current of variants) {
+    for (const target of SEARCH_TYPO_DICTIONARY) {
+      const distance = levenshteinDistance(current, target);
+      if (distance <= 2 && Math.abs(current.length - target.length) <= 2) {
+        return target;
+      }
+    }
+  }
+
+  return token;
+}
+
 export function shouldSearchProducts(message: string, deps: { normalizeText: (value: string) => string }) {
   const normalized = deps.normalizeText(message);
   const commercialServiceSignals = [
@@ -94,7 +112,7 @@ export function shouldSearchProducts(message: string, deps: { normalizeText: (va
       /\bitem\b/,
       /\bitens\b/,
       /\bcatalogo\b/,
-      /\bcatÃ¡logo\b/,
+      /\bcatÃƒÂ¡logo\b/,
       /\bloja\b/,
       /\bmercado livre\b/,
       /\bml\b/,
@@ -110,23 +128,30 @@ export function shouldSearchProducts(message: string, deps: { normalizeText: (va
   }
 
   const productSignals = [
+    "preciso de",
+    "preciso encontrar",
+    "busco",
+    "estou buscando",
+    "to procurando",
+    "tÃ´ procurando",
     "tem algum",
     "tem alguma",
     "voce tem",
+    "vc tem",
     "tem ai",
     "produto",
     "produtos",
     "item",
     "itens",
     "catalogo",
-    "catÃ¡logo",
+    "catÃƒÂ¡logo",
     "loja",
     "mercado livre",
     "ml",
     "venda",
     "vende",
     "disponivel",
-    "disponÃ­vel",
+    "disponÃƒÂ­vel",
     "procuro",
     "quero comprar",
     "estou procurando",
@@ -180,10 +205,10 @@ export function extractProductSearchTerm(message: string) {
   const cleaned = message
     .trim()
     .replace(/[?!.]+$/g, "")
-    .replace(/^(oi|ola|olÃ¡|opa)\s*[!,.-]?\s*/i, "")
-    .replace(/^(voces?|vocÃª|vc)\s+/i, "")
+    .replace(/^(oi|ola|olÃƒÂ¡|opa)\s*[!,.-]?\s*/i, "")
+    .replace(/^(voces?|vocÃƒÂª|vc)\s+/i, "")
     .replace(/^e\s+/i, "")
-    .replace(/^(tem|tem ai|tem aÃ­|vende|procuro|quero|estou procurando)\s+/i, "")
+    .replace(/^(tem|tem ai|tem aÃƒÂ­|vende|procuro|quero|estou procurando|preciso de|preciso encontrar|busco|to procurando|tô procurando)\s+/i, "")
     .replace(/^(algum|alguma|alguns|algumas)\s+/i, "")
     .replace(/^(produto|produtos|item|itens)\s+(de\s+)?/i, "")
     .replace(/^(no|na|da|do)\s+/i, "")
@@ -216,7 +241,8 @@ export function buildProductSearchCandidates(
   const tokens = normalized
     .split(/\s+/)
     .filter((token) => token.length >= 3)
-    .filter((token) => !PRODUCT_SEARCH_STOPWORDS.has(token));
+    .filter((token) => !PRODUCT_SEARCH_STOPWORDS.has(token))
+    .map((token) => recoverSearchTokenTypo(token));
   const candidates = new Set<string>();
 
   if (tokens.length) {
@@ -292,7 +318,7 @@ export function isMercadoLivreListingIntent(message: string, deps: { normalizeTe
     return false;
   }
 
-  if (["produtos", "produto", "catalogo", "catÃ¡logo", "loja", "vitrine", "anuncios", "anÃºncios", "itens"].includes(compact)) {
+  if (["produtos", "produto", "catalogo", "catÃƒÂ¡logo", "loja", "vitrine", "anuncios", "anÃƒÂºncios", "itens"].includes(compact)) {
     return true;
   }
 
@@ -340,7 +366,7 @@ export function isMercadoLivreListingIntent(message: string, deps: { normalizeTe
   }
 
   const browseVerb = /\b(mostra|mostrar|mostre|exiba|exibe|exibir|liste|listar|lista|traga|trazer|manda|mandar|envia|enviar|ver|veja|quero ver|apresenta|apresentar)\b/;
-  const catalogNoun = /\b(produto|produtos|item|itens|catalogo|catÃ¡logo|loja|vitrine|anuncio|anuncios|anÃºncio|anÃºncios)\b/;
+  const catalogNoun = /\b(produto|produtos|item|itens|catalogo|catÃƒÂ¡logo|loja|vitrine|anuncio|anuncios|anÃƒÂºncio|anÃƒÂºncios)\b/;
 
   return browseVerb.test(normalized) && catalogNoun.test(normalized);
 }
@@ -416,11 +442,11 @@ export function detectCatalogItems(history: ConversationMessage[], deps: { norma
   }
 
   if (asksForChat) {
-    items.push({ slug: "chat-ia", nome: "Chat com IA (widget)", precoLabel: "R$50 de adesao + R$20/mÃªs" });
+    items.push({ slug: "chat-ia", nome: "Chat com IA (widget)", precoLabel: "R$50 de adesao + R$20/mÃƒÂªs" });
   }
 
   if (has(/\bwhatsapp\b|\bautomatiza(?:r|cao) whatsapp\b|\batendimento no whatsapp\b/)) {
-    items.push({ slug: "automacao-whatsapp", nome: "Atendimento com agentes no WhatsApp", precoLabel: "A partir de R$200/mÃªs" });
+    items.push({ slug: "automacao-whatsapp", nome: "Atendimento com agentes no WhatsApp", precoLabel: "A partir de R$200/mÃƒÂªs" });
   }
 
   if (has(/\bcrm\b|\bintegrac(?:ao|a)o com crm\b/)) {
@@ -469,20 +495,20 @@ export function buildCatalogPricingReply(
   if (catalogItems.length === 1) {
     return deps.prefersStructuredReply(context)
       ? [
-          "âœ“ **Melhor encaixe inicial**",
+          "Ã¢Å“â€œ **Melhor encaixe inicial**",
           labels[0],
           "",
-          "â†’ Se quiser, eu sigo com voce por aqui e ja te explico como isso entra no seu caso, ou te encaminho no WhatsApp para fecharmos mais rapido.",
+          "Ã¢â€ â€™ Se quiser, eu sigo com voce por aqui e ja te explico como isso entra no seu caso, ou te encaminho no WhatsApp para fecharmos mais rapido.",
         ].join("\n")
       : `Pelo que voce descreveu, isso encaixa em ${joinedLabels}. Se quiser, eu sigo com voce por aqui ou te encaminho no WhatsApp para fecharmos o proximo passo.`;
   }
 
   return deps.prefersStructuredReply(context)
     ? [
-        "âœ“ **Melhor encaixe inicial**",
+        "Ã¢Å“â€œ **Melhor encaixe inicial**",
         ...labels.map((label) => `- ${label}`),
         "",
-        "â†’ Se quiser, eu posso te dizer qual combinacao faz mais sentido para o seu caso e te direcionar no WhatsApp para alinharmos os detalhes finais.",
+        "Ã¢â€ â€™ Se quiser, eu posso te dizer qual combinacao faz mais sentido para o seu caso e te direcionar no WhatsApp para alinharmos os detalhes finais.",
       ].join("\n")
     : `Pelo que voce descreveu, isso encaixa no nosso catalogo como ${joinedLabels}. Se quiser, eu posso te direcionar no WhatsApp para alinharmos os detalhes finais.`;
 }
@@ -523,3 +549,6 @@ export function maybeAskForLeadIdentification(
 
   return null;
 }
+
+
+

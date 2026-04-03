@@ -106,10 +106,11 @@ export function createFixtureSearchDeps() {
       if (!normalized || ["oi", "ola", "ok"].includes(normalized)) return [];
       if (normalized.includes("prato azul")) return ["prato azul"];
       if (normalized.includes("sopeira")) return ["sopeira"];
+      if (normalized.includes("soperia")) return ["sopeira"];
       if (normalized.includes("garantia")) return [];
       return normalized.split(/\s+/).length >= 2 ? [normalized] : [];
     },
-    shouldSearchProducts: (message: string) => /\b(tem|procuro|buscar|mostra|me mostra)\b/i.test(message),
+    shouldSearchProducts: (message: string) => /\b(tem|procuro|buscar|mostra|me mostra|preciso de|busco)\b/i.test(message),
     isMercadoLivrePurchaseIntent: (message: string) => /\b(gostei|quero|comprar|manda o link|vou querer)\b/i.test(message),
     isMercadoLivreDetailIntent: (message: string) => /\b(garantia|frete|estoque|detalhes|cor|material)\b/i.test(message),
   };

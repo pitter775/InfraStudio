@@ -11,12 +11,21 @@ import {
 import type { ConversationContext } from "@/lib/chat-context";
 import { buildApiContinuationFallbackReply, buildApiFallbackReply, buildFocusedApiContext } from "@/lib/chat-api-runtime";
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
+import { buildAgentScopedRecoveryReply } from "@/lib/chat-recovery-stage";
 import { buildWhatsAppMessageSequence, resolveCanonicalWhatsAppExternalIdentifier } from "@/lib/chat-service";
 import { buildCatalogDecisionFromSemanticIntent } from "@/lib/chat-semantic-intent-stage";
-import { shouldContinueProductSearch, shouldUseMercadoLivreConnectorFallback } from "@/lib/chat-sales-heuristics";
+import {
+  buildProductSearchCandidates as buildProductSearchCandidatesFromModule,
+  isGreetingOrAckMessage as isGreetingOrAckMessageFromModule,
+  isMercadoLivreListingIntent as isMercadoLivreListingIntentFromModule,
+  shouldContinueProductSearch,
+  shouldSearchProducts as shouldSearchProductsFromModule,
+  shouldUseMercadoLivreConnectorFallback,
+} from "@/lib/chat-sales-heuristics";
 import {
   buildMercadoLivreSalesReply,
   buildMercadoLivreReply,
+  buildMercadoLivreSingleResultReply,
   resolveMercadoLivreFlowState,
   resolveMercadoLivreHeuristicReply,
   resolveMercadoLivreHeuristicState,
@@ -132,7 +141,7 @@ async function analyzeMercadoLivreScenario(title: string, input: string, context
     buildProductSearchCandidates: deps.buildProductSearchCandidates,
     resolveRecentCatalogProductReference,
     isRecentCatalogReferenceAttempt: (message) => /\b(esse|essa|mandou|primeiro|segundo)\b/i.test(message),
-    isMercadoLivreListingIntent: (message) => /\b(loja|catalogo|vitrine)\b/i.test(message),
+    isMercadoLivreListingIntent: (message) => isMercadoLivreListingIntentFromModule(message, { normalizeText: normalizeFixtureText }),
     shouldUseMercadoLivreConnectorFallback: () => true,
   });
 
@@ -202,6 +211,7 @@ async function analyzeMercadoLivreScenario(title: string, input: string, context
     title,
     input,
     observations: [
+      `flow.reused_previous_search_for_listing=${flow.reusedPreviousCatalogSearchForListing}`,
       `flow.product_search=${flow.productSearchRequested}`,
       `flow.product_term=${flow.productSearchTerm || "none"}`,
       `flow.referenced=${flow.referencedCatalogProducts.map((item) => item.nome ?? item.id ?? "sem-nome").join(" | ") || "none"}`,
@@ -304,6 +314,102 @@ async function analyzeAgentTestFocusedProductScenario(title: string, input: stri
       `agent_test.reply_avoids_restart=${/Sigo por aqui no contexto|Me diga o ponto exato que voce quer validar/i.test(reply) ? "no" : "yes"}`,
       `agent_test.reply_avoids_relisting=${/buscar opcoes parecidas|mostrar mais detalhes/i.test(reply) ? "no" : "yes"}`,
       `agent_test.reply_product_name_repetitions=${repeatedNameCount}`,
+    ],
+  };
+}
+
+async function analyzeAgentTestConversationDiagnosticScenario(title: string): Promise<ScenarioResult> {
+  const agentTestContext: ConversationContext = {
+    ...baseContext,
+    channel: { kind: "admin_agent_test" },
+    catalogo: {
+      ...baseContext.catalogo!,
+      ultimaBusca: "sopeira",
+      produtoAtual: baseContext.catalogo?.ultimosProdutos?.[1],
+    },
+  };
+  const initialSearchCandidates = buildProductSearchCandidatesFromModule("preciso de uma sopeira", {
+    normalizeText: normalizeFixtureText,
+    isGreetingOrAckMessage: (message) => isGreetingOrAckMessageFromModule(message, { normalizeText: normalizeFixtureText }),
+  });
+  const typoSearchCandidates = buildProductSearchCandidatesFromModule("vc tem soperia", {
+    normalizeText: normalizeFixtureText,
+    isGreetingOrAckMessage: (message) => isGreetingOrAckMessageFromModule(message, { normalizeText: normalizeFixtureText }),
+  });
+  const initialSearchDetected = shouldSearchProductsFromModule("preciso de uma sopeira", { normalizeText: normalizeFixtureText });
+  const listingFlow = resolveMercadoLivreFlowState({
+    latestUserMessage: "exiba seus produtos pra mim",
+    context: agentTestContext,
+    hasMercadoLivreConnector: true,
+    leadNameReplyDetected: false,
+    recentCatalogProducts: agentTestContext.catalogo?.ultimosProdutos ?? [],
+    catalogFollowUpDecision: null,
+    detectProductSearch: () => shouldSearchProductsFromModule("exiba seus produtos pra mim", { normalizeText: normalizeFixtureText }),
+    buildProductSearchCandidates: deps.buildProductSearchCandidates,
+    resolveRecentCatalogProductReference,
+    isRecentCatalogReferenceAttempt: (message) => /\b(esse|essa|mandou|primeiro|segundo)\b/i.test(message),
+    isMercadoLivreListingIntent: (message) => isMercadoLivreListingIntentFromModule(message, { normalizeText: normalizeFixtureText }),
+    shouldUseMercadoLivreConnectorFallback: () => true,
+  });
+  const listingReply = buildMercadoLivreReply(loadCatalogProductsFromContext(baseContext), agentTestContext, {
+    normalizeText: normalizeFixtureText,
+    isWhatsAppChannel: () => false,
+  });
+  const likeReply = buildMercadoLivreSingleResultReply(mercadoLivreFocusProduct, agentTestContext, null, {
+    normalizeText: normalizeFixtureText,
+    isWhatsAppChannel: () => false,
+  });
+  const detailsReply = buildMercadoLivreSalesReply(
+    mercadoLivreFocusProduct,
+    "qro mais detalhes",
+    agentTestContext,
+    null,
+    {
+      normalizeText: normalizeFixtureText,
+      isWhatsAppChannel: () => false,
+    },
+  );
+  const recoveryReply = buildAgentScopedRecoveryReply({
+    message: "preciso de uma sopeira",
+    context: agentTestContext,
+    agent: {
+      id: "agent-ml",
+      nome: "Reliquia de familia",
+      slug: null,
+      projetoId: "proj-ml",
+      modeloId: null,
+      apiIds: [],
+      configuracoes: {},
+      arquivos: [],
+      promptBase: "",
+      createdAt: "",
+      updatedAt: "",
+      ativo: true,
+      descricao: null,
+    } as never,
+    apiContexts: [],
+    hasMercadoLivreConnector: true,
+  });
+
+  return {
+    category: "mercado_livre",
+    title,
+    input: "oi -> preciso de uma sopeira -> vc tem soperia -> exiba seus produtos pra mim -> gostei da sopeira -> qro mais detalhes",
+    observations: [
+      `agent_test.initial_search_detected=${initialSearchDetected ? "yes" : "no"}`,
+      `agent_test.initial_search_candidates=${initialSearchCandidates.join(" | ") || "none"}`,
+      `agent_test.typo_search_candidates=${typoSearchCandidates.join(" | ") || "none"}`,
+      `agent_test.typo_recovers_sopeira=${typoSearchCandidates.some((item) => /sopeira/i.test(item)) ? "yes" : "no"}`,
+      `agent_test.listing_intent_detected=${isMercadoLivreListingIntentFromModule("exiba seus produtos pra mim", { normalizeText: normalizeFixtureText }) ? "yes" : "no"}`,
+      `agent_test.listing_reuses_previous_search=${listingFlow.reusedPreviousCatalogSearchForListing ? "yes" : "no"}`,
+      `agent_test.listing_product_search=${listingFlow.productSearchRequested ? "yes" : "no"}`,
+      `agent_test.listing_referenced_count=${listingFlow.referencedCatalogProducts.length}`,
+      `agent_test.listing_generic=${/Separei alguns produtos da loja logo abaixo/i.test(listingReply ?? "") ? "yes" : "no"}`,
+      `agent_test.ml_recovery_guided_search=${/busca de .*sopeira/i.test(recoveryReply) ? "yes" : "no"}`,
+      `agent_test.ml_recovery_generic_form=${/me diga o produto, modelo, marca, cor ou sku/i.test(recoveryReply) ? "yes" : "no"}`,
+      `agent_test.like_reply_loops=${/mostrar mais detalhes ou buscar opcoes parecidas/i.test(likeReply ?? "") ? "yes" : "no"}`,
+      `agent_test.details_reply_is_rich=${/ceramica esmaltada|bom estado geral|uso a mesa|servir sopas e caldos/i.test(detailsReply) ? "yes" : "no"}`,
+      `agent_test.details_reply_loops=${/mostrar mais detalhes ou buscar opcoes parecidas/i.test(detailsReply) ? "yes" : "no"}`,
     ],
   };
 }
@@ -696,6 +802,21 @@ async function main() {
       },
     ),
   );
+  scenarios.push(
+    await analyzeMercadoLivreScenario(
+      "Fluxo ML: vitrine reaproveita busca anterior em vez de abrir lista generica",
+      "exiba seus produtos pra mim",
+      {
+        ...baseContext,
+        channel: { kind: "admin_agent_test" },
+        catalogo: {
+          ...baseContext.catalogo!,
+          ultimaBusca: "sopeira",
+        },
+      },
+      null,
+    ),
+  );
 
   scenarios.push(
     await analyzeMercadoLivreScenario(
@@ -715,6 +836,7 @@ async function main() {
   scenarios.push(await analyzeMercadoLivreCommercialScenario("Fluxo ML: produto em foco vira conversa consultiva", "acho que combina comigo", baseContext));
   scenarios.push(await analyzeAgentTestFocusedProductScenario("Agent test: pergunta tecnica sobre produto em foco nao entra em loop", "ela e resistente vc sabe o material dela"));
   scenarios.push(await analyzeAgentTestFocusedProductScenario("Agent test: pergunta de uso diario mantem venda consultiva", "serve para uso diario?"));
+  scenarios.push(await analyzeAgentTestConversationDiagnosticScenario("Agent test: diagnostico do papo real de sopeira"));
   scenarios.push(await analyzeMercadoLivreListingCopyScenario("Fluxo ML: copy humana apos envio de lista", baseContext));
   scenarios.push(await analyzeWhatsAppScenario("WhatsApp: identidade canonica e lista inicial com frase humana", whatsappContext));
   scenarios.push(

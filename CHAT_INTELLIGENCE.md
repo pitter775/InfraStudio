@@ -1165,3 +1165,13 @@ Objetivo pratico:
 - manter a conversa consultiva mesmo quando a camada OpenAI falhar
 - reduzir resposta seca ou genérica em cenarios de `vale a pena` e `segue`
 
+
+## Atualizacao 2026-04-03 - laboratorio de inicio de conversa ML
+- O laboratorio agora valida explicitamente o caminho de recovery do Mercado Livre no chat de teste do agente.
+- Novos sinais observados nos cenarios:
+  - `agent_test.ml_recovery_guided_search`
+  - `agent_test.ml_recovery_generic_form`
+  - `agent_test.listing_intent_detected`
+  - `agent_test.listing_reuses_previous_search`
+- O objetivo dessa rodada foi capturar antes do teste real quando o fluxo cair cedo demais em texto generico do tipo `Como este agente esta focado na loja do Mercado Livre...`.
+- O recovery contextual do Mercado Livre agora tenta transformar pedidos claros de produto em busca guiada, inclusive com typo simples como `soperia`, em vez de abrir um formulario generico.

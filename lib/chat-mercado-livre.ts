@@ -34,6 +34,7 @@ export type MercadoLivreFlowState = {
   loadMoreCatalogRequested: boolean;
   detectedProductSearch: boolean;
   previousCatalogSearchTerm: string;
+  reusedPreviousCatalogSearchForListing: boolean;
   preResolvedCatalogReferences: CatalogProductReference[];
   explicitCatalogReferenceRequested: boolean;
   genericMercadoLivreListingRequested: boolean;
@@ -684,6 +685,11 @@ export function resolveMercadoLivreFlowState(input: {
   shouldUseMercadoLivreConnectorFallback: () => boolean;
 }) {
   const loadMoreCatalogRequested = input.catalogFollowUpDecision?.kind === "load_more_results";
+  const listingIntentRequested =
+    input.hasMercadoLivreConnector &&
+    input.isMercadoLivreListingIntent(input.latestUserMessage) &&
+    !input.leadNameReplyDetected &&
+    !loadMoreCatalogRequested;
   const detectedProductSearch =
     input.catalogFollowUpDecision?.kind === "new_product_search"
       ? true
@@ -695,31 +701,34 @@ export function resolveMercadoLivreFlowState(input: {
     input.catalogFollowUpDecision?.kind === "recent_product_reference" ||
     input.catalogFollowUpDecision?.kind === "recent_product_reference_ambiguous"
       ? input.catalogFollowUpDecision.matchedProducts
-      : input.hasMercadoLivreConnector && !input.leadNameReplyDetected && input.recentCatalogProducts.length
+      : input.hasMercadoLivreConnector && !input.leadNameReplyDetected && !listingIntentRequested && input.recentCatalogProducts.length
       ? input.resolveRecentCatalogProductReference(input.latestUserMessage, input.context)
       : [];
   const explicitCatalogReferenceRequested =
     input.hasMercadoLivreConnector &&
     !input.leadNameReplyDetected &&
     !loadMoreCatalogRequested &&
+    !listingIntentRequested &&
     (input.catalogFollowUpDecision?.kind === "recent_product_reference" ||
       input.catalogFollowUpDecision?.kind === "recent_product_reference_ambiguous" ||
       preResolvedCatalogReferences.length > 0 ||
       input.isRecentCatalogReferenceAttempt(input.latestUserMessage, input.context));
+  const reusedPreviousCatalogSearchForListing =
+    listingIntentRequested &&
+    Boolean(previousCatalogSearchTerm);
   const genericMercadoLivreListingRequested =
-    input.hasMercadoLivreConnector &&
-    input.isMercadoLivreListingIntent(input.latestUserMessage) &&
-    !input.leadNameReplyDetected &&
-    !loadMoreCatalogRequested;
+    listingIntentRequested &&
+    !reusedPreviousCatalogSearchForListing;
   const productSearchRequested =
     !genericMercadoLivreListingRequested &&
     !explicitCatalogReferenceRequested &&
     !input.leadNameReplyDetected &&
     (input.catalogFollowUpDecision?.kind === "new_product_search" ||
       loadMoreCatalogRequested ||
+      reusedPreviousCatalogSearchForListing ||
       detectedProductSearch ||
       (input.catalogFollowUpDecision?.shouldBlockNewSearch ? false : input.hasMercadoLivreConnector && input.shouldUseMercadoLivreConnectorFallback()));
-  const productSearchSeed = loadMoreCatalogRequested ? previousCatalogSearchTerm : input.latestUserMessage;
+  const productSearchSeed = loadMoreCatalogRequested || reusedPreviousCatalogSearchForListing ? previousCatalogSearchTerm : input.latestUserMessage;
   const productSearchCandidates = productSearchRequested ? input.buildProductSearchCandidates(productSearchSeed) : [];
   const productSearchTerm = productSearchCandidates[0] ?? "";
   const referencedCatalogProducts =
@@ -735,6 +744,7 @@ export function resolveMercadoLivreFlowState(input: {
     loadMoreCatalogRequested,
     detectedProductSearch,
     previousCatalogSearchTerm,
+    reusedPreviousCatalogSearchForListing,
     preResolvedCatalogReferences,
     explicitCatalogReferenceRequested,
     genericMercadoLivreListingRequested,
