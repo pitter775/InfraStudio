@@ -1127,3 +1127,30 @@ Objetivo pratico:
 - manter respostas factuais uteis mesmo em queda da camada OpenAI
 - aumentar a capacidade de diagnosticar se a falha real estava na API, no OpenAI ou no payload
 
+## Suite Avancada para API no Chat Externo
+
+Foi criada uma camada de testes mais proxima do caso real do widget externo usando API factual de imovel.
+
+Arquivos envolvidos:
+- `C:\Projetos\infrastudio\tests\fixtures\api-runtime-context.real-estate.json`
+- `C:\Projetos\infrastudio\lib\chat-api-runtime.ts`
+- `C:\Projetos\infrastudio\lib\chat-recovery-stage.ts`
+- `C:\Projetos\infrastudio\tests\chat-intelligence.smoke.ts`
+- `C:\Projetos\infrastudio\tests\chat-intelligence.scenarios.ts`
+
+Cobertura nova:
+- pergunta analitica tipo `sera que vale a pena`
+- follow-up longo com muito contexto de risco, cartorio e matricula
+- follow-up curto em variacoes naturais, sem depender de frase exata
+- resposta mais empatica no fallback analitico de API
+
+Mudanca de comportamento:
+- o fallback analitico agora prioriza melhor campos de risco, cartorio, matricula e custo antes de titulo/descricao genericos
+- o recovery de API segura continuacoes curtas de forma mais contextual, sem depender de uma frase fixa especifica
+- o `buildFocusedApiContext(...)` tambem preserva contexto factual em continuacoes curtas, para o pipeline principal nao perder o fio da analise nem reiniciar o atendimento em mensagens como `sim segue`
+
+Objetivo pratico:
+- evitar que o chat externo se perca logo depois de uma boa resposta factual
+- manter a conversa consultiva mesmo quando a camada OpenAI falhar
+- reduzir resposta seca ou genérica em cenarios de `vale a pena` e `segue`
+

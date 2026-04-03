@@ -9,7 +9,7 @@ import {
   type CatalogFollowUpDecision,
 } from "@/lib/catalog-follow-up";
 import type { ConversationContext } from "@/lib/chat-context";
-import { buildApiFallbackReply, buildFocusedApiContext } from "@/lib/chat-api-runtime";
+import { buildApiContinuationFallbackReply, buildApiFallbackReply, buildFocusedApiContext } from "@/lib/chat-api-runtime";
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
 import { buildWhatsAppMessageSequence, resolveCanonicalWhatsAppExternalIdentifier } from "@/lib/chat-service";
 import { buildCatalogDecisionFromSemanticIntent } from "@/lib/chat-semantic-intent-stage";
@@ -23,6 +23,7 @@ import {
 import {
   createFixtureSearchDeps,
   loadApiRuntimeFixture,
+  loadApiRuntimeRealEstateFixture,
   loadCatalogContextFixture,
   loadWhatsAppContextFixture,
   normalizeFixtureText,
@@ -39,6 +40,7 @@ const deps = createFixtureSearchDeps();
 const baseContext: ConversationContext = loadCatalogContextFixture();
 const whatsappContext: ConversationContext = loadWhatsAppContextFixture();
 const apiRuntimeFixture = loadApiRuntimeFixture();
+const apiRuntimeRealEstateFixture = loadApiRuntimeRealEstateFixture();
 
 async function analyzeCatalogScenario(title: string, input: string, context: ConversationContext): Promise<ScenarioResult> {
   const decision = decideCatalogFollowUpHeuristically(input, context, deps);
@@ -438,6 +440,88 @@ async function analyzeApiLongContextScenario(title: string, input: string): Prom
   };
 }
 
+async function analyzeApiRealEstateScenario(title: string, input: string): Promise<ScenarioResult> {
+  const focused = buildFocusedApiContext(input, apiRuntimeRealEstateFixture.apis, {
+    normalizeText: normalizeFixtureText,
+    buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+    singularizeToken: (value) => value,
+  });
+  const reply = buildApiFallbackReply(input, apiRuntimeRealEstateFixture.apis, {
+    normalizeText: normalizeFixtureText,
+    buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+    singularizeToken: (value) => value,
+  });
+
+  return {
+    category: "api",
+    title,
+    input,
+    observations: [
+      `api.real_estate_fields=${focused.fields.length}`,
+      `api.real_estate_reply_kind=${/Leitura inicial|Motivos|Proximo passo/i.test(reply ?? "") ? "analytical" : reply ? "direct" : "null"}`,
+      `api.real_estate_reply_empathy=${/Faz sentido olhar isso com mais calma/i.test(reply ?? "") ? "yes" : "no"}`,
+      `api.real_estate_mentions_risk=${/riscos|cartorio|matricula/i.test(reply ?? "") ? "yes" : "no"}`,
+    ],
+  };
+}
+
+async function analyzeApiContinuationRecoveryScenario(title: string, inputs: string[]): Promise<ScenarioResult> {
+  const observations = inputs.map((input) => {
+    const reply = buildApiContinuationFallbackReply(apiRuntimeRealEstateFixture.apis, {
+      normalizeText: normalizeFixtureText,
+      buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+      singularizeToken: (value) => value,
+    });
+
+    return `${input} => ${/Faz sentido olhar isso com mais calma|Leitura inicial|Motivos/i.test(reply ?? "") ? "contextual" : "generic"}`;
+  });
+
+  return {
+    category: "api",
+    title,
+    input: inputs.join(" | "),
+    observations,
+  };
+}
+
+async function analyzeApiFocusedContinuationScenario(title: string, input: string): Promise<ScenarioResult> {
+  const focused = buildFocusedApiContext(input, apiRuntimeRealEstateFixture.apis, {
+    normalizeText: normalizeFixtureText,
+    buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+    singularizeToken: (value) => value,
+  });
+
+  const stageState = resolveConversationPipelineStageState({
+    leadNameAcknowledgementReply: null,
+    hasCatalogReferenceHeuristicReply: false,
+    hasMercadoLivreHeuristicReply: false,
+    catalogPricingReply: null,
+    leadIdentificationReply: null,
+    hasValidAgent: true,
+    hasOpenAiKey: true,
+    hasFocusedApiContext: focused.fields.length > 0 || Boolean(focused.instructions),
+    latestUserMessage: input,
+    hasMemorySummary: true,
+    semanticApiIntentStage: null,
+    semanticCatalogIntentStage: null,
+    hasCurrentCatalogContext: false,
+    hasMercadoLivreContext: false,
+    hasLeadContext: false,
+  });
+
+  return {
+    category: "api",
+    title,
+    input,
+    observations: [
+      `api.focused_fields=${focused.fields.length}`,
+      `api.focused_has_continuation_instruction=${/continuidade curta|contexto factual/i.test(focused.instructions) ? "yes" : "no"}`,
+      `classifier.domain_stage=${stageState.conversationDomainStage}`,
+      `classifier.route_stage=${stageState.orchestratorRouteStage}`,
+    ],
+  };
+}
+
 async function main() {
   const scenarios: ScenarioResult[] = [];
 
@@ -546,6 +630,24 @@ async function main() {
     await analyzeApiLongContextScenario(
       "Pipeline: follow-up analitico longo de API mantem contexto e conclusao",
       "entendi, mas eu preciso saber com mais clareza se vale a pena entrar nisso agora, considerando risco, cartorio, matricula, custo total e se existe algum ponto que possa atrapalhar depois",
+    ),
+  );
+  scenarios.push(
+    await analyzeApiRealEstateScenario(
+      "Pipeline: API de imovel responde vale a pena com mais empatia e contexto",
+      "sera que vale apena",
+    ),
+  );
+  scenarios.push(
+    await analyzeApiContinuationRecoveryScenario(
+      "Pipeline: follow-up curto de API nao depende de frase fixa",
+      ["sim segue", "pode continuar", "quero entender melhor isso"],
+    ),
+  );
+  scenarios.push(
+    await analyzeApiFocusedContinuationScenario(
+      "Pipeline: follow-up curto de API mantem contexto factual ativo",
+      "sim segue",
     ),
   );
   scenarios.push(

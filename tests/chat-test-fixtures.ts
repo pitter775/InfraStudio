@@ -71,6 +71,10 @@ export function loadApiRuntimeErrorFixture() {
   return readFixtureJson<ApiRuntimeFixture>("api-runtime-context.error.json");
 }
 
+export function loadApiRuntimeRealEstateFixture() {
+  return readFixtureJson<ApiRuntimeFixture>("api-runtime-context.real-estate.json");
+}
+
 export function loadMercadoLivreFixture() {
   return readFixtureJson<MercadoLivreFixture>("mercado-livre-products.json");
 }

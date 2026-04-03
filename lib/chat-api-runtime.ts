@@ -108,6 +108,20 @@ function isAnalyticalQuery(message: string, deps: ApiRuntimeDeps) {
   return ANALYTICAL_QUERY_SIGNALS.some((signal) => normalized.includes(signal));
 }
 
+function isApiContinuationMessage(message: string, deps: ApiRuntimeDeps) {
+  const normalized = deps.normalizeText(message).replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  if (!normalized) return false;
+
+  const words = normalized.split(" ").filter(Boolean);
+  if (normalized.length > 48 || words.length > 8) return false;
+
+  if (/^(oi|ola|ol[aá]|bom dia|boa tarde|boa noite)$/.test(normalized)) {
+    return false;
+  }
+
+  return true;
+}
+
 function formatApiFieldLabel(path: string) {
   const segments = path.split(".");
   const leaf = segments[segments.length - 1] ?? path;
@@ -209,12 +223,29 @@ export function buildFocusedApiContext(message: string, apiContexts: ApiRuntimeC
 
   const analytical = isAnalyticalQuery(message, deps);
   const explicitApiIntent = /codigo|status|consulta|buscar|verifica|api|integr/i.test(deps.normalizeText(message));
+  const apiContinuation = isApiContinuationMessage(message, deps);
 
   const matches = findMatchingApiFields(availableApis, message, deps)
     .sort((left, right) => right.score - left.score || left.nome.localeCompare(right.nome))
     .slice(0, 6);
 
-  const preferredFields = ["titulo", "nome", "descricao", "resumo", "categoria", "status", "valor", "preco"];
+  const preferredFields = [
+    "riscos",
+    "risco",
+    "cartorio",
+    "matricula",
+    "valor_minimo",
+    "valor_avaliacao",
+    "valor_mercado",
+    "preco",
+    "roi_estimado",
+    "titulo",
+    "nome",
+    "descricao",
+    "resumo",
+    "categoria",
+    "status",
+  ];
   const baselineFields = preferredFields.flatMap((field) =>
     availableApis.flatMap((api) =>
       api.campos.flatMap((campo) =>
@@ -226,7 +257,7 @@ export function buildFocusedApiContext(message: string, apiContexts: ApiRuntimeC
   );
 
   const fallbackFields =
-    explicitApiIntent || analytical
+    explicitApiIntent || analytical || apiContinuation
       ? baselineFields.length
         ? baselineFields.slice(0, 5)
         : availableApis
@@ -249,6 +280,7 @@ export function buildFocusedApiContext(message: string, apiContexts: ApiRuntimeC
       "Responda apenas com base nesses campos e no historico recente da conversa.",
       "Se a informacao pedida nao estiver presente, diga isso com clareza.",
       analytical ? "Sintetize os dados em conclusao util; nao apenas liste campos." : "",
+      apiContinuation && !analytical ? "A mensagem atual parece uma continuidade curta; mantenha o contexto factual ja aberto sem reiniciar o atendimento." : "",
       fieldLines.length ? "Campos relevantes para esta pergunta:\n" + fieldLines.join("\n") : "",
       failedLines.length ? "APIs indisponiveis:\n" + failedLines.join("\n") : "",
     ]
@@ -289,16 +321,69 @@ export function buildApiFallbackReply(message: string, apiContexts: ApiRuntimeCo
   if (analytical) {
     const highlights = focused.fields.slice(0, 3).map((campo) => `- **${formatApiFieldLabel(campo.nome)}:** ${String(campo.valor)}`);
     return [
-      "**Conclusao:** com os dados atuais, da para fazer uma avaliacao inicial, mas a recomendacao depende do peso desses pontos no seu contexto.",
+      "Faz sentido olhar isso com mais calma antes de decidir.",
+      "",
+      "**Leitura inicial:** com os dados atuais, eu vejo base para uma avaliacao inicial, mas eu nao bateria o martelo sem pesar estes pontos no seu contexto.",
       "",
       "**Motivos:**",
       ...highlights,
       "",
-      "**Proximo passo:** se voce quiser, eu posso aprofundar a analise com base no criterio que mais importa para voce, como risco, custo, retorno, qualidade ou prioridade.",
+      "**Proximo passo:** se voce quiser, eu sigo com voce pelo criterio que mais pesa agora, como risco, documentacao, custo, retorno ou estrategia de saida.",
     ].join("\n");
   }
 
   return focused.fields.map((campo) => formatDirectFieldReply(campo.nome, campo.valor, deps)).join("\n");
+}
+
+export function buildApiContinuationFallbackReply(apiContexts: ApiRuntimeContext[], deps: ApiRuntimeDeps) {
+  const availableApis = apiContexts.filter((api) => api.campos.length > 0);
+  if (!availableApis.length) return null;
+
+  const preferredFields = [
+    "riscos",
+    "risco",
+    "cartorio",
+    "matricula",
+    "status",
+    "valor_minimo",
+    "preco",
+    "roi_estimado",
+    "descricao",
+    "titulo",
+  ];
+
+  const selectedFields = preferredFields.flatMap((field) =>
+    availableApis.flatMap((api) =>
+      api.campos.flatMap((campo) =>
+        deps.normalizeText(campo.nome).endsWith(field)
+          ? [{ ...campo, apiNome: api.nome, score: 1 } satisfies ScoredApiField]
+          : [],
+      ),
+    ),
+  );
+
+  const deduped = selectedFields.filter(
+    (campo, index, list) => list.findIndex((item) => item.nome === campo.nome && item.apiNome === campo.apiNome) === index,
+  );
+
+  const fallbackFields = deduped.length
+    ? deduped.slice(0, 3)
+    : availableApis.flatMap((api) => api.campos.slice(0, 3).map((campo) => ({ ...campo, apiNome: api.nome, score: 1 }))).slice(0, 3);
+
+  if (!fallbackFields.length) return null;
+
+  const highlights = fallbackFields.map((campo) => `- **${formatApiFieldLabel(campo.nome)}:** ${String(campo.valor)}`);
+
+  return [
+    "Faz sentido olhar isso com mais calma antes de decidir.",
+    "",
+    "**Leitura inicial:** pelo que ja temos em maos, eu seguiria a analise olhando estes pontos primeiro.",
+    "",
+    "**Motivos:**",
+    ...highlights,
+    "",
+    "**Proximo passo:** se voce quiser, eu sigo com voce no ponto que mais pesa agora, como risco, documentacao, custo, retorno ou estrategia.",
+  ].join("\n");
 }
 
 export const API_RUNTIME_FACTUAL_SIGNALS = DIRECT_REPLY_FACTUAL_SIGNALS;

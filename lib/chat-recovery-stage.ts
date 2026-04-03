@@ -1,4 +1,4 @@
-import { API_RUNTIME_FACTUAL_SIGNALS, buildApiFallbackReply } from "@/lib/chat-api-runtime";
+import { API_RUNTIME_FACTUAL_SIGNALS, buildApiContinuationFallbackReply, buildApiFallbackReply } from "@/lib/chat-api-runtime";
 import type { ConversationContext } from "@/lib/chat-context";
 import { formatHeuristicReply } from "@/lib/chat-prompt-builders";
 import { extractName as extractNameFromModule, extractPhone as extractPhoneFromModule } from "@/lib/chat-contact-utils";
@@ -14,7 +14,7 @@ function isShortFollowUp(message: string) {
   }
 
   const words = compact.split(" ").filter(Boolean);
-  return compact.length <= 24 && words.length <= 4;
+  return compact.length <= 40 && words.length <= 6;
 }
 
 function buildWhatsAppHeuristicReply(message: string, context?: ConversationContext) {
@@ -155,6 +155,14 @@ export function buildAgentScopedRecoveryReply(input: {
     buildSearchTokens,
     singularizeToken,
   });
+  const apiContinuationReply =
+    !apiReply && isShortFollowUp(input.message)
+      ? buildApiContinuationFallbackReply(input.apiContexts, {
+          normalizeText,
+          buildSearchTokens,
+          singularizeToken,
+        })
+      : null;
 
   const runtime = normalizeAgentRuntimeConfig(input.agent?.configuracoes?.runtime);
   const objective =
@@ -170,7 +178,7 @@ export function buildAgentScopedRecoveryReply(input: {
       `Me diga o ponto exato que voce quer validar em ${objective}: valor, detalhes, documentos ou o que mais pesa na sua decisao.`,
     ].join("\n\n");
 
-    return apiReply ? formatHeuristicReply(apiReply, input.context) : baseReply;
+    return apiReply || apiContinuationReply ? formatHeuristicReply(apiReply || apiContinuationReply || "", input.context) : baseReply;
   }
 
   const neutralFallbackReply = buildNeutralGlobalFallbackReply(input.agent, input.context);
@@ -182,7 +190,7 @@ export function buildAgentScopedRecoveryReply(input: {
       ].join("\n\n")
     : mercadoLivreFallbackReply;
 
-  return apiReply ? formatHeuristicReply(apiReply, input.context) : baseReply;
+  return apiReply || apiContinuationReply ? formatHeuristicReply(apiReply || apiContinuationReply || "", input.context) : baseReply;
 }
 
 export function extractPhone(message: string) {

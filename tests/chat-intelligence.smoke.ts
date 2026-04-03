@@ -30,6 +30,7 @@ import {
 import {
   createFixtureSearchDeps,
   loadApiRuntimeFixture,
+  loadApiRuntimeRealEstateFixture,
   loadCatalogContextFixture,
   loadMercadoLivreFixture,
   loadWhatsAppContextFixture,
@@ -47,6 +48,7 @@ const recentCatalogContext: ConversationContext = loadCatalogContextFixture();
 const whatsappContext: ConversationContext = loadWhatsAppContextFixture();
 const mercadoLivreFixture = loadMercadoLivreFixture();
 const apiRuntimeFixture = loadApiRuntimeFixture();
+const apiRuntimeRealEstateFixture = loadApiRuntimeRealEstateFixture();
 
 const tests: TestCase[] = [
   {
@@ -176,6 +178,73 @@ const tests: TestCase[] = [
       assert.ok(focused.fields.length > 0);
       assert.ok(reply);
       assert.match(reply ?? "", /Conclusao|Motivos|Proximo passo/i);
+    },
+  },
+  {
+    name: "fallback de API de imovel responde com mais empatia em vale a pena",
+    run: () => {
+      const reply = buildApiFallbackReply("sera que vale apena", apiRuntimeRealEstateFixture.apis, {
+        normalizeText: normalizeFixtureText,
+        buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+        singularizeToken: (value) => value,
+      });
+
+      assert.ok(reply);
+      assert.match(reply ?? "", /Faz sentido olhar isso com mais calma/i);
+      assert.match(reply ?? "", /Motivos/i);
+      assert.match(reply ?? "", /riscos|cartorio|matricula/i);
+    },
+  },
+  {
+    name: "fallback de API de imovel segura follow-up curto sem depender de frase fixa",
+    run: () => {
+      const messages = [
+        "sim segue",
+        "pode continuar",
+        "quero entender melhor isso",
+      ];
+
+      for (const message of messages) {
+        const reply = buildAgentScopedRecoveryReply({
+          message,
+          context: {
+            channel: { kind: "external_widget" },
+          } as ConversationContext,
+          agent: {
+            id: "agent-1",
+            nome: "Agente do Imovel",
+            slug: null,
+            projetoId: "proj-1",
+            modeloId: null,
+            apiIds: [],
+            configuracoes: { runtime: { overview: { objetivo: "Qualificar leads e conduzir o atendimento com contexto do negocio." } } },
+            arquivos: [],
+            promptBase: "",
+            createdAt: "",
+            updatedAt: "",
+            ativo: true,
+            descricao: null,
+          } as never,
+          apiContexts: apiRuntimeRealEstateFixture.apis,
+          hasMercadoLivreConnector: false,
+        });
+
+        assert.match(reply, /Faz sentido olhar isso com mais calma|Leitura inicial|Motivos|riscos|cartorio|matricula/i);
+        assert.doesNotMatch(reply, /Me diga o ponto exato que voce quer validar/i);
+      }
+    },
+  },
+  {
+    name: "contexto focado de API permanece ativo em follow-up curto sem frase fixa",
+    run: () => {
+      const focused = buildFocusedApiContext("sim segue", apiRuntimeRealEstateFixture.apis, {
+        normalizeText: normalizeFixtureText,
+        buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+        singularizeToken: (value) => value,
+      });
+
+      assert.ok(focused.fields.length > 0);
+      assert.match(focused.instructions, /continuidade curta|contexto factual/i);
     },
   },
   {
