@@ -20,6 +20,14 @@ function getFileSizeLimit() {
   return process.env.WHATSAPP_SESSION_BACKUP_FILE_SIZE_LIMIT?.trim() || DEFAULT_FILE_SIZE_LIMIT;
 }
 
+export function getWhatsAppSessionBackupConfig() {
+  return {
+    bucketName: getBucketName(),
+    objectPath: getObjectPath(),
+    fileSizeLimit: getFileSizeLimit(),
+  };
+}
+
 async function ensureBackupBucket() {
   if (bucketReady) {
     return;
@@ -60,8 +68,7 @@ export async function uploadWhatsAppSessionBackup(buffer: Buffer) {
   await ensureBackupBucket();
 
   const supabase = getSupabaseAdminClient();
-  const bucketName = getBucketName();
-  const objectPath = getObjectPath();
+  const { bucketName, objectPath, fileSizeLimit } = getWhatsAppSessionBackupConfig();
 
   const { error } = await supabase.storage.from(bucketName).upload(objectPath, buffer, {
     upsert: true,
@@ -75,6 +82,7 @@ export async function uploadWhatsAppSessionBackup(buffer: Buffer) {
   return {
     bucketName,
     objectPath,
+    fileSizeLimit,
     size: buffer.byteLength,
   };
 }
@@ -83,8 +91,7 @@ export async function downloadWhatsAppSessionBackup() {
   await ensureBackupBucket();
 
   const supabase = getSupabaseAdminClient();
-  const bucketName = getBucketName();
-  const objectPath = getObjectPath();
+  const { bucketName, objectPath, fileSizeLimit } = getWhatsAppSessionBackupConfig();
 
   const { data, error } = await supabase.storage.from(bucketName).download(objectPath);
 
@@ -100,6 +107,7 @@ export async function downloadWhatsAppSessionBackup() {
   return {
     bucketName,
     objectPath,
+    fileSizeLimit,
     buffer,
   };
 }

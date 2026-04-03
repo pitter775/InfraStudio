@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { appendSystemLog } from "@/lib/chat-logs";
 import {
   downloadWhatsAppSessionBackup,
+  getWhatsAppSessionBackupConfig,
   uploadWhatsAppSessionBackup,
 } from "@/lib/whatsapp-session-backup";
 
@@ -24,6 +25,19 @@ function getBackupChannelId(request: Request) {
   return request.headers.get("x-whatsapp-channel-id")?.trim() || null;
 }
 
+function getBackupContext(request: Request, extras?: Record<string, unknown> | null) {
+  const config = getWhatsAppSessionBackupConfig();
+
+  return {
+    reason: getBackupReason(request),
+    channelId: getBackupChannelId(request),
+    bucketName: config.bucketName,
+    objectPath: config.objectPath,
+    configuredFileSizeLimit: config.fileSizeLimit,
+    ...(extras ?? {}),
+  };
+}
+
 export async function GET(request: Request) {
   try {
     if (!isBridgeAuthorized(request)) {
@@ -36,10 +50,7 @@ export async function GET(request: Request) {
         tipo: "whatsapp_backup_trace",
         origem: "whatsapp-session-backup",
         descricao: "Worker tentou restaurar backup automatico, mas nenhum arquivo salvo foi encontrado.",
-        payload: {
-          reason: getBackupReason(request),
-          channelId: getBackupChannelId(request),
-        },
+        payload: getBackupContext(request),
         skipErrorGate: true,
       });
 
@@ -55,6 +66,7 @@ export async function GET(request: Request) {
         channelId: getBackupChannelId(request),
         bucketName: backup.bucketName,
         objectPath: backup.objectPath,
+        configuredFileSizeLimit: backup.fileSizeLimit,
         size: backup.buffer.byteLength,
       },
       skipErrorGate: true,
@@ -74,19 +86,21 @@ export async function GET(request: Request) {
       tipo: "whatsapp_backup_error",
       origem: "whatsapp-session-backup",
       descricao: error instanceof Error ? error.message : "Falha ao entregar backup da sessao do WhatsApp.",
-      payload: {
-        reason: getBackupReason(request),
-        channelId: getBackupChannelId(request),
-      },
+      payload: getBackupContext(request),
     });
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Falha ao baixar backup da sessao do WhatsApp." },
+      {
+        error: error instanceof Error ? error.message : "Falha ao baixar backup da sessao do WhatsApp.",
+        ...getBackupContext(request),
+      },
       { status: 500 },
     );
   }
 }
 
 export async function POST(request: Request) {
+  let requestSize = 0;
+
   try {
     if (!isBridgeAuthorized(request)) {
       return NextResponse.json({ error: "Bridge do WhatsApp nao autorizado." }, { status: 401 });
@@ -94,6 +108,7 @@ export async function POST(request: Request) {
 
     const arrayBuffer = await request.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    requestSize = buffer.byteLength;
 
     if (!buffer.byteLength) {
       return NextResponse.json({ error: "Arquivo zip obrigatorio." }, { status: 400 });
@@ -110,6 +125,8 @@ export async function POST(request: Request) {
         channelId: getBackupChannelId(request),
         bucketName: result.bucketName,
         objectPath: result.objectPath,
+        configuredFileSizeLimit: result.fileSizeLimit,
+        requestSize,
         size: result.size,
       },
       skipErrorGate: true,
@@ -120,6 +137,8 @@ export async function POST(request: Request) {
         ok: true,
         bucketName: result.bucketName,
         objectPath: result.objectPath,
+        configuredFileSizeLimit: result.fileSizeLimit,
+        requestSize,
         size: result.size,
       },
       { status: 200 },
@@ -130,13 +149,20 @@ export async function POST(request: Request) {
       tipo: "whatsapp_backup_error",
       origem: "whatsapp-session-backup",
       descricao: error instanceof Error ? error.message : "Falha ao salvar backup da sessao do WhatsApp.",
-      payload: {
-        reason: getBackupReason(request),
-        channelId: getBackupChannelId(request),
-      },
+      payload: getBackupContext(request, {
+        requestSize,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        errorMessage: error instanceof Error ? error.message : "Falha ao salvar backup da sessao do WhatsApp.",
+      }),
     });
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Falha ao salvar backup da sessao do WhatsApp." },
+      {
+        error: error instanceof Error ? error.message : "Falha ao salvar backup da sessao do WhatsApp.",
+        ...getBackupContext(request, {
+          requestSize,
+          errorName: error instanceof Error ? error.name : "UnknownError",
+        }),
+      },
       { status: 500 },
     );
   }
