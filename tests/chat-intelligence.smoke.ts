@@ -35,6 +35,7 @@ import {
   loadWhatsAppContextFixture,
   normalizeFixtureText,
 } from "@/tests/chat-test-fixtures";
+import { buildApiFallbackReply, buildFocusedApiContext } from "@/lib/chat-api-runtime";
 
 type TestCase = {
   name: string;
@@ -122,6 +123,59 @@ const tests: TestCase[] = [
       });
 
       assert.match(reply, /preco|250/i);
+    },
+  },
+  {
+    name: "recovery do agente sustenta follow-up analitico de API como vale a pena",
+    run: () => {
+      const reply = buildAgentScopedRecoveryReply({
+        message: "sim preciso saber se vale apena",
+        context: {
+          channel: { kind: "external_widget" },
+        } as ConversationContext,
+        agent: {
+          id: "agent-1",
+          nome: "Agente do Imovel",
+          slug: null,
+          projetoId: "proj-1",
+          modeloId: null,
+          apiIds: [],
+          configuracoes: { runtime: { overview: { objetivo: "Qualificar leads e conduzir o atendimento com contexto do negocio." } } },
+          arquivos: [],
+          promptBase: "",
+          createdAt: "",
+          updatedAt: "",
+          ativo: true,
+          descricao: null,
+        } as never,
+        apiContexts: apiRuntimeFixture.apis,
+        hasMercadoLivreConnector: false,
+      });
+
+      assert.match(reply, /Conclusao|Motivos|Proximo passo/i);
+      assert.doesNotMatch(reply, /Me diga o ponto exato que voce quer validar/i);
+    },
+  },
+  {
+    name: "fallback de API sustenta follow-up analitico longo sem perder integridade",
+    run: () => {
+      const message =
+        "entendi, mas eu preciso saber com mais clareza se vale a pena entrar nisso agora, considerando risco, cartorio, matricula, custo total e se existe algum ponto que possa atrapalhar depois";
+
+      const focused = buildFocusedApiContext(message, apiRuntimeFixture.apis, {
+        normalizeText: normalizeFixtureText,
+        buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+        singularizeToken: (value) => value,
+      });
+      const reply = buildApiFallbackReply(message, apiRuntimeFixture.apis, {
+        normalizeText: normalizeFixtureText,
+        buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+        singularizeToken: (value) => value,
+      });
+
+      assert.ok(focused.fields.length > 0);
+      assert.ok(reply);
+      assert.match(reply ?? "", /Conclusao|Motivos|Proximo passo/i);
     },
   },
   {

@@ -9,6 +9,7 @@ import {
   type CatalogFollowUpDecision,
 } from "@/lib/catalog-follow-up";
 import type { ConversationContext } from "@/lib/chat-context";
+import { buildApiFallbackReply, buildFocusedApiContext } from "@/lib/chat-api-runtime";
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
 import { buildWhatsAppMessageSequence, resolveCanonicalWhatsAppExternalIdentifier } from "@/lib/chat-service";
 import { buildCatalogDecisionFromSemanticIntent } from "@/lib/chat-semantic-intent-stage";
@@ -21,6 +22,7 @@ import {
 } from "@/lib/chat-mercado-livre";
 import {
   createFixtureSearchDeps,
+  loadApiRuntimeFixture,
   loadCatalogContextFixture,
   loadWhatsAppContextFixture,
   normalizeFixtureText,
@@ -36,6 +38,7 @@ type ScenarioResult = {
 const deps = createFixtureSearchDeps();
 const baseContext: ConversationContext = loadCatalogContextFixture();
 const whatsappContext: ConversationContext = loadWhatsAppContextFixture();
+const apiRuntimeFixture = loadApiRuntimeFixture();
 
 async function analyzeCatalogScenario(title: string, input: string, context: ConversationContext): Promise<ScenarioResult> {
   const decision = decideCatalogFollowUpHeuristically(input, context, deps);
@@ -409,6 +412,32 @@ async function analyzeWhatsAppScenario(title: string, context: ConversationConte
   };
 }
 
+async function analyzeApiLongContextScenario(title: string, input: string): Promise<ScenarioResult> {
+  const focused = buildFocusedApiContext(input, apiRuntimeFixture.apis, {
+    normalizeText: normalizeFixtureText,
+    buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+    singularizeToken: (value) => value,
+  });
+  const reply = buildApiFallbackReply(input, apiRuntimeFixture.apis, {
+    normalizeText: normalizeFixtureText,
+    buildSearchTokens: (value) => normalizeFixtureText(value).split(/\s+/).filter((item) => item.length >= 2),
+    singularizeToken: (value) => value,
+  });
+
+  return {
+    category: "api",
+    title,
+    input,
+    observations: [
+      `api.focused_fields=${focused.fields.length}`,
+      `api.has_instructions=${focused.instructions ? "yes" : "no"}`,
+      `api.reply_kind=${/Conclusao|Motivos|Proximo passo/i.test(reply ?? "") ? "analytical" : reply ? "direct" : "null"}`,
+      `api.reply_mentions_risk=${/risco|riscos/i.test(reply ?? "") ? "yes" : "no"}`,
+      `api.reply_mentions_next_step=${/Proximo passo/i.test(reply ?? "") ? "yes" : "no"}`,
+    ],
+  };
+}
+
 async function main() {
   const scenarios: ScenarioResult[] = [];
 
@@ -512,6 +541,12 @@ async function main() {
       context: apiContext,
       hasFocusedApiContext: true,
     }),
+  );
+  scenarios.push(
+    await analyzeApiLongContextScenario(
+      "Pipeline: follow-up analitico longo de API mantem contexto e conclusao",
+      "entendi, mas eu preciso saber com mais clareza se vale a pena entrar nisso agora, considerando risco, cartorio, matricula, custo total e se existe algum ponto que possa atrapalhar depois",
+    ),
   );
   scenarios.push(
     await analyzePipelineScenario("Pipeline: continuidade curta de lead com memoria", "sim", {

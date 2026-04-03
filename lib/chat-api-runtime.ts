@@ -207,6 +207,7 @@ export function buildFocusedApiContext(message: string, apiContexts: ApiRuntimeC
     return { instructions: "", fields: [] as ScoredApiField[] };
   }
 
+  const analytical = isAnalyticalQuery(message, deps);
   const explicitApiIntent = /codigo|status|consulta|buscar|verifica|api|integr/i.test(deps.normalizeText(message));
 
   const matches = findMatchingApiFields(availableApis, message, deps)
@@ -225,7 +226,7 @@ export function buildFocusedApiContext(message: string, apiContexts: ApiRuntimeC
   );
 
   const fallbackFields =
-    explicitApiIntent
+    explicitApiIntent || analytical
       ? baselineFields.length
         ? baselineFields.slice(0, 5)
         : availableApis
@@ -236,7 +237,6 @@ export function buildFocusedApiContext(message: string, apiContexts: ApiRuntimeC
   const selectedFields = matches.length ? matches : fallbackFields;
   const fieldLines = selectedFields.map((campo) => `- ${formatApiFieldLabel(campo.nome)} (${campo.nome}): ${String(campo.valor)}`);
   const failedLines = failedApis.map((api) => `- API indisponivel: ${api.nome}. Motivo: ${api.erro}`);
-  const analytical = isAnalyticalQuery(message, deps);
 
   if (!selectedFields.length && !failedLines.length) {
     return { instructions: "", fields: [] as ScoredApiField[] };
