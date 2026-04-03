@@ -13,7 +13,9 @@ import { resolveConversationDomainSupportState } from "@/lib/chat-domain-stage";
 import { classifyConversationDomainStage, classifyHeuristicIntentStage, classifyOrchestratorRouteStage } from "@/lib/chat-intent-classifier";
 import { buildOpenAiStageRequestPayload } from "@/lib/chat-openai-stage";
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
+import { buildSystemPrompt } from "@/lib/chat-prompt-builders";
 import { buildAgentScopedRecoveryReply } from "@/lib/chat-recovery-stage";
+import { isLikelyLeadNameReply } from "@/lib/chat-lead-stage";
 import { buildWhatsAppMessageSequence, resolveCanonicalWhatsAppExternalIdentifier, sanitizeWhatsAppCustomerFacingReply } from "@/lib/chat-service";
 import { buildCatalogDecisionFromSemanticIntent, shouldBypassCatalogHeuristicFallback } from "@/lib/chat-semantic-intent-stage";
 import { shouldRefreshSummary } from "@/lib/chat-summary-stage";
@@ -200,6 +202,37 @@ const tests: TestCase[] = [
       });
 
       assert.match(reply, /busca de .*sopeira/i);
+      assert.doesNotMatch(reply, /me diga o produto, modelo, marca, cor ou sku/i);
+    },
+  },
+  {
+    name: "recovery do agente no mercado livre trata presente como brief comercial e nao como pedido de sku",
+    run: () => {
+      const reply = buildAgentScopedRecoveryReply({
+        message: "Presente",
+        context: {
+          channel: { kind: "admin_agent_test" },
+        } as ConversationContext,
+        agent: {
+          id: "agent-ml",
+          nome: "Reliquia de familia",
+          slug: null,
+          projetoId: "proj-ml",
+          modeloId: null,
+          apiIds: [],
+          configuracoes: {},
+          arquivos: [],
+          promptBase: "",
+          createdAt: "",
+          updatedAt: "",
+          ativo: true,
+          descricao: null,
+        } as never,
+        apiContexts: [],
+        hasMercadoLivreConnector: true,
+      });
+
+      assert.match(reply, /para quem e|qual estilo|faixa de valor/i);
       assert.doesNotMatch(reply, /me diga o produto, modelo, marca, cor ou sku/i);
     },
   },
@@ -651,6 +684,53 @@ const tests: TestCase[] = [
       });
 
       assert.equal(shouldBypass, true);
+    },
+  },
+  {
+    name: "resposta de assunto nao pode ser tratada como nome do lead",
+    run: () => {
+      const history = [
+        { role: "assistant" as const, content: "Qual e o seu nome?" },
+        { role: "user" as const, content: "Automacao" },
+      ];
+
+      const isNameReply = isLikelyLeadNameReply("Automacao", history, {
+        normalizeText: normalizeFixtureText,
+        extractName: (message: string) => message,
+      });
+
+      assert.equal(isNameReply, false);
+    },
+  },
+  {
+    name: "prompt de imoveis nao mistura identidade da infrastudio",
+    run: () => {
+      const prompt = buildSystemPrompt(
+        {
+          id: "agent-real-estate",
+          nome: "Nexo Leiloes",
+          slug: null,
+          projetoId: "proj-real-estate",
+          modeloId: null,
+          apiIds: [],
+          configuracoes: {},
+          arquivos: [],
+          promptBase: "",
+          createdAt: "",
+          updatedAt: "",
+          ativo: true,
+          descricao: "Assistente de leiloes imobiliarios",
+        } as never,
+        {
+          projeto: { nome: "Nexo Leiloes", slug: "nexo-leiloes" },
+          channel: { kind: "external_widget" },
+        } as ConversationContext,
+        false,
+      );
+
+      assert.doesNotMatch(prompt, /Voce e o agente comercial inicial da InfraStudio|Foque em automacao, IA, integracoes, sistemas sob medida/i);
+      assert.doesNotMatch(prompt, /priorize descobrir e confirmar o primeiro nome/i);
+      assert.match(prompt, /leiloes imobiliarios|imoveis|risco|matricula|cartorio/i);
     },
   },
   {

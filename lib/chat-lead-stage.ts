@@ -38,6 +38,26 @@ type LeadContextShape = {
   };
 };
 
+const NON_PERSON_LEAD_REPLY_PATTERNS = [
+  /\bautomac(?:ao|a)o\b/,
+  /\bimoveis?\b/,
+  /\bleil(?:ao|oes)\b/,
+  /\bwhatsapp\b/,
+  /\bcrm\b/,
+  /\berp\b/,
+  /\bintegrac(?:ao|a)o\b/,
+  /\bsite\b/,
+  /\bchat\b/,
+  /\bia\b/,
+  /\bproduto\b/,
+  /\bprodutos\b/,
+  /\batendimento\b/,
+  /\bvendas?\b/,
+  /\bagenda\b/,
+  /\bmarketing\b/,
+  /\bfinanceir[oa]\b/,
+];
+
 export function didAssistantRecentlyAskForLeadName(history: ConversationMessage[], normalizeText: (value: string) => string) {
   const previousAssistantMessage = [...history].reverse().find((item) => item.role === "assistant")?.content ?? "";
   const normalized = normalizeText(previousAssistantMessage);
@@ -72,6 +92,10 @@ export function isLikelyLeadNameReply(
 
   const normalized = deps.normalizeText(message);
   if (/\b(produto|produtos|modelo|marca|cor|tamanho|sku|loja|mercado livre|ml|catalogo)\b/.test(normalized)) {
+    return false;
+  }
+
+  if (NON_PERSON_LEAD_REPLY_PATTERNS.some((pattern) => pattern.test(normalized))) {
     return false;
   }
 

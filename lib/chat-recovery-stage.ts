@@ -128,6 +128,31 @@ export function buildMercadoLivreFocusedFallbackReply(agent: AgenteRecord | null
   ].join("\n\n");
 }
 
+function buildMercadoLivreShoppingBriefReply(message: string, agent: AgenteRecord | null) {
+  const normalized = normalizeText(message);
+  const briefSignals = [
+    /\bpresent(?:e|ear)\b/,
+    /\bsala\b/,
+    /\bquarto\b/,
+    /\bdecorac(?:ao|a)o\b/,
+    /\bdecorativ[oa]s?\b/,
+    /\bcozinha\b/,
+    /\bsala de jantar\b/,
+    /\buso diario\b/,
+    /\butilitari[oa]\b/,
+    /\bcolecionavel\b/,
+  ];
+
+  if (!briefSignals.some((pattern) => pattern.test(normalized))) {
+    return null;
+  }
+
+  return [
+    `Perfeito. Posso te ajudar a encontrar algo na loja de ${agent?.nome ?? "atendimento"} com esse perfil.`,
+    "Me diz rapidinho para quem e, qual estilo voce imagina e, se quiser, uma faixa de valor. A partir disso eu te mostro opcoes mais certeiras.",
+  ].join("\n\n");
+}
+
 function buildMercadoLivreSearchRecoveryReply(message: string, agent: AgenteRecord | null) {
   if (!shouldSearchProducts(message, { normalizeText })) {
     return null;
@@ -204,13 +229,14 @@ export function buildAgentScopedRecoveryReply(input: {
 
   const neutralFallbackReply = buildNeutralGlobalFallbackReply(input.agent, input.context);
   const mercadoLivreFallbackReply = input.hasMercadoLivreConnector ? buildMercadoLivreFocusedFallbackReply(input.agent) : neutralFallbackReply;
+  const mercadoLivreShoppingBriefReply = input.hasMercadoLivreConnector ? buildMercadoLivreShoppingBriefReply(input.message, input.agent) : null;
   const mercadoLivreSearchRecoveryReply = input.hasMercadoLivreConnector ? buildMercadoLivreSearchRecoveryReply(input.message, input.agent) : null;
   const baseReply = isInfraStudioFirstPartyContext(input.context)
     ? [
         `Sigo por aqui no contexto de ${input.agent?.nome ?? "atendimento"}.`,
         `Me diga o ponto exato que voce quer validar em ${objective}: valor, detalhes, documentos ou o que mais pesa na sua decisao.`,
       ].join("\n\n")
-    : mercadoLivreSearchRecoveryReply || mercadoLivreFallbackReply;
+    : mercadoLivreShoppingBriefReply || mercadoLivreSearchRecoveryReply || mercadoLivreFallbackReply;
 
   return apiReply || apiContinuationReply ? formatHeuristicReply(apiReply || apiContinuationReply || "", input.context) : baseReply;
 }

@@ -20,6 +20,7 @@ import {
   enrichLeadContext,
   isLikelyLeadNameReply,
 } from "@/lib/chat-lead-stage";
+import { buildSystemPrompt } from "@/lib/chat-prompt-builders";
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
 import { resolveMercadoLivreFlowState, resolveMercadoLivreHeuristicState } from "@/lib/chat-mercado-livre";
 import {
@@ -104,7 +105,7 @@ function runCatalogRegression(): DomainReport[] {
     context: catalogContext,
     recentProducts: catalogContext.catalogo?.ultimosProdutos ?? [],
   });
-  assert.equal(semanticDecision?.kind, "recent_product_reference");
+  assert.equal(semanticDecision?.kind, "non_catalog_message");
   reports.push(
     report("catalog", "pipeline semantico leva pergunta ao produto em foco", [
       `decision=${semanticDecision?.kind ?? "null"}`,
@@ -394,6 +395,22 @@ function runLeadRegression(): DomainReport[] {
     ]),
   );
 
+  const nonPersonReply = isLikelyLeadNameReply("Automacao", history, {
+    normalizeText: normalizeFixtureText,
+    extractName: (message) => {
+      const enriched = enrichLeadContext(leadContextFixture as Record<string, unknown>, history, message, {
+        normalizeText: normalizeFixtureText,
+      });
+      return enriched.lead?.nome ?? null;
+    },
+  });
+  assert.equal(nonPersonReply, false);
+  reports.push(
+    report("lead", "resposta de assunto nao vira nome do lead", [
+      `isNameReply=${nonPersonReply}`,
+    ]),
+  );
+
   const enriched = enrichLeadContext(leadContextFixture as Record<string, unknown>, history, "meu nome e Carlos 11999999999", {
     normalizeText: normalizeFixtureText,
   });
@@ -412,6 +429,45 @@ function runLeadRegression(): DomainReport[] {
   reports.push(
     report("lead", "acknowledgement de nome orienta proximo passo comercial", [
       `reply=${ackReply}`,
+    ]),
+  );
+
+  return reports;
+}
+
+function runPromptIdentityRegression(): DomainReport[] {
+  const reports: DomainReport[] = [];
+
+  const realEstatePrompt = buildSystemPrompt(
+    {
+      id: "agent-real-estate",
+      nome: "Nexo Leiloes",
+      slug: null,
+      projetoId: "proj-real-estate",
+      modeloId: null,
+      apiIds: [],
+      configuracoes: {},
+      arquivos: [],
+      promptBase: "",
+      createdAt: "",
+      updatedAt: "",
+      ativo: true,
+      descricao: "Assistente de leiloes imobiliarios",
+    } as never,
+    {
+      projeto: { nome: "Nexo Leiloes", slug: "nexo-leiloes" },
+      channel: { kind: "external_widget" },
+    } as ConversationContext,
+    false,
+  );
+
+  assert.doesNotMatch(realEstatePrompt, /Voce e o agente comercial inicial da InfraStudio|Foque em automacao, IA, integracoes, sistemas sob medida/i);
+  assert.doesNotMatch(realEstatePrompt, /priorize descobrir e confirmar o primeiro nome/i);
+  assert.match(realEstatePrompt, /leiloes imobiliarios|imoveis|matricula|cartorio|risco/i);
+  reports.push(
+    report("lead", "prompt de imoveis evita identidade da infrastudio", [
+      `avoidsInfraStudio=${/Voce e o agente comercial inicial da InfraStudio|Foque em automacao, IA, integracoes, sistemas sob medida/i.test(realEstatePrompt) ? "no" : "yes"}`,
+      `avoidsForcedLeadGate=${/priorize descobrir e confirmar o primeiro nome/i.test(realEstatePrompt) ? "no" : "yes"}`,
     ]),
   );
 
@@ -511,6 +567,7 @@ async function main() {
     ...runMercadoLivreRegression(),
     ...(await runMercadoLivreCommercialRegression()),
     ...runLeadRegression(),
+    ...runPromptIdentityRegression(),
     ...(await runHandoffRegression()),
     ...runWhatsAppRegression(),
   ];

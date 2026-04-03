@@ -1192,3 +1192,10 @@ Objetivo pratico:
   - `agent_test.follow_up_avoids_restart`
   - `agent_test.follow_up_avoids_relisting`
 - O objetivo dessa cobertura e impedir que o fluxo volte a repetir card, reafirmar item de forma seca ou reiniciar o atendimento apos o primeiro produto entregue.
+
+## Atualizacao 2026-04-03 - separacao de identidade entre agentes
+- O laboratorio agora protege contra mistura de persona entre o agente de imoveis e a identidade padrao da InfraStudio.
+- Coberturas novas:
+  - assunto como `Automacao` nao pode ser tratado como nome do lead apos pergunta de nome;
+  - prompt de agente imobiliario nao deve iniciar com a identidade ativa da InfraStudio nem forcar gate de nome.
+- Isso reduz o risco de respostas como `Posso ajudar com imoveis, automacao, IA, integracoes e sistemas sob medida` dentro de um agente focado em leiloes/imoveis.

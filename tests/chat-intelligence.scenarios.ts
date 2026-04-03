@@ -465,6 +465,43 @@ async function analyzeAgentTestConversationDiagnosticScenario(title: string): Pr
   };
 }
 
+async function analyzeAgentTestShoppingBriefScenario(title: string): Promise<ScenarioResult> {
+  const reply = buildAgentScopedRecoveryReply({
+    message: "Presente",
+    context: {
+      ...baseContext,
+      channel: { kind: "admin_agent_test" },
+    },
+    agent: {
+      id: "agent-ml",
+      nome: "Reliquia de familia",
+      slug: null,
+      projetoId: "proj-ml",
+      modeloId: null,
+      apiIds: [],
+      configuracoes: {},
+      arquivos: [],
+      promptBase: "",
+      createdAt: "",
+      updatedAt: "",
+      ativo: true,
+      descricao: null,
+    } as never,
+    apiContexts: [],
+    hasMercadoLivreConnector: true,
+  });
+
+  return {
+    category: "mercado_livre",
+    title,
+    input: "Presente",
+    observations: [
+      `agent_test.shopping_brief_consultive=${/para quem e|qual estilo|faixa de valor/i.test(reply) ? "yes" : "no"}`,
+      `agent_test.shopping_brief_avoids_sku_form=${/me diga o produto, modelo, marca, cor ou sku/i.test(reply) ? "no" : "yes"}`,
+    ],
+  };
+}
+
 async function analyzeMercadoLivreListingCopyScenario(title: string, context: ConversationContext): Promise<ScenarioResult> {
   const reply = buildMercadoLivreReply(loadCatalogProductsFromContext(context), context, {
     normalizeText: normalizeFixtureText,
@@ -888,6 +925,7 @@ async function main() {
   scenarios.push(await analyzeAgentTestFocusedProductScenario("Agent test: pergunta tecnica sobre produto em foco nao entra em loop", "ela e resistente vc sabe o material dela"));
   scenarios.push(await analyzeAgentTestFocusedProductScenario("Agent test: pergunta de uso diario mantem venda consultiva", "serve para uso diario?"));
   scenarios.push(await analyzeAgentTestPostSingleProductDeliveryScenario("Agent test: apos entregar produto unico o follow-up tecnico nao se perde"));
+  scenarios.push(await analyzeAgentTestShoppingBriefScenario("Agent test: contexto curto de compra vira brief comercial"));
   scenarios.push(await analyzeAgentTestConversationDiagnosticScenario("Agent test: diagnostico do papo real de sopeira"));
   scenarios.push(await analyzeMercadoLivreListingCopyScenario("Fluxo ML: copy humana apos envio de lista", baseContext));
   scenarios.push(await analyzeWhatsAppScenario("WhatsApp: identidade canonica e lista inicial com frase humana", whatsappContext));
