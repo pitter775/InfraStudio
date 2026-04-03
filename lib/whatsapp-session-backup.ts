@@ -3,7 +3,7 @@ import "server-only";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const DEFAULT_BUCKET = "whatsapp-session-backups";
-const DEFAULT_OBJECT_PATH = "worker/latest.zip";
+const DEFAULT_OBJECT_PATH = "worker/latest";
 const DEFAULT_FILE_SIZE_LIMIT = "512MB";
 
 let bucketReady = false;
@@ -30,28 +30,56 @@ export function getWhatsAppSessionBackupConfig() {
   };
 }
 
-export async function createWhatsAppSessionBackupUploadAccess() {
+function getManifestPath() {
+  return `${getObjectPath()}/manifest.json`;
+}
+
+function getChunkPath(partName: string) {
+  return `${getObjectPath()}/chunks/${partName}`;
+}
+
+export async function createWhatsAppSessionBackupUploadAccess(files?: Array<{ kind?: string; name?: string }>) {
   await ensureBackupBucket();
 
   const supabase = getSupabaseAdminClient();
-  const { bucketName, objectPath, fileSizeLimit, supabaseUrl, supabaseAnonKey } = getWhatsAppSessionBackupConfig();
-  const { data, error } = await supabase.storage.from(bucketName).createSignedUploadUrl(objectPath, {
-    upsert: true,
-  });
+  const { bucketName, fileSizeLimit, supabaseUrl, supabaseAnonKey } = getWhatsAppSessionBackupConfig();
+  const requestedFiles = Array.isArray(files) && files.length
+    ? files.map((file) => ({
+        kind: file?.kind === "manifest" ? "manifest" : "chunk",
+        path:
+          file?.kind === "manifest"
+            ? getManifestPath()
+            : getChunkPath(String(file?.name || "").trim()),
+      }))
+    : [{ kind: "manifest", path: getManifestPath() }];
+  const signedFiles = [];
 
-  if (error || !data) {
-    throw new Error(error?.message || "Falha ao criar acesso temporario de upload para o backup da sessao do WhatsApp.");
+  for (const file of requestedFiles) {
+    const { data, error } = await supabase.storage.from(bucketName).createSignedUploadUrl(file.path, {
+      upsert: true,
+    });
+
+    if (error || !data) {
+      throw new Error(error?.message || "Falha ao criar acesso temporario de upload para o backup da sessao do WhatsApp.");
+    }
+
+    signedFiles.push({
+      kind: file.kind,
+      path: data.path,
+      token: data.token,
+      signedUrl: "signedUrl" in data ? data.signedUrl : null,
+    });
   }
 
   return {
     bucketName,
-    objectPath,
+    objectPath: getObjectPath(),
     fileSizeLimit,
     supabaseUrl,
     supabaseAnonKey,
-    path: data.path,
-    token: data.token,
-    signedUrl: "signedUrl" in data ? data.signedUrl : null,
+    manifestPath: getManifestPath(),
+    chunkPrefix: `${getObjectPath()}/chunks/`,
+    signedFiles,
   };
 }
 
@@ -60,19 +88,43 @@ export async function createWhatsAppSessionBackupDownloadAccess() {
 
   const supabase = getSupabaseAdminClient();
   const { bucketName, objectPath, fileSizeLimit } = getWhatsAppSessionBackupConfig();
-  const { data, error } = await supabase.storage.from(bucketName).createSignedUrl(objectPath, 60 * 30, {
-    download: "whatsapp-session-backup.zip",
-  });
+  const manifestPath = getManifestPath();
+  const { data, error } = await supabase.storage.from(bucketName).download(manifestPath);
 
   if (error) {
     if (/not found|does not exist/i.test(error.message || "")) {
       return null;
     }
 
-    throw new Error(error.message || "Falha ao criar URL assinada para download do backup da sessao do WhatsApp.");
+    throw new Error(error.message || "Falha ao ler o manifest do backup da sessao do WhatsApp.");
   }
 
-  if (!data?.signedUrl) {
+  const manifest = JSON.parse(Buffer.from(await data.arrayBuffer()).toString("utf8"));
+  const parts = Array.isArray(manifest?.parts) ? manifest.parts : [];
+  const signedParts = [];
+
+  for (const part of parts) {
+    const chunkPath = getChunkPath(String(part?.name || "").trim());
+    const { data: signedData, error: signedError } = await supabase.storage.from(bucketName).createSignedUrl(chunkPath, 60 * 30, {
+      download: String(part?.name || "backup.part"),
+    });
+
+    if (signedError || !signedData?.signedUrl) {
+      throw new Error(signedError?.message || `Falha ao gerar URL assinada para a parte ${String(part?.name || "").trim()}.`);
+    }
+
+    signedParts.push({
+      name: String(part?.name || "").trim(),
+      size: Number(part?.size || 0),
+      signedUrl: signedData.signedUrl,
+    });
+  }
+
+  const { data: manifestSignedData, error: manifestSignedError } = await supabase.storage.from(bucketName).createSignedUrl(manifestPath, 60 * 30, {
+    download: "whatsapp-session-backup.zip",
+  });
+
+  if (manifestSignedError || !manifestSignedData?.signedUrl) {
     return null;
   }
 
@@ -80,7 +132,10 @@ export async function createWhatsAppSessionBackupDownloadAccess() {
     bucketName,
     objectPath,
     fileSizeLimit,
-    signedUrl: data.signedUrl,
+    manifest,
+    manifestPath,
+    signedUrl: manifestSignedData.signedUrl,
+    parts: signedParts,
   };
 }
 

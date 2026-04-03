@@ -77,7 +77,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Bridge do WhatsApp nao autorizado." }, { status: 401 });
     }
 
-    const access = await createWhatsAppSessionBackupUploadAccess();
+    const body = await request.json().catch(() => ({}));
+    const access = await createWhatsAppSessionBackupUploadAccess(Array.isArray(body?.files) ? body.files : []);
     return NextResponse.json(
       {
         ok: true,
