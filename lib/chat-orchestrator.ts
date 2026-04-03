@@ -22,7 +22,6 @@ import {
   resolveCatalogReferenceHeuristicReply,
   resolveRecentCatalogProductReference,
   type CatalogFollowUpDecision,
-  type CatalogFollowUpDecisionKind,
 } from "@/lib/catalog-follow-up";
 import type { CatalogProductReference, ConversationContext } from "@/lib/chat-context";
 import { resolveConversationContextStageState } from "@/lib/chat-context-stage";
@@ -32,6 +31,11 @@ import type { ConversationDomainStage, HeuristicIntentStage } from "@/lib/chat-i
 import { buildOpenAiStageRequestPayload } from "@/lib/chat-openai-stage";
 import { extractOpenAiOutputText, type OpenAIResponsesPayload } from "@/lib/chat-openai-utils";
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
+import {
+  buildCatalogDecisionFromSemanticIntent,
+  classifySemanticIntentStage,
+  type SemanticIntentStageResult,
+} from "@/lib/chat-semantic-intent-stage";
 import {
   buildAgentAssetInstruction as buildAgentAssetInstructionFromModule,
   buildAnalyticalReplyInstruction as buildAnalyticalReplyInstructionFromModule,
@@ -135,6 +139,7 @@ type SalesReplyResult = {
 type HeuristicPipelineState = {
   openai: Awaited<ReturnType<typeof getProjetoOpenAIConfig>>;
   recentCatalogProducts: CatalogProductReference[];
+  semanticIntentStage: SemanticIntentStageResult | null;
   catalogFollowUpHeuristicDecision: CatalogFollowUpDecision | null;
   catalogFollowUpDecision: CatalogFollowUpDecision | null;
   loadMoreCatalogRequested: boolean;
@@ -172,115 +177,6 @@ function buildRuntimeReplyAssets(assets: AgenteAssetRecord[]) {
   }));
 }
 
-async function classifyCatalogFollowUp(input: {
-  openai: Awaited<ReturnType<typeof getProjetoOpenAIConfig>>;
-  message: string;
-  context?: ConversationContext;
-}): Promise<CatalogFollowUpDecision | null> {
-  if (!input.openai.apiKey || !hasRecentCatalogSnapshot(input.context)) {
-    return null;
-  }
-
-  const recentProducts = normalizeRecentCatalogProducts(input.context);
-  if (!recentProducts.length) {
-    return null;
-  }
-
-  const currentProduct = input.context?.catalogo?.produtoAtual ?? null;
-  const requestPayload = {
-    model: input.openai.model,
-    temperature: 0.1,
-    max_output_tokens: 180,
-    instructions: [
-      "Classifique se a mensagem do cliente se refere aos produtos mostrados recentemente ou se pede nova busca.",
-      "Responda apenas JSON valido com as chaves: intent, confidence, matched_product_ids, reason.",
-      "Intent permitido: recent_product_reference, recent_product_reference_ambiguous, new_product_search, non_catalog_message.",
-      "Se houver candidato forte entre os produtos recentes, priorize referencia ao item ja mostrado.",
-    ].join("\n"),
-    input: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "input_text",
-            text: JSON.stringify({
-              message: input.message,
-              currentProduct: currentProduct
-                ? {
-                    id: currentProduct.id ?? null,
-                    nome: currentProduct.nome ?? null,
-                    preco: currentProduct.preco ?? null,
-                    link: currentProduct.link ?? null,
-                  }
-                : null,
-              recentProducts: recentProducts.map((product) => ({
-                id: product.id ?? product.link ?? product.nome ?? null,
-                nome: product.nome ?? null,
-                descricao: product.descricao ?? null,
-                preco: product.preco ?? null,
-                link: product.link ?? null,
-                cardIndex: product.cardIndex ?? null,
-              })),
-            }),
-          },
-        ],
-      },
-    ],
-  };
-
-  try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${input.openai.apiKey}`,
-      },
-      body: JSON.stringify(requestPayload),
-    });
-
-    const payload = (await response.json()) as OpenAIResponsesPayload;
-    const outputText = extractOpenAiOutputText(payload);
-    if (!response.ok || !outputText) {
-      return null;
-    }
-
-    const parsed = JSON.parse(outputText) as {
-      intent?: CatalogFollowUpDecisionKind;
-      confidence?: number;
-      matched_product_ids?: Array<string | null>;
-      reason?: string;
-    };
-
-    if (
-      parsed.intent !== "recent_product_reference" &&
-      parsed.intent !== "recent_product_reference_ambiguous" &&
-      parsed.intent !== "new_product_search" &&
-      parsed.intent !== "non_catalog_message"
-    ) {
-      return null;
-    }
-
-    const matchedIds = Array.isArray(parsed.matched_product_ids) ? parsed.matched_product_ids.filter(Boolean) : [];
-    const matchedProducts = recentProducts.filter((product) =>
-      matchedIds.includes(product.id ?? product.link ?? product.nome ?? null),
-    );
-
-    return {
-      kind: parsed.intent,
-      confidence:
-        typeof parsed.confidence === "number" && Number.isFinite(parsed.confidence)
-          ? Math.max(0, Math.min(1, parsed.confidence))
-          : 0.72,
-      reason: typeof parsed.reason === "string" && parsed.reason.trim() ? parsed.reason.trim() : "Classificacao LLM do follow-up de catalogo.",
-      matchedProducts,
-      usedLlm: true,
-      shouldBlockNewSearch: parsed.intent !== "new_product_search",
-    };
-  } catch {
-    return null;
-  }
-}
-
 async function buildHeuristicPipelineState(input: {
   projectId: string | null;
   latestUserMessage: string;
@@ -295,7 +191,21 @@ async function buildHeuristicPipelineState(input: {
   const buildProductSearchCandidates = (message: string) =>
     buildProductSearchCandidatesFromModule(message, { normalizeText, isGreetingOrAckMessage });
   const shouldSearchProducts = (message: string) => shouldSearchProductsFromModule(message, { normalizeText });
-  const catalogFollowUpHeuristicDecision =
+  const semanticIntentStage =
+    input.hasMercadoLivreConnector && !input.leadNameReplyDetected && hasRecentCatalogSnapshot(input.context)
+      ? await classifySemanticIntentStage({
+          openai,
+          message: input.latestUserMessage,
+          context: input.context,
+          recentProducts: recentCatalogProducts,
+        })
+      : null;
+  const semanticCatalogDecision = buildCatalogDecisionFromSemanticIntent({
+    semanticIntent: semanticIntentStage,
+    context: input.context,
+    recentProducts: recentCatalogProducts,
+  });
+  const fallbackCatalogDecision =
     input.hasMercadoLivreConnector && !input.leadNameReplyDetected
       ? decideCatalogFollowUpHeuristically(input.latestUserMessage, input.context, {
           buildProductSearchCandidates,
@@ -304,9 +214,10 @@ async function buildHeuristicPipelineState(input: {
           isMercadoLivreDetailIntent: (message) => isMercadoLivreDetailIntent(message, { normalizeText, isWhatsAppChannel }),
         })
       : null;
+  const catalogFollowUpHeuristicDecision = semanticCatalogDecision ?? fallbackCatalogDecision;
   const catalogFollowUpDecision =
     catalogFollowUpHeuristicDecision?.kind === "recent_product_reference_ambiguous"
-      ? (await classifyCatalogFollowUp({ openai, message: input.latestUserMessage, context: input.context })) ?? catalogFollowUpHeuristicDecision
+      ? catalogFollowUpHeuristicDecision
       : catalogFollowUpHeuristicDecision;
   const flowState = resolveMercadoLivreFlowState({
     latestUserMessage: input.latestUserMessage,
@@ -341,6 +252,7 @@ async function buildHeuristicPipelineState(input: {
   return {
     openai,
     recentCatalogProducts,
+    semanticIntentStage,
     catalogFollowUpHeuristicDecision,
     catalogFollowUpDecision,
     ...flowState,
@@ -723,6 +635,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const {
     openai,
     recentCatalogProducts,
+    semanticIntentStage,
     catalogFollowUpDecision,
     loadMoreCatalogRequested,
     genericMercadoLivreListingRequested,
@@ -778,6 +691,14 @@ export async function generateSalesReply(history: ConversationMessage[], context
     mercadoLivreCandidates: productSearchCandidates,
     mercadoLivreListingCount: mercadoLivreListingProducts.length,
     mercadoLivreCount: mercadoLivreProducts.length,
+    semanticIntentStage: semanticIntentStage
+      ? {
+          intent: semanticIntentStage.intent,
+          confidence: semanticIntentStage.confidence,
+          reason: semanticIntentStage.reason,
+          usedLlm: semanticIntentStage.usedLlm,
+        }
+      : null,
     catalogFollowUpDecision: catalogFollowUpDecision
       ? {
           kind: catalogFollowUpDecision.kind,

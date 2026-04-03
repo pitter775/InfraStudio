@@ -106,7 +106,7 @@ Isso melhora a leitura de:
 Foi criada uma base de testes reutilizavel com:
 
 - smoke tests
-- scenario runner com historico na raiz
+- scenario runner com historico em `analises`
 - domain regression runner
 - fixtures JSON de catalogo, API, Mercado Livre, lead e handoff
 
@@ -135,7 +135,7 @@ Estado mais recente validado:
 
 - `35 smoke tests passed`
 - `14 domain regression checks passed`
-- scenario runner gerando historico `.md` na raiz do projeto
+- scenario runner gerando historico `.md` na pasta `analises`
 
 ## Banco de Dados
 
@@ -182,3 +182,4 @@ Leitura final:
 - conclusao forte do objetivo
 - pronto para subida
 - recomendacao: validar agora em cenario real para capturar vestigios residuais de ruido
+

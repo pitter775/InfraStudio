@@ -327,7 +327,7 @@ async function main() {
 async function persistScenarioHistory(scenarios: ScenarioResult[]) {
   const timestamp = new Date().toISOString();
   const safeTimestamp = timestamp.replace(/[:.]/g, "-");
-  const historyFilePath = path.resolve(process.cwd(), `analise-chat-test-${safeTimestamp}.md`);
+  const historyFilePath = path.resolve(process.cwd(), "analises", `analise-chat-test-${safeTimestamp}.md`);
   const categorySummary = summarizeByCategory(scenarios);
   const tokenEstimate = estimateScenarioTokenUsage(scenarios);
   const body = [
@@ -399,5 +399,6 @@ main().catch((error) => {
   console.error(error);
   process.exit(1);
 });
+
 
 

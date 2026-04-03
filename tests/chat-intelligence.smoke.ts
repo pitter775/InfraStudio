@@ -13,6 +13,7 @@ import { resolveConversationDomainSupportState } from "@/lib/chat-domain-stage";
 import { classifyConversationDomainStage, classifyHeuristicIntentStage, classifyOrchestratorRouteStage } from "@/lib/chat-intent-classifier";
 import { buildOpenAiStageRequestPayload } from "@/lib/chat-openai-stage";
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
+import { buildCatalogDecisionFromSemanticIntent } from "@/lib/chat-semantic-intent-stage";
 import { shouldRefreshSummary } from "@/lib/chat-summary-stage";
 import { buildChatUsageOrigin, buildChatUsageTelemetry, describeChatUsageOrigin, readChatUsageTelemetry } from "@/lib/chat-usage-metrics";
 import {
@@ -106,6 +107,64 @@ const tests: TestCase[] = [
 
       const products = resolveRecentCatalogProductReference("gostei da sopeira", staleContext);
       assert.equal(products.length, 0);
+    },
+  },
+  {
+    name: "semantic stage direciona interesse para produto em foco",
+    run: () => {
+      const decision = buildCatalogDecisionFromSemanticIntent({
+        semanticIntent: {
+          intent: "product_interest",
+          confidence: 0.93,
+          reason: "demonstrou interesse no produto atual",
+          usedLlm: true,
+        },
+        context: recentCatalogContext,
+        recentProducts: recentCatalogContext.catalogo?.ultimosProdutos ?? [],
+      });
+
+      assert.ok(decision);
+      assert.equal(decision?.kind, "recent_product_reference");
+      assert.equal(decision?.matchedProducts[0]?.id, "MLB2");
+      assert.equal(decision?.usedLlm, true);
+    },
+  },
+  {
+    name: "semantic stage transforma rejeicao em continuidade de vitrine",
+    run: () => {
+      const decision = buildCatalogDecisionFromSemanticIntent({
+        semanticIntent: {
+          intent: "product_rejection",
+          confidence: 0.81,
+          reason: "nao gostou do produto em foco",
+          usedLlm: true,
+        },
+        context: recentCatalogContext,
+        recentProducts: recentCatalogContext.catalogo?.ultimosProdutos ?? [],
+      });
+
+      assert.ok(decision);
+      assert.equal(decision?.kind, "load_more_results");
+      assert.equal(decision?.shouldBlockNewSearch, true);
+    },
+  },
+  {
+    name: "semantic stage libera nova busca quando a intencao e nova exploracao",
+    run: () => {
+      const decision = buildCatalogDecisionFromSemanticIntent({
+        semanticIntent: {
+          intent: "new_search",
+          confidence: 0.88,
+          reason: "quer procurar outro produto",
+          usedLlm: true,
+        },
+        context: recentCatalogContext,
+        recentProducts: recentCatalogContext.catalogo?.ultimosProdutos ?? [],
+      });
+
+      assert.ok(decision);
+      assert.equal(decision?.kind, "new_product_search");
+      assert.equal(decision?.shouldBlockNewSearch, false);
     },
   },
   {

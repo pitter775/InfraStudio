@@ -4,6 +4,7 @@ build/
 !app/api/meta/build/route.ts
 dist/
 coverage/
+analises/
 .next/
 .vercel/
 out/

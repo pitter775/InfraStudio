@@ -718,8 +718,8 @@ Foi criada uma primeira bateria leve de smoke tests para os modulos extraidos:
     - resumo por categoria no arquivo gerado
     - estimativa de tokens por execucao e por cenario
 
-- `C:\Projetos\infrastudio\analise-chat-test-<timestamp>.md`
-  - arquivo gerado na raiz do projeto a cada execucao do runner de cenarios
+- `C:\Projetos\infrastudio\analises\analise-chat-test-<timestamp>.md`
+  - arquivo gerado na pasta `analises` a cada execucao do runner de cenarios
   - cada execucao cria um novo `.md`
   - isso facilita acompanhar a evolucao de um papo/teste por vez sem misturar rodadas
   - agora tambem registra estimativa de tokens:
@@ -903,3 +903,34 @@ Objetivo desse fechamento:
 - facilitar subida e validacao final
 - deixar documentado que nao houve necessidade de mudanca em banco
 - consolidar entregas, validacao e riscos residuais
+
+## Virada para Semantic Intent Stage
+
+Foi iniciada a troca do motor de interpretacao de mensagens do usuario no fluxo de catalogo:
+- `C:\Projetos\infrastudio\lib\chat-semantic-intent-stage.ts`
+
+Responsabilidade:
+- usar OpenAI apenas para classificar semanticamente a intencao do usuario
+- ler mensagem atual + contexto recente de catalogo
+- devolver JSON estruturado com:
+  - `intent`
+  - `confidence`
+  - `reason`
+
+Categorias atuais:
+- `product_interest`
+- `product_question`
+- `product_rejection`
+- `new_search`
+- `generic`
+
+Integracao atual:
+- a fase semantica passou a rodar antes do follow-up de catalogo no `chat-orchestrator.ts`
+- quando houver contexto recente de catalogo, ela vira o motor principal de decisao
+- a heuristica local continua apenas como fallback tecnico quando a classificacao semantica nao estiver disponivel
+
+Objetivo pratico:
+- reduzir dependencia de listas fixas de frases
+- diminuir loops de listagem e busca
+- fazer a decisao depender mais de contexto e menos de palavra exata
+
