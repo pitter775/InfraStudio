@@ -1080,6 +1080,59 @@ const tests: TestCase[] = [
     },
   },
   {
+    name: "follow-up misto de interesse e pergunta factual mantem produto em foco e evita fallback seco",
+    run: () => {
+      const flow = resolveMercadoLivreFlowState({
+        latestUserMessage: "Esse mesmo eu gostei dele e frete gratis",
+        context: {
+          ...recentCatalogContext,
+          channel: { kind: "admin_agent_test" },
+          catalogo: {
+            ...recentCatalogContext.catalogo!,
+            ultimaBusca: "jogo de jantar completo",
+            produtoAtual: {
+              id: "MLB1",
+              nome: "Jogo De Jantar Porcelana Floral Filete Dourado 41 Pecas Branco Florido",
+              descricao: "R$ 2990",
+              preco: 2990,
+              link: "https://produto.mercadolivre.com.br/MLB-4574498811-jogo-de-jantar-porcelana-floral-filete-dourado-41-pecas-branco-florido-_JM",
+              imagem: "https://example.com/jantar.jpg",
+              cardIndex: 0,
+            },
+            ultimosProdutos: [
+              {
+                id: "MLB1",
+                nome: "Jogo De Jantar Porcelana Floral Filete Dourado 41 Pecas Branco Florido",
+                descricao: "R$ 2990",
+                preco: 2990,
+                link: "https://produto.mercadolivre.com.br/MLB-4574498811-jogo-de-jantar-porcelana-floral-filete-dourado-41-pecas-branco-florido-_JM",
+                imagem: "https://example.com/jantar.jpg",
+                cardIndex: 0,
+              },
+            ],
+          },
+        },
+        hasMercadoLivreConnector: true,
+        leadNameReplyDetected: false,
+        recentCatalogProducts: recentCatalogContext.catalogo?.ultimosProdutos ?? [],
+        catalogFollowUpDecision: null,
+        detectProductSearch: () => true,
+        buildProductSearchCandidates: deps.buildProductSearchCandidates,
+        resolveRecentCatalogProductReference,
+        isRecentCatalogReferenceAttempt: () => false,
+        isMercadoLivreListingIntent: () => false,
+        shouldUseMercadoLivreConnectorFallback: () => true,
+        deps: {
+          normalizeText: normalizeFixtureText,
+          isWhatsAppChannel: () => false,
+        },
+      });
+
+      assert.equal(flow.productSearchRequested, false);
+      assert.equal(flow.currentCatalogProduct?.nome, "Jogo De Jantar Porcelana Floral Filete Dourado 41 Pecas Branco Florido");
+    },
+  },
+  {
     name: "telemetria de uso classifica origem com canal provider rota e dominio",
     run: () => {
       const origin = buildChatUsageOrigin({

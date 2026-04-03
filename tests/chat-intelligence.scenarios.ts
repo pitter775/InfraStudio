@@ -601,6 +601,67 @@ async function analyzeAgentTestSameProductDetailsScenario(title: string): Promis
   };
 }
 
+async function analyzeAgentTestMixedFollowUpScenario(title: string): Promise<ScenarioResult> {
+  const focusContext: ConversationContext = {
+    ...baseContext,
+    channel: { kind: "admin_agent_test" },
+    catalogo: {
+      ...baseContext.catalogo!,
+      ultimaBusca: "jogo de jantar completo",
+      produtoAtual: {
+        id: "MLB1",
+        nome: "Jogo De Jantar Porcelana Floral Filete Dourado 41 Pecas Branco Florido",
+        descricao: "R$ 2990",
+        preco: 2990,
+        link: "https://produto.mercadolivre.com.br/MLB-4574498811-jogo-de-jantar-porcelana-floral-filete-dourado-41-pecas-branco-florido-_JM",
+        imagem: "https://example.com/jantar.jpg",
+        cardIndex: 0,
+      },
+      ultimosProdutos: [
+        {
+          id: "MLB1",
+          nome: "Jogo De Jantar Porcelana Floral Filete Dourado 41 Pecas Branco Florido",
+          descricao: "R$ 2990",
+          preco: 2990,
+          link: "https://produto.mercadolivre.com.br/MLB-4574498811-jogo-de-jantar-porcelana-floral-filete-dourado-41-pecas-branco-florido-_JM",
+          imagem: "https://example.com/jantar.jpg",
+          cardIndex: 0,
+        },
+      ],
+    },
+  };
+
+  const flow = resolveMercadoLivreFlowState({
+    latestUserMessage: "Esse mesmo eu gostei dele e frete gratis",
+    context: focusContext,
+    hasMercadoLivreConnector: true,
+    leadNameReplyDetected: false,
+    recentCatalogProducts: focusContext.catalogo?.ultimosProdutos ?? [],
+    catalogFollowUpDecision: null,
+    detectProductSearch: () => true,
+    buildProductSearchCandidates: deps.buildProductSearchCandidates,
+    resolveRecentCatalogProductReference,
+    isRecentCatalogReferenceAttempt: () => false,
+    isMercadoLivreListingIntent: () => false,
+    shouldUseMercadoLivreConnectorFallback: () => true,
+    deps: {
+      normalizeText: normalizeFixtureText,
+      isWhatsAppChannel: () => false,
+    },
+  });
+
+  return {
+    category: "mercado_livre",
+    title,
+    input: "Esse mesmo eu gostei dele e frete gratis",
+    observations: [
+      `agent_test.mixed_follow_up_product_search=${flow.productSearchRequested ? "yes" : "no"}`,
+      `agent_test.mixed_follow_up_current_product=${flow.currentCatalogProduct?.nome ?? "none"}`,
+      `agent_test.mixed_follow_up_keeps_focus=${flow.currentCatalogProduct?.nome === "Jogo De Jantar Porcelana Floral Filete Dourado 41 Pecas Branco Florido" ? "yes" : "no"}`,
+    ],
+  };
+}
+
 async function analyzeMercadoLivreListingCopyScenario(title: string, context: ConversationContext): Promise<ScenarioResult> {
   const reply = buildMercadoLivreReply(loadCatalogProductsFromContext(context), context, {
     normalizeText: normalizeFixtureText,
@@ -1025,6 +1086,7 @@ async function main() {
   scenarios.push(await analyzeAgentTestFocusedProductScenario("Agent test: pergunta de uso diario mantem venda consultiva", "serve para uso diario?"));
   scenarios.push(await analyzeAgentTestPostSingleProductDeliveryScenario("Agent test: apos entregar produto unico o follow-up tecnico nao se perde"));
   scenarios.push(await analyzeAgentTestSameProductDetailsScenario("Agent test: pedir mais detalhes depois do produto escolhido mantem o mesmo item"));
+  scenarios.push(await analyzeAgentTestMixedFollowUpScenario("Agent test: follow-up misto com frete gratis mantem o produto em foco"));
   scenarios.push(await analyzeAgentTestShoppingBriefScenario("Agent test: contexto curto de compra vira brief comercial"));
   scenarios.push(await analyzeAgentTestConversationDiagnosticScenario("Agent test: diagnostico do papo real de sopeira"));
   scenarios.push(await analyzeMercadoLivreListingCopyScenario("Fluxo ML: copy humana apos envio de lista", baseContext));

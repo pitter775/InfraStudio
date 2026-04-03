@@ -124,6 +124,28 @@ export function isMercadoLivreDetailIntent(message: string, deps: MercadoLivreDe
   );
 }
 
+function shouldKeepCurrentProductConversation(
+  message: string,
+  currentCatalogProduct: CatalogProductReference | null | undefined,
+  deps: MercadoLivreDeps,
+) {
+  if (!currentCatalogProduct) {
+    return false;
+  }
+
+  const normalized = deps.normalizeText(message);
+  if (!normalized) {
+    return false;
+  }
+
+  if (isMercadoLivrePurchaseIntent(message, deps) || isMercadoLivreDetailIntent(message, deps)) {
+    return true;
+  }
+
+  return /\b(esse mesmo|essa mesma|gostei dele|gostei dela|dele|dela|desse|dessa)\b/.test(normalized);
+}
+
+
 function formatMercadoLivreCondition(value: string | null | undefined, deps: MercadoLivreDeps) {
   const normalized = deps.normalizeText(value ?? "");
   if (normalized === "new") return "novo";
@@ -759,7 +781,12 @@ export function resolveMercadoLivreFlowState(input: {
   isRecentCatalogReferenceAttempt: (message: string, context?: ConversationContext) => boolean;
   isMercadoLivreListingIntent: (message: string) => boolean;
   shouldUseMercadoLivreConnectorFallback: () => boolean;
+  deps?: MercadoLivreDeps;
 }) {
+  const currentCatalogProductFromContext =
+    input.context?.catalogo?.produtoAtual && typeof input.context.catalogo.produtoAtual === "object"
+      ? input.context.catalogo.produtoAtual
+      : null;
   const loadMoreCatalogRequested = input.catalogFollowUpDecision?.kind === "load_more_results";
   const listingIntentRequested =
     input.hasMercadoLivreConnector &&
@@ -772,6 +799,13 @@ export function resolveMercadoLivreFlowState(input: {
       : input.catalogFollowUpDecision?.shouldBlockNewSearch
       ? false
       : input.detectProductSearch();
+  const keepCurrentProductConversation =
+    input.hasMercadoLivreConnector &&
+    !input.leadNameReplyDetected &&
+    shouldKeepCurrentProductConversation(input.latestUserMessage, currentCatalogProductFromContext, {
+      normalizeText: input.deps?.normalizeText ?? ((value) => value),
+      isWhatsAppChannel: input.deps?.isWhatsAppChannel ?? (() => false),
+    });
   const previousCatalogSearchTerm = typeof input.context?.catalogo?.ultimaBusca === "string" ? input.context.catalogo.ultimaBusca.trim() : "";
   const preResolvedCatalogReferences =
     input.catalogFollowUpDecision?.kind === "recent_product_reference" ||
@@ -798,6 +832,7 @@ export function resolveMercadoLivreFlowState(input: {
   const productSearchRequested =
     !genericMercadoLivreListingRequested &&
     !explicitCatalogReferenceRequested &&
+    !keepCurrentProductConversation &&
     !input.leadNameReplyDetected &&
     (input.catalogFollowUpDecision?.kind === "new_product_search" ||
       loadMoreCatalogRequested ||
@@ -812,8 +847,8 @@ export function resolveMercadoLivreFlowState(input: {
       ? preResolvedCatalogReferences
       : [];
   const currentCatalogProduct =
-    !productSearchRequested && input.context?.catalogo?.produtoAtual && typeof input.context.catalogo.produtoAtual === "object"
-      ? input.context.catalogo.produtoAtual
+    !productSearchRequested && currentCatalogProductFromContext
+      ? currentCatalogProductFromContext
       : null;
 
   return {
