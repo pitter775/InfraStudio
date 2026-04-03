@@ -1024,6 +1024,62 @@ const tests: TestCase[] = [
     },
   },
   {
+    name: "follow-up de detalhes do produto em foco nao repete card nem link sem necessidade",
+    run: () => {
+      const reply = resolveMercadoLivreHeuristicReply({
+        context: { channel: { kind: "admin_agent_test" } } as ConversationContext,
+        latestUserMessage: "Queria mais detalhes",
+        agentId: "agent-1",
+        agentName: "Reliquia de familia",
+        selectedProductSalesReply: "Boa escolha. Ele e de ceramica esmaltada e esta em bom estado geral.",
+        salesFocusProduct: mercadoLivreFocusProduct,
+        selectedCatalogProduct: recentCatalogContext.catalogo?.ultimosProdutos?.[1] ?? null,
+        mercadoLivreListingReply: null,
+        mercadoLivreListingProductsForAssets: [],
+        directMercadoLivreReply: null,
+        mercadoLivreProductsForAssets: [],
+        currentProductForMetadata: recentCatalogContext.catalogo?.ultimosProdutos?.[1] ?? null,
+        mercadoLivreNoResultsReply: null,
+        formatReply: (value) => value,
+        deps: {
+          normalizeText: normalizeFixtureText,
+          isWhatsAppChannel: () => false,
+        },
+      });
+
+      assert.ok(reply);
+      assert.equal(reply?.assets.length, 0);
+    },
+  },
+  {
+    name: "pedido explicito de link ou imagem pode repetir asset do produto em foco",
+    run: () => {
+      const reply = resolveMercadoLivreHeuristicReply({
+        context: { channel: { kind: "admin_agent_test" } } as ConversationContext,
+        latestUserMessage: "me manda o link desse produto",
+        agentId: "agent-1",
+        agentName: "Reliquia de familia",
+        selectedProductSalesReply: "Boa escolha. Posso te mandar o link sim.",
+        salesFocusProduct: mercadoLivreFocusProduct,
+        selectedCatalogProduct: recentCatalogContext.catalogo?.ultimosProdutos?.[1] ?? null,
+        mercadoLivreListingReply: null,
+        mercadoLivreListingProductsForAssets: [],
+        directMercadoLivreReply: null,
+        mercadoLivreProductsForAssets: [],
+        currentProductForMetadata: recentCatalogContext.catalogo?.ultimosProdutos?.[1] ?? null,
+        mercadoLivreNoResultsReply: null,
+        formatReply: (value) => value,
+        deps: {
+          normalizeText: normalizeFixtureText,
+          isWhatsAppChannel: () => false,
+        },
+      });
+
+      assert.ok(reply);
+      assert.ok((reply?.assets.length ?? 0) >= 1);
+    },
+  },
+  {
     name: "telemetria de uso classifica origem com canal provider rota e dominio",
     run: () => {
       const origin = buildChatUsageOrigin({

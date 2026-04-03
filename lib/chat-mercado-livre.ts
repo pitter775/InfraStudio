@@ -187,6 +187,63 @@ function buildMercadoLivreDescriptionLead(compactDescription: string | null) {
   return `No anuncio ele aparece assim: ${compactDescription}`;
 }
 
+function shouldRepeatFocusedProductAsset(message: string, deps: MercadoLivreDeps) {
+  const normalized = deps.normalizeText(message);
+
+  if (!normalized) {
+    return true;
+  }
+
+  const explicitAssetSignals = [
+    /\blink\b/,
+    /\banuncio\b/,
+    /\banúncio\b/,
+    /\bfoto\b/,
+    /\bfotos\b/,
+    /\bimagem\b/,
+    /\bimagens\b/,
+    /\bmostra ele\b/,
+    /\bme manda\b/,
+    /\bme envia\b/,
+  ];
+
+  if (explicitAssetSignals.some((pattern) => pattern.test(normalized))) {
+    return true;
+  }
+
+  const detailConversationSignals = [
+    /\bmais detalhes\b/,
+    /\bdetalhes dele\b/,
+    /\bdetalhes dela\b/,
+    /\bmaterial\b/,
+    /\bresistente\b/,
+    /\bresistencia\b/,
+    /\bserve\b/,
+    /\buso diario\b/,
+    /\bdia a dia\b/,
+    /\bgarantia\b/,
+    /\bfrete\b/,
+    /\bentrega\b/,
+    /\bestoque\b/,
+    /\bcondicao\b/,
+    /\bestado\b/,
+    /\bmedida\b/,
+    /\bmedidas\b/,
+    /\btamanho\b/,
+    /\bcapacidade\b/,
+    /\bcor\b/,
+    /\bmais sobre ele\b/,
+    /\bmais sobre ela\b/,
+    /\bme fala mais\b/,
+  ];
+
+  if (detailConversationSignals.some((pattern) => pattern.test(normalized))) {
+    return false;
+  }
+
+  return true;
+}
+
 function buildMercadoLivreTechnicalAnswer(
   produto: ProdutoDetalhadoMercadoLivre,
   latestUserMessage: string,
@@ -938,11 +995,12 @@ export function resolveMercadoLivreHeuristicReply(input: {
   deps: MercadoLivreDeps;
 }): MercadoLivreHeuristicReply | null {
   if (input.selectedProductSalesReply && input.salesFocusProduct) {
+    const shouldRepeatAsset = shouldRepeatFocusedProductAsset(input.latestUserMessage, input.deps);
     return {
       mode: "mercado_livre_product_sales",
       logMessage: "Resposta comercial de produto especifico do Mercado Livre acionada.",
       reply: input.formatReply(input.selectedProductSalesReply, input.context),
-      assets: buildMercadoLivreProductAssets([input.salesFocusProduct], input.latestUserMessage, input.deps),
+      assets: shouldRepeatAsset ? buildMercadoLivreProductAssets([input.salesFocusProduct], input.latestUserMessage, input.deps) : [],
       metadata: {
         provider: "heuristic",
         model: "mercado_livre_product_sales",

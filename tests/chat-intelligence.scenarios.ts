@@ -566,6 +566,26 @@ async function analyzeAgentTestSameProductDetailsScenario(title: string): Promis
   });
 
   const reply = state.selectedProductSalesReply ?? "";
+  const heuristicReply = resolveMercadoLivreHeuristicReply({
+    context: focusContext,
+    latestUserMessage: "Vc tem mais detalhes dele",
+    agentId: "agent-1",
+    agentName: "Reliquia de familia",
+    selectedProductSalesReply: state.selectedProductSalesReply,
+    salesFocusProduct: state.salesFocusProduct,
+    selectedCatalogProduct: state.selectedCatalogProduct,
+    mercadoLivreListingReply: state.mercadoLivreListingReply,
+    mercadoLivreListingProductsForAssets: [],
+    directMercadoLivreReply: state.directMercadoLivreReply,
+    mercadoLivreProductsForAssets: [],
+    currentProductForMetadata: state.currentProductForMetadata,
+    mercadoLivreNoResultsReply: state.mercadoLivreNoResultsReply,
+    formatReply: (value) => value,
+    deps: {
+      normalizeText: normalizeFixtureText,
+      isWhatsAppChannel: () => false,
+    },
+  });
 
   return {
     category: "mercado_livre",
@@ -576,6 +596,7 @@ async function analyzeAgentTestSameProductDetailsScenario(title: string): Promis
       `agent_test.same_product_mentions_jantar=${/jogo de jantar|41 pecas|2990/i.test(reply) ? "yes" : "no"}`,
       `agent_test.same_product_avoids_other_item=${/bules inox|meridional|290/i.test(reply) ? "no" : "yes"}`,
       `agent_test.same_product_focus_name=${state.salesFocusProduct?.nome ?? "none"}`,
+      `agent_test.same_product_avoids_repeated_card=${(heuristicReply?.assets.length ?? 0) === 0 ? "yes" : "no"}`,
     ],
   };
 }
