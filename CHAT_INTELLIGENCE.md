@@ -248,6 +248,21 @@ De forma simplificada, o fluxo hoje funciona assim:
 10. persistir resposta, contexto e logs
 11. registrar telemetria de uso por projeto, canal, provider, rota e dominio
 
+## Ajustes Operacionais de WhatsApp
+
+- o canal WhatsApp agora foi ajustado para responder com uma unica mensagem textual por vez
+- o `chat-service` nao persiste mais `followUpReply` separado quando o canal e `whatsapp`
+- a `messageSequence` do WhatsApp foi colapsada para uma unica mensagem principal, evitando multiplos historicos/saidas em sequencia
+- o retorno do WhatsApp tambem nao expoe mais `assets` na resposta final do webhook, reduzindo o risco de pontes externas dispararem midias/mensagens extras
+- tambem foi adicionada uma sanitizacao operacional para remover promessas como:
+  - `vou ver`
+  - `vou verificar`
+  - `ja vejo`
+  - `deixa eu ver`
+  - `ver o status`
+- isso reduz ruido operacional e evita o agente prometer ao cliente uma consulta/status que nao deve verbalizar desse jeito
+- os fallbacks de recovery tambem deixaram de sugerir `status` como topico de conversa para o cliente
+
 ## Follow-up de Catalogo
 
 Esse foi um dos pontos mais importantes corrigidos.
@@ -928,6 +943,100 @@ Integracao atual:
 - a fase semantica passou a rodar antes do follow-up de catalogo no `chat-orchestrator.ts`
 - quando houver contexto recente de catalogo, ela vira o motor principal de decisao
 - a heuristica local continua apenas como fallback tecnico quando a classificacao semantica nao estiver disponivel
+
+Evolucao herdada para API:
+- a mesma familia semantica passou a apoiar tambem o dominio de API quando existir `focusedApiContext`
+- nesse caminho, a classificacao nao responde o usuario; ela apenas ajuda o classificador central a decidir se a mensagem continua no contexto factual de API ou se voltou para um fluxo generico/comercial
+- isso reduz o risco de o contexto de API sequestrar mensagens que na verdade ja mudaram de assunto
+
+## Ajuste de Linguagem Pos-Lista
+
+Foi removida a dependencia de copy que exigia a palavra `"mais"` apos envio de lista de produtos no WhatsApp.
+
+Arquivos principais:
+- `C:\Projetos\infrastudio\lib\chat-mercado-livre.ts`
+- `C:\Projetos\infrastudio\lib\chat-service.ts`
+
+Mudanca:
+- as respostas de vitrine/listagem passaram a convidar continuidade livre da conversa
+- exemplos de nova direcao:
+  - "Me diga se gostou de algum..."
+  - "Se gostar desse estilo..."
+  - "Posso te mostrar outras opcoes parecidas..."
+
+Objetivo pratico:
+- nao ensinar o usuario a depender de uma palavra gatilho
+- deixar a `semantic_intent_stage` assumir mais da interpretacao
+- reduzir loops causados por heuristica presa a frase esperada
+
+## Reducao de Peso da Heuristica de Catalogo
+
+Foi feita mais uma rodada para empurrar a heuristica de catalogo para um papel mais secundario.
+
+Mudancas:
+- `C:\Projetos\infrastudio\lib\catalog-follow-up.ts`
+  - deixou de usar sinais amplos de compra/detalhe como motor de referencia de catalogo
+  - removeu boost heuristico que prendia a interpretacao ao produto atual apenas por linguagem comercial generica
+
+Impacto esperado:
+- menos chance de o fallback heuristico "adivinhar" intencao do usuario
+- mais espaco para a `semantic_intent_stage` decidir pelo contexto
+- fallback local mais tecnico e contido, em vez de motor principal de conversa
+
+Laboratorio:
+- `C:\Projetos\infrastudio\tests\chat-intelligence.domain-regression.ts`
+- `C:\Projetos\infrastudio\tests\chat-intelligence.scenarios.ts`
+
+Nova observacao:
+- os runners passaram a olhar tambem o pipeline semantico integrado em catalogo, e nao apenas helpers heuristicos isolados
+
+## Reducao de Busca Automatizada Solta
+
+Foi feita uma rodada para reduzir disparos de busca automatica baseados em memoria textual do proprio assistente.
+
+Arquivos:
+- `C:\Projetos\infrastudio\lib\chat-sales-heuristics.ts`
+
+Mudanca:
+- `shouldContinueProductSearch(...)` deixou de depender de frases anteriores do assistente como indicio de continuidade
+- `shouldUseMercadoLivreConnectorFallback(...)` deixou de disparar fallback solto apenas porque a frase tinha cara vaga de produto
+
+Regra nova:
+- esses dois caminhos agora exigem contexto real de busca anterior (`catalogo.ultimaBusca`) para continuar automaticamente
+
+Objetivo pratico:
+- evitar repeticao
+- evitar busca nova em mensagens curtas como "gostei desse"
+- reduzir a sensacao de fluxo apressado e engessado
+
+## Fortalecimento da Fala Comercial do Produto
+
+Foi feita uma rodada para o agente vender melhor quando o produto entra em foco, principalmente no Mercado Livre.
+
+Arquivo principal:
+- `C:\Projetos\infrastudio\lib\chat-mercado-livre.ts`
+
+Mudanca:
+- a resposta comercial passou a usar melhor a `descricao` detalhada do anuncio
+- a fala agora mistura:
+  - preco
+  - pontos fortes do anuncio
+  - resumo curto do descritivo
+  - convite natural para seguir no papo de venda
+
+Objetivo pratico:
+- evitar resposta seca demais
+- melhorar conducao comercial
+- aproveitar melhor o contexto detalhado ja disponivel do anuncio
+
+Refino adicional:
+- quando o fluxo estiver em produto unico ou produto em foco e o cliente demonstrar interesse, a resposta deve priorizar conversa comercial sobre esse item
+- nesse caso, o agente nao deve apenas relistar ou reapresentar o mesmo produto; ele deve usar o descritivo detalhado para vender melhor e sondar o cliente
+- o modo "produto em foco" tambem passou a valer quando o proprio pipeline semantico ja decidiu que o item atual e a continuidade correta da conversa
+- os runners de laboratorio passaram a observar explicitamente se o produto em foco virou conversa consultiva, com:
+  - uso do descritivo
+  - pergunta de sondagem
+  - bloqueio de relistagem
 
 Objetivo pratico:
 - reduzir dependencia de listas fixas de frases

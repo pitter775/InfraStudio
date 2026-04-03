@@ -161,7 +161,7 @@ export function buildAgentScopedRecoveryReply(input: {
   if (isWhatsAppChannel(input.context)) {
     const baseReply = [
       `Sigo por aqui no contexto de ${input.agent?.nome ?? "atendimento"}.`,
-      `Me diga o ponto exato que voce quer validar em ${objective}: risco, valor, status, documentos ou detalhes.`,
+      `Me diga o ponto exato que voce quer validar em ${objective}: valor, detalhes, documentos ou o que mais pesa na sua decisao.`,
     ].join("\n\n");
 
     const apiReply = /codigo|status|consulta|buscar|verifica|api|integr/i.test(normalizeText(input.message))
@@ -180,7 +180,7 @@ export function buildAgentScopedRecoveryReply(input: {
   const baseReply = isInfraStudioFirstPartyContext(input.context)
     ? [
         `Sigo por aqui no contexto de ${input.agent?.nome ?? "atendimento"}.`,
-        `Me diga o ponto exato que voce quer validar em ${objective}: risco, valor, status, documentos ou detalhes.`,
+        `Me diga o ponto exato que voce quer validar em ${objective}: valor, detalhes, documentos ou o que mais pesa na sua decisao.`,
       ].join("\n\n")
     : mercadoLivreFallbackReply;
 

@@ -269,10 +269,11 @@ function splitCatalogReplyForWhatsApp(reply: string, hasAssets: boolean) {
   }
 
   const followUpPatterns = [
-    /Se quiser ver outras sem repetir estas, me responda "mais"\.?/i,
-    /Se quiser ver outras opcoes parecidas, me responda "mais"\.?/i,
-    /Se quiser ver mais opcoes, me responda "mais"\.?/i,
-    /Se quiser, eu tambem posso buscar outras opcoes parecidas\. No WhatsApp, basta responder "mais"\.?/i,
+    /Me diga se gostou de algum ou se quer que eu traga mais opcoes parecidas\.?/i,
+    /Me diga se gostou de algum ou se quer que eu traga mais opcoes nesse estilo\.?/i,
+    /Se gostar desse estilo, eu posso te mostrar outras opcoes parecidas tambem\.?/i,
+    /Se gostar desse estilo, eu posso te trazer outras opcoes parecidas tambem\.?/i,
+    /Se quiser, eu tambem posso buscar outras opcoes parecidas ou seguir com este item por aqui\.?/i,
   ];
 
   const matchedPattern = followUpPatterns.find((pattern) => pattern.test(normalizedReply));
@@ -343,7 +344,24 @@ function stripAssistantMetaReply(reply: string, channelKind: ChatChannelKind) {
   return channelKind === "whatsapp" ? formatWhatsAppOutboundTextSafe(sanitized) : sanitized;
 }
 
-function buildWhatsAppMessageSequence(
+export function sanitizeWhatsAppCustomerFacingReply(reply: string) {
+  let sanitized = String(reply || "");
+
+  const promisePatterns = [
+    /\b(?:deixa|deixe)\s+eu\s+(?:ver|verificar|consultar|olhar)\b[^.!?\n]*[.!?]?/gi,
+    /\b(?:eu\s+)?vou\s+(?:ver|verificar|consultar|olhar)\b[^.!?\n]*[.!?]?/gi,
+    /\b(?:eu\s+)?ja\s+(?:vejo|verifico|consulto|olho)\b[^.!?\n]*[.!?]?/gi,
+    /\b(?:posso|consigo)\s+(?:ver|verificar|consultar|olhar)\s+(?:o\s+)?status\b[^.!?\n]*[.!?]?/gi,
+  ];
+
+  for (const pattern of promisePatterns) {
+    sanitized = sanitized.replace(pattern, " ");
+  }
+
+  return sanitized.replace(/\s{2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+export function buildWhatsAppMessageSequence(
   reply: string,
   assets: unknown,
   followUpReply?: string | null,
@@ -352,44 +370,6 @@ function buildWhatsAppMessageSequence(
   const intro = formatWhatsAppOutboundTextSafe(reply);
   if (intro) {
     messages.push(intro);
-  }
-
-  if (Array.isArray(assets)) {
-    for (const asset of assets.slice(0, 3)) {
-      if (!asset || typeof asset !== "object" || Array.isArray(asset)) {
-        continue;
-      }
-
-      const targetUrl = "targetUrl" in asset ? String((asset as { targetUrl?: string | null }).targetUrl || "").trim() : "";
-      const whatsappText = "whatsappText" in asset ? String((asset as { whatsappText?: string | null }).whatsappText || "").trim() : "";
-      const descricao = "descricao" in asset ? String((asset as { descricao?: string | null }).descricao || "").trim() : "";
-      const supportText = whatsappText || descricao;
-
-      if (!targetUrl && !supportText) {
-        continue;
-      }
-
-      const parts = [];
-      if (targetUrl) {
-        parts.push(targetUrl);
-      }
-      if (supportText) {
-        if (parts.length) {
-          parts.push("");
-        }
-        parts.push(supportText);
-      }
-
-      const message = formatWhatsAppOutboundTextSafe(parts.join("\n").trim());
-      if (message) {
-        messages.push(message);
-      }
-    }
-  }
-
-  const followUp = formatWhatsAppOutboundTextSafe(String(followUpReply || ""));
-  if (followUp) {
-    messages.push(followUp);
   }
 
   return messages;
@@ -1372,9 +1352,13 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
   const splitReply =
     channelKind === "whatsapp" ? splitCatalogReplyForWhatsApp(ai.reply, Array.isArray(ai.assets) && ai.assets.length > 0) : null;
   const primaryReplyRaw = splitReply?.mainReply || ai.reply;
-  const followUpReplyRaw = splitReply?.followUpReply || "";
-  const primaryReply = stripAssistantMetaReply(primaryReplyRaw, channelKind);
-  const followUpReply = stripAssistantMetaReply(followUpReplyRaw, channelKind);
+  const followUpReplyRaw = channelKind === "whatsapp" ? "" : splitReply?.followUpReply || "";
+  const primaryReplyBase = stripAssistantMetaReply(primaryReplyRaw, channelKind);
+  const followUpReplyBase = stripAssistantMetaReply(followUpReplyRaw, channelKind);
+  const primaryReply =
+    channelKind === "whatsapp" ? sanitizeWhatsAppCustomerFacingReply(primaryReplyBase) : primaryReplyBase;
+  const followUpReply =
+    channelKind === "whatsapp" ? sanitizeWhatsAppCustomerFacingReply(followUpReplyBase) : followUpReplyBase;
 
   const assistantMessage = await appendMessage({
     chatId: chat.id,
@@ -1396,7 +1380,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     throw new Error("O modelo respondeu, mas nao foi possivel salvar a resposta no banco.");
   }
 
-  if (followUpReply) {
+  if (followUpReply && channelKind !== "whatsapp") {
     await appendMessage({
       chatId: chat.id,
       role: "assistant",
@@ -1556,9 +1540,9 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
   return {
     chatId: chat.id,
     reply: assistantMessage.conteudo ?? primaryReply,
-    followUpReply,
-    messageSequence: channelKind === "whatsapp" ? buildWhatsAppMessageSequence(primaryReply, ai.assets ?? [], followUpReply) : [],
-    assets: ai.assets ?? [],
+    followUpReply: channelKind === "whatsapp" ? "" : followUpReply,
+    messageSequence: channelKind === "whatsapp" ? buildWhatsAppMessageSequence(primaryReply, [], null) : [],
+    assets: channelKind === "whatsapp" ? [] : ai.assets ?? [],
     whatsapp,
   };
 }

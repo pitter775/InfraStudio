@@ -6,6 +6,7 @@ import {
 } from "@/lib/catalog-follow-up";
 import type { CatalogFollowUpDecision } from "@/lib/catalog-follow-up";
 import { buildApiFallbackReply, buildFocusedApiContext } from "@/lib/chat-api-runtime";
+import { buildCatalogDecisionFromSemanticIntent } from "@/lib/chat-semantic-intent-stage";
 import {
   appendOptionalHumanOffer,
   buildHumanHandoffReply,
@@ -18,7 +19,8 @@ import {
   isLikelyLeadNameReply,
 } from "@/lib/chat-lead-stage";
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
-import { resolveMercadoLivreFlowState } from "@/lib/chat-mercado-livre";
+import { resolveMercadoLivreFlowState, resolveMercadoLivreHeuristicState } from "@/lib/chat-mercado-livre";
+import { shouldContinueProductSearch, shouldUseMercadoLivreConnectorFallback } from "@/lib/chat-sales-heuristics";
 import {
   createFixtureSearchDeps,
   loadApiRuntimeErrorFixture,
@@ -77,6 +79,25 @@ function runCatalogRegression(): DomainReport[] {
     report("catalog", "atributo compartilhado volta ambiguo", [
       `decision=${colorDecision?.kind ?? "null"}`,
       `matched=${colorDecision?.matchedProducts.length ?? 0}`,
+    ]),
+  );
+
+  const semanticDecision = buildCatalogDecisionFromSemanticIntent({
+    semanticIntent: {
+      intent: "product_question",
+      confidence: 0.92,
+      reason: "pergunta sobre o produto atual em foco",
+      usedLlm: true,
+    },
+    context: catalogContext,
+    recentProducts: catalogContext.catalogo?.ultimosProdutos ?? [],
+  });
+  assert.equal(semanticDecision?.kind, "recent_product_reference");
+  reports.push(
+    report("catalog", "pipeline semantico leva pergunta ao produto em foco", [
+      `decision=${semanticDecision?.kind ?? "null"}`,
+      `usedLlm=${String(semanticDecision?.usedLlm ?? false)}`,
+      `matched=${semanticDecision?.matchedProducts.map((item) => item.nome).join(" | ") || "none"}`,
     ]),
   );
 
@@ -190,6 +211,93 @@ function runMercadoLivreRegression(): DomainReport[] {
     ]),
   );
 
+  const noStickySearch = shouldContinueProductSearch(
+    [
+      { role: "assistant", content: "Encontrei algumas opcoes parecidas na loja logo abaixo." },
+      { role: "user", content: "gostei desse" },
+    ],
+    "gostei desse",
+    { ...catalogContext, catalogo: { ...catalogContext.catalogo!, ultimaBusca: "" } },
+    {
+      normalizeText: normalizeFixtureText,
+      isGreetingOrAckMessage: () => false,
+      shouldSearchProducts: () => false,
+      buildProductSearchCandidates: deps.buildProductSearchCandidates,
+    },
+  );
+  assert.equal(noStickySearch, false);
+  reports.push(
+    report("mercado_livre", "continuidade curta sem ultima busca nao vira busca automatica", [
+      `continueSearch=${noStickySearch}`,
+    ]),
+  );
+
+  const noLooseFallback = shouldUseMercadoLivreConnectorFallback(
+    [{ role: "user", content: "gostei desse" }],
+    "gostei desse",
+    { ...catalogContext, catalogo: { ...catalogContext.catalogo!, ultimaBusca: "" } },
+    {
+      normalizeText: normalizeFixtureText,
+      isGreetingOrAckMessage: () => false,
+      buildProductSearchCandidates: deps.buildProductSearchCandidates,
+      shouldSearchProducts: () => false,
+      isLikelyLeadNameReply: () => false,
+      extractName: () => null,
+    },
+  );
+  assert.equal(noLooseFallback, false);
+  reports.push(
+    report("mercado_livre", "fallback solto do conector nao dispara sem contexto real de busca", [
+      `connectorFallback=${noLooseFallback}`,
+    ]),
+  );
+
+  return reports;
+}
+
+async function runMercadoLivreCommercialRegression(): Promise<DomainReport[]> {
+  const reports: DomainReport[] = [];
+
+  const state = await resolveMercadoLivreHeuristicState({
+    agentId: "agent-1",
+    latestUserMessage: "acho que combina comigo",
+    context: catalogContext,
+    hasMercadoLivreConnector: true,
+    leadNameReplyDetected: false,
+    hasReferencedCatalogReply: true,
+    productSearchRequested: false,
+    genericMercadoLivreListingRequested: false,
+    mercadoLivreListingProducts: [],
+    mercadoLivreProducts: [],
+    resolvedProductSearchTerm: "",
+    productSearchTerm: "",
+    loadMoreCatalogRequested: false,
+    referencedCatalogProducts: [catalogContext.catalogo!.ultimosProdutos![1]!],
+    currentCatalogProduct: catalogContext.catalogo!.ultimosProdutos![1]!,
+    catalogFollowUpDecision: {
+      kind: "recent_product_reference",
+      confidence: 0.94,
+      reason: "pipeline semantico manteve produto em foco",
+      matchedProducts: [catalogContext.catalogo!.ultimosProdutos![1]!],
+      usedLlm: true,
+      shouldBlockNewSearch: true,
+    },
+    lojaCta: null,
+    deps: {
+      normalizeText: normalizeFixtureText,
+      isWhatsAppChannel: () => true,
+    },
+  });
+
+  assert.ok(state.selectedProductSalesReply);
+  reports.push(
+    report("mercado_livre", "produto em foco continua em fala consultiva", [
+      `hasSalesReply=${state.selectedProductSalesReply ? "yes" : "no"}`,
+      `hasFocusProduct=${state.salesFocusProduct ? "yes" : "no"}`,
+      `replyHasProbe=${/o que mais pesa para voce/i.test(state.selectedProductSalesReply ?? "") ? "yes" : "no"}`,
+    ]),
+  );
+
   return reports;
 }
 
@@ -293,6 +401,7 @@ async function main() {
     ...runCatalogRegression(),
     ...runApiRegression(),
     ...runMercadoLivreRegression(),
+    ...(await runMercadoLivreCommercialRegression()),
     ...runLeadRegression(),
     ...(await runHandoffRegression()),
   ];

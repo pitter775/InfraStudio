@@ -111,6 +111,52 @@ function formatMercadoLivreCondition(value: string | null | undefined, deps: Mer
   return value?.trim() || null;
 }
 
+function compactMercadoLivreDescription(value: string | null | undefined, maxLength = 220) {
+  const compact = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!compact) return null;
+  if (compact.length <= maxLength) return compact;
+
+  return `${compact.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
+}
+
+function buildMercadoLivreSalesClose(
+  produto: ProdutoDetalhadoMercadoLivre,
+  cta: string | null | undefined,
+  fallback: string,
+) {
+  if (cta?.trim()) {
+    return cta.trim();
+  }
+
+  const productName = produto.nome?.trim() || "esse item";
+  return `${fallback} Se fizer sentido para voce, eu sigo com voce nesse ${productName} e te ajudo a decidir se vale fechar agora ou comparar com outro parecido. O que mais pesa para voce nesse item: garantia, frete, estado ou preco?`;
+}
+
+function buildSyntheticMercadoLivreProductDetails(product: CatalogProductReference | null | undefined) {
+  if (!product?.nome) {
+    return null;
+  }
+
+  return {
+    id: product.id ?? product.link ?? product.nome,
+    nome: product.nome,
+    preco: typeof product.preco === "number" && Number.isFinite(product.preco) ? product.preco : 0,
+    imagem: product.imagem ?? "",
+    link: product.link ?? "",
+    publicadoEm: null,
+    descricao: product.descricao ?? "",
+    condicao: null,
+    garantia: null,
+    estoque: null,
+    vendidos: null,
+    aceitaMercadoPago: null,
+    freteGratis: null,
+    sellerId: null,
+    pertenceALoja: true,
+    atributos: [],
+  } satisfies ProdutoDetalhadoMercadoLivre;
+}
+
 export function getCatalogProductRefForDetails(product: CatalogProductReference | null | undefined) {
   if (!product) return null;
   if (typeof product.id === "string" && /^MLB\d+$/i.test(product.id.trim())) return product.id.trim();
@@ -127,12 +173,12 @@ export function buildMercadoLivreListingReply(produtos: ProdutoPadronizado[], co
 
   if (produtos.length === 1) {
     return deps.isWhatsAppChannel(context)
-      ? 'Separei um produto da loja para voce logo abaixo. Se quiser ver mais opcoes, me responda "mais".'
+      ? "Separei um produto da loja para voce logo abaixo. Se gostar desse estilo, eu posso te mostrar outras opcoes parecidas tambem."
       : "Separei um produto da loja logo abaixo. Se quiser, eu tambem posso buscar um modelo especifico.";
   }
 
   return deps.isWhatsAppChannel(context)
-    ? 'Separei alguns produtos da loja para voce logo abaixo. Se quiser ver mais opcoes, me responda "mais".'
+    ? "Separei alguns produtos da loja para voce logo abaixo. Me diga se gostou de algum ou se quer que eu traga mais opcoes parecidas."
     : "Separei alguns produtos da loja logo abaixo. Se quiser, eu tambem posso buscar um modelo especifico.";
 }
 
@@ -190,6 +236,7 @@ export function buildMercadoLivreSalesReply(
   deps: MercadoLivreDeps,
 ) {
   const normalized = deps.normalizeText(latestUserMessage);
+  const compactDescription = compactMercadoLivreDescription(produto.descricao, 260);
   const storeOwnershipNote =
     produto.pertenceALoja === false
       ? "Vi que esse link e de um anuncio fora da loja conectada aqui."
@@ -198,8 +245,8 @@ export function buildMercadoLivreSalesReply(
   if (/\bgarantia\b/.test(normalized)) {
     const garantia = produto.garantia?.trim() || "Nao encontrei garantia informada no anuncio";
     const baseReply = deps.isWhatsAppChannel(context)
-      ? `${produto.nome}: ${garantia}.\n\nSe quiser, eu tambem posso te dizer condicao, estoque e frete para voce decidir melhor.`
-      : `**${produto.nome}**: ${garantia}.\n\nSe quiser, eu tambem posso te dizer **condicao, estoque e frete** para voce decidir melhor.`;
+      ? `${produto.nome}: ${garantia}.\n\n${compactDescription ? `No anuncio ele aparece assim: ${compactDescription}\n\n` : ""}Se quiser, eu tambem posso te dizer condicao, estoque e frete para voce decidir melhor.`
+      : `**${produto.nome}**: ${garantia}.\n\n${compactDescription ? `No anuncio ele aparece assim: ${compactDescription}\n\n` : ""}Se quiser, eu tambem posso te dizer **condicao, estoque e frete** para voce decidir melhor.`;
     return [storeOwnershipNote, baseReply].filter(Boolean).join("\n\n");
   }
 
@@ -210,7 +257,14 @@ export function buildMercadoLivreSalesReply(
           ? "O anuncio indica frete gratis."
           : "O anuncio nao indica frete gratis."
         : "Nao encontrei frete detalhado no anuncio.";
-    return [storeOwnershipNote, frete, cta?.trim() || "Se quiser, eu sigo com voce e vejo se vale a pena fechar este item ou comparar com outro parecido."].filter(Boolean).join("\n\n");
+    return [
+      storeOwnershipNote,
+      frete,
+      compactDescription ? `Resumo do anuncio: ${compactDescription}` : null,
+      buildMercadoLivreSalesClose(produto, cta, "Se quiser, eu sigo com voce e vejo se vale a pena fechar este item"),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
   }
 
   if (/\bestoque\b|\bdisponivel\b/.test(normalized)) {
@@ -218,7 +272,14 @@ export function buildMercadoLivreSalesReply(
       typeof produto.estoque === "number"
         ? `No anuncio aparecem ${produto.estoque} unidade(s) disponivel(is).`
         : "Nao encontrei estoque detalhado no anuncio.";
-    return [storeOwnershipNote, estoque, cta?.trim() || "Se quiser, eu sigo com voce e te ajudo a decidir se vale fechar este item agora."].filter(Boolean).join("\n\n");
+    return [
+      storeOwnershipNote,
+      estoque,
+      compactDescription ? `Resumo do anuncio: ${compactDescription}` : null,
+      buildMercadoLivreSalesClose(produto, cta, "Se quiser, eu sigo com voce e te ajudo a decidir se vale fechar este item"),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
   }
 
   if (/\bmaterial\b|\bmedida\b|\bmedidas\b|\btamanho\b|\bcapacidade\b|\bcor\b/.test(normalized)) {
@@ -227,11 +288,24 @@ export function buildMercadoLivreSalesReply(
     );
     if (matchingAttributes.length) {
       const summary = matchingAttributes.slice(0, 3).map((item) => `${item.nome}: ${item.valor}`).join(" | ");
-      return [storeOwnershipNote, `Encontrei estes detalhes no anuncio: ${summary}.`, cta?.trim() || "Se quiser, eu tambem posso te falar de garantia, estoque e frete antes de voce decidir."].filter(Boolean).join("\n\n");
+      return [
+        storeOwnershipNote,
+        `Encontrei estes detalhes no anuncio: ${summary}.`,
+        compactDescription ? `Descricao resumida: ${compactDescription}` : null,
+        buildMercadoLivreSalesClose(produto, cta, "Se quiser, eu tambem posso te falar de garantia, estoque e frete antes de voce decidir"),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
     }
 
     if (produto.descricao) {
-      return [storeOwnershipNote, `Na descricao do anuncio encontrei isto que ajuda na sua duvida: ${produto.descricao}`, cta?.trim() || "Se quiser, eu tambem posso te resumir garantia, estoque e frete deste item."].filter(Boolean).join("\n\n");
+      return [
+        storeOwnershipNote,
+        `Na descricao do anuncio encontrei isto que ajuda na sua duvida: ${compactDescription ?? produto.descricao}`,
+        buildMercadoLivreSalesClose(produto, cta, "Se quiser, eu tambem posso te resumir garantia, estoque e frete deste item"),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
     }
   }
 
@@ -248,10 +322,14 @@ export function buildMercadoLivreSalesReply(
     : `**Boa escolha.** ${produto.nome} esta por **R$ ${produto.preco.toLocaleString("pt-BR")}**.`;
   const sellingPoint = highlights.length
     ? `Pelo anuncio, os pontos que mais ajudam na decisao sao: ${highlights.join(" | ")}.`
-    : produto.descricao
-    ? produto.descricao
+    : compactDescription
+    ? `No anuncio ele aparece assim: ${compactDescription}`
     : "Posso te detalhar melhor esse item e te ajudar a decidir com mais seguranca.";
-  const close = cta?.trim() ? cta.trim() : "Se fizer sentido para voce, me diga se quer seguir com este item ou comparar com outra opcao parecida.";
+  const close = buildMercadoLivreSalesClose(
+    produto,
+    cta,
+    "Se fizer sentido para voce, eu posso seguir com voce nesse item agora",
+  );
 
   return [storeOwnershipNote, leadIn, sellingPoint, close].filter(Boolean).join("\n\n");
 }
@@ -313,11 +391,11 @@ export function buildMercadoLivreReply(produtos: ProdutoPadronizado[], context: 
   if (!produtos.length) return null;
   if (produtos.length === 1) {
     return deps.isWhatsAppChannel(context)
-      ? 'Encontrei um produto da loja para voce logo abaixo. Se quiser ver outras opcoes parecidas, me responda "mais".'
+      ? "Encontrei um produto da loja para voce logo abaixo. Se gostar desse estilo, eu posso te trazer outras opcoes parecidas tambem."
       : "Encontrei um produto da loja logo abaixo. Se quiser, eu posso buscar outras opcoes parecidas.";
   }
   return deps.isWhatsAppChannel(context)
-    ? 'Encontrei algumas opcoes parecidas na loja logo abaixo. Se quiser ver outras sem repetir estas, me responda "mais".'
+    ? "Encontrei algumas opcoes parecidas na loja logo abaixo. Me diga se gostou de algum ou se quer que eu traga mais opcoes nesse estilo."
     : "Encontrei algumas opcoes parecidas na loja logo abaixo. Se quiser, eu posso buscar mais variacoes desse produto.";
 }
 
@@ -339,8 +417,17 @@ export function buildMercadoLivreSingleResultReply(
     ? `Encontrei um produto que combina com a sua busca: ${produto.nome}. Ele esta por R$ ${produto.preco.toLocaleString("pt-BR")}.`
     : `Encontrei um produto que combina com a busca: **${produto.nome}** por **R$ ${produto.preco.toLocaleString("pt-BR")}**.`;
 
-  const details = highlights.length ? `Resumo rapido: ${highlights.join(" | ")}.` : produto.descricao ? produto.descricao : "Posso te explicar melhor os detalhes desse item se voce quiser.";
-  const close = cta?.trim() ? cta.trim() : 'Se quiser, eu tambem posso buscar outras opcoes parecidas. No WhatsApp, basta responder "mais".';
+  const compactDescription = compactMercadoLivreDescription(produto.descricao, 240);
+  const details = highlights.length
+    ? `Resumo rapido: ${highlights.join(" | ")}.${compactDescription ? ` No anuncio ele aparece assim: ${compactDescription}` : ""}`
+    : compactDescription
+    ? `No anuncio ele aparece assim: ${compactDescription}`
+    : "Posso te explicar melhor os detalhes desse item se voce quiser.";
+  const close = buildMercadoLivreSalesClose(
+    produto,
+    cta,
+    "Se quiser, eu tambem posso buscar outras opcoes parecidas ou seguir com este item por aqui",
+  );
   return [intro, details, close].filter(Boolean).join("\n\n");
 }
 
@@ -560,10 +647,9 @@ export async function resolveMercadoLivreHeuristicState(input: {
     !input.productSearchRequested && input.agentId
       ? await obterDetalhesProdutoMercadoLivrePorAgente(input.agentId, input.latestUserMessage)
       : null;
-  const shouldPitchSelectedProduct =
-    Boolean(selectedCatalogProduct || linkedProductDetails) &&
-    (isMercadoLivrePurchaseIntent(input.latestUserMessage, input.deps) ||
-      isMercadoLivreDetailIntent(input.latestUserMessage, input.deps));
+  const purchaseOrDetailIntent =
+    isMercadoLivrePurchaseIntent(input.latestUserMessage, input.deps) ||
+    isMercadoLivreDetailIntent(input.latestUserMessage, input.deps);
   const directSingleProduct =
     input.mercadoLivreProducts.length === 1
       ? {
@@ -582,7 +668,7 @@ export async function resolveMercadoLivreHeuristicState(input: {
     !input.genericMercadoLivreListingRequested &&
     Boolean(input.agentId);
   const selectedCatalogProductDetails =
-    shouldPitchSelectedProduct && input.agentId && getCatalogProductRefForDetails(selectedCatalogProduct)
+    Boolean(selectedCatalogProduct) && input.agentId && getCatalogProductRefForDetails(selectedCatalogProduct)
       ? await obterDetalhesProdutoMercadoLivrePorAgente(
           input.agentId,
           getCatalogProductRefForDetails(selectedCatalogProduct) ?? "",
@@ -595,27 +681,38 @@ export async function resolveMercadoLivreHeuristicState(input: {
           getCatalogProductRefForDetails(directSingleProduct) ?? "",
         )
       : null;
+  const hasAmbiguousReferenceSignal =
+    input.catalogFollowUpDecision?.kind === "recent_product_reference_ambiguous" ||
+    (input.catalogFollowUpDecision?.kind === "recent_product_reference" && input.referencedCatalogProducts.length === 0) ||
+    /\b(esse|essa|isso|a que mandou|o que mandou|a da lista|o da lista|o primeiro|a primeira|o segundo|a segunda|o terceiro|a terceira|mandou|mostrou)\b/.test(
+      input.deps.normalizeText(input.latestUserMessage),
+    );
+  const fallbackFocusProductDetails =
+    buildSyntheticMercadoLivreProductDetails(selectedCatalogProduct) ??
+    buildSyntheticMercadoLivreProductDetails(input.currentCatalogProduct) ??
+    buildSyntheticMercadoLivreProductDetails(directSingleProduct);
+  const focusProductDetails =
+    selectedCatalogProductDetails ?? linkedProductDetails ?? directSingleProductDetails ?? fallbackFocusProductDetails;
+  const productAlreadyInFocus =
+    input.catalogFollowUpDecision?.kind === "recent_product_reference" ||
+    (Boolean(input.currentCatalogProduct) && !input.productSearchRequested && !input.genericMercadoLivreListingRequested);
+  const shouldPitchSelectedProduct = Boolean(focusProductDetails) && !hasAmbiguousReferenceSignal && (purchaseOrDetailIntent || productAlreadyInFocus);
   const selectedProductSalesReply =
-    (selectedCatalogProductDetails ?? linkedProductDetails) && shouldPitchSelectedProduct
+    focusProductDetails && shouldPitchSelectedProduct
       ? buildMercadoLivreSalesReply(
-          selectedCatalogProductDetails ?? linkedProductDetails!,
+          focusProductDetails,
           input.latestUserMessage,
           input.context,
           input.lojaCta,
           input.deps,
         )
       : null;
-  const salesFocusProduct = selectedCatalogProductDetails ?? linkedProductDetails;
+  const salesFocusProduct = shouldPitchSelectedProduct ? focusProductDetails : selectedCatalogProductDetails ?? linkedProductDetails;
   const ambiguousCatalogReferenceReply =
     input.hasMercadoLivreConnector &&
     !input.leadNameReplyDetected &&
     !input.hasReferencedCatalogReply &&
-    (input.catalogFollowUpDecision?.kind === "recent_product_reference_ambiguous" ||
-      (input.catalogFollowUpDecision?.kind === "recent_product_reference" &&
-        input.referencedCatalogProducts.length === 0) ||
-      /\b(esse|essa|isso|a que mandou|o que mandou|a da lista|o da lista|o primeiro|a primeira|o segundo|a segunda|o terceiro|a terceira|mandou|mostrou)\b/.test(
-        input.deps.normalizeText(input.latestUserMessage),
-      ))
+    hasAmbiguousReferenceSignal
       ? buildAmbiguousCatalogReferenceReply(input.context, input.deps)
       : null;
   const mercadoLivreListingReply = input.genericMercadoLivreListingRequested

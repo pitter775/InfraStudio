@@ -253,6 +253,7 @@ export function shouldContinueProductSearch(
     buildProductSearchCandidates: (message: string) => string[];
   },
 ) {
+  void history;
   const normalized = deps.normalizeText(latestUserMessage).trim();
   if (!normalized) {
     return false;
@@ -280,18 +281,7 @@ export function shouldContinueProductSearch(
     return false;
   }
 
-  const previousMessages = history.slice(-4, -1).map((item) => deps.normalizeText(item.content));
-  const previousHadCatalogIntent = previousMessages.some((item) =>
-    item.includes("na loja") ||
-    item.includes("produto") ||
-    item.includes("opcoes parecidas") ||
-    item.includes("buscar mais opcoes") ||
-    item.includes("outro nome") ||
-    item.includes("modelo parecido") ||
-    item.includes("nao encontrei resultados"),
-  );
-
-  return previousHadCatalogIntent || Boolean(context?.catalogo?.ultimaBusca);
+  return Boolean(context?.catalogo?.ultimaBusca);
 }
 
 export function isMercadoLivreListingIntent(message: string, deps: { normalizeText: (value: string) => string }) {
@@ -404,11 +394,7 @@ export function shouldUseMercadoLivreConnectorFallback(
     return false;
   }
 
-  if (Boolean(context?.catalogo?.ultimaBusca)) {
-    return true;
-  }
-
-  return words.some((word) => word.length >= 3 || /\d/.test(word));
+  return Boolean(context?.catalogo?.ultimaBusca);
 }
 
 export function detectCatalogItems(history: ConversationMessage[], deps: { normalizeText: (value: string) => string }) {

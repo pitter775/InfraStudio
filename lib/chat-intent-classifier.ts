@@ -1,6 +1,7 @@
 import "server-only";
 
 import { API_RUNTIME_FACTUAL_SIGNALS } from "@/lib/chat-api-runtime";
+import type { ApiSemanticIntentStageResult } from "@/lib/chat-semantic-intent-stage";
 import { normalizeText } from "@/lib/chat-text-utils";
 
 export type HeuristicIntentStage =
@@ -80,6 +81,7 @@ export function classifyConversationDomainStage(input: {
   hasMemorySummary?: boolean;
   hasCurrentCatalogContext?: boolean;
   hasLeadContext?: boolean;
+  semanticApiIntentStage?: ApiSemanticIntentStageResult | null;
 }) {
   const normalizedMessage = normalizeText(input.latestUserMessage ?? "");
   const continuationLikeMessage = isContinuationLikeMessage(normalizedMessage);
@@ -105,11 +107,17 @@ export function classifyConversationDomainStage(input: {
     return "lead_qualification" satisfies ConversationDomainStage;
   }
 
+  if (input.hasFocusedApiContext && input.semanticApiIntentStage) {
+    if (input.semanticApiIntentStage.intent !== "generic") {
+      return "api_runtime" satisfies ConversationDomainStage;
+    }
+  }
+
   if (input.hasFocusedApiContext && apiLikeMessage) {
     return "api_runtime" satisfies ConversationDomainStage;
   }
 
-  if (input.hasFocusedApiContext) {
+  if (input.hasFocusedApiContext && !input.semanticApiIntentStage) {
     return "api_runtime" satisfies ConversationDomainStage;
   }
 

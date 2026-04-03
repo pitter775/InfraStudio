@@ -270,7 +270,6 @@ function hasCatalogReferenceSignal(message: string, context: ConversationContext
   if (!normalized || !hasRecentCatalogSnapshot(context)) return false;
 
   if (isRecentCatalogReferenceAttempt(message, context)) return true;
-  if (deps.isMercadoLivrePurchaseIntent(message) || deps.isMercadoLivreDetailIntent(message)) return true;
 
   return [
     /\b(mandou|manda|mostrou|mostra|passou|enviou|esse da lista|esse da loja|esse anuncio|essa opcao)\b/,
@@ -334,12 +333,6 @@ function scoreRecentCatalogProductReference(
     if (productColors.includes(color)) {
       score += 4;
     }
-  }
-
-  if ((deps.isMercadoLivrePurchaseIntent(message) || deps.isMercadoLivreDetailIntent(message)) && context?.catalogo?.produtoAtual) {
-    const currentRef = getCatalogProductRefForDetails(context.catalogo.produtoAtual);
-    const productRef = getCatalogProductRefForDetails(product);
-    if (currentRef && productRef && currentRef === productRef) score += 6;
   }
 
   if (hasCatalogReferenceSignal(message, context, deps) && !tokens.length && context?.catalogo?.produtoAtual) {

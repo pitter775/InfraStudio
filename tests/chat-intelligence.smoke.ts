@@ -13,10 +13,15 @@ import { resolveConversationDomainSupportState } from "@/lib/chat-domain-stage";
 import { classifyConversationDomainStage, classifyHeuristicIntentStage, classifyOrchestratorRouteStage } from "@/lib/chat-intent-classifier";
 import { buildOpenAiStageRequestPayload } from "@/lib/chat-openai-stage";
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
+import { buildWhatsAppMessageSequence, sanitizeWhatsAppCustomerFacingReply } from "@/lib/chat-service";
 import { buildCatalogDecisionFromSemanticIntent } from "@/lib/chat-semantic-intent-stage";
 import { shouldRefreshSummary } from "@/lib/chat-summary-stage";
 import { buildChatUsageOrigin, buildChatUsageTelemetry, describeChatUsageOrigin, readChatUsageTelemetry } from "@/lib/chat-usage-metrics";
 import {
+  buildMercadoLivreSalesReply,
+  buildMercadoLivreListingReply,
+  buildMercadoLivreReply,
+  buildMercadoLivreSingleResultReply,
   resolveMercadoLivreFlowState,
   resolveMercadoLivreHeuristicReply,
   resolveMercadoLivreHeuristicState,
@@ -40,6 +45,36 @@ const mercadoLivreFixture = loadMercadoLivreFixture();
 const apiRuntimeFixture = loadApiRuntimeFixture();
 
 const tests: TestCase[] = [
+  {
+    name: "whatsapp colapsa sequencia em uma unica mensagem textual",
+    run: () => {
+      const sequence = buildWhatsAppMessageSequence(
+        "Encontrei algumas opcoes para voce.",
+        [
+          {
+            targetUrl: "https://example.com/produto",
+            descricao: "Detalhe do produto",
+            whatsappText: "Texto extra",
+          },
+        ],
+        "Me diga se gostou de algum.",
+      );
+
+      assert.equal(sequence.length, 1);
+      assert.equal(sequence[0], "Encontrei algumas opcoes para voce.");
+    },
+  },
+  {
+    name: "whatsapp remove promessas de verificar status da resposta ao cliente",
+    run: () => {
+      const sanitized = sanitizeWhatsAppCustomerFacingReply(
+        "Vou verificar o status para voce. Esse produto tem bom acabamento e pode combinar com o que voce procura.",
+      );
+
+      assert.doesNotMatch(sanitized, /vou verificar|status/i);
+      assert.match(sanitized, /bom acabamento/i);
+    },
+  },
   {
     name: "follow-up escolhe a sopeira ja mostrada",
     run: () => {
@@ -175,6 +210,112 @@ const tests: TestCase[] = [
       assert.equal(mercadoLivreFixture.detailedProducts[0]?.garantia, "90 dias");
       assert.equal(apiRuntimeFixture.apis.length, 2);
       assert.equal(apiRuntimeFixture.apis[0]?.campos[1]?.valor, "disponivel");
+    },
+  },
+  {
+    name: "copy de listagem mercado livre no whatsapp nao exige a palavra mais",
+    run: () => {
+      const reply = buildMercadoLivreReply(mercadoLivreFixture.listingProducts, recentCatalogContext, {
+        normalizeText: normalizeFixtureText,
+        isWhatsAppChannel: () => true,
+      });
+
+      assert.ok(reply);
+      assert.doesNotMatch(reply ?? "", /me responda "mais"|basta responder "mais"/i);
+      assert.match(reply ?? "", /me diga se gostou de algum|traga mais opcoes/i);
+    },
+  },
+  {
+    name: "copy de vitrine unica no whatsapp convida continuidade livre",
+    run: () => {
+      const reply = buildMercadoLivreListingReply([mercadoLivreFixture.listingProducts[0]!], recentCatalogContext, {
+        normalizeText: normalizeFixtureText,
+        isWhatsAppChannel: () => true,
+      });
+
+      assert.ok(reply);
+      assert.doesNotMatch(reply ?? "", /me responda "mais"|basta responder "mais"/i);
+      assert.match(reply ?? "", /se gostar desse estilo/i);
+    },
+  },
+  {
+    name: "copy de resultado unico nao prende o usuario a palavra gatilho",
+    run: () => {
+      const reply = buildMercadoLivreSingleResultReply(mercadoLivreFixture.detailedProducts[0]!, recentCatalogContext, null, {
+        normalizeText: normalizeFixtureText,
+        isWhatsAppChannel: () => true,
+      });
+
+      assert.doesNotMatch(reply, /me responda "mais"|basta responder "mais"/i);
+      assert.match(reply, /ou seguir com este item por aqui/i);
+    },
+  },
+  {
+    name: "resposta comercial usa descricao detalhada e puxa conversa de venda",
+    run: () => {
+      const reply = buildMercadoLivreSingleResultReply(mercadoLivreFixture.detailedProducts[0]!, recentCatalogContext, null, {
+        normalizeText: normalizeFixtureText,
+        isWhatsAppChannel: () => true,
+      });
+
+      assert.match(reply, /No anuncio ele aparece assim:/i);
+      assert.match(reply, /seguir com este item por aqui|vale fechar agora|te ajudo a decidir/i);
+    },
+  },
+  {
+    name: "produto unico com interesse do cliente deve puxar conversa comercial e nao relistar",
+    run: () => {
+      const reply = resolveMercadoLivreHeuristicReply({
+        context: recentCatalogContext,
+        latestUserMessage: "gostei desse produto",
+        agentId: "agent-1",
+        agentName: "Agent",
+        selectedProductSalesReply: buildMercadoLivreSalesReply(
+          mercadoLivreFixture.detailedProducts[0]!,
+          "gostei desse produto",
+          recentCatalogContext,
+          null,
+          {
+            normalizeText: normalizeFixtureText,
+            isWhatsAppChannel: () => true,
+          },
+        ),
+        salesFocusProduct: mercadoLivreFixture.detailedProducts[0]!,
+        selectedCatalogProduct: null,
+        mercadoLivreListingReply: null,
+        mercadoLivreListingProductsForAssets: [],
+        directMercadoLivreReply: null,
+        mercadoLivreProductsForAssets: [],
+        currentProductForMetadata: null,
+        mercadoLivreNoResultsReply: null,
+        formatReply: (reply) => reply,
+        deps: {
+          normalizeText: normalizeFixtureText,
+          isWhatsAppChannel: () => true,
+        },
+      });
+
+      assert.equal(reply?.mode, "mercado_livre_product_sales");
+      assert.doesNotMatch(reply?.reply ?? "", /encontrei um produto da loja/i);
+      assert.match(reply?.reply ?? "", /seguir com voce nesse|te ajudo a decidir|No anuncio ele aparece assim:/i);
+    },
+  },
+  {
+    name: "produto em foco decidido pelo pipeline gera fala comercial consultiva",
+    run: () => {
+      const reply = buildMercadoLivreSalesReply(
+        mercadoLivreFixture.detailedProducts[0]!,
+        "acho que combina comigo",
+        recentCatalogContext,
+        null,
+        {
+          normalizeText: normalizeFixtureText,
+          isWhatsAppChannel: () => true,
+        },
+      );
+
+      assert.match(reply, /o que mais pesa para voce/i);
+      assert.match(reply, /No anuncio ele aparece assim:|Pelo anuncio/i);
     },
   },
   {
@@ -539,6 +680,48 @@ const tests: TestCase[] = [
       });
 
       assert.equal(stage, "api_runtime");
+    },
+  },
+  {
+    name: "classificador de dominio usa semantic api follow-up para manter contexto factual",
+    run: () => {
+      const stage = classifyConversationDomainStage({
+        heuristicIntentStage: "none",
+        hasFocusedApiContext: true,
+        latestUserMessage: "e os riscos?",
+        hasMemorySummary: false,
+        hasCurrentCatalogContext: false,
+        hasLeadContext: false,
+        semanticApiIntentStage: {
+          intent: "api_follow_up",
+          confidence: 0.91,
+          reason: "continuidade curta sobre a mesma consulta estruturada",
+          usedLlm: true,
+        },
+      });
+
+      assert.equal(stage, "api_runtime");
+    },
+  },
+  {
+    name: "classificador de dominio evita sequestrar conversa generica quando semantic api marcar generic",
+    run: () => {
+      const stage = classifyConversationDomainStage({
+        heuristicIntentStage: "none",
+        hasFocusedApiContext: true,
+        latestUserMessage: "quero ver outros produtos",
+        hasMemorySummary: false,
+        hasCurrentCatalogContext: false,
+        hasLeadContext: false,
+        semanticApiIntentStage: {
+          intent: "generic",
+          confidence: 0.88,
+          reason: "mensagem fora do contexto da consulta de API atual",
+          usedLlm: true,
+        },
+      });
+
+      assert.equal(stage, "general_sales");
     },
   },
   {

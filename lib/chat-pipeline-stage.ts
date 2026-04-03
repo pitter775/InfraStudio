@@ -1,6 +1,7 @@
 import "server-only";
 
 import { resolveConversationDomainSupportState, type ConversationDomainSupportState } from "@/lib/chat-domain-stage";
+import type { ApiSemanticIntentStageResult } from "@/lib/chat-semantic-intent-stage";
 import {
   classifyConversationDomainStage,
   classifyHeuristicIntentStage,
@@ -31,6 +32,7 @@ export function resolveConversationPipelineStageState(input: {
   latestUserMessage?: string;
   hasMemorySummary?: boolean;
   hasCurrentCatalogContext?: boolean;
+  semanticApiIntentStage?: ApiSemanticIntentStageResult | null;
 }) {
   const heuristicIntentStage = classifyHeuristicIntentStage({
     leadNameAcknowledgementReply: input.leadNameAcknowledgementReply,
@@ -46,6 +48,7 @@ export function resolveConversationPipelineStageState(input: {
     hasMemorySummary: input.hasMemorySummary,
     hasCurrentCatalogContext: input.hasCurrentCatalogContext,
     hasLeadContext: input.hasLeadContext,
+    semanticApiIntentStage: input.semanticApiIntentStage,
   });
   const orchestratorRouteStage = classifyOrchestratorRouteStage({
     hasValidAgent: input.hasValidAgent,

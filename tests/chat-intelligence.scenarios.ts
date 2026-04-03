@@ -10,7 +10,10 @@ import {
 } from "@/lib/catalog-follow-up";
 import type { ConversationContext } from "@/lib/chat-context";
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
+import { buildCatalogDecisionFromSemanticIntent } from "@/lib/chat-semantic-intent-stage";
+import { shouldContinueProductSearch, shouldUseMercadoLivreConnectorFallback } from "@/lib/chat-sales-heuristics";
 import {
+  buildMercadoLivreReply,
   resolveMercadoLivreFlowState,
   resolveMercadoLivreHeuristicReply,
   resolveMercadoLivreHeuristicState,
@@ -57,6 +60,53 @@ async function analyzeCatalogScenario(title: string, input: string, context: Con
   }
 
   return { category: "catalog", title, input, observations };
+}
+
+async function analyzeSemanticCatalogPipelineScenario(
+  title: string,
+  input: string,
+  context: ConversationContext,
+  semanticIntent: "product_interest" | "product_question" | "product_rejection" | "new_search" | "generic",
+): Promise<ScenarioResult> {
+  const semanticDecision = buildCatalogDecisionFromSemanticIntent({
+    semanticIntent: {
+      intent: semanticIntent,
+      confidence: 0.91,
+      reason: "cenario controlado do pipeline semantico",
+      usedLlm: true,
+    },
+    context,
+    recentProducts: context.catalogo?.ultimosProdutos ?? [],
+  });
+
+  const flow = resolveMercadoLivreFlowState({
+    latestUserMessage: input,
+    context,
+    hasMercadoLivreConnector: true,
+    leadNameReplyDetected: false,
+    recentCatalogProducts: context.catalogo?.ultimosProdutos ?? [],
+    catalogFollowUpDecision: semanticDecision,
+    detectProductSearch: () => true,
+    buildProductSearchCandidates: deps.buildProductSearchCandidates,
+    resolveRecentCatalogProductReference,
+    isRecentCatalogReferenceAttempt: (message) => /\b(esse|essa|mandou|primeiro|segundo)\b/i.test(message),
+    isMercadoLivreListingIntent: (message) => /\b(loja|catalogo|vitrine)\b/i.test(message),
+    shouldUseMercadoLivreConnectorFallback: () => true,
+  });
+
+  return {
+    category: "pipeline",
+    title,
+    input,
+    observations: [
+      `semantic.intent=${semanticIntent}`,
+      `semantic.decision=${semanticDecision?.kind ?? "null"}`,
+      `semantic.used_llm=${semanticDecision?.usedLlm ?? false}`,
+      `flow.product_search=${flow.productSearchRequested}`,
+      `flow.referenced=${flow.referencedCatalogProducts.map((item) => item.nome ?? item.id ?? "sem-nome").join(" | ") || "none"}`,
+      `flow.current_product=${flow.currentCatalogProduct?.nome ?? "none"}`,
+    ],
+  };
 }
 
 async function analyzeMercadoLivreScenario(title: string, input: string, context: ConversationContext, decision: CatalogFollowUpDecision | null): Promise<ScenarioResult> {
@@ -155,6 +205,87 @@ async function analyzeMercadoLivreScenario(title: string, input: string, context
   };
 }
 
+async function analyzeMercadoLivreCommercialScenario(title: string, input: string, context: ConversationContext): Promise<ScenarioResult> {
+  const decision: CatalogFollowUpDecision = {
+    kind: "recent_product_reference",
+    confidence: 0.94,
+    reason: "pipeline semantico manteve o produto atual em foco",
+    matchedProducts: [context.catalogo!.ultimosProdutos![1]!],
+    usedLlm: true,
+    shouldBlockNewSearch: true,
+  };
+
+  const flow = resolveMercadoLivreFlowState({
+    latestUserMessage: input,
+    context,
+    hasMercadoLivreConnector: true,
+    leadNameReplyDetected: false,
+    recentCatalogProducts: context.catalogo?.ultimosProdutos ?? [],
+    catalogFollowUpDecision: decision,
+    detectProductSearch: () => true,
+    buildProductSearchCandidates: deps.buildProductSearchCandidates,
+    resolveRecentCatalogProductReference,
+    isRecentCatalogReferenceAttempt: (message) => /\b(esse|essa|mandou|primeiro|segundo)\b/i.test(message),
+    isMercadoLivreListingIntent: (message) => /\b(loja|catalogo|vitrine)\b/i.test(message),
+    shouldUseMercadoLivreConnectorFallback: () => true,
+  });
+
+  const state = await resolveMercadoLivreHeuristicState({
+    agentId: "agent-1",
+    latestUserMessage: input,
+    context,
+    hasMercadoLivreConnector: true,
+    leadNameReplyDetected: false,
+    hasReferencedCatalogReply: true,
+    productSearchRequested: flow.productSearchRequested,
+    genericMercadoLivreListingRequested: flow.genericMercadoLivreListingRequested,
+    mercadoLivreListingProducts: [],
+    mercadoLivreProducts: [],
+    resolvedProductSearchTerm: flow.productSearchTerm,
+    productSearchTerm: flow.productSearchTerm,
+    loadMoreCatalogRequested: flow.loadMoreCatalogRequested,
+    referencedCatalogProducts: flow.referencedCatalogProducts,
+    currentCatalogProduct: flow.currentCatalogProduct,
+    catalogFollowUpDecision: decision,
+    lojaCta: null,
+    deps: {
+      normalizeText: normalizeFixtureText,
+      isWhatsAppChannel: () => true,
+    },
+  });
+
+  return {
+    category: "mercado_livre",
+    title,
+    input,
+    observations: [
+      `flow.product_search=${flow.productSearchRequested}`,
+      `flow.current_product=${flow.currentCatalogProduct?.nome ?? "none"}`,
+      `sales.reply_present=${state.selectedProductSalesReply ? "yes" : "no"}`,
+      `sales.probe_present=${/o que mais pesa para voce/i.test(state.selectedProductSalesReply ?? "") ? "yes" : "no"}`,
+      `sales.uses_description=${/No anuncio ele aparece assim:|Pelo anuncio/i.test(state.selectedProductSalesReply ?? "") ? "yes" : "no"}`,
+    ],
+  };
+}
+
+async function analyzeMercadoLivreListingCopyScenario(title: string, context: ConversationContext): Promise<ScenarioResult> {
+  const reply = buildMercadoLivreReply(loadCatalogProductsFromContext(context), context, {
+    normalizeText: normalizeFixtureText,
+    isWhatsAppChannel: () => true,
+  });
+
+  return {
+    category: "mercado_livre",
+    title,
+    input: "[listagem enviada]",
+    observations: [
+      `listing.reply=${reply ?? "null"}`,
+      `listing.requires_exact_word=${/me responda "mais"|basta responder "mais"/i.test(reply ?? "") ? "yes" : "no"}`,
+      `listing.invites_free_follow_up=${/me diga se gostou|se gostar desse estilo|traga mais opcoes/i.test(reply ?? "") ? "yes" : "no"}`,
+    ],
+  };
+}
+
 async function analyzePipelineScenario(
   title: string,
   input: string,
@@ -200,6 +331,47 @@ async function analyzePipelineScenario(
   };
 }
 
+async function analyzeSearchFallbackScenario(title: string, input: string, context: ConversationContext): Promise<ScenarioResult> {
+  const continueSearch = shouldContinueProductSearch(
+    [
+      { role: "assistant", content: "Encontrei algumas opcoes parecidas na loja logo abaixo." },
+      { role: "user", content: input },
+    ],
+    input,
+    context,
+    {
+      normalizeText: normalizeFixtureText,
+      isGreetingOrAckMessage: () => false,
+      shouldSearchProducts: () => false,
+      buildProductSearchCandidates: deps.buildProductSearchCandidates,
+    },
+  );
+  const connectorFallback = shouldUseMercadoLivreConnectorFallback(
+    [{ role: "user", content: input }],
+    input,
+    context,
+    {
+      normalizeText: normalizeFixtureText,
+      isGreetingOrAckMessage: () => false,
+      buildProductSearchCandidates: deps.buildProductSearchCandidates,
+      shouldSearchProducts: () => false,
+      isLikelyLeadNameReply: () => false,
+      extractName: () => null,
+    },
+  );
+
+  return {
+    category: "pipeline",
+    title,
+    input,
+    observations: [
+      `search.continue=${continueSearch}`,
+      `search.connector_fallback=${connectorFallback}`,
+      `context.last_search=${context.catalogo?.ultimaBusca || "none"}`,
+    ],
+  };
+}
+
 async function main() {
   const scenarios: ScenarioResult[] = [];
 
@@ -208,6 +380,22 @@ async function main() {
   scenarios.push(await analyzeCatalogScenario("Fora da normalidade: mensagem curta neutra", "oi", baseContext));
   scenarios.push(await analyzeCatalogScenario("Fora da normalidade: ambiguidade por cor", "quero o amarelo", baseContext));
   scenarios.push(await analyzeCatalogScenario("Catalogo: referencia por preco curto", "quero o de 250", baseContext));
+  scenarios.push(
+    await analyzeSemanticCatalogPipelineScenario(
+      "Pipeline semantico: pergunta sobre produto em foco continua na venda",
+      "tem garantia?",
+      baseContext,
+      "product_question",
+    ),
+  );
+  scenarios.push(
+    await analyzeSemanticCatalogPipelineScenario(
+      "Pipeline semantico: rejeicao do produto atual pede nova vitrine",
+      "nao gostei desse",
+      baseContext,
+      "product_rejection",
+    ),
+  );
 
   scenarios.push(
     await analyzeMercadoLivreScenario(
@@ -256,6 +444,8 @@ async function main() {
       },
     ),
   );
+  scenarios.push(await analyzeMercadoLivreCommercialScenario("Fluxo ML: produto em foco vira conversa consultiva", "acho que combina comigo", baseContext));
+  scenarios.push(await analyzeMercadoLivreListingCopyScenario("Fluxo ML: copy humana apos envio de lista", baseContext));
 
   const staleContext: ConversationContext = {
     ...baseContext,
@@ -306,6 +496,15 @@ async function main() {
       context: baseContext,
       hasMercadoLivreHeuristicReply: true,
       hasMercadoLivreContext: true,
+    }),
+  );
+  scenarios.push(
+    await analyzeSearchFallbackScenario("Pipeline: continuidade comercial curta nao dispara busca solta", "gostei desse", {
+      ...baseContext,
+      catalogo: {
+        ...baseContext.catalogo!,
+        ultimaBusca: "",
+      },
     }),
   );
 
@@ -367,6 +566,20 @@ function summarizeByCategory(scenarios: ScenarioResult[]) {
   return [...counts.entries()]
     .sort((left, right) => left[0].localeCompare(right[0]))
     .map(([category, count]) => `${category}: ${count} cenarios`);
+}
+
+function loadCatalogProductsFromContext(context: ConversationContext) {
+  return (context.catalogo?.ultimosProdutos ?? []).map((item) => ({
+    id: item.id ?? "",
+    nome: item.nome ?? "Produto",
+    preco: Number(item.preco ?? 0),
+    link: item.link ?? "",
+    imagem: item.imagem ?? "",
+    publicadoEm: null,
+    descricao: item.descricao ?? "",
+    atributos: [],
+    pertenceALoja: true,
+  }));
 }
 
 function estimateScenarioTokenUsage(scenarios: ScenarioResult[]) {

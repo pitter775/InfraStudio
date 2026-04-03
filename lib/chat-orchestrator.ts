@@ -33,6 +33,7 @@ import { extractOpenAiOutputText, type OpenAIResponsesPayload } from "@/lib/chat
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
 import {
   buildCatalogDecisionFromSemanticIntent,
+  classifySemanticApiIntentStage,
   classifySemanticIntentStage,
   type SemanticIntentStageResult,
 } from "@/lib/chat-semantic-intent-stage";
@@ -680,35 +681,6 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const mercadoLivreListingProductsForAssets = mercadoLivreSearch.listingProductsForAssets;
   const mercadoLivreProductsForAssets = mercadoLivreSearch.productsForAssets;
   const resolvedProductSearchTerm = mercadoLivreSearch.resolvedProductSearchTerm;
-  const resourceTrace = {
-    apiNames: apiContexts.map((item) => item.nome),
-    apiErrors: apiContexts.filter((item) => item.erro).map((item) => ({ nome: item.nome, erro: item.erro })),
-    mercadoLivreRequested: productSearchRequested,
-    mercadoLivreLoadMoreRequested: loadMoreCatalogRequested,
-    mercadoLivreConnectorActive: hasMercadoLivreConnector,
-    mercadoLivreListingRequested: genericMercadoLivreListingRequested,
-    mercadoLivreTerm: resolvedProductSearchTerm || null,
-    mercadoLivreCandidates: productSearchCandidates,
-    mercadoLivreListingCount: mercadoLivreListingProducts.length,
-    mercadoLivreCount: mercadoLivreProducts.length,
-    semanticIntentStage: semanticIntentStage
-      ? {
-          intent: semanticIntentStage.intent,
-          confidence: semanticIntentStage.confidence,
-          reason: semanticIntentStage.reason,
-          usedLlm: semanticIntentStage.usedLlm,
-        }
-      : null,
-    catalogFollowUpDecision: catalogFollowUpDecision
-      ? {
-          kind: catalogFollowUpDecision.kind,
-          confidence: catalogFollowUpDecision.confidence,
-          reason: catalogFollowUpDecision.reason,
-          usedLlm: catalogFollowUpDecision.usedLlm,
-          matchedProductIds: catalogFollowUpDecision.matchedProducts.map((item: CatalogProductReference) => item.id ?? item.link ?? item.nome ?? null),
-        }
-      : null,
-  };
   const {
     systemPrompt,
     channelReplyInstruction,
@@ -768,6 +740,51 @@ export async function generateSalesReply(history: ConversationMessage[], context
         buildLeadNameAcknowledgementReplyFromModule(name, connector, runtimeContext, isWhatsAppChannel),
     },
   });
+  const semanticApiIntentStage = hasFocusedApiContext
+    ? await classifySemanticApiIntentStage({
+        openai,
+        message: latestUserMessage,
+        context,
+        focusedApiContextInstructions: focusedApiContext.instructions,
+      })
+    : null;
+  const resourceTrace = {
+    apiNames: apiContexts.map((item) => item.nome),
+    apiErrors: apiContexts.filter((item) => item.erro).map((item) => ({ nome: item.nome, erro: item.erro })),
+    mercadoLivreRequested: productSearchRequested,
+    mercadoLivreLoadMoreRequested: loadMoreCatalogRequested,
+    mercadoLivreConnectorActive: hasMercadoLivreConnector,
+    mercadoLivreListingRequested: genericMercadoLivreListingRequested,
+    mercadoLivreTerm: resolvedProductSearchTerm || null,
+    mercadoLivreCandidates: productSearchCandidates,
+    mercadoLivreListingCount: mercadoLivreListingProducts.length,
+    mercadoLivreCount: mercadoLivreProducts.length,
+    semanticIntentStage: semanticIntentStage
+      ? {
+          intent: semanticIntentStage.intent,
+          confidence: semanticIntentStage.confidence,
+          reason: semanticIntentStage.reason,
+          usedLlm: semanticIntentStage.usedLlm,
+        }
+      : null,
+    semanticApiIntentStage: semanticApiIntentStage
+      ? {
+          intent: semanticApiIntentStage.intent,
+          confidence: semanticApiIntentStage.confidence,
+          reason: semanticApiIntentStage.reason,
+          usedLlm: semanticApiIntentStage.usedLlm,
+        }
+      : null,
+    catalogFollowUpDecision: catalogFollowUpDecision
+      ? {
+          kind: catalogFollowUpDecision.kind,
+          confidence: catalogFollowUpDecision.confidence,
+          reason: catalogFollowUpDecision.reason,
+          usedLlm: catalogFollowUpDecision.usedLlm,
+          matchedProductIds: catalogFollowUpDecision.matchedProducts.map((item: CatalogProductReference) => item.id ?? item.link ?? item.nome ?? null),
+        }
+      : null,
+  };
   const {
     selectedCatalogProduct,
     selectedProductSalesReply,
@@ -847,6 +864,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     latestUserMessage,
     hasMemorySummary: Boolean(context?.memoria?.resumo),
     hasCurrentCatalogContext: Boolean(currentCatalogProduct || recentCatalogProducts.length > 0),
+    semanticApiIntentStage,
     hasMercadoLivreContext: Boolean(
       mercadoLivrePromptContext ||
         mercadoLivreDetailPromptContext ||
