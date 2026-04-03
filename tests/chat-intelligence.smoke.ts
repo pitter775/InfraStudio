@@ -32,6 +32,7 @@ import {
   loadApiRuntimeFixture,
   loadApiRuntimeRealEstateFixture,
   loadCatalogContextFixture,
+  loadMercadoLivreFocusProductFixture,
   loadMercadoLivreFixture,
   loadWhatsAppContextFixture,
   normalizeFixtureText,
@@ -47,6 +48,7 @@ const deps = createFixtureSearchDeps();
 const recentCatalogContext: ConversationContext = loadCatalogContextFixture();
 const whatsappContext: ConversationContext = loadWhatsAppContextFixture();
 const mercadoLivreFixture = loadMercadoLivreFixture();
+const mercadoLivreFocusProduct = loadMercadoLivreFocusProductFixture();
 const apiRuntimeFixture = loadApiRuntimeFixture();
 const apiRuntimeRealEstateFixture = loadApiRuntimeRealEstateFixture();
 
@@ -609,6 +611,45 @@ const tests: TestCase[] = [
       );
 
       assert.match(reply, /bater o martelo|mais importam para voce/i);
+    },
+  },
+  {
+    name: "agent test chat responde pergunta tecnica do produto em foco sem relistar nem reiniciar",
+    run: () => {
+      const reply = buildMercadoLivreSalesReply(
+        mercadoLivreFocusProduct,
+        "ela e resistente vc sabe o material dela",
+        { channel: { kind: "admin_agent_test" } } as ConversationContext,
+        null,
+        {
+          normalizeText: normalizeFixtureText,
+          isWhatsAppChannel: () => false,
+        },
+      );
+
+      assert.match(reply, /ceramica esmaltada/i);
+      assert.match(reply, /bom estado geral|sem trincas|sem quebras/i);
+      assert.doesNotMatch(reply, /buscar opcoes parecidas|mostrar mais detalhes/i);
+      assert.doesNotMatch(reply, /Sigo por aqui no contexto|Me diga o ponto exato que voce quer validar/i);
+    },
+  },
+  {
+    name: "agent test chat evita loop de repeticao do produto em pergunta tecnica",
+    run: () => {
+      const reply = buildMercadoLivreSalesReply(
+        mercadoLivreFocusProduct,
+        "serve para uso diario?",
+        { channel: { kind: "admin_agent_test" } } as ConversationContext,
+        null,
+        {
+          normalizeText: normalizeFixtureText,
+          isWhatsAppChannel: () => false,
+        },
+      );
+
+      const repeatedNameCount = (reply.match(/Jogo De Sopeira Com Consumes Ceramica Decorada Vintage Branco/gi) ?? []).length;
+      assert.ok(repeatedNameCount <= 1);
+      assert.match(reply, /uso a mesa|dia a dia|servir sopas e caldos/i);
     },
   },
   {

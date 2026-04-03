@@ -83,6 +83,10 @@ export function loadMercadoLivreAmbiguousFixture() {
   return readFixtureJson<MercadoLivreFixture>("mercado-livre-ambiguous.json");
 }
 
+export function loadMercadoLivreFocusProductFixture() {
+  return readFixtureJson<ProdutoDetalhadoMercadoLivre>("mercado-livre-focus-product.json");
+}
+
 export function loadLeadContextFixture(): ConversationContext {
   return readFixtureJson<ConversationContext>("lead-context.base.json");
 }

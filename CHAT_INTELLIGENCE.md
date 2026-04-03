@@ -1154,6 +1154,11 @@ Mudanca de comportamento:
   - ausencia de empatia
   - data crua em ISO
   - perda de contexto na sequencia `datas -> vale a pena -> sim segue`
+- a suite tambem cobre o `chat de teste do agente` em produto focado, observando:
+  - repeticao indevida do mesmo produto
+  - reinicio generico do atendimento
+  - relistagem em vez de resposta tecnica
+  - riqueza da resposta com base na descricao detalhada do anuncio
 
 Objetivo pratico:
 - evitar que o chat externo se perca logo depois de uma boa resposta factual

@@ -15,6 +15,7 @@ import { buildWhatsAppMessageSequence, resolveCanonicalWhatsAppExternalIdentifie
 import { buildCatalogDecisionFromSemanticIntent } from "@/lib/chat-semantic-intent-stage";
 import { shouldContinueProductSearch, shouldUseMercadoLivreConnectorFallback } from "@/lib/chat-sales-heuristics";
 import {
+  buildMercadoLivreSalesReply,
   buildMercadoLivreReply,
   resolveMercadoLivreFlowState,
   resolveMercadoLivreHeuristicReply,
@@ -25,6 +26,7 @@ import {
   loadApiRuntimeFixture,
   loadApiRuntimeRealEstateFixture,
   loadCatalogContextFixture,
+  loadMercadoLivreFocusProductFixture,
   loadWhatsAppContextFixture,
   normalizeFixtureText,
 } from "@/tests/chat-test-fixtures";
@@ -41,6 +43,7 @@ const baseContext: ConversationContext = loadCatalogContextFixture();
 const whatsappContext: ConversationContext = loadWhatsAppContextFixture();
 const apiRuntimeFixture = loadApiRuntimeFixture();
 const apiRuntimeRealEstateFixture = loadApiRuntimeRealEstateFixture();
+const mercadoLivreFocusProduct = loadMercadoLivreFocusProductFixture();
 
 async function analyzeCatalogScenario(title: string, input: string, context: ConversationContext): Promise<ScenarioResult> {
   const decision = decideCatalogFollowUpHeuristically(input, context, deps);
@@ -272,6 +275,35 @@ async function analyzeMercadoLivreCommercialScenario(title: string, input: strin
       `sales.reply_present=${state.selectedProductSalesReply ? "yes" : "no"}`,
       `sales.probe_present=${/o que mais pesa para voce/i.test(state.selectedProductSalesReply ?? "") ? "yes" : "no"}`,
       `sales.uses_description=${/No anuncio ele aparece assim:|Pelo anuncio/i.test(state.selectedProductSalesReply ?? "") ? "yes" : "no"}`,
+    ],
+  };
+}
+
+async function analyzeAgentTestFocusedProductScenario(title: string, input: string): Promise<ScenarioResult> {
+  const reply = buildMercadoLivreSalesReply(
+    mercadoLivreFocusProduct,
+    input,
+    { channel: { kind: "admin_agent_test" } } as ConversationContext,
+    null,
+    {
+      normalizeText: normalizeFixtureText,
+      isWhatsAppChannel: () => false,
+    },
+  );
+
+  const repeatedNameCount = (reply.match(/Jogo De Sopeira Com Consumes Ceramica Decorada Vintage Branco/gi) ?? []).length;
+
+  return {
+    category: "mercado_livre",
+    title,
+    input,
+    observations: [
+      `agent_test.reply_mentions_material=${/ceramica esmaltada/i.test(reply) ? "yes" : "no"}`,
+      `agent_test.reply_mentions_state=${/bom estado geral|sem trincas|sem quebras/i.test(reply) ? "yes" : "no"}`,
+      `agent_test.reply_mentions_usage=${/uso a mesa|dia a dia|servir sopas e caldos/i.test(reply) ? "yes" : "no"}`,
+      `agent_test.reply_avoids_restart=${/Sigo por aqui no contexto|Me diga o ponto exato que voce quer validar/i.test(reply) ? "no" : "yes"}`,
+      `agent_test.reply_avoids_relisting=${/buscar opcoes parecidas|mostrar mais detalhes/i.test(reply) ? "no" : "yes"}`,
+      `agent_test.reply_product_name_repetitions=${repeatedNameCount}`,
     ],
   };
 }
@@ -681,6 +713,8 @@ async function main() {
     ),
   );
   scenarios.push(await analyzeMercadoLivreCommercialScenario("Fluxo ML: produto em foco vira conversa consultiva", "acho que combina comigo", baseContext));
+  scenarios.push(await analyzeAgentTestFocusedProductScenario("Agent test: pergunta tecnica sobre produto em foco nao entra em loop", "ela e resistente vc sabe o material dela"));
+  scenarios.push(await analyzeAgentTestFocusedProductScenario("Agent test: pergunta de uso diario mantem venda consultiva", "serve para uso diario?"));
   scenarios.push(await analyzeMercadoLivreListingCopyScenario("Fluxo ML: copy humana apos envio de lista", baseContext));
   scenarios.push(await analyzeWhatsAppScenario("WhatsApp: identidade canonica e lista inicial com frase humana", whatsappContext));
   scenarios.push(

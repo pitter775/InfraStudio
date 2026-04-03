@@ -167,6 +167,82 @@ function buildMercadoLivreDescriptionLead(compactDescription: string | null) {
   return `No anuncio ele aparece assim: ${compactDescription}`;
 }
 
+function buildMercadoLivreTechnicalAnswer(
+  produto: ProdutoDetalhadoMercadoLivre,
+  latestUserMessage: string,
+  consultiveProbe: string,
+  deps: MercadoLivreDeps,
+) {
+  const normalized = deps.normalizeText(latestUserMessage);
+  const description = deps.normalizeText(produto.descricao ?? "");
+  const productName = produto.nome?.trim() || "esse item";
+  const attributeText = (produto.atributos ?? []).map((item) => `${item.nome}: ${item.valor}`).join(" | ");
+
+  const materialInfo =
+    (produto.atributos ?? []).find((item) => /\bmaterial\b/.test(deps.normalizeText(item.nome)))?.valor ??
+    (description.includes("ceramica esmaltada") ? "ceramica esmaltada" : null);
+  const stateInfo =
+    description.includes("bom estado geral")
+      ? "Pelo anuncio, ele esta em bom estado geral, com leves marcas de uso e sem trincas ou quebras aparentes."
+      : null;
+  const usageInfo =
+    description.includes("ideal para servir sopas e caldos")
+      ? "Ele foi pensado para servir sopas e caldos de forma pratica e elegante, entao faz sentido para uso a mesa no dia a dia com os cuidados normais de uma peca vintage."
+      : description.includes("uso a mesa")
+      ? "O conjunto foi descrito para uso a mesa, com alcas laterais nas cumbucas que ajudam no manuseio."
+      : null;
+  const resistanceInfo =
+    description.includes("sem trincas ou quebras aparentes")
+      ? "Eu nao venderia como peca nova ou de uso bruto, mas o anuncio mostra uma peca integra, sem trincas ou quebras aparentes."
+      : null;
+
+  if (/\bresistente\b|\bresistencia\b|\bresiste\b/.test(normalized)) {
+    return [
+      materialInfo ? `${productName} e de ${materialInfo}.` : null,
+      resistanceInfo,
+      stateInfo,
+      usageInfo,
+      consultiveProbe,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  if (/\bmaterial\b/.test(normalized)) {
+    return [
+      materialInfo ? `${productName} e de ${materialInfo}.` : null,
+      usageInfo,
+      stateInfo,
+      consultiveProbe,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  if (/\buso diario\b|\bdia a dia\b|\buso a mesa\b|\bserve\b/.test(normalized)) {
+    return [
+      usageInfo ?? `Pelo anuncio, ${productName} foi pensado para servir a mesa com praticidade e um visual retro.`,
+      stateInfo,
+      materialInfo ? `Material informado: ${materialInfo}.` : null,
+      consultiveProbe,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  if (/\bmedida\b|\bmedidas\b|\btamanho\b|\bcapacidade\b|\bcor\b/.test(normalized) && attributeText) {
+    return [
+      `No anuncio encontrei estes detalhes: ${attributeText}.`,
+      usageInfo,
+      consultiveProbe,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  return null;
+}
+
 function buildSyntheticMercadoLivreProductDetails(product: CatalogProductReference | null | undefined) {
   if (!product?.nome) {
     return null;
@@ -320,6 +396,11 @@ export function buildMercadoLivreSalesReply(
   }
 
   if (/\bmaterial\b|\bmedida\b|\bmedidas\b|\btamanho\b|\bcapacidade\b|\bcor\b/.test(normalized)) {
+    const technicalAnswer = buildMercadoLivreTechnicalAnswer(produto, latestUserMessage, cta?.trim() || consultiveProbe, deps);
+    if (technicalAnswer) {
+      return [storeOwnershipNote, technicalAnswer].filter(Boolean).join("\n\n");
+    }
+
     const matchingAttributes = (produto.atributos ?? []).filter((item) =>
       /\b(material|medida|medidas|tamanho|capacidade|cor)\b/.test(deps.normalizeText(item.nome)),
     );
@@ -343,6 +424,13 @@ export function buildMercadoLivreSalesReply(
       ]
         .filter(Boolean)
         .join("\n\n");
+    }
+  }
+
+  if (/\bresistente\b|\bresistencia\b|\bresiste\b|\buso diario\b|\bdia a dia\b|\buso a mesa\b|\bserve\b/.test(normalized)) {
+    const technicalAnswer = buildMercadoLivreTechnicalAnswer(produto, latestUserMessage, cta?.trim() || consultiveProbe, deps);
+    if (technicalAnswer) {
+      return [storeOwnershipNote, technicalAnswer].filter(Boolean).join("\n\n");
     }
   }
 
