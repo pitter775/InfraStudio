@@ -1618,11 +1618,15 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
       agentAtual.configuracoes.handoff !== null;
     const whatsappPhone = preferredChannel?.numero || fallbackWidgetPhone;
     const hasWhatsappBias = Boolean(whatsappPhone) || Boolean(configuredWhatsappCta) || hasWhatsappHandoff;
+    const isFocusedMercadoLivreConversation =
+      ai.metadata?.model === "mercado_livre_product_sales" &&
+      Boolean(ai.metadata && "catalogoProdutoAtual" in ai.metadata && ai.metadata.catalogoProdutoAtual);
     const shouldOfferCommercialCta =
       /whats\s?app/i.test(ai.reply) ||
       /estimativa|orcamento|orÃ§amento|proximo passo|pr[oÃ³]ximo passo|encaixe inicial|fecharmos/i.test(ai.reply);
     const shouldPreferWhatsappButton =
       hasWhatsappBias &&
+      !isFocusedMercadoLivreConversation &&
       (Boolean(nextContext.qualificacao?.pronto_para_whatsapp) ||
         shouldOfferCommercialCta ||
         Number(nextContext.memoria?.mensagem_count ?? 0) >= 2);

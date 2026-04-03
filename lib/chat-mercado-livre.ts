@@ -444,8 +444,12 @@ export function buildMercadoLivreSalesReply(
   context: ConversationContext | undefined,
   cta: string | null | undefined,
   deps: MercadoLivreDeps,
+  options?: {
+    productAlreadyInFocus?: boolean;
+  },
 ) {
   const normalized = deps.normalizeText(latestUserMessage);
+  const productAlreadyInFocus = options?.productAlreadyInFocus === true;
   const compactDescription = compactMercadoLivreDescription(produto.descricao, 260);
   const consultiveProbe = buildMercadoLivreConsultiveProbe(produto, latestUserMessage, deps);
   const descriptionLead = buildMercadoLivreDescriptionLead(compactDescription);
@@ -456,7 +460,9 @@ export function buildMercadoLivreSalesReply(
 
   if (/\bgarantia\b/.test(normalized)) {
     const garantia = produto.garantia?.trim() || "Nao encontrei garantia informada no anuncio";
-    const baseReply = deps.isWhatsAppChannel(context)
+    const baseReply = productAlreadyInFocus
+      ? `Sobre a garantia: ${garantia}.\n\n${descriptionLead ? `${descriptionLead}\n\n` : ""}${consultiveProbe}`
+      : deps.isWhatsAppChannel(context)
       ? `${produto.nome}: ${garantia}.\n\n${descriptionLead ? `${descriptionLead}\n\n` : ""}${consultiveProbe}`
       : `**${produto.nome}**: ${garantia}.\n\n${descriptionLead ? `${descriptionLead}\n\n` : ""}${consultiveProbe}`;
     return [storeOwnershipNote, baseReply].filter(Boolean).join("\n\n");
@@ -541,7 +547,11 @@ export function buildMercadoLivreSalesReply(
   if (typeof produto.freteGratis === "boolean") highlights.push(produto.freteGratis ? "Frete gratis" : "Frete a consultar");
   if (typeof produto.vendidos === "number" && produto.vendidos > 0) highlights.push(`${produto.vendidos} vendas`);
 
-  const leadIn = deps.isWhatsAppChannel(context)
+  const leadIn = productAlreadyInFocus
+    ? deps.isWhatsAppChannel(context)
+      ? `Sobre esse item, ele esta por R$ ${produto.preco.toLocaleString("pt-BR")}.`
+      : `**Sobre esse item,** ele esta por **R$ ${produto.preco.toLocaleString("pt-BR")}**.`
+    : deps.isWhatsAppChannel(context)
     ? `Boa escolha. ${produto.nome} esta por R$ ${produto.preco.toLocaleString("pt-BR")}.`
     : `**Boa escolha.** ${produto.nome} esta por **R$ ${produto.preco.toLocaleString("pt-BR")}**.`;
   const sellingPoint = highlights.length
@@ -952,6 +962,9 @@ export async function resolveMercadoLivreHeuristicState(input: {
           input.context,
           input.lojaCta,
           input.deps,
+          {
+            productAlreadyInFocus: productAlreadyInFocus,
+          },
         )
       : null;
   const salesFocusProduct = shouldPitchSelectedProduct ? focusProductDetails : selectedCatalogProductDetails ?? linkedProductDetails;

@@ -886,6 +886,28 @@ const tests: TestCase[] = [
     },
   },
   {
+    name: "produto em foco evita reapresentar o mesmo item em follow-up de detalhe",
+    run: () => {
+      const reply = buildMercadoLivreSalesReply(
+        mercadoLivreFocusProduct,
+        "qual o material completo desse jogo",
+        { channel: { kind: "admin_agent_test" } } as ConversationContext,
+        null,
+        {
+          normalizeText: normalizeFixtureText,
+          isWhatsAppChannel: () => false,
+        },
+        {
+          productAlreadyInFocus: true,
+        },
+      );
+
+      assert.doesNotMatch(reply, /\*\*Boa escolha\.\*\*/i);
+      assert.doesNotMatch(reply, /Boa escolha\./i);
+      assert.match(reply, /Sobre esse item|ceramica|porcelana/i);
+    },
+  },
+  {
     name: "agent test chat responde pergunta tecnica do produto em foco sem relistar nem reiniciar",
     run: () => {
       const reply = buildMercadoLivreSalesReply(
