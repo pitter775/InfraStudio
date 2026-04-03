@@ -271,6 +271,8 @@ De forma simplificada, o fluxo hoje funciona assim:
 - agora tambem existe log de diagnostico para WhatsApp quando:
   - os assets foram incorporados com sucesso na mensagem unica
   - os assets vieram, mas nao tinham dados suficientes para montar a lista entregavel
+- o identificador canonico do contato no WhatsApp agora prioriza o telefone real do contato (`remotePhone` / `rawContact.number`) antes de aceitar ids temporarios como `@lid`
+- isso protege a continuidade do contexto e reduz o risco de o mesmo cliente ser tratado como conversa nova varias vezes
 
 ## Evolucao da Fala Comercial em Produto em Foco
 
@@ -1082,4 +1084,27 @@ Objetivo pratico:
 - reduzir dependencia de listas fixas de frases
 - diminuir loops de listagem e busca
 - fazer a decisao depender mais de contexto e menos de palavra exata
+
+## Reforco da Suite de WhatsApp no Inicio do Atendimento
+
+Foi adicionada uma rodada mais realista de testes para pegar problemas logo no comeco da conversa via WhatsApp, antes do teste vivo.
+
+Arquivos envolvidos:
+- `C:\Projetos\infrastudio\tests\fixtures\whatsapp-context.base.json`
+- `C:\Projetos\infrastudio\tests\chat-intelligence.smoke.ts`
+- `C:\Projetos\infrastudio\tests\chat-intelligence.domain-regression.ts`
+- `C:\Projetos\infrastudio\tests\chat-intelligence.scenarios.ts`
+
+Cobertura nova:
+- identidade canonica do contato quando o inbound vier com `@lid`
+- preservacao da frase humana de follow-up na intro da lista
+- entrega da lista no formato:
+  - intro
+  - um produto por mensagem
+- continuidade curta apos lista no WhatsApp, evitando reiniciar o atendimento como se fosse cliente novo
+
+Objetivo pratico:
+- capturar perda de contexto logo no inicio
+- evitar que a mesma cliente pareca "nova" por divergencia de identificador
+- garantir que a lista continue convidando o cliente a responder livremente
 

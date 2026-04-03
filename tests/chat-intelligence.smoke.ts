@@ -13,7 +13,7 @@ import { resolveConversationDomainSupportState } from "@/lib/chat-domain-stage";
 import { classifyConversationDomainStage, classifyHeuristicIntentStage, classifyOrchestratorRouteStage } from "@/lib/chat-intent-classifier";
 import { buildOpenAiStageRequestPayload } from "@/lib/chat-openai-stage";
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
-import { buildWhatsAppMessageSequence, sanitizeWhatsAppCustomerFacingReply } from "@/lib/chat-service";
+import { buildWhatsAppMessageSequence, resolveCanonicalWhatsAppExternalIdentifier, sanitizeWhatsAppCustomerFacingReply } from "@/lib/chat-service";
 import { buildCatalogDecisionFromSemanticIntent, shouldBypassCatalogHeuristicFallback } from "@/lib/chat-semantic-intent-stage";
 import { shouldRefreshSummary } from "@/lib/chat-summary-stage";
 import { buildChatUsageOrigin, buildChatUsageTelemetry, describeChatUsageOrigin, readChatUsageTelemetry } from "@/lib/chat-usage-metrics";
@@ -31,6 +31,7 @@ import {
   loadApiRuntimeFixture,
   loadCatalogContextFixture,
   loadMercadoLivreFixture,
+  loadWhatsAppContextFixture,
   normalizeFixtureText,
 } from "@/tests/chat-test-fixtures";
 
@@ -41,6 +42,7 @@ type TestCase = {
 
 const deps = createFixtureSearchDeps();
 const recentCatalogContext: ConversationContext = loadCatalogContextFixture();
+const whatsappContext: ConversationContext = loadWhatsAppContextFixture();
 const mercadoLivreFixture = loadMercadoLivreFixture();
 const apiRuntimeFixture = loadApiRuntimeFixture();
 
@@ -75,6 +77,26 @@ const tests: TestCase[] = [
     },
   },
   {
+    name: "whatsapp preserva frase humana na introducao da lista",
+    run: () => {
+      const reply = buildMercadoLivreReply(mercadoLivreFixture.listingProducts, whatsappContext, {
+        normalizeText: normalizeFixtureText,
+        isWhatsAppChannel: () => true,
+      });
+
+      const sequence = buildWhatsAppMessageSequence(reply ?? "", mercadoLivreFixture.listingProducts.map((produto) => ({
+        nome: produto.nome,
+        targetUrl: produto.link,
+        descricao: "",
+        whatsappText: `Se esse estilo fizer sentido para voce, eu posso te explicar melhor este item.`,
+      })));
+
+      assert.ok(sequence[0]);
+      assert.match(sequence[0] ?? "", /me diga se gostou de algum|traga mais opcoes/i);
+      assert.equal(sequence.length, 4);
+    },
+  },
+  {
     name: "whatsapp remove promessas de verificar status da resposta ao cliente",
     run: () => {
       const sanitized = sanitizeWhatsAppCustomerFacingReply(
@@ -83,6 +105,46 @@ const tests: TestCase[] = [
 
       assert.doesNotMatch(sanitized, /vou verificar|status/i);
       assert.match(sanitized, /bom acabamento/i);
+    },
+  },
+  {
+    name: "whatsapp usa telefone canonico do contexto e ignora identificador lid",
+    run: () => {
+      const externalId = resolveCanonicalWhatsAppExternalIdentifier({
+        identificadorExterno: "270570709065941@lid",
+        identificador: "270570709065941@lid",
+        context: {
+          whatsapp: {
+            remetente: "270570709065941@lid",
+            remoteJid: "270570709065941@lid",
+            remotePhone: "5511978510655",
+            rawContact: {
+              number: "5511978510655",
+            },
+          },
+        },
+      });
+
+      assert.equal(externalId, "5511978510655");
+    },
+  },
+  {
+    name: "whatsapp contexto base mantem telefone canonico para continuidade da conversa",
+    run: () => {
+      const firstId = resolveCanonicalWhatsAppExternalIdentifier({
+        identificadorExterno: "270570709065941@lid",
+        identificador: "270570709065941@lid",
+        context: whatsappContext,
+      });
+
+      const secondId = resolveCanonicalWhatsAppExternalIdentifier({
+        identificadorExterno: "5511978510655@c.us",
+        identificador: "5511978510655@c.us",
+        context: whatsappContext,
+      });
+
+      assert.equal(firstId, "5511978510655");
+      assert.equal(secondId, "5511978510655");
     },
   },
   {
@@ -814,6 +876,22 @@ const tests: TestCase[] = [
       });
 
       assert.equal(stage, "lead_qualification");
+    },
+  },
+  {
+    name: "classificador de dominio prioriza catalogo ativo sobre lead em continuidade curta no whatsapp",
+    run: () => {
+      const stage = classifyConversationDomainStage({
+        heuristicIntentStage: "none",
+        hasFocusedApiContext: false,
+        latestUserMessage: "sim",
+        hasMemorySummary: true,
+        hasCurrentCatalogContext: true,
+        hasLeadContext: true,
+        semanticCatalogIntentStage: null,
+      });
+
+      assert.equal(stage, "catalog_commerce");
     },
   },
   {

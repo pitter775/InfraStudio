@@ -83,6 +83,10 @@ export function loadLeadContextFixture(): ConversationContext {
   return readFixtureJson<ConversationContext>("lead-context.base.json");
 }
 
+export function loadWhatsAppContextFixture(): ConversationContext {
+  return materializeCatalogFixture(readFixtureJson<ConversationContext>("whatsapp-context.base.json"));
+}
+
 export function loadHandoffFixture() {
   return readFixtureJson<HandoffFixture>("handoff-cases.json");
 }

@@ -21,6 +21,7 @@ import {
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
 import { resolveMercadoLivreFlowState, resolveMercadoLivreHeuristicState } from "@/lib/chat-mercado-livre";
 import { shouldContinueProductSearch, shouldUseMercadoLivreConnectorFallback } from "@/lib/chat-sales-heuristics";
+import { buildWhatsAppMessageSequence, resolveCanonicalWhatsAppExternalIdentifier } from "@/lib/chat-service";
 import {
   createFixtureSearchDeps,
   loadApiRuntimeErrorFixture,
@@ -30,6 +31,7 @@ import {
   loadLeadContextFixture,
   loadMercadoLivreAmbiguousFixture,
   loadStaleCatalogContextFixture,
+  loadWhatsAppContextFixture,
   normalizeFixtureText,
 } from "@/tests/chat-test-fixtures";
 
@@ -41,9 +43,10 @@ const apiErrorFixture = loadApiRuntimeErrorFixture();
 const leadContextFixture = loadLeadContextFixture();
 const handoffFixture = loadHandoffFixture();
 const mercadoLivreAmbiguousFixture = loadMercadoLivreAmbiguousFixture();
+const whatsappContextFixture = loadWhatsAppContextFixture();
 
 type DomainReport = {
-  domain: "catalog" | "api" | "mercado_livre" | "lead" | "handoff";
+  domain: "catalog" | "api" | "mercado_livre" | "lead" | "handoff" | "whatsapp";
   title: string;
   details: string[];
 };
@@ -396,6 +399,45 @@ async function runHandoffRegression(): Promise<DomainReport[]> {
   return reports;
 }
 
+function runWhatsAppRegression(): DomainReport[] {
+  const reports: DomainReport[] = [];
+
+  const canonicalId = resolveCanonicalWhatsAppExternalIdentifier({
+    identificadorExterno: "270570709065941@lid",
+    identificador: "270570709065941@lid",
+    context: whatsappContextFixture,
+  });
+  assert.equal(canonicalId, "5511978510655");
+  reports.push(
+    report("whatsapp", "identidade canonica prioriza telefone real e evita perder contexto", [
+      `canonicalId=${canonicalId}`,
+      `leadPhone=${whatsappContextFixture.lead?.telefone ?? "none"}`,
+    ]),
+  );
+
+  const listingSequence = buildWhatsAppMessageSequence(
+    "Encontrei algumas opcoes parecidas na loja logo abaixo. Me diga se gostou de algum ou se quer que eu traga mais opcoes nesse estilo.",
+    (whatsappContextFixture.catalogo?.ultimosProdutos ?? []).map((item) => ({
+      nome: item.nome ?? "Produto",
+      targetUrl: item.link ?? "",
+      descricao: item.descricao ?? "",
+      whatsappText: "Se esse estilo fizer sentido para voce, eu posso te explicar melhor este item.",
+    })),
+  );
+  assert.equal(listingSequence.length, 4);
+  assert.match(listingSequence[0] ?? "", /me diga se gostou de algum|traga mais opcoes/i);
+  assert.match(listingSequence[1] ?? "", /\*1\./i);
+  reports.push(
+    report("whatsapp", "lista inicial mantem frase humana e entrega um produto por mensagem", [
+      `sequenceLength=${listingSequence.length}`,
+      `introHasFollowUp=${/me diga se gostou de algum|traga mais opcoes/i.test(listingSequence[0] ?? "") ? "yes" : "no"}`,
+      `firstProductHasLink=${/https?:\/\//i.test(listingSequence[1] ?? "") ? "yes" : "no"}`,
+    ]),
+  );
+
+  return reports;
+}
+
 async function main() {
   const reports = [
     ...runCatalogRegression(),
@@ -404,6 +446,7 @@ async function main() {
     ...(await runMercadoLivreCommercialRegression()),
     ...runLeadRegression(),
     ...(await runHandoffRegression()),
+    ...runWhatsAppRegression(),
   ];
 
   console.log("\nChat Intelligence Domain Regression\n");

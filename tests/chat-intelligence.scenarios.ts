@@ -10,6 +10,7 @@ import {
 } from "@/lib/catalog-follow-up";
 import type { ConversationContext } from "@/lib/chat-context";
 import { resolveConversationPipelineStageState } from "@/lib/chat-pipeline-stage";
+import { buildWhatsAppMessageSequence, resolveCanonicalWhatsAppExternalIdentifier } from "@/lib/chat-service";
 import { buildCatalogDecisionFromSemanticIntent } from "@/lib/chat-semantic-intent-stage";
 import { shouldContinueProductSearch, shouldUseMercadoLivreConnectorFallback } from "@/lib/chat-sales-heuristics";
 import {
@@ -21,6 +22,7 @@ import {
 import {
   createFixtureSearchDeps,
   loadCatalogContextFixture,
+  loadWhatsAppContextFixture,
   normalizeFixtureText,
 } from "@/tests/chat-test-fixtures";
 
@@ -33,6 +35,7 @@ type ScenarioResult = {
 
 const deps = createFixtureSearchDeps();
 const baseContext: ConversationContext = loadCatalogContextFixture();
+const whatsappContext: ConversationContext = loadWhatsAppContextFixture();
 
 async function analyzeCatalogScenario(title: string, input: string, context: ConversationContext): Promise<ScenarioResult> {
   const decision = decideCatalogFollowUpHeuristically(input, context, deps);
@@ -372,6 +375,40 @@ async function analyzeSearchFallbackScenario(title: string, input: string, conte
   };
 }
 
+async function analyzeWhatsAppScenario(title: string, context: ConversationContext): Promise<ScenarioResult> {
+  const canonicalId = resolveCanonicalWhatsAppExternalIdentifier({
+    identificadorExterno: "270570709065941@lid",
+    identificador: "270570709065941@lid",
+    context,
+  });
+  const listingReply = buildMercadoLivreReply(loadCatalogProductsFromContext(context), context, {
+    normalizeText: normalizeFixtureText,
+    isWhatsAppChannel: () => true,
+  });
+  const sequence = buildWhatsAppMessageSequence(
+    listingReply ?? "",
+    loadCatalogProductsFromContext(context).map((item) => ({
+      nome: item.nome,
+      targetUrl: item.link,
+      descricao: item.descricao,
+      whatsappText: "Se esse estilo fizer sentido para voce, eu posso te explicar melhor este item.",
+    })),
+  );
+
+  return {
+    category: "whatsapp",
+    title,
+    input: "[mensagem inicial: vc tem jogo de jantar?]",
+    observations: [
+      `whatsapp.canonical_external_id=${canonicalId ?? "null"}`,
+      `whatsapp.sequence_length=${sequence.length}`,
+      `whatsapp.intro_has_follow_up=${/me diga se gostou de algum|traga mais opcoes/i.test(sequence[0] ?? "") ? "yes" : "no"}`,
+      `whatsapp.first_product_has_link=${/(https?:\/\/)/i.test(sequence[1] ?? "") ? "yes" : "no"}`,
+      `whatsapp.first_product_has_support=${/explicar melhor este item/i.test(sequence[1] ?? "") ? "yes" : "no"}`,
+    ],
+  };
+}
+
 async function main() {
   const scenarios: ScenarioResult[] = [];
 
@@ -446,6 +483,13 @@ async function main() {
   );
   scenarios.push(await analyzeMercadoLivreCommercialScenario("Fluxo ML: produto em foco vira conversa consultiva", "acho que combina comigo", baseContext));
   scenarios.push(await analyzeMercadoLivreListingCopyScenario("Fluxo ML: copy humana apos envio de lista", baseContext));
+  scenarios.push(await analyzeWhatsAppScenario("WhatsApp: identidade canonica e lista inicial com frase humana", whatsappContext));
+  scenarios.push(
+    await analyzePipelineScenario("WhatsApp: continuidade curta apos lista continua no catalogo em vez de reiniciar atendimento", "sim", {
+      context: whatsappContext,
+      hasMercadoLivreContext: true,
+    }),
+  );
 
   const staleContext: ConversationContext = {
     ...baseContext,

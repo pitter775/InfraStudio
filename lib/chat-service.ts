@@ -118,8 +118,38 @@ function getWhatsAppContactPhoneFromContext(context: Record<string, unknown> | n
     return normalizedRemotePhone;
   }
 
+  const rawContact = isPlainObject(context.whatsapp.rawContact) ? context.whatsapp.rawContact : null;
+  const rawContactNumber = rawContact?.number;
+  const normalizedRawContactNumber = normalizeInboundPhoneCandidate(typeof rawContactNumber === "string" ? rawContactNumber : null);
+  if (normalizedRawContactNumber) {
+    return normalizedRawContactNumber;
+  }
+
   const senderPhone = context.whatsapp.remetente;
   return normalizeInboundPhoneCandidate(typeof senderPhone === "string" ? senderPhone : null);
+}
+
+export function resolveCanonicalWhatsAppExternalIdentifier(input: {
+  identificadorExterno?: string | null;
+  identificador?: string | null;
+  context?: Record<string, unknown> | null;
+}) {
+  const contextPhone = getWhatsAppContactPhoneFromContext(input.context);
+  if (contextPhone) {
+    return contextPhone;
+  }
+
+  const normalizedExternal = normalizeInboundPhoneCandidate(input.identificadorExterno);
+  if (normalizedExternal) {
+    return normalizedExternal;
+  }
+
+  const normalizedFallback = normalizeInboundPhoneCandidate(input.identificador);
+  if (normalizedFallback) {
+    return normalizedFallback;
+  }
+
+  return sanitizePhone(input.identificadorExterno ?? input.identificador);
 }
 
 function getWhatsAppContactAvatarFromContext(context: Record<string, unknown> | null | undefined) {
@@ -770,7 +800,11 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
 
   const normalizedExternalIdentifier =
     channelKind === "whatsapp"
-      ? sanitizePhone(effectiveBody.identificadorExterno ?? effectiveBody.identificador)
+      ? resolveCanonicalWhatsAppExternalIdentifier({
+          identificadorExterno: effectiveBody.identificadorExterno,
+          identificador: effectiveBody.identificador,
+          context: isPlainObject(effectiveBody.context) ? effectiveBody.context : null,
+        })
       : effectiveBody.identificadorExterno?.trim() || effectiveBody.identificador?.trim() || null;
   const resolved = await resolveChatChannel({
     ...effectiveBody,
@@ -1380,8 +1414,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
   const whatsappContactNameForTitle = getWhatsAppContactNameFromContext(nextContext);
   const contactSnapshot = resolveChatContactSnapshot(nextContext, normalizedExternalIdentifier);
 
-  const splitReply =
-    channelKind === "whatsapp" ? splitCatalogReplyForWhatsApp(ai.reply, Array.isArray(ai.assets) && ai.assets.length > 0) : null;
+  const splitReply = channelKind === "whatsapp" ? null : splitCatalogReplyForWhatsApp(ai.reply, Array.isArray(ai.assets) && ai.assets.length > 0);
   const primaryReplyRaw = splitReply?.mainReply || ai.reply;
   const followUpReplyRaw = channelKind === "whatsapp" ? "" : splitReply?.followUpReply || "";
   const primaryReplyBase = stripAssistantMetaReply(primaryReplyRaw, channelKind);
