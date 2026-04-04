@@ -8,6 +8,7 @@ export type ChatChannelKind = "web" | "whatsapp" | string;
 
 export type ChatRecord = {
   id: string;
+  conversationKey?: string | null;
   titulo: string;
   contatoNome: string | null;
   contatoTelefone: string | null;
@@ -236,7 +237,7 @@ type MensagemRow = {
 };
 
 function mapChat(row: ChatRow): ChatRecord {
-  return {
+  const mapped = {
     id: row.id,
     titulo: row.titulo?.trim() || "Nova conversa",
     contatoNome: normalizeOptionalText(row.contato_nome),
@@ -255,6 +256,11 @@ function mapChat(row: ChatRow): ChatRecord {
     contexto: row.contexto,
     ultimaMensagem: null,
     totalMensagens: 0,
+  };
+
+  return {
+    ...mapped,
+    conversationKey: getUnifiedConversationIdentity(mapped),
   };
 }
 

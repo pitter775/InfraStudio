@@ -18,6 +18,7 @@ type Projeto = {
 
 type ChatRecord = {
   id: string;
+  conversationKey?: string | null;
   titulo: string;
   contatoNome?: string | null;
   contatoTelefone?: string | null;
@@ -458,6 +459,7 @@ export default function AdminAtendimentoPage() {
   const [chats, setChats] = useState<ChatRecord[]>([]);
   const [chatChannelFilter, setChatChannelFilter] = useState<ChatChannelFilter>("all");
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [selectedConversationKey, setSelectedConversationKey] = useState<string | null>(null);
   const [messagesByChatId, setMessagesByChatId] = useState<Record<string, ChatMessageRecord[]>>({});
   const [replyText, setReplyText] = useState("");
   const [selectedAttachments, setSelectedAttachments] = useState<PendingAttachment[]>([]);
@@ -486,6 +488,13 @@ export default function AdminAtendimentoPage() {
     () => chats.find((chat) => chat.id === selectedChatId) ?? null,
     [chats, selectedChatId],
   );
+  useEffect(() => {
+    if (!selectedChat?.conversationKey) {
+      return;
+    }
+
+    setSelectedConversationKey(selectedChat.conversationKey);
+  }, [selectedChat?.conversationKey]);
   const currentUserFirstName = useMemo(() => getFirstName(currentUser?.name), [currentUser?.name]);
   const resolvedProjectName = useMemo(() => {
     if (!activeProjectId && availableProjects.length === 1) {
@@ -645,14 +654,22 @@ export default function AdminAtendimentoPage() {
         return;
       }
 
-      const nextChats = payload.chats ?? [];
-      setChats(nextChats);
-      setSelectedChatId((current) => {
-        if (current && nextChats.some((chat) => chat.id === current)) {
-          return current;
-        }
-        return nextChats[0]?.id ?? null;
-      });
+        const nextChats = payload.chats ?? [];
+        setChats(nextChats);
+        setSelectedChatId((current) => {
+          if (current && nextChats.some((chat) => chat.id === current)) {
+            return current;
+          }
+
+          if (selectedConversationKey) {
+            const matchingConversation = nextChats.find((chat) => chat.conversationKey === selectedConversationKey);
+            if (matchingConversation) {
+              return matchingConversation.id;
+            }
+          }
+
+          return nextChats[0]?.id ?? null;
+        });
       if (!options?.silent) {
         setLoadingChats(false);
       }
@@ -853,6 +870,10 @@ export default function AdminAtendimentoPage() {
     }
 
     setSelectedChatId(requestedChatId);
+    const requestedChat = chats.find((chat) => chat.id === requestedChatId) ?? null;
+    if (requestedChat?.conversationKey) {
+      setSelectedConversationKey(requestedChat.conversationKey);
+    }
 
     if (typeof window !== "undefined" && window.innerWidth < 1280) {
       setMobileConversationOpen(true);
@@ -913,6 +934,10 @@ export default function AdminAtendimentoPage() {
 
   const handleSelectChat = (chatId: string) => {
     setSelectedChatId(chatId);
+    const chat = chats.find((item) => item.id === chatId) ?? null;
+    if (chat?.conversationKey) {
+      setSelectedConversationKey(chat.conversationKey);
+    }
     setMobileHeaderMenuOpen(false);
 
     if (typeof window !== "undefined" && window.innerWidth < 1280) {
