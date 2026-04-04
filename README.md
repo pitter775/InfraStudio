@@ -58,7 +58,8 @@ O widget agora opera em modo host-controlled. O script expoe a API global para a
 
 ## Desenvolvimento
 
-### Requisitos....
+### Requisitos........
+
 
 - Node.js
 
