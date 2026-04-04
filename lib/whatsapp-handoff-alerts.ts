@@ -1,6 +1,7 @@
 import "server-only";
 
 import { appendSystemLog } from "@/lib/chat-logs";
+import { normalizeBrazilWhatsAppPhone } from "@/lib/whatsapp-phone";
 import { sendWhatsAppServiceMessage } from "@/lib/whatsapp-service";
 import { listWhatsAppHandoffContacts } from "@/lib/whatsapp-handoff-contatos";
 
@@ -10,10 +11,6 @@ function getAppBaseUrl() {
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
     "https://infrastudio.vercel.app"
   ).replace(/\/$/, "");
-}
-
-function sanitizePhone(value: string | null | undefined) {
-  return String(value || "").replace(/\D/g, "");
 }
 
 function buildHandoffAlertLink(input: {
@@ -91,7 +88,7 @@ export async function notifyWhatsAppHandoffContacts(input: {
   const failures: Array<{ numero: string; error: string }> = [];
 
   for (const contact of contacts) {
-    const phone = sanitizePhone(contact.numero);
+    const phone = normalizeBrazilWhatsAppPhone(contact.numero);
     if (!phone) {
       continue;
     }

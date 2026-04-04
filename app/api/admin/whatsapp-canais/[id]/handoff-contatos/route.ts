@@ -3,6 +3,7 @@ import { canAccessAdmin, canManageProject } from "@/lib/access";
 import { appendSystemLog } from "@/lib/chat-logs";
 import { getSessionUser } from "@/lib/session";
 import { getWhatsAppChannelById } from "@/lib/whatsapp-channels";
+import { areSameBrazilWhatsAppPhone } from "@/lib/whatsapp-phone";
 import {
   createWhatsAppHandoffContact,
   deleteWhatsAppHandoffContact,
@@ -142,10 +143,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Nome e numero sao obrigatorios." }, { status: 400 });
   }
 
-  const normalizedChannelPhone = String(channel.numero || "").replace(/\D/g, "");
-  const normalizedContactPhone = String(body.numero || "").replace(/\D/g, "");
-
-  if (normalizedChannelPhone && normalizedContactPhone && normalizedChannelPhone === normalizedContactPhone) {
+  if (areSameBrazilWhatsAppPhone(channel.numero, body.numero)) {
     return NextResponse.json(
       {
         error:

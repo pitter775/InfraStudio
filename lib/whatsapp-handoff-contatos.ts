@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { normalizeBrazilWhatsAppPhone } from "@/lib/whatsapp-phone";
 
 export class WhatsAppHandoffContactError extends Error {
   constructor(message: string) {
@@ -75,10 +76,6 @@ type WhatsAppHandoffContactRow = {
   updated_at: string | null;
 };
 
-function sanitizePhone(value: string | null | undefined) {
-  return String(value || "").replace(/\D/g, "");
-}
-
 function mapContact(row: WhatsAppHandoffContactRow): WhatsAppHandoffContactRecord {
   return {
     id: row.id,
@@ -86,7 +83,7 @@ function mapContact(row: WhatsAppHandoffContactRow): WhatsAppHandoffContactRecor
     canalWhatsappId: row.canal_whatsapp_id,
     usuarioId: row.usuario_id,
     nome: row.nome?.trim() || "Contato",
-    numero: sanitizePhone(row.numero),
+    numero: normalizeBrazilWhatsAppPhone(row.numero),
     papel: row.papel?.trim() || null,
     observacoes: row.observacoes?.trim() || null,
     ativo: row.ativo !== false,
@@ -139,7 +136,7 @@ export async function createWhatsAppHandoffContact(input: {
 }) {
   const supabase = getSupabaseAdminClient();
   const now = new Date().toISOString();
-  const normalizedPhone = sanitizePhone(input.numero);
+  const normalizedPhone = normalizeBrazilWhatsAppPhone(input.numero);
   const { data, error } = await supabase
     .from("whatsapp_handoff_contatos")
     .insert({
@@ -185,7 +182,7 @@ export async function updateWhatsAppHandoffContact(input: {
   }
 
   if (typeof input.numero === "string") {
-    patch.numero = sanitizePhone(input.numero);
+    patch.numero = normalizeBrazilWhatsAppPhone(input.numero);
   }
 
   if (input.papel !== undefined) {

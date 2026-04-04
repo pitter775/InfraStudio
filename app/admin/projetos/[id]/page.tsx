@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Activity, ArrowLeft, Bold, Bot, Boxes, Cable, CheckCircle2, ChevronDown, Coins, Copy, Cpu, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, LoaderCircle, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, Power, ShieldAlert, Sparkles, TestTube2, Trash2, Waypoints, X } from "lucide-react";
 import { getAgentRuntimeBlockEntries, normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
+import { formatBrazilWhatsAppPhone, getNormalizedBrazilPhoneLocalDigits, normalizeBrazilWhatsAppPhone } from "@/lib/whatsapp-phone";
 import { ProjectChatsSection } from "./_components/project-chats-section";
 import { ProjectMercadoSection } from "./_components/project-mercado-section";
 import { ProjectWhatsAppSection } from "./_components/project-whatsapp-section";
@@ -403,38 +404,11 @@ const ACTIVE_PROJECT_STORAGE_KEY = "projeto_ativo";
 const ACTIVE_WHATSAPP_QR_MODAL_STORAGE_KEY = "projeto_whatsapp_qr_modal";
 
 function sanitizePhoneDigits(value: string) {
-  const digits = value.replace(/\D/g, "");
-  const localDigits = digits.startsWith("55") && digits.length > 11 ? digits.slice(2) : digits;
-
-  return localDigits.slice(0, 11);
+  return getNormalizedBrazilPhoneLocalDigits(value);
 }
 
 function formatWhatsAppPhone(value: string) {
-  const digits = sanitizePhoneDigits(value);
-
-  if (!digits) {
-    return "";
-  }
-
-  const area = digits.slice(0, 2);
-  const local = digits.slice(2);
-  let formatted = "+55";
-
-  if (area) {
-    formatted += ` ${area}`;
-  }
-
-  if (local) {
-    if (local.length <= 4) {
-      formatted += ` ${local}`;
-    } else if (local.length <= 8) {
-      formatted += ` ${local.slice(0, 4)}-${local.slice(4)}`;
-    } else {
-      formatted += ` ${local.slice(0, 5)}-${local.slice(5, 9)}`;
-    }
-  }
-
-  return formatted;
+  return formatBrazilWhatsAppPhone(value);
 }
 
 function getWhatsAppServiceUrl(pathname: string, channelId: string) {
@@ -6209,7 +6183,7 @@ export default function AdminProjetoDetalhePage() {
         },
         body: JSON.stringify({
           nome: whatsappHandoffContactForm.nome.trim(),
-          numero: sanitizePhoneDigits(whatsappHandoffContactForm.numero),
+          numero: normalizeBrazilWhatsAppPhone(whatsappHandoffContactForm.numero),
           papel: whatsappHandoffContactForm.papel.trim() || null,
           observacoes: whatsappHandoffContactForm.observacoes.trim() || null,
           ativo: true,

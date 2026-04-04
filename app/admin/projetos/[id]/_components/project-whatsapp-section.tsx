@@ -1,6 +1,7 @@
 "use client";
 
 import { Activity, CheckCircle2, LoaderCircle, Pencil, Plus, Power, Trash2, Unplug, Waypoints } from "lucide-react";
+import { formatBrazilWhatsAppPhone } from "@/lib/whatsapp-phone";
 
 type AgenteSummary = {
   id: string;
@@ -89,39 +90,8 @@ type ProjectWhatsAppSectionProps = {
   onDeleteHandoffContact: (contact: WhatsAppHandoffContact) => void;
 };
 
-function sanitizePhoneDigits(value: string) {
-  const digits = value.replace(/\D/g, "");
-  const localDigits = digits.startsWith("55") && digits.length > 11 ? digits.slice(2) : digits;
-
-  return localDigits.slice(0, 11);
-}
-
 function formatWhatsAppPhone(value: string) {
-  const digits = sanitizePhoneDigits(value);
-
-  if (!digits) {
-    return "";
-  }
-
-  const area = digits.slice(0, 2);
-  const local = digits.slice(2);
-  let formatted = "+55";
-
-  if (area) {
-    formatted += ` ${area}`;
-  }
-
-  if (local) {
-    if (local.length <= 4) {
-      formatted += ` ${local}`;
-    } else if (local.length <= 8) {
-      formatted += ` ${local.slice(0, 4)}-${local.slice(4)}`;
-    } else {
-      formatted += ` ${local.slice(0, 5)}-${local.slice(5, 9)}`;
-    }
-  }
-
-  return formatted;
+  return formatBrazilWhatsAppPhone(value);
 }
 
 function getChannelStatusTone(status: string) {
