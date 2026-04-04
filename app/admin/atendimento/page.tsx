@@ -1432,13 +1432,13 @@ export default function AdminAtendimentoPage() {
           </div>
         </div>
 
-        <div
-          className={`grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)] ${
-            mobileConversationOpen
-              ? "fixed inset-0 z-40 rounded-none bg-[#07111f] xl:relative xl:inset-auto xl:z-auto xl:rounded-[22px] xl:bg-white/[0.02]"
-              : "hidden rounded-[22px] xl:grid"
-          }`}
-        >
+          <div
+            className={`grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)] ${
+              mobileConversationOpen
+                ? "fixed inset-x-0 bottom-0 top-[73px] z-40 rounded-none bg-[#07111f] xl:relative xl:inset-auto xl:z-auto xl:rounded-[22px] xl:bg-white/[0.02]"
+                : "hidden rounded-[22px] xl:grid"
+            }`}
+          >
           {selectedChat ? (
             <>
               <div className="shrink-0 border-b border-white/10 px-3 py-2.5 sm:px-4">
