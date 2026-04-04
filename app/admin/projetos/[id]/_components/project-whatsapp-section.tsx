@@ -1,7 +1,7 @@
 "use client";
 
 import { Activity, CheckCircle2, LoaderCircle, Pencil, Plus, Power, Trash2, Unplug, Waypoints } from "lucide-react";
-import { formatBrazilWhatsAppPhone } from "@/lib/whatsapp-phone";
+import { formatBrazilWhatsAppPhone, formatBrazilWhatsAppPhoneInput } from "@/lib/whatsapp-phone";
 
 type AgenteSummary = {
   id: string;
@@ -442,16 +442,17 @@ export function ProjectWhatsAppSection({
                   </div>
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Numero do WhatsApp</p>
-                    <input
-                      value={handoffContactForm.numero}
-                      onChange={(event) => onHandoffFormChange("numero", formatWhatsAppPhone(event.target.value))}
-                      placeholder="+55 11 99999-9999"
-                      inputMode="tel"
-                      autoComplete="tel"
-                      maxLength={17}
-                      className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/30"
-                    />
-                  </div>
+                      <input
+                        value={handoffContactForm.numero}
+                        onChange={(event) => onHandoffFormChange("numero", formatBrazilWhatsAppPhoneInput(event.target.value))}
+                        placeholder="11 99999-9999"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        maxLength={14}
+                        className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/30"
+                      />
+                      <p className="mt-2 text-[11px] text-slate-500">Digite DDD + numero. O codigo +55 entra automaticamente no envio.</p>
+                    </div>
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Papel</p>
                     <input
