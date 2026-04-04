@@ -72,7 +72,7 @@ function mapChatHandoff(row: ChatHandoffRow): ChatHandoffRecord {
 }
 
 export function shouldPauseAssistantForHandoff(handoff: ChatHandoffRecord | null | undefined) {
-  return handoff?.status === "pending_human" || handoff?.status === "human";
+  return handoff?.status === "human";
 }
 
 export async function getChatHandoffByChatId(chatId: string) {
