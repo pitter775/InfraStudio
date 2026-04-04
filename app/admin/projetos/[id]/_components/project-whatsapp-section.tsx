@@ -129,6 +129,10 @@ function getChannelStatusTone(status: string) {
     return "bg-emerald-500/15 text-emerald-300";
   }
 
+  if (status === "connecting") {
+    return "bg-cyan-500/15 text-cyan-200";
+  }
+
   if (status === "aguardando_qr") {
     return "bg-amber-500/15 text-amber-200";
   }
@@ -139,6 +143,10 @@ function getChannelStatusTone(status: string) {
 function getChannelStatusLabel(status: string | null | undefined) {
   if (status === "online" || status === "conectado") {
     return "conectado";
+  }
+
+  if (status === "connecting") {
+    return "connecting";
   }
 
   if (status === "aguardando_qr") {
@@ -273,9 +281,10 @@ export function ProjectWhatsAppSection({
           {primaryChannel ? (() => {
             const channel = primaryChannel;
             const agente = channel.agenteId ? agentes.find((item) => item.id === channel.agenteId) ?? null : agenteAtivo;
-            const runtimeStatus = serviceStatusByChannel[channel.id] ?? "desconectado";
+            const runtimeStatus = serviceStatusByChannel[channel.id] ?? getChannelStatusLabel(channel.sessionData?.connectionStatus);
             const qrImage = serviceQrByChannel[channel.id] ?? channel.sessionData?.qrCodeDataUrl ?? channel.sessionData?.qrCodeUrl ?? null;
             const isConnected = runtimeStatus === "conectado" || runtimeStatus === "online";
+            const isConnecting = runtimeStatus === "connecting";
             const isWaitingQr = runtimeStatus === "aguardando_qr" && Boolean(qrImage);
             const runtimeNote = channel.sessionData?.notes ?? null;
             const shouldShowRuntimeNote = runtimeStatus !== "desconectado" && Boolean(runtimeNote);
@@ -293,14 +302,22 @@ export function ProjectWhatsAppSection({
                       </p>
                     </div>
                     <div className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] ${getChannelStatusTone(runtimeStatus)}`}>
-                      {isConnected ? "conectado" : runtimeStatus}
+                      {isConnected ? "conectado" : isConnecting ? "reconectando" : runtimeStatus}
                     </div>
                   </div>
 
                   <div className="mt-6 grid gap-4 md:grid-cols-2">
                     <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
                       <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Estado</p>
-                      <p className="mt-3 text-lg font-bold text-white">{isConnected ? "WhatsApp conectado" : isWaitingQr ? "Escaneie o QR" : "Aguardando conexao"}</p>
+                      <p className="mt-3 text-lg font-bold text-white">
+                        {isConnected
+                          ? "WhatsApp conectado"
+                          : isWaitingQr
+                            ? "Escaneie o QR"
+                            : isConnecting
+                              ? "Reconectando WhatsApp"
+                              : "Aguardando conexao"}
+                      </p>
                     </div>
                     <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
                       <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Ultima sincronizacao</p>

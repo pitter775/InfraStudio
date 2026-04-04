@@ -457,6 +457,10 @@ function getChannelStatusTone(status: string) {
     return "bg-emerald-500/15 text-emerald-300";
   }
 
+  if (status === "connecting") {
+    return "bg-cyan-500/15 text-cyan-200";
+  }
+
   if (status === "aguardando_qr") {
     return "bg-amber-500/15 text-amber-200";
   }
@@ -467,6 +471,10 @@ function getChannelStatusTone(status: string) {
 function getChannelStatusLabel(status: string | null | undefined) {
   if (status === "online" || status === "conectado") {
     return "conectado";
+  }
+
+  if (status === "connecting") {
+    return "connecting";
   }
 
   if (status === "aguardando_qr") {

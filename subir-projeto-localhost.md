@@ -128,4 +128,4 @@ O Railway atende bem esse caso porque normalmente oferece:
 ### Resumo pratico
 
 Para esse projeto, o Railway atende porque o `whatsapp-service` precisa ser um processo Node dedicado e persistente, e nao apenas uma API stateless.
-
+----------------
