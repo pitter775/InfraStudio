@@ -72,6 +72,7 @@ type ProjectWhatsAppSectionProps = {
   handoffContactForm: WhatsAppHandoffContactFormState;
   loadingHandoffContacts: boolean;
   savingHandoffContact: boolean;
+  testingHandoffAlert: boolean;
   updatingHandoffContactId: string | null;
   handoffFeedback: string | null;
   handoffFeedbackTone: "success" | "error";
@@ -83,6 +84,7 @@ type ProjectWhatsAppSectionProps = {
   onDeleteChannel: (channel: WhatsAppChannel) => void;
   onHandoffFormChange: (field: keyof WhatsAppHandoffContactFormState, value: string) => void;
   onCreateHandoffContact: () => void;
+  onTestHandoffAlert: () => void;
   onUpdateHandoffContact: (
     contact: WhatsAppHandoffContact,
     patch: Partial<Pick<WhatsAppHandoffContact, "ativo" | "receberAlertas">>,
@@ -212,6 +214,7 @@ export function ProjectWhatsAppSection({
   handoffContactForm,
   loadingHandoffContacts,
   savingHandoffContact,
+  testingHandoffAlert,
   updatingHandoffContactId,
   handoffFeedback,
   handoffFeedbackTone,
@@ -223,6 +226,7 @@ export function ProjectWhatsAppSection({
   onDeleteChannel,
   onHandoffFormChange,
   onCreateHandoffContact,
+  onTestHandoffAlert,
   onUpdateHandoffContact,
   onDeleteHandoffContact,
 }: ProjectWhatsAppSectionProps) {
@@ -477,6 +481,15 @@ export function ProjectWhatsAppSection({
                   >
                     {savingHandoffContact ? <BusyIcon /> : <Plus size={16} />}
                     Adicionar numero de aviso
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onTestHandoffAlert}
+                    disabled={testingHandoffAlert || !activeHandoffContacts.length}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-50 transition-all hover:border-cyan-300/30 hover:bg-cyan-500/14 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {testingHandoffAlert ? <BusyIcon /> : <Activity size={16} />}
+                    Testar alerta
                   </button>
                   <p className="self-center text-xs text-slate-500">
                     O aviso vai no mesmo canal oficial conectado acima.

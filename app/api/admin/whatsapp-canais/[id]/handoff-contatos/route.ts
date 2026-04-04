@@ -3,6 +3,7 @@ import { canAccessAdmin, canManageProject } from "@/lib/access";
 import { appendSystemLog } from "@/lib/chat-logs";
 import { getSessionUser } from "@/lib/session";
 import { getWhatsAppChannelById } from "@/lib/whatsapp-channels";
+import { sendWhatsAppHandoffTestAlert } from "@/lib/whatsapp-handoff-alerts";
 import { areSameBrazilWhatsAppPhone } from "@/lib/whatsapp-phone";
 import {
   createWhatsAppHandoffContact,
@@ -86,8 +87,42 @@ export async function POST(request: Request, context: RouteContext) {
     observacoes?: string | null;
     ativo?: boolean;
     receberAlertas?: boolean;
-    action?: "delete";
+    action?: "delete" | "test";
   } | null;
+
+  if (body?.action === "test") {
+    try {
+      const result = await sendWhatsAppHandoffTestAlert({
+        projetoId: channel.projetoId,
+        projetoNome: null,
+        canalWhatsappId: channel.id,
+        channelNumber: channel.numero,
+      });
+
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error ?? "Nao foi possivel enviar o teste de alerta." }, { status: 400 });
+      }
+
+      return NextResponse.json({ success: true, sent: result.sent, failures: result.failures }, { status: 200 });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nao foi possivel enviar o teste de alerta.";
+
+      await appendSystemLog({
+        projetoId: channel.projetoId,
+        tipo: "whatsapp_handoff_error",
+        origem: "whatsapp_handoff_contatos",
+        descricao: "Erro ao enviar teste do alerta de atendimento humano.",
+        payload: {
+          channelId: channel.id,
+          action: "test",
+          error: message,
+        },
+        skipErrorGate: true,
+      });
+
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
 
   if (body?.action === "delete" && body.contactId) {
     const ok = await deleteWhatsAppHandoffContact(body.contactId);

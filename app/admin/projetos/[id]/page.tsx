@@ -4250,6 +4250,7 @@ export default function AdminProjetoDetalhePage() {
   const [loadingWhatsAppHandoffContacts, setLoadingWhatsAppHandoffContacts] = useState(false);
   const lastLoadedWhatsAppHandoffChannelRef = useRef<string | null>(null);
   const [savingWhatsAppHandoffContact, setSavingWhatsAppHandoffContact] = useState(false);
+  const [testingWhatsAppHandoffAlert, setTestingWhatsAppHandoffAlert] = useState(false);
   const [updatingWhatsAppHandoffContactId, setUpdatingWhatsAppHandoffContactId] = useState<string | null>(null);
   const [feedbackBilling, setFeedbackBilling] = useState<string | null>(null);
   const [agenteModalOpen, setAgenteModalOpen] = useState(false);
@@ -6212,6 +6213,58 @@ export default function AdminProjetoDetalhePage() {
     }
   };
 
+  const handleTestWhatsAppHandoffAlert = async () => {
+    if (!primaryWhatsAppChannel) {
+      setHandoffFeedback("Crie e conecte o canal principal antes de testar o alerta.");
+      setHandoffFeedbackTone("error");
+      return;
+    }
+
+    if (!whatsappHandoffContacts.some((contact) => contact.ativo && contact.receberAlertas)) {
+      setHandoffFeedback("Cadastre pelo menos um contato ativo para testar o alerta.");
+      setHandoffFeedbackTone("error");
+      return;
+    }
+
+    setTestingWhatsAppHandoffAlert(true);
+    setHandoffFeedback(null);
+
+    try {
+      const response = await fetch(`/api/admin/whatsapp-canais/${primaryWhatsAppChannel.id}/handoff-contatos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "test",
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        sent?: number;
+        failures?: Array<{ numero: string; error: string }>;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Nao foi possivel enviar o teste de alerta.");
+      }
+
+      const failedCount = Array.isArray(payload.failures) ? payload.failures.length : 0;
+      setHandoffFeedback(
+        failedCount
+          ? `Teste enviado para ${payload.sent ?? 0} contato(s), com ${failedCount} falha(s). Veja a observabilidade para o detalhe.`
+          : `Teste de alerta enviado com sucesso para ${payload.sent ?? 0} contato(s).`,
+      );
+      setHandoffFeedbackTone(failedCount ? "error" : "success");
+    } catch (error) {
+      setHandoffFeedback(error instanceof Error ? error.message : "Nao foi possivel enviar o teste de alerta.");
+      setHandoffFeedbackTone("error");
+    } finally {
+      setTestingWhatsAppHandoffAlert(false);
+    }
+  };
+
   const handleUpdateWhatsAppHandoffContact = async (
     contact: WhatsAppHandoffContact,
     patch: Partial<Pick<WhatsAppHandoffContact, "ativo" | "receberAlertas">>,
@@ -7550,12 +7603,13 @@ export default function AdminProjetoDetalhePage() {
           disconnectingChannelId={disconnectingWhatsAppChannelId}
           deletingChannelId={deletingWhatsAppChannelId}
           handoffContacts={whatsappHandoffContacts}
-          handoffContactForm={whatsappHandoffContactForm}
-          loadingHandoffContacts={loadingWhatsAppHandoffContacts}
-          savingHandoffContact={savingWhatsAppHandoffContact}
-          updatingHandoffContactId={updatingWhatsAppHandoffContactId}
-          handoffFeedback={handoffFeedback}
-          handoffFeedbackTone={handoffFeedbackTone}
+            handoffContactForm={whatsappHandoffContactForm}
+            loadingHandoffContacts={loadingWhatsAppHandoffContacts}
+            savingHandoffContact={savingWhatsAppHandoffContact}
+            testingHandoffAlert={testingWhatsAppHandoffAlert}
+            updatingHandoffContactId={updatingWhatsAppHandoffContactId}
+            handoffFeedback={handoffFeedback}
+            handoffFeedbackTone={handoffFeedbackTone}
           actionButtonClass={headerActionButtonClass}
           onOpenNewChannel={openNewWhatsAppChannelModal}
           onConnectChannel={(channel, options) => void handleConnectWhatsAppChannel(channel, options)}
@@ -7567,11 +7621,12 @@ export default function AdminProjetoDetalhePage() {
               ...current,
               [field]: value,
             }))
-          }
-          onCreateHandoffContact={() => void handleCreateWhatsAppHandoffContact()}
-          onUpdateHandoffContact={(contact, patch) => void handleUpdateWhatsAppHandoffContact(contact, patch)}
-          onDeleteHandoffContact={(contact) => void handleDeleteWhatsAppHandoffContact(contact)}
-        />
+            }
+            onCreateHandoffContact={() => void handleCreateWhatsAppHandoffContact()}
+            onTestHandoffAlert={() => void handleTestWhatsAppHandoffAlert()}
+            onUpdateHandoffContact={(contact, patch) => void handleUpdateWhatsAppHandoffContact(contact, patch)}
+            onDeleteHandoffContact={(contact) => void handleDeleteWhatsAppHandoffContact(contact)}
+          />
       </section>
       <section className={`${renderedTab === "chats" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
         <ProjectChatsSection

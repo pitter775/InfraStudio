@@ -44,6 +44,21 @@ function buildHandoffAlertMessage(input: {
   return lines.join("\n\n");
 }
 
+function buildHandoffTestAlertMessage(input: {
+  projetoNome?: string | null;
+  channelNumber?: string | null;
+}) {
+  const lines = [
+    "InfraStudio",
+    "Teste de alerta do atendimento humano.",
+    input.projetoNome ? `Projeto: ${input.projetoNome}` : null,
+    input.channelNumber ? `Canal monitorado: ${input.channelNumber}` : null,
+    "Se esta mensagem chegou, o aviso por WhatsApp para handoff humano esta funcionando.",
+  ].filter(Boolean);
+
+  return lines.join("\n\n");
+}
+
 export async function notifyWhatsAppHandoffContacts(input: {
   projetoId: string;
   projetoNome?: string | null;
@@ -131,6 +146,81 @@ export async function notifyWhatsAppHandoffContacts(input: {
     ok: sent > 0,
     sent,
     link,
+    message,
+    failures,
+  };
+}
+
+export async function sendWhatsAppHandoffTestAlert(input: {
+  projetoId: string;
+  projetoNome?: string | null;
+  canalWhatsappId: string;
+  channelNumber?: string | null;
+}) {
+  const contacts = await listWhatsAppHandoffContacts({
+    projetoId: input.projetoId,
+    canalWhatsappId: input.canalWhatsappId,
+    onlyActive: true,
+  });
+
+  if (!contacts.length) {
+    return {
+      ok: false,
+      sent: 0,
+      failures: [] as Array<{ numero: string; error: string }>,
+      error: "Nenhum contato ativo cadastrado para testar o alerta deste canal.",
+    };
+  }
+
+  const message = buildHandoffTestAlertMessage({
+    projetoNome: input.projetoNome,
+    channelNumber: input.channelNumber,
+  });
+
+  let sent = 0;
+  const failures: Array<{ numero: string; error: string }> = [];
+
+  for (const contact of contacts) {
+    const phone = normalizeBrazilWhatsAppPhone(contact.numero);
+    if (!phone) {
+      continue;
+    }
+
+    const result = await sendWhatsAppServiceMessage({
+      channelId: input.canalWhatsappId,
+      to: phone,
+      message,
+    });
+
+    if (result.ok) {
+      sent += 1;
+      continue;
+    }
+
+    failures.push({
+      numero: phone,
+      error: result.error ?? "Falha ao enviar teste de alerta.",
+    });
+  }
+
+  await appendSystemLog({
+    projetoId: input.projetoId,
+    tipo: failures.length ? "handoff_alert_test_partial" : "handoff_alert_test_sent",
+    origem: "whatsapp_handoff_alerts",
+    descricao: failures.length
+      ? "Teste de alerta do handoff enviado com falhas parciais."
+      : "Teste de alerta do handoff enviado para os contatos cadastrados.",
+    payload: {
+      canalWhatsappId: input.canalWhatsappId,
+      sent,
+      totalContacts: contacts.length,
+      failures,
+    },
+  });
+
+  return {
+    ok: sent > 0,
+    sent,
     message,
     failures,
   };
