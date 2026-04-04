@@ -115,6 +115,30 @@ function normalizeWhatsAppLookupPhone(value: string | null | undefined) {
   return normalized;
 }
 
+function normalizeWhatsAppOutboundPhone(value: string | null | undefined) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!digits) {
+    return null;
+  }
+
+  if (digits.startsWith("55") && digits.length >= 12 && digits.length <= 13) {
+    return digits;
+  }
+
+  if (digits.length === 10 || digits.length === 11) {
+    return `55${digits}`;
+  }
+
+  if (digits.length > 13) {
+    const last13 = digits.slice(-13);
+    if (last13.startsWith("55")) {
+      return last13;
+    }
+  }
+
+  return null;
+}
+
 function getUnifiedConversationIdentity(chat: ChatRecord) {
   const contactSnapshot = extractChatContactSnapshot(chat.contexto, chat.identificadorExterno);
   const phoneCandidates = [
@@ -746,18 +770,32 @@ export async function getUnifiedWhatsAppOutboundContext(chatId: string) {
 
   const whatsapp =
     whatsappChat.contexto && typeof whatsappChat.contexto.whatsapp === "object" && whatsappChat.contexto.whatsapp !== null && !Array.isArray(whatsappChat.contexto.whatsapp)
-      ? (whatsappChat.contexto.whatsapp as { channelId?: string | null; remoteJid?: string | null; remetente?: string | null })
+      ? (whatsappChat.contexto.whatsapp as {
+          channelId?: string | null;
+          remoteJid?: string | null;
+          remetente?: string | null;
+          remotePhone?: string | null;
+          rawContact?: { number?: string | null } | null;
+        })
       : null;
+  const contactSnapshot = extractChatContactSnapshot(whatsappChat.contexto, whatsappChat.identificadorExterno);
+  const outboundPhone =
+    normalizeWhatsAppOutboundPhone(whatsapp?.remotePhone) ??
+    normalizeWhatsAppOutboundPhone(whatsapp?.rawContact?.number) ??
+    normalizeWhatsAppOutboundPhone(whatsappChat.contatoTelefone) ??
+    normalizeWhatsAppOutboundPhone(contactSnapshot.contatoTelefone) ??
+    normalizeWhatsAppOutboundPhone(whatsappChat.identificadorExterno);
 
   return {
     chatId: whatsappChat.id,
     channelId: typeof whatsapp?.channelId === "string" && whatsapp.channelId.trim() ? whatsapp.channelId.trim() : null,
     to:
-      typeof whatsapp?.remoteJid === "string" && whatsapp.remoteJid.trim()
+      outboundPhone ??
+      (typeof whatsapp?.remoteJid === "string" && whatsapp.remoteJid.trim()
         ? whatsapp.remoteJid.trim()
         : typeof whatsapp?.remetente === "string" && whatsapp.remetente.trim()
           ? whatsapp.remetente.trim()
-          : whatsappChat.identificadorExterno ?? "",
+          : whatsappChat.identificadorExterno ?? ""),
   };
 }
 
