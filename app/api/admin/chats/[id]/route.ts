@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { canAccessAdmin, canAccessProject } from "@/lib/access";
 import { appendSystemLog } from "@/lib/chat-logs";
 import { claimHumanHandoff, getChatHandoffByChatId } from "@/lib/chat-handoffs";
-import { appendMessage, deleteChatConversation, getChatById, listChatMessages, touchChatUpdatedAt } from "@/lib/chats";
+import { appendMessage, deleteChatConversation, getChatById, listUnifiedChatMessages, touchChatUpdatedAt } from "@/lib/chats";
 import { getSessionUser } from "@/lib/session";
 import { sendWhatsAppServiceMessage } from "@/lib/whatsapp-service";
 
@@ -30,7 +30,7 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Acesso negado para esta conversa." }, { status: 403 });
   }
 
-  const messages = await listChatMessages(id);
+  const messages = await listUnifiedChatMessages(id);
   const handoff = await getChatHandoffByChatId(id);
   return NextResponse.json({ chat, messages, handoff }, { status: 200 });
 }

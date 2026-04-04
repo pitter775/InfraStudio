@@ -114,6 +114,42 @@ function normalizeWhatsAppLookupPhone(value: string | null | undefined) {
   return normalized;
 }
 
+function getUnifiedConversationIdentity(chat: ChatRecord) {
+  const contactSnapshot = extractChatContactSnapshot(chat.contexto, chat.identificadorExterno);
+  const phoneCandidates = [
+    chat.contatoTelefone,
+    contactSnapshot.contatoTelefone,
+    chat.identificadorExterno,
+  ];
+
+  for (const candidate of phoneCandidates) {
+    const normalizedPhone = normalizeWhatsAppLookupPhone(candidate);
+    if (normalizedPhone) {
+      return `phone:${normalizedPhone}`;
+    }
+  }
+
+  const externalId = normalizeOptionalText(chat.identificadorExterno)?.toLowerCase();
+  if (externalId) {
+    return `external:${externalId}`;
+  }
+
+  return `chat:${chat.id}`;
+}
+
+function groupChatsByUnifiedIdentity(chats: ChatRecord[]) {
+  const groups = new Map<string, ChatRecord[]>();
+
+  for (const chat of chats) {
+    const key = getUnifiedConversationIdentity(chat);
+    const bucket = groups.get(key) ?? [];
+    bucket.push(chat);
+    groups.set(key, bucket);
+  }
+
+  return groups;
+}
+
 function extractChatContactSnapshot(
   contexto: Record<string, unknown> | null | undefined,
   fallbackExternalIdentifier?: string | null,
@@ -533,10 +569,14 @@ export async function listChats(projetoId?: string | null) {
   }
 
   const chats = data.map((row) => mapChat(row as ChatRow));
+  const groupedChats = groupChatsByUnifiedIdentity(chats);
+  const representativeChats = Array.from(groupedChats.values()).map((group) =>
+    [...group].sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())[0],
+  );
   const chatIds = chats.map((chat) => chat.id);
 
   if (!chatIds.length) {
-    return chats;
+    return representativeChats;
   }
 
   const { data: messagesData, error: messagesError } = await supabase
@@ -550,7 +590,7 @@ export async function listChats(projetoId?: string | null) {
     if (messagesError) {
       console.error("[chats] failed to load latest chat messages", messagesError);
     }
-    return chats;
+    return representativeChats;
   }
 
   const latestMessageByChatId = new Map<string, string>();
@@ -576,11 +616,22 @@ export async function listChats(projetoId?: string | null) {
     latestMessageByChatId.set(chatId, content);
   }
 
-  return chats.map((chat) => ({
-    ...chat,
-    ultimaMensagem: latestMessageByChatId.get(chat.id) ?? null,
-    totalMensagens: messageCountByChatId.get(chat.id) ?? 0,
-  }));
+  return representativeChats.map((chat) => {
+    const relatedChats = groupedChats.get(getUnifiedConversationIdentity(chat)) ?? [chat];
+    const totalMensagens = relatedChats.reduce((sum, item) => sum + (messageCountByChatId.get(item.id) ?? 0), 0);
+    const ultimaMensagem =
+      latestMessageByChatId.get(chat.id) ??
+      relatedChats
+        .map((item) => latestMessageByChatId.get(item.id))
+        .find((value) => Boolean(value)) ??
+      null;
+
+    return {
+      ...chat,
+      ultimaMensagem,
+      totalMensagens,
+    };
+  });
 }
 
 export async function listChatMessages(chatId: string) {
@@ -593,6 +644,56 @@ export async function listChatMessages(chatId: string) {
 
   if (error || !data) {
     console.error("[chats] failed to list messages", error);
+    return [];
+  }
+
+  return data.map((row) => mapMensagem(row as MensagemRow));
+}
+
+export async function listUnifiedChatMessages(chatId: string) {
+  const chat = await getChatById(chatId);
+  if (!chat) {
+    return [];
+  }
+
+  const supabase = getSupabaseAdminClient();
+  let chatCandidatesQuery = supabase
+    .from("chats")
+    .select("id, titulo, contato_nome, contato_telefone, contato_avatar_url, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
+    .eq("status", "ativo")
+    .order("updated_at", { ascending: false })
+    .limit(200);
+
+  if (chat.projetoId) {
+    chatCandidatesQuery = chatCandidatesQuery.eq("projeto_id", chat.projetoId);
+  }
+
+  const { data: chatCandidates, error: chatCandidatesError } = await chatCandidatesQuery;
+  if (chatCandidatesError || !chatCandidates) {
+    if (chatCandidatesError) {
+      console.error("[chats] failed to load unified chat candidates", chatCandidatesError);
+    }
+    return await listChatMessages(chatId);
+  }
+
+  const normalizedIdentity = getUnifiedConversationIdentity(chat);
+  const relatedChatIds = (chatCandidates as ChatRow[])
+    .map((row) => mapChat(row))
+    .filter((candidate) => getUnifiedConversationIdentity(candidate) === normalizedIdentity)
+    .map((candidate) => candidate.id);
+
+  if (!relatedChatIds.length) {
+    return await listChatMessages(chatId);
+  }
+
+  const { data, error } = await supabase
+    .from("mensagens")
+    .select("id, chat_id, role, conteudo, canal, identificador_externo, tokens_input, tokens_output, custo, metadata, created_at")
+    .in("chat_id", relatedChatIds)
+    .order("created_at", { ascending: true });
+
+  if (error || !data) {
+    console.error("[chats] failed to list unified chat messages", error);
     return [];
   }
 
