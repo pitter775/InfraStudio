@@ -32,6 +32,7 @@ function HomePageContent() {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatDocked, setChatDocked] = useState(false);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
+  const [authResolved, setAuthResolved] = useState(false);
   const authProvider = getAuthProviderLabel();
   const embeddedProjeto = searchParams.get("projeto")?.trim() || DEFAULT_CHAT_PROJECT;
   const embeddedAgente = searchParams.get("agente")?.trim() || DEFAULT_CHAT_AGENT;
@@ -42,10 +43,24 @@ function HomePageContent() {
     const loadUser = async () => {
       const user = await getCurrentProjectUser();
       setCurrentUser(user);
+      setAuthResolved(true);
     };
 
     void loadUser();
   }, []);
+
+  useEffect(() => {
+    if (!returnTo || !authResolved) {
+      return;
+    }
+
+    if (currentUser) {
+      window.location.href = returnTo;
+      return;
+    }
+
+    setLoginModalOpen(true);
+  }, [authResolved, currentUser, returnTo]);
 
   const handleLogin = async (email: string, password: string) => {
     const result = await signInWithProjectAuth(email, password);
