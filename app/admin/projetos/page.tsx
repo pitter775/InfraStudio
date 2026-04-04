@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BriefcaseBusiness, Cable, LoaderCircle, Lock, MessageSquareText, Plus, Shield, Bot, X } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
@@ -82,6 +83,7 @@ function CenterLoader() {
 }
 
 export default function AdminProjetosPage() {
+  const searchParams = useSearchParams();
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [planos, setPlanos] = useState<PlanoOption[]>([]);
@@ -91,6 +93,7 @@ export default function AdminProjetosPage() {
   const [updatingPlanoProjetoId, setUpdatingPlanoProjetoId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const handoffError = searchParams.get("handoff_error")?.trim() || null;
 
   const loadProjetos = async () => {
     const [projetosResponse, usoResponse, planosResponse] = await Promise.all([
@@ -143,6 +146,14 @@ export default function AdminProjetosPage() {
 
     void load();
   }, []);
+
+  useEffect(() => {
+    if (handoffError !== "access_denied") {
+      return;
+    }
+
+    setFeedback("Voce nao tem acesso ao projeto desse link de handoff. Entre com outro usuario ou abra um projeto permitido.");
+  }, [handoffError]);
 
   const handleSubmit = async () => {
     setSaving(true);

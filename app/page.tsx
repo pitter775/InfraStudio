@@ -37,7 +37,12 @@ function HomePageContent() {
   const embeddedProjeto = searchParams.get("projeto")?.trim() || DEFAULT_CHAT_PROJECT;
   const embeddedAgente = searchParams.get("agente")?.trim() || DEFAULT_CHAT_AGENT;
   const returnTo = searchParams.get("returnTo")?.trim() || null;
+  const handoffError = searchParams.get("handoff_error")?.trim() || null;
   const externalWidgetTestMode = searchParams.get("embed") === "1" && Boolean(embeddedProjeto && embeddedAgente);
+  const handoffErrorMessage =
+    handoffError === "invalid_link"
+      ? "Este link de atendimento expirou ou nao e mais valido. Peca um novo aviso no WhatsApp."
+      : null;
 
   useEffect(() => {
     const loadUser = async () => {
@@ -102,6 +107,14 @@ function HomePageContent() {
 
       {externalWidgetTestMode ? (
         <ExternalChatEmbed projeto={embeddedProjeto} agente={embeddedAgente} open={chatOpen} />
+      ) : null}
+
+      {handoffErrorMessage ? (
+        <div className="mx-auto mt-6 w-full max-w-5xl px-6">
+          <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            {handoffErrorMessage}
+          </div>
+        </div>
       ) : null}
 
       <HeroSection onOpenChat={openPreferredChat} />
