@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { canAccessAdmin, canAccessProject } from "@/lib/access";
 import { appendSystemLog } from "@/lib/chat-logs";
 import { claimHumanHandoff, getChatHandoffByChatId } from "@/lib/chat-handoffs";
-import { appendMessage, deleteChatConversation, getChatById, listUnifiedChatMessages, touchChatUpdatedAt } from "@/lib/chats";
+import { appendMessage, deleteChatConversation, getChatById, getUnifiedWhatsAppOutboundContext, listUnifiedChatMessages, touchChatUpdatedAt } from "@/lib/chats";
 import { getSessionUser } from "@/lib/session";
 import { sendWhatsAppServiceMessage } from "@/lib/whatsapp-service";
 
@@ -108,17 +108,9 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Nao foi possivel enviar a mensagem." }, { status: 500 });
   }
 
-  const channelContext =
-    chat.contexto && typeof chat.contexto === "object" && !Array.isArray(chat.contexto)
-      ? (chat.contexto.whatsapp as { channelId?: string | null; remoteJid?: string | null; remetente?: string | null } | undefined)
-      : undefined;
-  const canalWhatsappId = typeof channelContext?.channelId === "string" ? channelContext.channelId : null;
-  const destinatarioWhatsapp =
-    typeof channelContext?.remoteJid === "string" && channelContext.remoteJid.trim()
-      ? channelContext.remoteJid.trim()
-      : typeof channelContext?.remetente === "string" && channelContext.remetente.trim()
-        ? channelContext.remetente.trim()
-      : chat.identificadorExterno ?? "";
+  const unifiedWhatsAppContext = await getUnifiedWhatsAppOutboundContext(chat.id);
+  const canalWhatsappId = unifiedWhatsAppContext?.channelId ?? null;
+  const destinatarioWhatsapp = unifiedWhatsAppContext?.to ?? chat.identificadorExterno ?? "";
 
   if (sentByHuman && chat.projetoId) {
     await claimHumanHandoff({
@@ -133,7 +125,7 @@ export async function POST(request: Request, context: RouteContext) {
     });
   }
 
-  if (chat.canal === "whatsapp" && canalWhatsappId && (conteudo || attachments.length)) {
+  if (canalWhatsappId && destinatarioWhatsapp && (conteudo || attachments.length)) {
     const outbound = await sendWhatsAppServiceMessage({
       channelId: canalWhatsappId,
       to: destinatarioWhatsapp,

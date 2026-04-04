@@ -150,6 +150,43 @@ function groupChatsByUnifiedIdentity(chats: ChatRecord[]) {
   return groups;
 }
 
+async function listUnifiedConversationChats(chatId: string) {
+  const chat = await getChatById(chatId);
+  if (!chat) {
+    return { chat: null, relatedChats: [] as ChatRecord[] };
+  }
+
+  const supabase = getSupabaseAdminClient();
+  let chatCandidatesQuery = supabase
+    .from("chats")
+    .select("id, titulo, contato_nome, contato_telefone, contato_avatar_url, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
+    .eq("status", "ativo")
+    .order("updated_at", { ascending: false })
+    .limit(200);
+
+  if (chat.projetoId) {
+    chatCandidatesQuery = chatCandidatesQuery.eq("projeto_id", chat.projetoId);
+  }
+
+  const { data: chatCandidates, error: chatCandidatesError } = await chatCandidatesQuery;
+  if (chatCandidatesError || !chatCandidates) {
+    if (chatCandidatesError) {
+      console.error("[chats] failed to load unified conversation chat candidates", chatCandidatesError);
+    }
+    return { chat, relatedChats: [chat] };
+  }
+
+  const normalizedIdentity = getUnifiedConversationIdentity(chat);
+  const relatedChats = (chatCandidates as ChatRow[])
+    .map((row) => mapChat(row))
+    .filter((candidate) => getUnifiedConversationIdentity(candidate) === normalizedIdentity);
+
+  return {
+    chat,
+    relatedChats: relatedChats.length ? relatedChats : [chat],
+  };
+}
+
 function extractChatContactSnapshot(
   contexto: Record<string, unknown> | null | undefined,
   fallbackExternalIdentifier?: string | null,
@@ -651,36 +688,12 @@ export async function listChatMessages(chatId: string) {
 }
 
 export async function listUnifiedChatMessages(chatId: string) {
-  const chat = await getChatById(chatId);
+  const { chat, relatedChats } = await listUnifiedConversationChats(chatId);
   if (!chat) {
     return [];
   }
-
   const supabase = getSupabaseAdminClient();
-  let chatCandidatesQuery = supabase
-    .from("chats")
-    .select("id, titulo, contato_nome, contato_telefone, contato_avatar_url, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
-    .eq("status", "ativo")
-    .order("updated_at", { ascending: false })
-    .limit(200);
-
-  if (chat.projetoId) {
-    chatCandidatesQuery = chatCandidatesQuery.eq("projeto_id", chat.projetoId);
-  }
-
-  const { data: chatCandidates, error: chatCandidatesError } = await chatCandidatesQuery;
-  if (chatCandidatesError || !chatCandidates) {
-    if (chatCandidatesError) {
-      console.error("[chats] failed to load unified chat candidates", chatCandidatesError);
-    }
-    return await listChatMessages(chatId);
-  }
-
-  const normalizedIdentity = getUnifiedConversationIdentity(chat);
-  const relatedChatIds = (chatCandidates as ChatRow[])
-    .map((row) => mapChat(row))
-    .filter((candidate) => getUnifiedConversationIdentity(candidate) === normalizedIdentity)
-    .map((candidate) => candidate.id);
+  const relatedChatIds = relatedChats.map((candidate) => candidate.id);
 
   if (!relatedChatIds.length) {
     return await listChatMessages(chatId);
@@ -698,6 +711,48 @@ export async function listUnifiedChatMessages(chatId: string) {
   }
 
   return data.map((row) => mapMensagem(row as MensagemRow));
+}
+
+export async function getUnifiedWhatsAppOutboundContext(chatId: string) {
+  const { chat, relatedChats } = await listUnifiedConversationChats(chatId);
+  if (!chat) {
+    return null;
+  }
+
+  const whatsappChat = [...relatedChats]
+    .filter((candidate) => candidate.canal === "whatsapp")
+    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
+    .find((candidate) => {
+      const whatsapp = candidate.contexto?.whatsapp;
+      return Boolean(
+        whatsapp &&
+        typeof whatsapp === "object" &&
+        !Array.isArray(whatsapp) &&
+        (typeof (whatsapp as { channelId?: string | null }).channelId === "string" ||
+          typeof (whatsapp as { remoteJid?: string | null }).remoteJid === "string" ||
+          typeof (whatsapp as { remetente?: string | null }).remetente === "string"),
+      );
+    });
+
+  if (!whatsappChat) {
+    return null;
+  }
+
+  const whatsapp =
+    whatsappChat.contexto && typeof whatsappChat.contexto.whatsapp === "object" && whatsappChat.contexto.whatsapp !== null && !Array.isArray(whatsappChat.contexto.whatsapp)
+      ? (whatsappChat.contexto.whatsapp as { channelId?: string | null; remoteJid?: string | null; remetente?: string | null })
+      : null;
+
+  return {
+    chatId: whatsappChat.id,
+    channelId: typeof whatsapp?.channelId === "string" && whatsapp.channelId.trim() ? whatsapp.channelId.trim() : null,
+    to:
+      typeof whatsapp?.remoteJid === "string" && whatsapp.remoteJid.trim()
+        ? whatsapp.remoteJid.trim()
+        : typeof whatsapp?.remetente === "string" && whatsapp.remetente.trim()
+          ? whatsapp.remetente.trim()
+          : whatsappChat.identificadorExterno ?? "",
+  };
 }
 
 function extractAttachmentStoragePaths(metadata: Record<string, unknown> | null | undefined) {
