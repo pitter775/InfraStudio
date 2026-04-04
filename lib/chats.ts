@@ -92,6 +92,28 @@ function normalizeOptionalText(value: string | null | undefined) {
   return normalized ? normalized : null;
 }
 
+function normalizeWhatsAppLookupPhone(value: string | null | undefined) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!digits) {
+    return null;
+  }
+
+  let normalized = digits;
+  while (normalized.startsWith("55") && normalized.length > 11) {
+    normalized = normalized.slice(2);
+  }
+
+  if (normalized.length < 10) {
+    return null;
+  }
+
+  if (normalized.length > 11) {
+    normalized = normalized.slice(-11);
+  }
+
+  return normalized;
+}
+
 function extractChatContactSnapshot(
   contexto: Record<string, unknown> | null | undefined,
   fallbackExternalIdentifier?: string | null,
@@ -426,6 +448,67 @@ export async function findActiveChatByChannel(input: {
     const mapped = mapChat(row as ChatRow);
     const whatsapp = (mapped.contexto?.whatsapp ?? null) as Record<string, unknown> | null;
     return typeof whatsapp?.channelId === "string" && whatsapp.channelId === input.channelScopeId;
+  });
+
+  return match ? mapChat(match as ChatRow) : null;
+}
+
+export async function findActiveWhatsAppChatByPhone(input: {
+  projetoId?: string | null;
+  agenteId?: string | null;
+  phone: string;
+  channelScopeId?: string | null;
+}) {
+  const normalizedPhone = normalizeWhatsAppLookupPhone(input.phone);
+  if (!normalizedPhone) {
+    return null;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  let query = supabase
+    .from("chats")
+    .select("id, titulo, contato_nome, contato_telefone, contato_avatar_url, status, created_at, updated_at, total_tokens, total_custo, agente_id, usuario_id, projeto_id, canal, identificador_externo, contexto")
+    .eq("canal", "whatsapp")
+    .eq("status", "ativo")
+    .order("updated_at", { ascending: false })
+    .limit(50);
+
+  if (input.projetoId) {
+    query = query.eq("projeto_id", input.projetoId);
+  }
+
+  if (input.agenteId) {
+    query = query.eq("agente_id", input.agenteId);
+  }
+
+  const { data, error } = await query;
+  if (error || !data) {
+    if (error) {
+      console.error("[chats] failed to find active whatsapp chats by phone", error);
+    }
+    return null;
+  }
+
+  const match = data.find((row) => {
+    const mapped = mapChat(row as ChatRow);
+    const whatsapp = (mapped.contexto?.whatsapp ?? null) as Record<string, unknown> | null;
+    const channelMatches =
+      !input.channelScopeId || (typeof whatsapp?.channelId === "string" && whatsapp.channelId === input.channelScopeId);
+
+    if (!channelMatches) {
+      return false;
+    }
+
+    const contactSnapshot = extractChatContactSnapshot(mapped.contexto, mapped.identificadorExterno);
+    const candidates = [
+      mapped.contatoTelefone,
+      mapped.identificadorExterno,
+      contactSnapshot.contatoTelefone,
+      typeof whatsapp?.remotePhone === "string" ? whatsapp.remotePhone : null,
+      typeof whatsapp?.remetente === "string" ? whatsapp.remetente : null,
+    ];
+
+    return candidates.some((candidate) => normalizeWhatsAppLookupPhone(candidate) === normalizedPhone);
   });
 
   return match ? mapChat(match as ChatRow) : null;

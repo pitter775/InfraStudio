@@ -12,7 +12,7 @@ import { getChatHandoffByChatId, requestHumanHandoff, shouldPauseAssistantForHan
 import { enrichLeadContext, generateSalesReply, shouldRefreshSummary, summarizeConversation } from "@/lib/chat-orchestrator";
 import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetByProjetoAgente, getChatWidgetBySlug } from "@/lib/chat-widgets";
 import { getChatAttachmentsMetadata, uploadChatAttachmentPayloads } from "@/lib/chat-attachments";
-import { appendMessage, createChat, findActiveChatByChannel, getChatById, getChatContext, listChatMessages, type ChatChannelKind, updateChatContext, updateChatStats } from "@/lib/chats";
+import { appendMessage, createChat, findActiveChatByChannel, findActiveWhatsAppChatByPhone, getChatById, getChatContext, listChatMessages, type ChatChannelKind, updateChatContext, updateChatStats } from "@/lib/chats";
 import { registrarUso, verifyProjetoBillingAccess } from "@/lib/billing";
 import { estimateOpenAICostUsd } from "@/lib/openai-pricing";
 import { getProjetoById, getProjetoByIdentifier } from "@/lib/projetos";
@@ -907,22 +907,38 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     }
   }
 
-  if (!chat) {
-    if (normalizedExternalIdentifier) {
-      const preferredAgentId = resolved.agente?.id ?? null;
-      chat = await findActiveChatByChannel({
-        projetoId: resolved.projeto.id,
+    if (!chat) {
+      const extraContext = isPlainObject(effectiveBody.context) ? effectiveBody.context : null;
+      if (normalizedExternalIdentifier) {
+        const preferredAgentId = resolved.agente?.id ?? null;
+        chat = await findActiveChatByChannel({
+          projetoId: resolved.projeto.id,
         agenteId: preferredAgentId,
         canal: channelKind,
         identificadorExterno: normalizedExternalIdentifier,
-        channelScopeId: channelKind === "whatsapp" ? body.whatsappChannelId ?? null : null,
-      });
-    }
+          channelScopeId: channelKind === "whatsapp" ? body.whatsappChannelId ?? null : null,
+        });
 
-    if (!chat) {
-      const extraContext = isPlainObject(effectiveBody.context) ? effectiveBody.context : null;
-      const source = effectiveBody.source?.trim() || (channelKind === "whatsapp" ? "whatsapp_bridge" : "site_widget");
-      const baseContext = {
+        if (!chat && channelKind === "whatsapp") {
+          const fallbackPhone =
+            getWhatsAppContactPhoneFromContext(extraContext) ??
+            getWhatsAppContactPhoneFromContext(effectiveBody.context && typeof effectiveBody.context === "object" ? effectiveBody.context : null) ??
+            normalizedExternalIdentifier;
+
+          if (fallbackPhone) {
+            chat = await findActiveWhatsAppChatByPhone({
+              projetoId: resolved.projeto.id,
+              agenteId: preferredAgentId,
+              phone: fallbackPhone,
+              channelScopeId: body.whatsappChannelId ?? null,
+            });
+          }
+        }
+      }
+
+      if (!chat) {
+        const source = effectiveBody.source?.trim() || (channelKind === "whatsapp" ? "whatsapp_bridge" : "site_widget");
+        const baseContext = {
         source,
         canal: channelKind,
         objetivo: channelKind === "whatsapp" ? "atendimento_whatsapp" : "captacao_comercial",
