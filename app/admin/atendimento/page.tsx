@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, ExternalLink, LoaderCircle, MessageCircleMore, MoreHorizontal, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, Trash2, X } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
@@ -439,6 +439,7 @@ function ChatMediaModal({
 }
 
 export default function AdminAtendimentoPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const conversationViewportRef = useRef<HTMLDivElement | null>(null);
@@ -568,6 +569,33 @@ export default function AdminAtendimentoPage() {
       practicalSummary,
     };
   }, [chats]);
+
+  useEffect(() => {
+    if (!authResolved || !activeProjectId) {
+      return;
+    }
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("projeto", activeProjectId);
+
+    if (selectedChatId) {
+      nextParams.set("chat", selectedChatId);
+    } else {
+      nextParams.delete("chat");
+      nextParams.delete("handoff");
+    }
+
+    const currentProjeto = searchParams.get("projeto")?.trim() || null;
+    const currentChat = searchParams.get("chat")?.trim() || null;
+    const nextProjeto = nextParams.get("projeto")?.trim() || null;
+    const nextChat = nextParams.get("chat")?.trim() || null;
+
+    if (currentProjeto === nextProjeto && currentChat === nextChat) {
+      return;
+    }
+
+    router.replace(`/admin/atendimento?${nextParams.toString()}`, { scroll: false });
+  }, [activeProjectId, authResolved, router, searchParams, selectedChatId]);
 
   const loadProjects = async () => {
     setLoadingProjects(true);
