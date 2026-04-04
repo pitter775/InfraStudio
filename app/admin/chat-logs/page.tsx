@@ -1,10 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentProjectUser } from "@/lib/auth";
 import { canAccessGlobalAdmin } from "@/lib/access";
+
+// Este componente deixou de ser apenas uma tela de "chat-logs" e hoje funciona como
+// laboratorio de observacao operacional, com foco especial no worker do WhatsApp.
+// Ao evoluir esta tela, preservar a leitura rapida de runtime, bootstrap e reconexao:
+// filtros, busca por channelId/numero/origem/tipo e payload visivel sao parte do uso esperado.
+// Se a UX mudar no futuro, considerar renomear a rota/entrada de menu para algo como
+// "Observabilidade" sem perder este papel de diagnostico rapido.
 
 type SystemLog = {
   id: string;
@@ -112,16 +119,83 @@ function formatPayloadPreview(payload: Record<string, unknown> | null) {
   }
 }
 
+function isWhatsAppWorkerLog(log: SystemLog) {
+  const joined = [log.tipo, log.origem, log.descricao]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return joined.includes("whatsapp") || joined.includes("worker");
+}
+
+function isWhatsAppBootstrapLog(log: SystemLog) {
+  const joined = [log.tipo, log.origem, log.descricao]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return joined.includes("bootstrap") || joined.includes("reconexao") || joined.includes("reconnect");
+}
+
+function extractWorkerChannelId(log: SystemLog) {
+  const value = log.payload?.channelId;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function extractWorkerPhone(log: SystemLog) {
+  const value = log.payload?.numero;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function buildSearchableText(log: SystemLog) {
+  const payload = log.payload ?? {};
+  const pieces = [
+    log.id,
+    log.projetoId,
+    log.tipo,
+    log.origem,
+    log.descricao,
+    extractWorkerChannelId(log),
+    extractWorkerPhone(log),
+    ...Object.entries(payload).flatMap(([key, value]) => {
+      if (value == null) {
+        return [key];
+      }
+
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        return [key, String(value)];
+      }
+
+      return [key];
+    }),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return pieces;
+}
+
 export default function AdminChatLogsPage() {
   const router = useRouter();
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [copiedLogId, setCopiedLogId] = useState<string | null>(null);
+  const [scope, setScope] = useState<"all" | "whatsapp" | "bootstrap">("whatsapp");
+  const [levelFilter, setLevelFilter] = useState<"all" | "error" | "info">("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    const load = async () => {
+  const loadLogs = async (options?: { silent?: boolean }) => {
+    if (options?.silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
       const currentUser = await getCurrentProjectUser();
       if (!canAccessGlobalAdmin(currentUser)) {
         router.replace("/admin/projetos");
@@ -131,11 +205,55 @@ export default function AdminChatLogsPage() {
       const response = await fetch("/api/admin/chat-logs", { cache: "no-store" });
       const payload = (await response.json()) as { logs?: SystemLog[] };
       setLogs(payload.logs ?? []);
-      setLoading(false);
-    };
+    } finally {
+      if (options?.silent) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
+    }
+  };
 
-    void load();
+  useEffect(() => {
+    void loadLogs();
   }, [router]);
+
+  const visibleLogs = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    return logs.filter((log) => {
+      if (scope === "whatsapp" && !isWhatsAppWorkerLog(log)) {
+        return false;
+      }
+
+      if (scope === "bootstrap" && !isWhatsAppBootstrapLog(log)) {
+        return false;
+      }
+
+      if (levelFilter !== "all" && log.level !== levelFilter) {
+        return false;
+      }
+
+      if (normalizedQuery && !buildSearchableText(log).includes(normalizedQuery)) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [levelFilter, logs, scope, searchQuery]);
+
+  const summary = useMemo(() => {
+    const whatsappLogs = logs.filter(isWhatsAppWorkerLog);
+    const bootstrapLogs = logs.filter(isWhatsAppBootstrapLog);
+    const errorLogs = logs.filter((log) => log.level === "error");
+
+    return {
+      total: logs.length,
+      whatsapp: whatsappLogs.length,
+      bootstrap: bootstrapLogs.length,
+      errors: errorLogs.length,
+    };
+  }, [logs]);
 
   const handleClearLogs = async () => {
     const confirmed = window.confirm("Remover todos os logs do sistema e de runtime?");
@@ -197,23 +315,99 @@ export default function AdminChatLogsPage() {
             <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Observabilidade</p>
             <h1 className="mt-2 text-[2rem] font-extrabold text-white">Logs</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-              Lista geral dos eventos de erro mais recentes do sistema. Eventos informativos deixam de ser registrados aqui para reduzir ruido.
+              Laboratorio de observacao para acompanhar runtime, bootstrap e reconexao do worker do WhatsApp sem depender apenas do card do canal.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void handleClearLogs()}
-            disabled={loading || clearing}
-            className="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-50 transition-colors hover:bg-rose-500/16 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {clearing ? "Removendo logs..." : "Remover todos os logs"}
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => void loadLogs({ silent: true })}
+              disabled={loading || refreshing}
+              className="inline-flex items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-50 transition-colors hover:bg-cyan-500/16 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {refreshing ? "Atualizando..." : "Atualizar logs"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleClearLogs()}
+              disabled={loading || clearing}
+              className="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-50 transition-colors hover:bg-rose-500/16 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {clearing ? "Removendo logs..." : "Remover todos os logs"}
+            </button>
+          </div>
         </div>
         {feedback ? (
           <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${feedback.includes("removidos") ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-100" : "border-rose-500/20 bg-rose-500/10 text-rose-100"}`}>
             {feedback}
           </div>
         ) : null}
+        <div className="mt-5 grid gap-3 md:grid-cols-4">
+          <div className="rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Logs carregados</p>
+            <p className="mt-2 text-2xl font-black text-white">{summary.total}</p>
+          </div>
+          <div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/10 px-4 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-100/80">Worker WhatsApp</p>
+            <p className="mt-2 text-2xl font-black text-cyan-50">{summary.whatsapp}</p>
+          </div>
+          <div className="rounded-2xl border border-amber-400/15 bg-amber-500/10 px-4 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-100/80">Bootstrap</p>
+            <p className="mt-2 text-2xl font-black text-amber-50">{summary.bootstrap}</p>
+          </div>
+          <div className="rounded-2xl border border-rose-400/15 bg-rose-500/10 px-4 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-rose-100/80">Erros</p>
+            <p className="mt-2 text-2xl font-black text-rose-50">{summary.errors}</p>
+          </div>
+        </div>
+        <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr),auto,auto]">
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Buscar por channelId, numero, origem, tipo ou texto do evento"
+            className="w-full rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/30"
+          />
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: "whatsapp", label: "WhatsApp Worker" },
+              { id: "bootstrap", label: "Bootstrap" },
+              { id: "all", label: "Todos" },
+            ].map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setScope(option.id as "all" | "whatsapp" | "bootstrap")}
+                className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${
+                  scope === option.id
+                    ? "border-cyan-400/25 bg-cyan-500/14 text-cyan-50"
+                    : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: "all", label: "Tudo" },
+              { id: "info", label: "Info" },
+              { id: "error", label: "Erro" },
+            ].map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setLevelFilter(option.id as "all" | "info" | "error")}
+                className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${
+                  levelFilter === option.id
+                    ? "border-emerald-400/25 bg-emerald-500/14 text-emerald-50"
+                    : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </section>
 
       {loading ? (
@@ -223,13 +417,24 @@ export default function AdminChatLogsPage() {
       ) : null}
 
       <section className="space-y-2">
-        {logs.map((log, index) => {
+        {!loading && visibleLogs.length ? (
+          <p className="px-1 text-xs text-slate-500">
+            Mostrando {visibleLogs.length} de {logs.length} logs carregados.
+          </p>
+        ) : null}
+
+        {visibleLogs.map((log, index) => {
           const compactDetails = buildCompactDetails(log);
           const payloadPreview = formatPayloadPreview(log.payload);
+          const workerChannelId = extractWorkerChannelId(log);
+          const workerPhone = extractWorkerPhone(log);
+          const isWorkerLog = isWhatsAppWorkerLog(log);
           const lineClass =
             log.level === "error"
               ? "border-red-500/35 bg-[linear-gradient(90deg,rgba(239,68,68,0.2),rgba(127,29,29,0.16))] text-red-100 shadow-[inset_3px_0_0_rgba(248,113,113,0.85)]"
-              : "border-white/8 bg-white/[0.03] text-slate-300";
+              : isWorkerLog
+                ? "border-cyan-500/20 bg-[linear-gradient(90deg,rgba(6,182,212,0.14),rgba(8,47,73,0.12))] text-cyan-50 shadow-[inset_3px_0_0_rgba(34,211,238,0.55)]"
+                : "border-white/8 bg-white/[0.03] text-slate-300";
           const subtleTextClass = log.level === "error" ? "text-red-200/80" : "text-slate-500";
           const separatorClass = log.level === "error" ? "text-red-300/35" : "text-slate-600";
 
@@ -263,6 +468,20 @@ export default function AdminChatLogsPage() {
                   </>
                 ) : null}
               </p>
+              {workerChannelId || workerPhone ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {workerChannelId ? (
+                    <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-100">
+                      channel {workerChannelId}
+                    </span>
+                  ) : null}
+                  {workerPhone ? (
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
+                      numero {workerPhone}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
               {payloadPreview ? (
                 <pre className={`mt-2 overflow-x-auto rounded-xl border px-3 py-2 text-[10px] leading-5 ${log.level === "error" ? "border-red-400/20 bg-red-950/20 text-red-100/90" : "border-white/10 bg-slate-950/30 text-slate-300"}`}>
                   {payloadPreview}
@@ -272,9 +491,9 @@ export default function AdminChatLogsPage() {
           );
         })}
 
-        {!loading && !logs.length ? (
+        {!loading && !visibleLogs.length ? (
           <section className="rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-5 text-sm text-slate-400">
-            Ainda nao ha logs de erro para mostrar.
+            Nenhum log corresponde aos filtros atuais.
           </section>
         ) : null}
       </section>
