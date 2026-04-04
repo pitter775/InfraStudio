@@ -1,27 +1,21 @@
 import "server-only";
 
 import { appendSystemLog } from "@/lib/chat-logs";
+import { createHandoffAccessLink } from "@/lib/handoff-link";
 import { normalizeBrazilWhatsAppPhone } from "@/lib/whatsapp-phone";
 import { sendWhatsAppServiceMessage } from "@/lib/whatsapp-service";
 import { listWhatsAppHandoffContacts } from "@/lib/whatsapp-handoff-contatos";
 
-function getAppBaseUrl() {
-  return (
-    process.env.APP_URL?.trim() ||
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    "https://infrastudio.vercel.app"
-  ).replace(/\/$/, "");
-}
-
-function buildHandoffAlertLink(input: {
+async function buildHandoffAlertLink(input: {
   projetoId: string;
   chatId: string;
+  canalWhatsappId?: string | null;
 }) {
-  const url = new URL("/admin/atendimento", getAppBaseUrl());
-  url.searchParams.set("projeto", input.projetoId);
-  url.searchParams.set("chat", input.chatId);
-  url.searchParams.set("handoff", "1");
-  return url.toString();
+  return await createHandoffAccessLink({
+    projetoId: input.projetoId,
+    chatId: input.chatId,
+    canalWhatsappId: input.canalWhatsappId ?? null,
+  });
 }
 
 function buildHandoffAlertMessage(input: {
@@ -78,17 +72,19 @@ export async function notifyWhatsAppHandoffContacts(input: {
     return {
       ok: false,
       sent: 0,
-      link: buildHandoffAlertLink({
+      link: await buildHandoffAlertLink({
         projetoId: input.projetoId,
         chatId: input.chatId,
+        canalWhatsappId: input.canalWhatsappId,
       }),
       error: "Nenhum contato ativo cadastrado para handoff neste canal.",
     };
   }
 
-  const link = buildHandoffAlertLink({
+  const link = await buildHandoffAlertLink({
     projetoId: input.projetoId,
     chatId: input.chatId,
+    canalWhatsappId: input.canalWhatsappId,
   });
 
   const message = buildHandoffAlertMessage({
