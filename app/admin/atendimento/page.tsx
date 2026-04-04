@@ -853,6 +853,10 @@ export default function AdminAtendimentoPage() {
     }
 
     setSelectedChatId(requestedChatId);
+
+    if (typeof window !== "undefined" && window.innerWidth < 1280) {
+      setMobileConversationOpen(true);
+    }
   }, [chats, searchParams]);
 
   useEffect(() => {
