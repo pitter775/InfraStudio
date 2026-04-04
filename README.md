@@ -54,7 +54,7 @@ O widget agora opera em modo host-controlled. O script expoe a API global para a
 
 - `POST /api/chat` recebe `projeto`, `agente`, `message`, `chatId` e `context`.
 - `GET /api/chat/config` resolve a configuracao visual do canal com base em `projeto` e `agente`.
-- O schema de referencia do banco esta em [database/geral-schema.sql](./database/geral-schema.sql).
+- O schema de referencia do banco esta em [database/geral-schema.sql](./database/geral-schema.sql).....
 
 ## Desenvolvimento
 
