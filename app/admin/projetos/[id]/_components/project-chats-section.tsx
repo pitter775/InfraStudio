@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Cable, Expand, ExternalLink, MessageSquareText, PanelsTopLeft, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Cable, Expand, ExternalLink, MessageSquareText, PanelsTopLeft, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 
 type ChatWidget = {
   id?: string;
@@ -16,17 +16,11 @@ type ChatWidget = {
   ativo: boolean;
 };
 
-type WidgetAgentSummary = {
-  id: string;
-  nome: string;
-} | null;
-
 type ProjectChatsSectionProps = {
   widgets: ChatWidget[];
   deletingWidgetId: string | null;
   createButtonClass: string;
   onOpenNewWidget: () => void;
-  onResolveWidgetAgent: (widget: ChatWidget) => WidgetAgentSummary;
   onOpenWidgetCode: (widget: ChatWidget) => void;
   onEditWidget: (widget: ChatWidget) => void;
   onDeleteWidget: (widget: ChatWidget) => void;
@@ -37,7 +31,6 @@ export function ProjectChatsSection({
   deletingWidgetId,
   createButtonClass,
   onOpenNewWidget,
-  onResolveWidgetAgent,
   onOpenWidgetCode,
   onEditWidget,
   onDeleteWidget,
@@ -47,7 +40,7 @@ export function ProjectChatsSection({
       <section>
         <div className="flex flex-col gap-4 px-2 py-2 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><MessageSquareText size={18} className="text-rose-200" />Chats do projeto</h3>
+            <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><MessageSquareText size={18} className="text-rose-200" />Chat widget</h3>
             <p className="mt-1 text-sm text-slate-400">Widgets criados para este projeto e os codigos prontos para instalar no site.</p>
           </div>
           <button
@@ -82,8 +75,6 @@ export function ProjectChatsSection({
           {widgets.length ? (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {widgets.map((widget) => {
-                const agente = onResolveWidgetAgent(widget);
-
                 return (
                   <article key={`chat-widget-card-${widget.id ?? widget.slug}`} className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),rgba(255,255,255,0.03)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.24),0_0_0_1px_rgba(34,211,238,0.04)] transition-[background-color,border-color,color,opacity,box-shadow,transform] duration-180 ease-out">
                     <div
@@ -114,13 +105,12 @@ export function ProjectChatsSection({
                     <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/35 px-3.5 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                       <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Trecho do widget</p>
                       <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-slate-200">
-                        {agente?.nome ? `Conectado ao agente ${agente.nome}.` : "Sem agente especifico; usa o agente principal do projeto."} Tema {widget.tema} com cor {widget.corPrimaria} e slug {widget.slug}.
+                        Widget pronto para instalar no site. Tema {widget.tema} com cor {widget.corPrimaria} e slug {widget.slug}.
                       </p>
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">
                       {[
-                        { key: "agente", label: "Agente", value: agente?.nome ?? "Projeto", active: Boolean(agente), activeClass: "text-cyan-100", inactiveClass: "text-slate-500", icon: Bot },
                         { key: "dominio", label: "Dominio", value: widget.dominio || "Livre", active: Boolean(widget.dominio), activeClass: "text-emerald-100", inactiveClass: "text-slate-500", icon: Cable },
                         { key: "tema", label: "Tema", value: widget.tema, active: true, activeClass: "text-amber-100", inactiveClass: "text-slate-500", icon: Sparkles },
                         { key: "slug", label: "Slug", value: widget.slug, active: true, activeClass: "text-violet-100", inactiveClass: "text-slate-500", icon: MessageSquareText },

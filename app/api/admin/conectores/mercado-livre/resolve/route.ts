@@ -54,6 +54,11 @@ function extractNickname(html: string) {
   return null;
 }
 
+function hasMercadoLivreProductIdentifier(targetUrl: URL) {
+  const hashParams = new URLSearchParams(targetUrl.hash.replace(/^#/, ""));
+  return /MLB\d+/i.test(targetUrl.pathname) || /MLB\d+/i.test(hashParams.get("wid") || "");
+}
+
 export async function POST(request: Request) {
   const user = await getSessionUser();
 
@@ -84,6 +89,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Use uma URL valida de produto do Mercado Livre." }, { status: 400 });
   }
 
+  const hasProductIdentifier = hasMercadoLivreProductIdentifier(targetUrl);
+
   let html = "";
   try {
     const response = await fetch(targetUrl.toString(), {
@@ -97,7 +104,14 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      return NextResponse.json({ error: "Nao foi possivel abrir o produto informado no Mercado Livre." }, { status: 502 });
+      return NextResponse.json(
+        {
+          error: hasProductIdentifier
+            ? "Nao foi possivel abrir o produto informado no Mercado Livre."
+            : "Use o link completo de um anuncio do Mercado Livre, de preferencia o que tenha o identificador do produto no final.",
+        },
+        { status: 502 },
+      );
     }
 
     html = await response.text();

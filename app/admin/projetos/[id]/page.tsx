@@ -3340,14 +3340,31 @@ function ApiModal({
             <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar API" : "Nova API"}</h2>
             <p className="mt-1 text-sm text-slate-400">Cadastre uma API GET, teste a resposta e escolha os campos ativos, inclusive os aninhados.</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className={`${neutralActionButtonClass} px-3`}
-            aria-label="Fechar modal"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <label className="mr-2 inline-flex cursor-pointer items-center gap-3">
+              <span className={`text-xs font-semibold uppercase tracking-[0.16em] ${form.ativo ? "text-emerald-200" : "text-slate-500"}`}>
+                {form.ativo ? "Ativa" : "Inativa"}
+              </span>
+              <span className="relative inline-flex items-center">
+                <input
+                  type="checkbox"
+                  checked={form.ativo}
+                  onChange={(event) => onChange({ ativo: event.target.checked })}
+                  className="peer sr-only"
+                />
+                <span className="h-7 w-12 rounded-full bg-white/10 transition-colors peer-checked:bg-emerald-500/30" />
+                <span className="pointer-events-none absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-checked:bg-emerald-200" />
+              </span>
+            </label>
+            <button
+              type="button"
+              onClick={onClose}
+              className={`${neutralActionButtonClass} px-3`}
+              aria-label="Fechar modal"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="flex max-h-[calc(92vh-88px)] flex-col">
@@ -3407,11 +3424,6 @@ function ApiModal({
               <FormLabel>Descricao da API</FormLabel>
               <textarea value={form.descricao} onChange={(event) => onChange({ descricao: event.target.value })} placeholder="Explique o que essa API retorna e quando o agente deve usa-la" rows={5} className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none placeholder:text-slate-500" />
             </div>
-            <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
-              <input type="checkbox" checked={form.ativo} onChange={(event) => onChange({ ativo: event.target.checked })} />
-              API ativa no projeto
-            </label>
-
             <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-white">Campos detectados</p>
@@ -4118,16 +4130,33 @@ function WhatsAppChannelModal({
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">WhatsApp oficial</p>
             <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar canal" : "Novo canal"}</h2>
-            <p className="mt-1 text-sm text-slate-400">Cadastre o numero principal e escolha qual agente vai responder por esse canal.</p>
+            <p className="mt-1 text-sm text-slate-400">Cadastre o numero principal que vai atender este projeto.</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className={`${neutralActionButtonClass} px-3`}
-            aria-label="Fechar modal"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <label className="mr-2 inline-flex cursor-pointer items-center gap-3">
+              <span className={`text-xs font-semibold uppercase tracking-[0.16em] ${form.status === "ativo" ? "text-emerald-200" : "text-slate-500"}`}>
+                {form.status === "ativo" ? "Ativo" : "Inativo"}
+              </span>
+              <span className="relative inline-flex items-center">
+                <input
+                  type="checkbox"
+                  checked={form.status === "ativo"}
+                  onChange={(event) => onChange({ status: event.target.checked ? "ativo" : "inativo" })}
+                  className="peer sr-only"
+                />
+                <span className="h-7 w-12 rounded-full bg-white/10 transition-colors peer-checked:bg-emerald-500/30" />
+                <span className="pointer-events-none absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-checked:bg-emerald-200" />
+              </span>
+            </label>
+            <button
+              type="button"
+              onClick={onClose}
+              className={`${neutralActionButtonClass} px-3`}
+              aria-label="Fechar modal"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="flex max-h-[calc(92vh-88px)] flex-col">
@@ -4141,36 +4170,10 @@ function WhatsAppChannelModal({
                 placeholder="+55 11 99999-9999"
                 inputMode="tel"
                 autoComplete="tel"
-                maxLength={17}
+                maxLength={20}
                 className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
               />
-            </div>
-            <div>
-              <FormLabel>Agente</FormLabel>
-              <select
-                value={form.agenteId ?? ""}
-                onChange={(event) => onChange({ agenteId: event.target.value || null })}
-                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
-              >
-                <option value="">Selecione um agente</option>
-                {agentes.map((agente) => (
-                  <option key={agente.id} value={agente.id}>
-                    {agente.nome}
-                    {agente.ativo ? " (ativo)" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <FormLabel>Status</FormLabel>
-              <select
-                value={form.status}
-                onChange={(event) => onChange({ status: event.target.value === "inativo" ? "inativo" : "ativo" })}
-                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
-              >
-                <option value="ativo">ativo</option>
-                <option value="inativo">inativo</option>
-              </select>
+              <p className="mt-2 text-xs text-slate-400">Pode digitar ou colar livremente. O sistema limpa e salva apenas os numeros.</p>
             </div>
 
             
@@ -4954,7 +4957,10 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const resetWhatsAppChannelForm = () => {
-    setWhatsAppChannelForm(emptyWhatsAppChannelForm);
+    setWhatsAppChannelForm({
+      ...emptyWhatsAppChannelForm,
+      agenteId: data?.agentes.find((agente) => agente.ativo)?.id ?? data?.agentes[0]?.id ?? null,
+    });
     setFeedbackWhatsApp(null);
   };
 
@@ -6248,6 +6254,17 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const handleSaveWhatsAppChannel = async () => {
+    const resolvedWhatsAppAgentId =
+      whatsAppChannelForm.agenteId ??
+      data?.agentes.find((agente) => agente.ativo)?.id ??
+      data?.agentes[0]?.id ??
+      null;
+
+    if (!resolvedWhatsAppAgentId) {
+      setFeedbackWhatsApp("Nao foi possivel identificar o agente ativo deste projeto para vincular o canal.");
+      return;
+    }
+
     setSavingWhatsAppChannel(true);
     setFeedbackWhatsApp(null);
 
@@ -6259,7 +6276,7 @@ export default function AdminProjetoDetalhePage() {
       body: JSON.stringify({
         id: whatsAppChannelForm.id,
         projetoId: params.id,
-        agenteId: whatsAppChannelForm.agenteId,
+        agenteId: resolvedWhatsAppAgentId,
         numero: sanitizePhoneDigits(whatsAppChannelForm.numero),
         status: whatsAppChannelForm.status,
       }),
@@ -7265,13 +7282,13 @@ export default function AdminProjetoDetalhePage() {
       activeClass: "border-amber-400/30 bg-amber-400/14 text-amber-50 shadow-[0_10px_25px_rgba(251,191,36,0.12)]",
       inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-amber-400/18 hover:bg-amber-400/[0.08] hover:text-amber-50",
     },
-    {
-      key: "chats" as const,
-      label: "Chats",
-      icon: MessageSquareText,
-      count: data.stats.totalChats,
-      activeClass: "border-violet-400/30 bg-violet-400/14 text-violet-50 shadow-[0_10px_25px_rgba(167,139,250,0.12)]",
-      inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-violet-400/18 hover:bg-violet-400/[0.08] hover:text-violet-50",
+      {
+        key: "chats" as const,
+        label: "Chat widget",
+        icon: MessageSquareText,
+        count: data.stats.totalChats,
+        activeClass: "border-violet-400/30 bg-violet-400/14 text-violet-50 shadow-[0_10px_25px_rgba(167,139,250,0.12)]",
+        inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-violet-400/18 hover:bg-violet-400/[0.08] hover:text-violet-50",
     },
   ];
   const selectedBillingModel =
@@ -8113,7 +8130,6 @@ export default function AdminProjetoDetalhePage() {
           deletingWidgetId={deletingWidgetId}
           createButtonClass={`${headerActionButtonClass} ${premiumInteractiveClass}`}
           onOpenNewWidget={openNewWidgetModal}
-          onResolveWidgetAgent={getResolvedWidgetAgent}
           onOpenWidgetCode={(widget) =>
             setWidgetCodeModalState({
               widget,
@@ -8236,25 +8252,24 @@ export default function AdminProjetoDetalhePage() {
         }}
         onClose={() => setWhatsAppQrModalChannelId(null)}
       />
-      <WhatsAppChannelModal
-        open={whatsAppChannelModalOpen}
-        form={whatsAppChannelForm}
-        agentes={data.agentes}
+        <WhatsAppChannelModal
+          open={whatsAppChannelModalOpen}
+          form={whatsAppChannelForm}
+          agentes={data.agentes}
         saving={savingWhatsAppChannel}
         feedback={feedbackWhatsApp}
         onClose={() => {
           setWhatsAppChannelModalOpen(false);
           resetWhatsAppChannelForm();
         }}
-        onChange={(next) =>
-          setWhatsAppChannelForm((prev) => ({
-            ...prev,
-            ...next,
-            numero: next.numero !== undefined ? formatWhatsAppPhone(next.numero) : prev.numero,
-          }))
-        }
-        onSubmit={() => void handleSaveWhatsAppChannel()}
-      />
+          onChange={(next) =>
+            setWhatsAppChannelForm((prev) => ({
+              ...prev,
+              ...next,
+            }))
+          }
+          onSubmit={() => void handleSaveWhatsAppChannel()}
+        />
       <ChatHistoryModal
         open={chatHistoryOpen}
         loading={chatHistoryLoading}
