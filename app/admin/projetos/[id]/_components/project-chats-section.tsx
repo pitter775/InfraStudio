@@ -53,28 +53,8 @@ export function ProjectChatsSection({
           </button>
         </div>
 
-        <div className="grid gap-4 p-2 pt-4 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
-          <aside className="space-y-4">
-            <div className="rounded-2xl border border-amber-400/14 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(15,23,42,0.18))] px-4 py-4 shadow-[0_18px_36px_rgba(2,8,23,0.16)]">
-              <div className="space-y-3">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-100/85">Documentacao</p>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-200">Referencia unica para todos os widgets quando o site precisar controlar criacao, atualizacao e destruicao do chat.</p>
-                </div>
-                <a
-                  href="/docs/chat-widget-host-control"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-2xl border border-amber-400/20 bg-white/5 px-4 py-3 text-sm font-semibold text-amber-50 transition-colors hover:bg-white/10 hover:text-white"
-                >
-                  <ExternalLink size={15} />
-                  Abrir documentacao completa
-                </a>
-              </div>
-            </div>
-          </aside>
-
-          <div className="space-y-4">
+        <div className="grid gap-4 p-2 pt-4 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
+          <div className="order-2 space-y-4 xl:order-1">
             <div className="flex items-center justify-between gap-3 px-1">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200/85">Widgets criados</p>
@@ -105,7 +85,7 @@ export function ProjectChatsSection({
                     <div className="relative flex items-start justify-between gap-3 pr-12">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="truncate text-base font-bold text-white">{widget.nome}</h4>
+                          <h4 className="truncate text-base font-bold text-white">Chat widget</h4>
                           <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${widget.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
                             {widget.ativo ? "ativo" : "inativo"}
                           </span>
@@ -186,6 +166,26 @@ export function ProjectChatsSection({
               </div>
             )}
           </div>
+
+          <aside className="order-1 space-y-4 xl:order-2">
+            <div className="rounded-2xl border border-amber-400/14 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(15,23,42,0.18))] px-4 py-4 shadow-[0_18px_36px_rgba(2,8,23,0.16)]">
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-100/85">Documentacao</p>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-200">Referencia unica para todos os widgets quando o site precisar controlar criacao, atualizacao e destruicao do chat.</p>
+                </div>
+                <a
+                  href="/docs/chat-widget-host-control"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-amber-400/20 bg-white/5 px-4 py-3 text-sm font-semibold text-amber-50 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  <ExternalLink size={15} />
+                  Abrir documentacao completa
+                </a>
+              </div>
+            </div>
+          </aside>
         </div>
       </section>
     </div>

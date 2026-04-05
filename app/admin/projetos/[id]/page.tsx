@@ -3619,13 +3619,23 @@ function WidgetModal({
             <div className="rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm text-slate-300">
               Agente ativo selecionado automaticamente
             </div>
-            <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
-              <input
-                type="checkbox"
-                checked={form.fundoTransparente}
-                onChange={(event) => onChange({ fundoTransparente: event.target.checked })}
-              />
-              Fundo transparente
+            <label className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
+              <span className="block">
+                <span className="block text-sm font-semibold text-white">Fundo</span>
+                <span className={`mt-1 block text-[11px] uppercase tracking-[0.16em] ${form.fundoTransparente ? "text-emerald-200" : "text-slate-500"}`}>
+                  {form.fundoTransparente ? "Transparente" : "Solido"}
+                </span>
+              </span>
+              <span className="relative inline-flex items-center">
+                <input
+                  type="checkbox"
+                  checked={form.fundoTransparente}
+                  onChange={(event) => onChange({ fundoTransparente: event.target.checked })}
+                  className="peer sr-only"
+                />
+                <span className="h-7 w-12 rounded-full bg-white/10 transition-colors peer-checked:bg-emerald-500/30" />
+                <span className="pointer-events-none absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-checked:bg-emerald-200" />
+              </span>
             </label>
 
             
@@ -7498,13 +7508,17 @@ export default function AdminProjetoDetalhePage() {
                     <span className="block text-sm font-semibold text-white">Bloqueio automatico</span>
                     <span className="mt-1 block text-xs text-slate-400">Interrompe consumo ao bater os limites configurados.</span>
                   </span>
-                  <input
-                    type="checkbox"
-                    checked={billingPlanForm.autoBloquear}
-                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, autoBloquear: event.target.checked }))}
-                    disabled={!data.billing.canManage}
-                    className="h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400 disabled:cursor-not-allowed"
-                  />
+                  <span className="relative inline-flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={billingPlanForm.autoBloquear}
+                      onChange={(event) => setBillingPlanForm((current) => ({ ...current, autoBloquear: event.target.checked }))}
+                      disabled={!data.billing.canManage}
+                      className="peer sr-only"
+                    />
+                    <span className="h-7 w-12 rounded-full bg-white/10 transition-colors peer-checked:bg-emerald-500/30" />
+                    <span className="pointer-events-none absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-checked:bg-emerald-200" />
+                  </span>
                 </label>
 
                 <label className="flex items-center justify-between gap-3 rounded-2xl border border-rose-400/15 bg-rose-500/10 px-4 py-3">
@@ -7512,13 +7526,17 @@ export default function AdminProjetoDetalhePage() {
                     <span className="block text-sm font-semibold text-white">Bloqueio manual</span>
                     <span className="mt-1 block text-xs text-rose-100/75">Forca a parada do uso mesmo sem atingir o limite.</span>
                   </span>
-                  <input
-                    type="checkbox"
-                    checked={billingPlanForm.bloqueado}
-                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, bloqueado: event.target.checked }))}
-                    disabled={!data.billing.canManage}
-                    className="h-4 w-4 rounded border-white/20 bg-slate-950 text-rose-400 disabled:cursor-not-allowed"
-                  />
+                  <span className="relative inline-flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={billingPlanForm.bloqueado}
+                      onChange={(event) => setBillingPlanForm((current) => ({ ...current, bloqueado: event.target.checked }))}
+                      disabled={!data.billing.canManage}
+                      className="peer sr-only"
+                    />
+                    <span className="h-7 w-12 rounded-full bg-white/10 transition-colors peer-checked:bg-rose-500/30" />
+                    <span className="pointer-events-none absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-checked:bg-rose-200" />
+                  </span>
                 </label>
 
                 <label className="grid gap-2">

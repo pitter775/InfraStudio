@@ -347,23 +347,23 @@ function Sidebar({
           })}
         </nav>
 
-        <div className="border-t border-white/10 px-2 pt-4">
+        <div className="border-t border-white/10 px-3 pt-4">
           <div
             className={cn(
-              "rounded-2xl p-3",
+              "pb-2",
               collapsed ? "flex flex-col items-center gap-3" : "space-y-3",
             )}
           >
             {!collapsed ? (
               <>
                 <div className="flex items-center justify-center">
-                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                     build {buildId}
                   </span>
                 </div>
                 {currentUser ? (
-                  <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(34,211,238,0.24),rgba(59,130,246,0.24))] text-sm font-bold text-white shadow-[0_0_20px_rgba(34,211,238,0.18)]">
+                  <div className="flex items-center gap-3 px-1">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(34,211,238,0.20),rgba(59,130,246,0.20))] text-sm font-bold text-white">
                       {getUserInitials(currentUser.name)}
                     </div>
                     <div className="min-w-0">
@@ -374,10 +374,10 @@ function Sidebar({
                     </div>
                   </div>
                 ) : null}
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-3 px-1">
                   <Link
                     href="/"
-                    className="infra-click-pulse inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                    className="infra-click-pulse inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 transition-colors hover:text-white"
                     title="Site"
                   >
                     <Globe size={16} />
@@ -389,7 +389,7 @@ function Sidebar({
                     onClick={() => {
                       void onLogout();
                     }}
-                    className="infra-click-pulse inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                    className="infra-click-pulse inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 transition-colors hover:text-white"
                     title="Sair"
                   >
                     <LogOut size={16} />
@@ -400,14 +400,14 @@ function Sidebar({
             ) : (
               <>
                 <span
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500"
                   title={`Build ${buildId}`}
                 >
                   {buildId}
                 </span>
                 {currentUser ? (
                   <div
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(34,211,238,0.24),rgba(59,130,246,0.24))] text-xs font-bold text-white shadow-[0_0_20px_rgba(34,211,238,0.18)]"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(34,211,238,0.20),rgba(59,130,246,0.20))] text-xs font-bold text-white"
                     title={currentUser.name}
                   >
                     {getUserInitials(currentUser.name)}
@@ -415,7 +415,7 @@ function Sidebar({
                 ) : null}
                 <Link
                   href="/"
-                  className="infra-click-pulse inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                  className="infra-click-pulse inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-300 transition-colors hover:text-white"
                   title="Site"
                 >
                   <Globe size={16} />
@@ -426,7 +426,7 @@ function Sidebar({
                   onClick={() => {
                     void onLogout();
                   }}
-                  className="infra-click-pulse inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                  className="infra-click-pulse inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-300 transition-colors hover:text-white"
                   title="Sair"
                 >
                   <LogOut size={16} />

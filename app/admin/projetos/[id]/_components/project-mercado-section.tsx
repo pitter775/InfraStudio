@@ -46,6 +46,7 @@ export function ProjectMercadoSection({
 }: ProjectMercadoSectionProps) {
   const [tutorialExpanded, setTutorialExpanded] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const hasConnectors = connectors.length > 0;
   const appBaseUrl = useMemo(() => {
     if (typeof window !== "undefined" && window.location?.origin) {
       return window.location.origin;
@@ -100,90 +101,8 @@ export function ProjectMercadoSection({
           ) : null}
         </div>
 
-        <div className="mt-4 space-y-6">
-          <aside className="rounded-2xl border border-amber-400/14 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(15,23,42,0.22))] p-5 shadow-[0_18px_36px_rgba(2,8,23,0.18)]">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-100/85">Tutorial rapido</p>
-            <h4 className="mt-2 text-lg font-bold text-white">Como conectar o Mercado Livre</h4>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">Aqui funciona em 2 etapas bem simples: primeiro voce cadastra a loja com os dados do aplicativo, depois conecta a conta do Mercado Livre para liberar o acesso.</p>
-
-            <div className="mt-4 space-y-3">
-              <a
-                href="https://developers.mercadolivre.com.br/apps"
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/35 px-3.5 py-3 text-sm font-semibold text-white transition-colors hover:border-amber-300/25 hover:bg-slate-950/50"
-              >
-                Painel de apps do Mercado Livre
-                <ExternalLink size={15} />
-              </a>
-            </div>
-
-            <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4 text-sm text-slate-300">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Resumo rapido</p>
-              <p className="mt-3">
-                <span className="font-semibold text-white">Etapa 1. Cadastrar a loja:</span> crie um aplicativo do tipo `Web`, ative as opcoes pedidas pelo Mercado Livre e copie o `APP ID` e o `CLIENT SECRET` para este cadastro.
-              </p>
-              <p className="mt-2">
-                <span className="font-semibold text-white">Etapa 2. Conectar a loja:</span> depois de salvar, clique em conectar para autorizar a conta do Mercado Livre e finalizar a integracao.
-              </p>
-            </div>
-
-            <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4 text-sm text-slate-300">
-              <button
-                type="button"
-                onClick={() => setTutorialExpanded((current) => !current)}
-                className="flex w-full items-center justify-between gap-3 text-left"
-              >
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tutorial</p>
-                  <p className="mt-2 text-sm font-semibold text-white">Links para configurar no Mercado Livre</p>
-                  <p className="mt-1 text-xs text-slate-400">Abra para copiar os links que o Mercado Livre vai pedir na configuracao.</p>
-                </div>
-                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
-                  {tutorialExpanded ? "Ocultar" : "Mostrar"}
-                </span>
-              </button>
-
-              {tutorialExpanded ? (
-                <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
-                  <p className="text-xs text-amber-100/90">
-                    Use os links abaixo exatamente como estao. Se o campo de notificacoes nao aceitar o endereco direto, use uma URL publica intermediaria.
-                  </p>
-
-                  <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3.5 py-3">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Link de retorno</p>
-                    <button
-                      type="button"
-                      title={copiedKey === "callback" ? "URL copiada" : "Clique para copiar"}
-                      onClick={() => void handleCopyUrl("callback", mercadoLivreUrls.callback)}
-                      className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left font-mono text-[11px] text-cyan-100 transition-colors hover:border-cyan-300/25 hover:bg-cyan-500/10"
-                    >
-                      {mercadoLivreUrls.callback}
-                    </button>
-                  </div>
-
-                  <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3.5 py-3">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Link de notificacoes</p>
-                    <p className="mt-2 text-xs leading-6 text-slate-300">
-                      Em alguns casos, o Mercado Livre pode nao aceitar esse endereco direto nesse campo.
-                    </p>
-                    <p className="mt-2 text-xs leading-6 text-slate-300">
-                      Se isso acontecer, use uma URL publica intermediaria e aponte essa URL para o endereco abaixo:
-                    </p>
-                    <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-[11px] text-cyan-100">
-                      {mercadoLivreUrls.webhook}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="mt-4 rounded-xl border border-emerald-500/18 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-50/90">
-              Depois de salvar, o proximo passo e clicar em `Editar` para revisar os dados e concluir a conexao da conta.
-            </div>
-          </aside>
-
-          <div className="space-y-3">
+        <div className={`mt-4 grid gap-6 ${hasConnectors ? "xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start" : ""}`}>
+          <div className={`space-y-3 ${hasConnectors ? "order-2 xl:order-1" : ""}`}>
             {connectors.length ? (
               connectors.map((connector) => (
                 <article
@@ -250,6 +169,96 @@ export function ProjectMercadoSection({
               <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhuma loja do Mercado Livre cadastrada para este projeto ainda.</div>
             )}
           </div>
+
+          <aside className={`${hasConnectors ? "order-1 xl:order-2" : ""}`}>
+            <div className="rounded-2xl border border-amber-400/14 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(15,23,42,0.22))] p-5 shadow-[0_18px_36px_rgba(2,8,23,0.18)]">
+              <button
+                type="button"
+                onClick={() => setTutorialExpanded((current) => !current)}
+                className="flex w-full items-start justify-between gap-3 text-left"
+              >
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-100/85">Tutorial rapido</p>
+                  <h4 className="mt-2 text-lg font-bold text-white">Como conectar o Mercado Livre</h4>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                    Aqui funciona em 2 etapas bem simples: primeiro voce cadastra a loja com os dados do aplicativo, depois conecta a conta do Mercado Livre para liberar o acesso.
+                  </p>
+                </div>
+                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
+                  {tutorialExpanded || !hasConnectors ? "Ocultar" : "Expandir"}
+                </span>
+              </button>
+
+              {tutorialExpanded || !hasConnectors ? (
+                <>
+                  <div className="mt-4 space-y-3">
+                    <a
+                      href="https://developers.mercadolivre.com.br/apps"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/35 px-3.5 py-3 text-sm font-semibold text-white transition-colors hover:border-amber-300/25 hover:bg-slate-950/50"
+                    >
+                      Painel de apps do Mercado Livre
+                      <ExternalLink size={15} />
+                    </a>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4 text-sm text-slate-300">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Resumo rapido</p>
+                    <p className="mt-3">
+                      <span className="font-semibold text-white">Etapa 1. Cadastrar a loja:</span> crie um aplicativo do tipo `Web`, ative as opcoes pedidas pelo Mercado Livre e copie o `APP ID` e o `CLIENT SECRET` para este cadastro.
+                    </p>
+                    <p className="mt-2">
+                      <span className="font-semibold text-white">Etapa 2. Conectar a loja:</span> depois de salvar, clique em conectar para autorizar a conta do Mercado Livre e finalizar a integracao.
+                    </p>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4 text-sm text-slate-300">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tutorial</p>
+                      <p className="mt-2 text-sm font-semibold text-white">Links para configurar no Mercado Livre</p>
+                      <p className="mt-1 text-xs text-slate-400">Abra para copiar os links que o Mercado Livre vai pedir na configuracao.</p>
+                    </div>
+
+                    <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+                      <p className="text-xs text-amber-100/90">
+                        Use os links abaixo exatamente como estao. Se o campo de notificacoes nao aceitar o endereco direto, use uma URL publica intermediaria.
+                      </p>
+
+                      <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3.5 py-3">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Link de retorno</p>
+                        <button
+                          type="button"
+                          title={copiedKey === "callback" ? "URL copiada" : "Clique para copiar"}
+                          onClick={() => void handleCopyUrl("callback", mercadoLivreUrls.callback)}
+                          className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left font-mono text-[11px] text-cyan-100 transition-colors hover:border-cyan-300/25 hover:bg-cyan-500/10"
+                        >
+                          {mercadoLivreUrls.callback}
+                        </button>
+                      </div>
+
+                      <div className="rounded-xl border border-white/10 bg-slate-950/45 px-3.5 py-3">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Link de notificacoes</p>
+                        <p className="mt-2 text-xs leading-6 text-slate-300">
+                          Em alguns casos, o Mercado Livre pode nao aceitar esse endereco direto nesse campo.
+                        </p>
+                        <p className="mt-2 text-xs leading-6 text-slate-300">
+                          Se isso acontecer, use uma URL publica intermediaria e aponte essa URL para o endereco abaixo:
+                        </p>
+                        <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-[11px] text-cyan-100">
+                          {mercadoLivreUrls.webhook}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-emerald-500/18 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-50/90">
+                    Depois de salvar, o proximo passo e clicar em `Editar` para revisar os dados e concluir a conexao da conta.
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </aside>
         </div>
       </section>
     </div>

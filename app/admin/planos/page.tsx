@@ -224,8 +224,19 @@ export default function AdminPlanosPage() {
               </label>
             </div>
             <label className="inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm text-slate-200">
-              <input type="checkbox" checked={form.ativo} onChange={(event) => setForm((current) => ({ ...current, ativo: event.target.checked }))} />
-              Plano ativo
+              <span className={`text-xs font-semibold uppercase tracking-[0.16em] ${form.ativo ? "text-emerald-200" : "text-slate-500"}`}>
+                {form.ativo ? "Ativo" : "Inativo"}
+              </span>
+              <span className="relative inline-flex items-center">
+                <input
+                  type="checkbox"
+                  checked={form.ativo}
+                  onChange={(event) => setForm((current) => ({ ...current, ativo: event.target.checked }))}
+                  className="peer sr-only"
+                />
+                <span className="h-7 w-12 rounded-full bg-white/10 transition-colors peer-checked:bg-emerald-500/30" />
+                <span className="pointer-events-none absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-checked:bg-emerald-200" />
+              </span>
             </label>
             <button
               type="button"
