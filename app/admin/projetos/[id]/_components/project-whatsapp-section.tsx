@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Activity, CheckCircle2, LoaderCircle, Pencil, Plus, Power, Trash2, Unplug, Waypoints } from "lucide-react";
 import { formatBrazilWhatsAppPhone, formatBrazilWhatsAppPhoneInput } from "@/lib/whatsapp-phone";
 
@@ -231,6 +232,7 @@ export function ProjectWhatsAppSection({
   onDeleteHandoffContact,
 }: ProjectWhatsAppSectionProps) {
   const activeHandoffContacts = handoffContacts.filter((contact) => contact.ativo && contact.receberAlertas);
+  const [mobileWhatsAppTab, setMobileWhatsAppTab] = useState<"channel" | "handoff">("channel");
   const whatsAppServiceHealthClass =
     whatsappServiceHealthTone === "online"
       ? "text-emerald-300"
@@ -251,7 +253,27 @@ export function ProjectWhatsAppSection({
             <p className="mt-3 text-xs text-amber-200/90">A conexao do WhatsApp ainda nao esta disponivel neste ambiente.</p>
           ) : null}
         </div>
+        <div className="mt-4 flex gap-2 overflow-x-auto px-1 lg:hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {[
+            { id: "channel" as const, label: "Canal" },
+            { id: "handoff" as const, label: "Atendimento humano" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setMobileWhatsAppTab(tab.id)}
+              className={`shrink-0 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
+                mobileWhatsAppTab === tab.id
+                  ? "border-cyan-400/30 bg-cyan-500/10 text-cyan-100"
+                  : "border-white/10 bg-white/5 text-slate-300"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
         <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1.35fr),minmax(340px,0.92fr)] xl:items-start">
+          <div className={mobileWhatsAppTab === "channel" ? "" : "hidden lg:block"}>
           {primaryChannel ? (() => {
             const channel = primaryChannel;
             const agente = channel.agenteId ? agentes.find((item) => item.id === channel.agenteId) ?? null : agenteAtivo;
@@ -407,9 +429,10 @@ export function ProjectWhatsAppSection({
               </div>
             </div>
           )}
+          </div>
 
           {primaryChannel ? (
-            <div className="rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:sticky xl:top-6">
+            <div className={`${mobileWhatsAppTab === "handoff" ? "" : "hidden lg:block"} rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:sticky xl:top-6`}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Atendimento humano</p>
                 {totalChannels > 1 ? (

@@ -2518,7 +2518,7 @@ function AgenteModal({
         <div className="mt-4 space-y-2">
           {entries.map((entry) => (
             <div key={entry.id} className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-white">{entry.title}</p>
                   <p className="mt-1 text-xs text-slate-400">{entry.subtitle}</p>
@@ -2534,7 +2534,7 @@ function AgenteModal({
                   type="button"
                   onClick={() => entry.onAssign?.()}
                   disabled={!entry.onAssign || entry.saving || saving}
-                  className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  className={`inline-flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${
                     entry.assignedToCurrent
                       ? "border-rose-500/20 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20"
                       : "border-cyan-500/20 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20"
@@ -2616,25 +2616,25 @@ function AgenteModal({
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
       <div className={`max-h-[92vh] w-full overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl transition-all duration-300 ${promptExpanded ? "max-w-6xl" : "max-w-5xl"}`}>
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
-          <div>
+        <div className="flex flex-col gap-4 border-b border-white/10 px-4 py-4 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Agente</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar agente" : "Novo agente"}</h2>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar" : "Novo agente"}</h2>
             <p className="mt-1 hidden text-sm text-slate-400 sm:block">Defina o agente e selecione quais APIs deste projeto ele pode usar.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 sm:justify-end">
             <button
               type="button"
               onClick={() => onChange({ ativo: !form.ativo })}
               disabled={saving}
-              className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold ${
+              className={`inline-flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold ${
                 form.ativo
                   ? "border-amber-400/20 bg-amber-500/10 text-amber-50 hover:border-amber-300/30 hover:bg-amber-500/14"
                   : "border-emerald-400/20 bg-emerald-500/10 text-emerald-50 hover:border-emerald-300/30 hover:bg-emerald-500/14"
               } disabled:cursor-not-allowed disabled:opacity-60`}
             >
               <Power size={16} />
-              {form.ativo ? "Desativar agente" : "Ativar agente"}
+              {form.ativo ? "Desativar" : "Ativar"}
             </button>
             <button
               type="button"
