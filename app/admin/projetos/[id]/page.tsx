@@ -7584,7 +7584,7 @@ export default function AdminProjetoDetalhePage() {
                 const recentEvents = buildAgentStatusEvents(data.chats, latestProjectChat);
 
                 return (
-                  <div key={agente.id} className="xl:grid xl:grid-cols-[minmax(0,1fr)_320px] xl:gap-10">
+                  <div key={agente.id} className="xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(220px,0.33fr)_minmax(240px,0.38fr)] xl:gap-8">
                   <article className={`relative flex h-full flex-col overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),rgba(255,255,255,0.03)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.24),0_0_0_1px_rgba(34,211,238,0.04)] ${premiumTransitionClass}`}>
                     <div
                       aria-hidden="true"
@@ -7757,9 +7757,15 @@ export default function AdminProjetoDetalhePage() {
                       >
                         {isAgentStatusExpanded ? "ocultar detalhes ↑" : "ver detalhes →"}
                       </button>
+                    </div>
+                  </aside>
+
+                  <aside className="hidden xl:block">
+                    <div className="sticky top-28 py-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Detalhes do agente</p>
 
                       {isAgentStatusExpanded ? (
-                        <div className="mt-6 space-y-6">
+                        <div className="mt-5 space-y-6">
                           <div>
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Pipeline atual</p>
                             <div className="mt-3 space-y-2.5">
@@ -7786,7 +7792,29 @@ export default function AdminProjetoDetalhePage() {
                             </div>
                           </div>
                         </div>
-                      ) : null}
+                      ) : (
+                        <div className="mt-5 space-y-4">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Pipeline atual</p>
+                            <p className="mt-2 text-sm leading-6 text-slate-300">
+                              intent: {pipelineCurrent[0]?.value}
+                            </p>
+                            <p className="text-sm leading-6 text-slate-400">
+                              acao: {pipelineCurrent[2]?.value}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Eventos recentes</p>
+                            <p className="mt-2 text-sm leading-6 text-slate-300">
+                              [{recentEvents[0]?.time}] {recentEvents[0]?.label}
+                            </p>
+                            <p className="text-sm leading-6 text-slate-400">
+                              [{recentEvents[1]?.time}] {recentEvents[1]?.label}
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </aside>
                   </div>
