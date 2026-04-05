@@ -772,13 +772,19 @@ export async function getUnifiedWhatsAppOutboundContext(chatId: string) {
               remoteJid?: string | null;
               remetente?: string | null;
               remotePhone?: string | null;
-              rawContact?: { number?: string | null } | null;
+              rawContact?: {
+                number?: string | null;
+                id?: {
+                  _serialized?: string | null;
+                } | null;
+              } | null;
             })
           : null;
 
       const contactSnapshot = extractChatContactSnapshot(candidate.contexto, candidate.identificadorExterno);
       const candidateIdentity = getUnifiedConversationIdentity(candidate);
       const jid =
+        normalizeWhatsAppAddress(whatsapp?.rawContact?.id?._serialized) ??
         normalizeWhatsAppAddress(whatsapp?.remoteJid) ??
         normalizeWhatsAppAddress(whatsapp?.remetente) ??
         normalizeWhatsAppAddress(candidate.identificadorExterno);
