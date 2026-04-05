@@ -4578,7 +4578,6 @@ export default function AdminProjetoDetalhePage() {
   const [agentStoreLatestResult, setAgentStoreLatestResult] = useState<AgentStoreLatestResult | null>(null);
   const [agentStoreSearchResult, setAgentStoreSearchResult] = useState<AgentStoreSearchResult | null>(null);
   const [agentTestTarget, setAgentTestTarget] = useState<Agente | null>(null);
-  const [expandedAgentStatusId, setExpandedAgentStatusId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ProjectTab>("agentes");
   const [renderedTab, setRenderedTab] = useState<ProjectTab>("agentes");
   const [tabContentVisible, setTabContentVisible] = useState(true);
@@ -7743,7 +7742,6 @@ export default function AdminProjetoDetalhePage() {
                   },
                 ] as const;
 
-                const isAgentStatusExpanded = expandedAgentStatusId === agente.id;
                 const now = new Date();
                 const projectChatsToday = data.chats.filter((chat) => isSameCalendarDay(new Date(chat.updatedAt), now));
                 const latestProjectChat = [...data.chats]
@@ -7791,11 +7789,18 @@ export default function AdminProjetoDetalhePage() {
                       aria-hidden="true"
                       className={`pointer-events-none absolute right-4 top-4 ${
                         agente.ativo
-                          ? "text-cyan-300/40 animate-pulse drop-shadow-[0_0_18px_rgba(34,211,238,0.35)]"
+                          ? "text-cyan-200/95 animate-pulse drop-shadow-[0_0_24px_rgba(34,211,238,0.95)]"
                           : "text-slate-500/28"
                       }`}
                     >
-                      <Bot size={34} strokeWidth={1.6} />
+                      {agente.ativo ? (
+                        <>
+                          <span className="absolute inset-[-22px] rounded-full bg-cyan-400/25 blur-3xl" />
+                          <span className="absolute inset-[-12px] rounded-full bg-sky-400/25 blur-2xl animate-ping" />
+                          <span className="absolute inset-[-4px] rounded-full border border-cyan-300/35 animate-pulse" />
+                        </>
+                      ) : null}
+                      <Bot size={42} strokeWidth={1.8} className="relative" />
                     </div>
 
                     <div className="relative flex items-start justify-between gap-3 pr-12">
@@ -7813,11 +7818,6 @@ export default function AdminProjetoDetalhePage() {
                     <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/35 px-3.5 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                       <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Trecho do agente</p>
                       <p className="mt-2 line-clamp-4 text-sm leading-relaxed text-slate-200">{agentCardPreview}</p>
-                      {requiredParameters.length ? (
-                        <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-cyan-100/80">
-                          {requiredParameters.map((parametro) => parametro.nome).join(", ")}
-                        </p>
-                      ) : null}
                       {inactiveApis.length ? (
                         <p className="mt-2 text-xs text-amber-200/80">
                           {inactiveApis.length} API{inactiveApis.length > 1 ? "s" : ""} vinculada{inactiveApis.length > 1 ? "s" : ""} estao inativas.
@@ -7946,72 +7946,39 @@ export default function AdminProjetoDetalhePage() {
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Ultima atividade</p>
                         <p className="mt-2 max-w-[28ch] text-sm leading-6 text-slate-200">{latestActivity}</p>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setExpandedAgentStatusId((current) => (current === agente.id ? null : agente.id))}
-                        className="mt-5 text-sm font-medium text-cyan-200 transition-colors hover:text-cyan-100"
-                      >
-                        {isAgentStatusExpanded ? "ocultar detalhes ↑" : "ver detalhes →"}
-                      </button>
                     </div>
                   </aside>
 
                   <aside className="hidden xl:block">
                     <div className="sticky top-28 py-2">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Detalhes do agente</p>
-
-                      {isAgentStatusExpanded ? (
-                        <div className="mt-5 space-y-6">
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Pipeline atual</p>
-                            <div className="mt-3 space-y-2.5">
-                              {pipelineCurrent.map((item) => (
-                                <div key={item.label} className="flex items-start gap-3 text-sm leading-6 text-slate-300">
-                                  <CheckCircle2 size={15} className="mt-1 shrink-0 text-emerald-300" />
-                                  <span>
-                                    <span className="text-slate-100">{item.label}:</span> {item.value}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Eventos recentes</p>
-                            <div className="mt-3 space-y-2.5">
-                              {recentEvents.map((event, index) => (
-                                <div key={`${event.time}-${index}`} className="text-sm leading-6 text-slate-300">
-                                  <span className="text-slate-500">[{event.time}]</span>{" "}
-                                  <span>{event.label}</span>
-                                </div>
-                              ))}
-                            </div>
+                      <div className="mt-5 space-y-6">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Pipeline atual</p>
+                          <div className="mt-3 space-y-2.5">
+                            {pipelineCurrent.map((item) => (
+                              <div key={item.label} className="flex items-start gap-3 text-sm leading-6 text-slate-300">
+                                <CheckCircle2 size={15} className="mt-1 shrink-0 text-emerald-300" />
+                                <span>
+                                  <span className="text-slate-100">{item.label}:</span> {item.value}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      ) : (
-                        <div className="mt-5 space-y-4">
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Pipeline atual</p>
-                            <p className="mt-2 text-sm leading-6 text-slate-300">
-                              intent: {pipelineCurrent[0]?.value}
-                            </p>
-                            <p className="text-sm leading-6 text-slate-400">
-                              acao: {pipelineCurrent[2]?.value}
-                            </p>
-                          </div>
 
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Eventos recentes</p>
-                            <p className="mt-2 text-sm leading-6 text-slate-300">
-                              [{recentEvents[0]?.time}] {recentEvents[0]?.label}
-                            </p>
-                            <p className="text-sm leading-6 text-slate-400">
-                              [{recentEvents[1]?.time}] {recentEvents[1]?.label}
-                            </p>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Eventos recentes</p>
+                          <div className="mt-3 space-y-2.5">
+                            {recentEvents.map((event, index) => (
+                              <div key={`${event.time}-${index}`} className="text-sm leading-6 text-slate-300">
+                                <span className="text-slate-500">[{event.time}]</span>{" "}
+                                <span>{event.label}</span>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      )}
+                      </div>
                     </div>
                   </aside>
                   </div>
@@ -8156,6 +8123,17 @@ export default function AdminProjetoDetalhePage() {
           widgets={data.widgets}
           deletingWidgetId={deletingWidgetId}
           createButtonClass={`${headerActionButtonClass} ${premiumInteractiveClass}`}
+          exposedCode={
+            data.widgets.length
+              ? (() => {
+                  const previewWidget = data.widgets.find((widget) => widget.ativo) ?? data.widgets[0];
+                  return {
+                    widgetName: previewWidget.nome || "Chat widget",
+                    code: buildWidgetSnippet(previewWidget),
+                  };
+                })()
+              : null
+          }
           onOpenNewWidget={openNewWidgetModal}
           onOpenWidgetCode={(widget) =>
             setWidgetCodeModalState({

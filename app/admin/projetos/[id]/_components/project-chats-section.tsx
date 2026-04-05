@@ -20,6 +20,10 @@ type ProjectChatsSectionProps = {
   widgets: ChatWidget[];
   deletingWidgetId: string | null;
   createButtonClass: string;
+  exposedCode: {
+    widgetName: string;
+    code: string;
+  } | null;
   onOpenNewWidget: () => void;
   onOpenWidgetCode: (widget: ChatWidget) => void;
   onEditWidget: (widget: ChatWidget) => void;
@@ -30,6 +34,7 @@ export function ProjectChatsSection({
   widgets,
   deletingWidgetId,
   createButtonClass,
+  exposedCode,
   onOpenNewWidget,
   onOpenWidgetCode,
   onEditWidget,
@@ -183,6 +188,29 @@ export function ProjectChatsSection({
                   <ExternalLink size={15} />
                   Abrir documentacao completa
                 </a>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-cyan-400/14 bg-[linear-gradient(180deg,rgba(34,211,238,0.08),rgba(15,23,42,0.18))] px-4 py-4 shadow-[0_18px_36px_rgba(2,8,23,0.16)]">
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-100/85">Codigo fonte</p>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-200">
+                    {exposedCode
+                      ? `Snippet pronto do ${exposedCode.widgetName} para instalar no site.`
+                      : "Crie um widget para liberar aqui o snippet de instalacao."}
+                  </p>
+                </div>
+
+                {exposedCode ? (
+                  <pre className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-[12px] leading-6 text-cyan-50">
+                    <code>{exposedCode.code}</code>
+                  </pre>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/20 p-4 text-sm text-slate-400">
+                    Nenhum codigo disponivel enquanto nao houver widget criado.
+                  </div>
+                )}
               </div>
             </div>
           </aside>
