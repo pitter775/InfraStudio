@@ -154,7 +154,11 @@ Hoje ele opera quatro frentes conectadas:
 - `C:\Projetos\infrastudio\lib\runtime-error-log.ts`
 - `C:\Projetos\infrastudio\lib\chat-usage-metrics.ts`
 - `C:\Projetos\infrastudio\lib\ia-usage.ts`
+- `C:\Projetos\infrastudio\lib\billing.ts`
+- `C:\Projetos\infrastudio\lib\planos.ts`
 - `C:\Projetos\infrastudio\app\admin\chat-logs\page.tsx`
+- `C:\Projetos\infrastudio\app\admin\planos\page.tsx`
+- `C:\Projetos\infrastudio\app\admin\planos\_components\*`
 
 ## 7. Estado atual da inteligencia do chat
 
@@ -206,6 +210,39 @@ O contexto de catalogo considera:
 - o envio manual do atendimento usa formatter proprio do WhatsApp
 - o worker agora aceita envio de anexo mesmo sem texto
 - arquivos genericos usam `sendMediaAsDocument`
+
+## 7.1. Billing e uso de tokens
+
+### Direcao atual
+- o controle de uso esta centralizado em `C:\Projetos\infrastudio\lib\billing.ts`
+- o frontend nao deve recalcular regra de negocio de billing
+- `chat-service` continua como ponto de bloqueio operacional antes da resposta da IA
+- `chat-orchestrator` agora pode expor snapshot operacional em `metadata.billingControl`
+
+### Ordem de consumo ativa
+- `tokens_avulsos`
+- limite do plano
+- excedente quando permitido
+- bloqueio quando excedente nao for permitido
+
+### Comportamento operacional atual
+- ao atingir 80% do limite total do ciclo, marca `alerta_80`
+- ao atingir 100% do limite total do ciclo, marca `alerta_100`
+- se `permitir_excedente = false`, o ciclo marca `bloqueado = true` e a IA para responder
+- se `permitir_excedente = true`, o ciclo continua ativo e calcula `excedente_tokens` e `excedente_custo`
+- inbox humana continua fora desse bloqueio operacional
+
+### Ciclo e persistencia
+- o ciclo aberto em `projetos_ciclos_uso` guarda limite, alertas, bloqueio, excedente e `plano_id`
+- novo ciclo reseta tokens, custo, alertas, bloqueio e excedente
+- `registrarUso` consome tokens avulsos antes de acumular no ciclo/plano
+- `consumos` continua sendo gravado como trilha de uso cobrado no plano
+
+### Arquivos-chave de billing
+- `C:\Projetos\infrastudio\lib\billing.ts`
+- `C:\Projetos\infrastudio\app\api\admin\uso\route.ts`
+- `C:\Projetos\infrastudio\app\api\admin\planos\route.ts`
+- `C:\Projetos\infrastudio\app\api\admin\planos\[id]\route.ts`
 
 ## 8. Testes e laboratorio
 
@@ -289,6 +326,10 @@ Arquivos mais sensiveis para refactor:
 - tela de projetos no mobile ficou mais compacta
 - modal de editar agente no mobile virou fluxo com abas
 - secao de WhatsApp do projeto no mobile tambem ganhou abas
+- `admin/planos` virou tela unificada de planos e consumo
+- a tela unificada prioriza resumo no topo, lista simples de planos e lista principal de projetos
+- status visual de uso segue cores por estado operacional: verde, amarelo, laranja, vermelho e azul para excedente
+- a listagem de projetos em `admin/planos` usa dados prontos de `/api/admin/uso`, sem recalculo local de billing
 
 ## 12. O que sempre lembrar antes de mexer
 

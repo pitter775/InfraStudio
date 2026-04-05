@@ -13,6 +13,7 @@ type PlanoRow = {
   max_apis: number | null;
   max_whatsapp: number | null;
   ativo: boolean | null;
+  permitir_excedente: boolean | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -27,6 +28,7 @@ export type PlanoRecord = {
   maxApis: number;
   maxWhatsapp: number;
   ativo: boolean;
+  permitirExcedente: boolean;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -68,6 +70,7 @@ function mapPlano(row: PlanoRow): PlanoRecord {
     maxApis: row.max_apis ?? 0,
     maxWhatsapp: row.max_whatsapp ?? 0,
     ativo: row.ativo !== false,
+    permitirExcedente: row.permitir_excedente === true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -91,7 +94,7 @@ export async function listPlanos() {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("planos")
-    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, created_at, updated_at")
+    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, permitir_excedente, created_at, updated_at")
     .order("preco_mensal", { ascending: true })
     .order("nome", { ascending: true });
 
@@ -133,7 +136,7 @@ export async function getPlanoById(id: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("planos")
-    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, created_at, updated_at")
+    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, permitir_excedente, created_at, updated_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -173,7 +176,7 @@ export async function createPlano(input: {
       created_at: now,
       updated_at: now,
     }) as never)
-    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, created_at, updated_at")
+    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, permitir_excedente, created_at, updated_at")
     .single();
 
   if (error || !data) {
@@ -221,7 +224,7 @@ export async function updatePlano(input: {
       updated_at: new Date().toISOString(),
     }) as never)
     .eq("id", input.id)
-    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, created_at, updated_at")
+    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, permitir_excedente, created_at, updated_at")
     .single();
 
   if (error || !data) {
