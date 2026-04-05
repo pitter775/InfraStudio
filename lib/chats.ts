@@ -758,7 +758,24 @@ export async function getUnifiedWhatsAppOutboundContext(chatId: string) {
     return null;
   }
 
+  const resolveChannelId = (candidate: ChatRecord) => {
+    const whatsapp =
+      candidate.contexto &&
+      typeof candidate.contexto.whatsapp === "object" &&
+      candidate.contexto.whatsapp !== null &&
+      !Array.isArray(candidate.contexto.whatsapp)
+        ? (candidate.contexto.whatsapp as { channelId?: string | null })
+        : null;
+
+    return typeof whatsapp?.channelId === "string" && whatsapp.channelId.trim() ? whatsapp.channelId.trim() : null;
+  };
+
   const selectedIdentity = getUnifiedConversationIdentity(chat);
+  const fallbackChannelId =
+    [...relatedChats]
+      .filter((candidate) => candidate.canal === "whatsapp")
+      .map((candidate) => resolveChannelId(candidate))
+      .find((value) => Boolean(value)) ?? null;
   const whatsappChat = [...relatedChats]
     .filter((candidate) => candidate.canal === "whatsapp")
     .map((candidate) => {
@@ -830,10 +847,13 @@ export async function getUnifiedWhatsAppOutboundContext(chatId: string) {
   }
 
   const { candidate, whatsapp, jid, outboundPhone, identityMatch, directMatch } = whatsappChat;
+  const resolvedChannelId =
+    (typeof whatsapp?.channelId === "string" && whatsapp.channelId.trim() ? whatsapp.channelId.trim() : null) ??
+    fallbackChannelId;
 
   return {
     chatId: candidate.id,
-    channelId: typeof whatsapp?.channelId === "string" && whatsapp.channelId.trim() ? whatsapp.channelId.trim() : null,
+    channelId: resolvedChannelId,
     to: jid ?? outboundPhone ?? candidate.identificadorExterno ?? "",
     recipientKind: jid ? "jid" : outboundPhone ? "phone" : "external",
     matchedBy: directMatch ? "selected_chat" : identityMatch ? "conversation_identity" : "fallback",
