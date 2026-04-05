@@ -1,4 +1,4 @@
-import { getAgenteById, getAgenteByIdentifier, type AgenteRecord } from "@/lib/agentes";
+﻿import { getAgenteById, getAgenteByIdentifier, type AgenteRecord } from "@/lib/agentes";
 import { appendChatRequestLog, appendSystemLog } from "@/lib/chat-logs";
 import { buildChatUsageTelemetry } from "@/lib/chat-usage-metrics";
 import {
@@ -253,7 +253,7 @@ function extractRecentMercadoLivreProductsFromAssets(assets: unknown) {
 
 function isCatalogSearchMessage(message: string) {
   const latestNormalizedMessage = message.toLowerCase();
-  const catalogSignals = ["tem ", "produto", "produtos", "catalogo", "catálogo", "loja", "vende", "procuro", "estou procurando"];
+  const catalogSignals = ["tem ", "produto", "produtos", "catalogo", "loja", "vende", "procuro", "estou procurando"];
   return catalogSignals.some((signal) => latestNormalizedMessage.includes(signal)) || /^\s*e\s+\S+/i.test(message);
 }
 
@@ -328,9 +328,9 @@ function formatWhatsAppOutboundText(reply: string) {
     .replace(/\r\n/g, "\n")
     .replace(/\*\*(.+?)\*\*/g, "*$1*")
     .replace(/__(.+?)__/g, "*$1*")
-    .replace(/^[\-\*]\s+/gm, "• ")
+    .replace(/^[\-\*]\s+/gm, "- ")
     .replace(/^(\d+)\)\s+/gm, "$1. ")
-    .replace(/^([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s]{1,28}):\s*/gm, "*$1:* ")
+    .replace(/^([A-Za-z\u00C0-\u00FF][A-Za-z\u00C0-\u00FF0-9\s]{1,28}):\s*/gm, "*$1:* ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -341,9 +341,9 @@ function formatWhatsAppOutboundTextSafe(reply: string) {
     .replace(/([.!?])\s+(?=[A-Z0-9*])/g, "$1\n\n")
     .replace(/\*\*(.+?)\*\*/g, "*$1*")
     .replace(/__(.+?)__/g, "*$1*")
-    .replace(/^[\-\*]\s+/gm, "â€¢ ")
+    .replace(/^[\-\*]\s+/gm, "- ")
     .replace(/^(\d+)\)\s+/gm, "$1. ")
-    .replace(/^([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s]{1,28}):\s*/gm, (match, label: string) => {
+    .replace(/^([A-Za-z\u00C0-\u00FF][A-Za-z\u00C0-\u00FF0-9\s]{1,28}):\s*/gm, (match, label: string) => {
       const normalizedLabel = String(label || "").trim().toLowerCase();
       if (["http", "https", "www"].includes(normalizedLabel)) {
         return match;
@@ -369,8 +369,8 @@ function stripAssistantMetaArtifacts(reply: string) {
   const forbiddenPatterns = [
     /Seu atendimento acontece exclusivamente via WhatsApp[^\n]*?/gi,
     /Seu atendimento ocorre exclusivamente via WhatsApp[^\n]*?/gi,
-    /de forma natural,\s*simp[aá]t(?:i|í)ca e acolhedora[^\n]*?/gi,
-    /de forma natural,\s*simpat(?:i|í)ca e acolhedora[^\n]*?/gi,
+    /de forma natural,\s*simp(?:a|\u00E1)t(?:i|\u00ED)ca e acolhedora[^\n]*?/gi,
+    /de forma natural,\s*simpat(?:i|\u00ED)ca e acolhedora[^\n]*?/gi,
     /de forma natural[^\n]*?acolhedora[^\n]*?/gi,
     /como se fosse uma pessoa real atendendo[^\n]*?/gi,
     /voce esta falando com (uma )?ia[^\n]*?/gi,
@@ -1438,7 +1438,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
   };
 
   const latestNormalizedMessage = message.toLowerCase();
-  const catalogSignals = ["tem ", "produto", "produtos", "catalogo", "catálogo", "loja", "vende", "procuro", "estou procurando"];
+  const catalogSignals = ["tem ", "produto", "produtos", "catalogo", "loja", "vende", "procuro", "estou procurando"];
   const catalogSearchRequested =
     !isCatalogLoadMoreMessage(message) &&
     (catalogSignals.some((signal) => latestNormalizedMessage.includes(signal)) || /^\s*e\s+\S+/i.test(message));
@@ -1712,7 +1712,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
         : null;
     const shouldOfferCommercialCta =
       /whats\s?app/i.test(ai.reply) ||
-      /estimativa|orcamento|orÃ§amento|proximo passo|pr[oÃ³]ximo passo|encaixe inicial|fecharmos/i.test(ai.reply);
+      /estimativa|orcamento|orÃƒÂ§amento|proximo passo|pr[oÃƒÂ³]ximo passo|encaixe inicial|fecharmos/i.test(ai.reply);
     const shouldPreferWhatsappButton =
       hasWhatsappBias &&
       !isFocusedMercadoLivreConversation &&
@@ -1760,4 +1760,5 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     whatsapp,
   };
 }
+
 

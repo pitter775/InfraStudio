@@ -3491,7 +3491,6 @@ function ApiModal({
 function WidgetModal({
   open,
   form,
-  agentes,
   saving,
   feedback,
   onClose,
@@ -3500,7 +3499,6 @@ function WidgetModal({
 }: {
   open: boolean;
   form: WidgetFormState;
-  agentes: Agente[];
   saving: boolean;
   feedback: string | null;
   onClose: () => void;
@@ -3518,16 +3516,33 @@ function WidgetModal({
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Widget</p>
             <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar widget" : "Novo widget"}</h2>
-            <p className="mt-1 text-sm text-slate-400">Este widget ja nasce vinculado ao projeto atual para evitar ambiguidades na abertura do chat.</p>
+            <p className="mt-1 text-sm text-slate-400">Este widget ja nasce vinculado automaticamente ao agente ativo do projeto.</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className={`${neutralActionButtonClass} px-3`}
-            aria-label="Fechar modal"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <label className="mr-2 inline-flex cursor-pointer items-center gap-3">
+              <span className={`text-xs font-semibold uppercase tracking-[0.16em] ${form.ativo ? "text-emerald-200" : "text-slate-500"}`}>
+                {form.ativo ? "Ativo" : "Inativo"}
+              </span>
+              <span className="relative inline-flex items-center">
+                <input
+                  type="checkbox"
+                  checked={form.ativo}
+                  onChange={(event) => onChange({ ativo: event.target.checked })}
+                  className="peer sr-only"
+                />
+                <span className="h-7 w-12 rounded-full bg-white/10 transition-colors peer-checked:bg-emerald-500/30" />
+                <span className="pointer-events-none absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-checked:bg-emerald-200" />
+              </span>
+            </label>
+            <button
+              type="button"
+              onClick={onClose}
+              className={`${neutralActionButtonClass} px-3`}
+              aria-label="Fechar modal"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="flex max-h-[calc(92vh-88px)] flex-col">
@@ -3598,23 +3613,9 @@ function WidgetModal({
             <div className="rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm text-slate-300">
               Projeto selecionado
             </div>
-            <select
-              value={form.agenteId ?? ""}
-              onChange={(event) => onChange({ agenteId: event.target.value || null })}
-              className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
-            >
-              <option value="">Selecione um agente</option>
-              {agentes.map((agente) => (
-                <option key={agente.id} value={agente.id}>
-                  {agente.nome}
-                  {agente.ativo ? " (ativo)" : ""}
-                </option>
-              ))}
-            </select>
-            <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
-              <input type="checkbox" checked={form.ativo} onChange={(event) => onChange({ ativo: event.target.checked })} />
-              Widget ativo
-            </label>
+            <div className="rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm text-slate-300">
+              Agente ativo selecionado automaticamente
+            </div>
             <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
               <input
                 type="checkbox"
@@ -4952,6 +4953,7 @@ export default function AdminProjetoDetalhePage() {
     setWidgetForm({
       ...emptyWidgetForm,
       projetoId: params.id,
+      agenteId: data?.agentes.find((agente) => agente.ativo)?.id ?? data?.agentes[0]?.id ?? null,
     });
     setFeedbackWidget(null);
   };
@@ -5921,6 +5923,17 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const handleWidgetSubmit = async () => {
+    const resolvedWidgetAgentId =
+      widgetForm.agenteId ??
+      data?.agentes.find((agente) => agente.ativo)?.id ??
+      data?.agentes[0]?.id ??
+      null;
+
+    if (!resolvedWidgetAgentId) {
+      setFeedbackWidget("Nao foi possivel identificar o agente ativo deste projeto para vincular o widget.");
+      return;
+    }
+
     setSavingWidget(true);
     setFeedbackWidget(null);
 
@@ -5931,6 +5944,7 @@ export default function AdminProjetoDetalhePage() {
       },
       body: JSON.stringify({
         ...widgetForm,
+        agenteId: resolvedWidgetAgentId,
         whatsappCelular: sanitizePhoneDigits(widgetForm.whatsappCelular),
         projetoId: params.id,
       }),
@@ -8070,14 +8084,6 @@ export default function AdminProjetoDetalhePage() {
           createButtonClass={`${headerActionButtonClass} ${premiumInteractiveClass}`}
           deletingConnectorId={deletingConnectorId}
           onOpenNewConnector={openNewConnectorModal}
-          onResolveConnectorAgent={(connector) => (connector.agenteId ? data.agentes.find((item) => item.id === connector.agenteId) ?? null : null)}
-          onTestConnector={(connector) => {
-            const agente = connector.agenteId ? data.agentes.find((item) => item.id === connector.agenteId) ?? null : null;
-            if (!agente) {
-              return;
-            }
-            void handleOpenAgentStoreSearchModal(agente);
-          }}
           onEditConnector={handleEditConnector}
           onDeleteConnector={(connector) => void handleDeleteConnector(connector)}
         />
@@ -8142,6 +8148,24 @@ export default function AdminProjetoDetalhePage() {
           onDeleteWidget={(widget) => void handleDeleteWidget(widget)}
         />
       </section>
+      <WidgetModal
+        open={widgetModalOpen}
+        form={widgetForm}
+        saving={savingWidget}
+        feedback={feedbackWidget}
+        onClose={() => {
+          setWidgetModalOpen(false);
+          resetWidgetForm();
+        }}
+        onChange={(next) =>
+          setWidgetForm((prev) => ({
+            ...prev,
+            ...next,
+            projetoId: params.id,
+          }))
+        }
+        onSubmit={() => void handleWidgetSubmit()}
+      />
       <WidgetCodeModal
         open={Boolean(widgetCodeModalState)}
         state={widgetCodeModalState}

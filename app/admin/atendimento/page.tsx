@@ -291,22 +291,52 @@ function getMojibakeScore(value: string) {
   return (value.match(/Ã.|Â.|ðŸ|â€¢|â€“|â€”|â€œ|â€|�/g) ?? []).length;
 }
 
+function repairCommonMojibakeArtifacts(value: string) {
+  return value
+    .replace(/Ã¢â‚¬Â¢/g, "- ")
+    .replace(/â€¢/g, "- ")
+    .replace(/Ã¢â‚¬â€œ|â€“/g, "-")
+    .replace(/Ã¢â‚¬â€|â€”/g, "-")
+    .replace(/Ã¢â‚¬Å“|â€œ|â€/g, '"')
+    .replace(/Ã¢â‚¬â„¢|â€™/g, "'")
+    .replace(/Ã¡/g, "a")
+    .replace(/Ã©/g, "e")
+    .replace(/Ã­/g, "i")
+    .replace(/Ã³/g, "o")
+    .replace(/Ãº/g, "u")
+    .replace(/Ã§/g, "c")
+    .replace(/Ã£/g, "a")
+    .replace(/Ãµ/g, "o")
+    .replace(/Â/g, "")
+    .replace(/�/g, "");
+}
+
 function decodeLikelyMojibake(value: string) {
   if (!value || typeof TextDecoder === "undefined") {
-    return value;
+    return repairCommonMojibakeArtifacts(value);
   }
 
   if (!/(?:Ã.|Â.|ðŸ|â€¢|â€“|â€”|â€œ|â€|�)/.test(value)) {
-    return value;
+    return repairCommonMojibakeArtifacts(value);
   }
 
   try {
-    const bytes = Uint8Array.from(Array.from(value).map((char) => char.charCodeAt(0) & 0xff));
-    const decoded = new TextDecoder("utf-8").decode(bytes);
+    let best = value;
 
-    return getMojibakeScore(decoded) <= getMojibakeScore(value) ? decoded : value;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const bytes = Uint8Array.from(Array.from(best).map((char) => char.charCodeAt(0) & 0xff));
+      const decoded = new TextDecoder("utf-8").decode(bytes);
+
+      if (getMojibakeScore(decoded) > getMojibakeScore(best)) {
+        break;
+      }
+
+      best = decoded;
+    }
+
+    return repairCommonMojibakeArtifacts(best);
   } catch {
-    return value;
+    return repairCommonMojibakeArtifacts(value);
   }
 }
 

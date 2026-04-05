@@ -7,6 +7,10 @@ type ResolveBody = {
   url?: string;
 };
 
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function isMercadoLivreHostname(hostname: string) {
   const normalized = hostname.toLowerCase();
   return (
@@ -59,6 +63,19 @@ function hasMercadoLivreProductIdentifier(targetUrl: URL) {
   return /MLB\d+/i.test(targetUrl.pathname) || /MLB\d+/i.test(hashParams.get("wid") || "");
 }
 
+function buildMercadoLivreCandidateUrls(targetUrl: URL) {
+  const canonicalUrl = new URL(targetUrl.toString());
+  canonicalUrl.hash = "";
+
+  const candidates = [targetUrl.toString()];
+  const canonicalHref = canonicalUrl.toString();
+  if (!candidates.includes(canonicalHref)) {
+    candidates.push(canonicalHref);
+  }
+
+  return candidates;
+}
+
 export async function POST(request: Request) {
   const user = await getSessionUser();
 
@@ -91,32 +108,59 @@ export async function POST(request: Request) {
 
   const hasProductIdentifier = hasMercadoLivreProductIdentifier(targetUrl);
 
+  const candidateUrls = buildMercadoLivreCandidateUrls(targetUrl);
   let html = "";
+  let lastStatus = 0;
   try {
-    const response = await fetch(targetUrl.toString(), {
-      method: "GET",
-      cache: "no-store",
-      headers: {
-        "user-agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
-        "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-      },
-    });
+    for (const candidateUrl of candidateUrls) {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const response = await fetch(candidateUrl, {
+          method: "GET",
+          cache: "no-store",
+          headers: {
+            "user-agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+            "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "cache-control": "no-cache",
+            "pragma": "no-cache",
+          },
+        });
 
-    if (!response.ok) {
-      return NextResponse.json(
-        {
-          error: hasProductIdentifier
-            ? "Nao foi possivel abrir o produto informado no Mercado Livre."
-            : "Use o link completo de um anuncio do Mercado Livre, de preferencia o que tenha o identificador do produto no final.",
-        },
-        { status: 502 },
-      );
+        lastStatus = response.status;
+        const nextHtml = await response.text();
+        const sellerId = response.ok ? extractSellerId(nextHtml) : null;
+
+        if (response.ok && sellerId) {
+          html = nextHtml;
+          break;
+        }
+
+        if (attempt < 2) {
+          await wait(700 * (attempt + 1));
+        }
+      }
+
+      if (html) {
+        break;
+      }
     }
-
-    html = await response.text();
   } catch {
     return NextResponse.json({ error: "Falha ao consultar o produto informado no Mercado Livre." }, { status: 502 });
+  }
+
+  if (!html) {
+    return NextResponse.json(
+      {
+        error:
+          !hasProductIdentifier
+            ? "Use o link completo de um anuncio do Mercado Livre, de preferencia o que tenha o identificador do produto no final."
+            : lastStatus === 429
+              ? "O Mercado Livre bloqueou a consulta por alguns segundos. Tente novamente com o mesmo link em instantes."
+              : "Nao foi possivel abrir o produto informado no Mercado Livre.",
+      },
+      { status: 502 },
+    );
   }
 
   const sellerId = extractSellerId(html);

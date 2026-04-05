@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Cable, ExternalLink, Pencil, Plus, TestTube2, Trash2 } from "lucide-react";
+import { Cable, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
 
 type ConnectorConfig = {
   app_id?: string;
@@ -27,18 +27,11 @@ type Connector = {
   updatedAt?: string;
 };
 
-type AgentSummary = {
-  id: string;
-  nome: string;
-} | null;
-
 type ProjectMercadoSectionProps = {
   connectors: Connector[];
   createButtonClass: string;
   deletingConnectorId: string | null;
   onOpenNewConnector: () => void;
-  onResolveConnectorAgent: (connector: Connector) => AgentSummary;
-  onTestConnector: (connector: Connector) => void;
   onEditConnector: (connector: Connector) => void;
   onDeleteConnector: (connector: Connector) => void;
 };
@@ -48,8 +41,6 @@ export function ProjectMercadoSection({
   createButtonClass,
   deletingConnectorId,
   onOpenNewConnector,
-  onResolveConnectorAgent,
-  onTestConnector,
   onEditConnector,
   onDeleteConnector,
 }: ProjectMercadoSectionProps) {
@@ -109,90 +100,8 @@ export function ProjectMercadoSection({
           ) : null}
         </div>
 
-        <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,0.88fr)_minmax(420px,1.12fr)] xl:items-start">
-          <div className="space-y-3 xl:min-w-0">
-            {connectors.length ? (
-              connectors.map((connector) => {
-                const agente = onResolveConnectorAgent(connector);
-                const canTestConnectorStore = Boolean(agente);
-
-                return (
-                  <article
-                    key={connector.id ?? connector.nome}
-                    className="relative overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),rgba(255,255,255,0.025)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.2),0_0_0_1px_rgba(34,211,238,0.03)] transition-[background-color,border-color,color,opacity,box-shadow,transform] duration-180 ease-out"
-                  >
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/35 to-transparent"
-                    />
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <h4 className="text-base font-bold text-white">{connector.nome}</h4>
-                        <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200">{connector.tipo}</span>
-                        <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${connector.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
-                          {connector.ativo ? "ativo" : "inativo"}
-                        </span>
-                      </div>
-
-                      <div className="mt-4 grid gap-3 md:grid-cols-3">
-                        <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Seller ID</p>
-                          <p className="mt-2 text-sm font-semibold text-white">{connector.configuracoes?.seller_id ?? "nao informado"}</p>
-                        </div>
-                        <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Nickname</p>
-                          <p className="mt-2 text-sm font-semibold text-white">{connector.configuracoes?.nickname ?? "nao informado"}</p>
-                        </div>
-                        <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Conta</p>
-                          <p className="mt-2 text-sm font-semibold text-white">
-                            {connector.configuracoes?.refresh_token ? "conectada" : connector.configuracoes?.access_token ? "token manual" : "nao conectada"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <p className="mt-3 truncate text-xs text-cyan-200/80">{connector.endpointBase}</p>
-                    </div>
-
-                    <div className="mt-5 border-t border-white/10 pt-4">
-                      <div className="grid gap-2 sm:grid-cols-3">
-                        <button
-                          type="button"
-                          onClick={() => onTestConnector(connector)}
-                          disabled={!canTestConnectorStore}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-50 transition-all hover:border-emerald-300/30 hover:bg-emerald-500/14 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <TestTube2 size={14} />
-                          {canTestConnectorStore ? "Testar loja" : "Vincule um agente"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onEditConnector(connector)}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-50 transition-all hover:border-amber-300/30 hover:bg-amber-500/14"
-                        >
-                          <Pencil size={14} />
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDeleteConnector(connector)}
-                          disabled={Boolean(connector.id) && deletingConnectorId === connector.id}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-50 transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <Trash2 size={14} />
-                          {Boolean(connector.id) && deletingConnectorId === connector.id ? "Removendo..." : "Remover completamente"}
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })
-            ) : (
-              <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhuma loja do Mercado Livre cadastrada para este projeto ainda.</div>
-            )}
-          </div>
-
-          <aside className="rounded-2xl border border-amber-400/14 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(15,23,42,0.22))] p-5 shadow-[0_18px_36px_rgba(2,8,23,0.18)] xl:sticky xl:top-6 xl:w-full xl:self-start">
+        <div className="mt-4 space-y-6">
+          <aside className="rounded-2xl border border-amber-400/14 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(15,23,42,0.22))] p-5 shadow-[0_18px_36px_rgba(2,8,23,0.18)]">
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-100/85">Tutorial rapido</p>
             <h4 className="mt-2 text-lg font-bold text-white">Como conectar o Mercado Livre</h4>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">Aqui funciona em 2 etapas bem simples: primeiro voce cadastra a loja com os dados do aplicativo, depois conecta a conta do Mercado Livre para liberar o acesso.</p>
@@ -273,6 +182,74 @@ export function ProjectMercadoSection({
               Depois de salvar, o proximo passo e clicar em `Editar` para revisar os dados e concluir a conexao da conta.
             </div>
           </aside>
+
+          <div className="space-y-3">
+            {connectors.length ? (
+              connectors.map((connector) => (
+                <article
+                  key={connector.id ?? connector.nome}
+                  className="relative overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),rgba(255,255,255,0.025)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.2),0_0_0_1px_rgba(34,211,238,0.03)] transition-[background-color,border-color,color,opacity,box-shadow,transform] duration-180 ease-out"
+                >
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/35 to-transparent"
+                  />
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h4 className="text-base font-bold text-white">{connector.nome}</h4>
+                      <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200">{connector.tipo}</span>
+                      <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${connector.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
+                        {connector.ativo ? "ativo" : "inativo"}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Seller ID</p>
+                        <p className="mt-2 text-sm font-semibold text-white">{connector.configuracoes?.seller_id ?? "nao informado"}</p>
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Nickname</p>
+                        <p className="mt-2 text-sm font-semibold text-white">{connector.configuracoes?.nickname ?? "nao informado"}</p>
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-slate-950/45 px-3.5 py-3">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Conta</p>
+                        <p className="mt-2 text-sm font-semibold text-white">
+                          {connector.configuracoes?.refresh_token ? "conectada" : connector.configuracoes?.access_token ? "token manual" : "nao conectada"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="mt-3 truncate text-xs text-cyan-200/80">{connector.endpointBase}</p>
+                  </div>
+
+                  <div className="mt-5 border-t border-white/10 pt-4">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => onEditConnector(connector)}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-50 transition-all hover:border-amber-300/30 hover:bg-amber-500/14"
+                      >
+                        <Pencil size={14} />
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteConnector(connector)}
+                        disabled={Boolean(connector.id) && deletingConnectorId === connector.id}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-50 transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Trash2 size={14} />
+                        {Boolean(connector.id) && deletingConnectorId === connector.id ? "Removendo..." : "Remover completamente"}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhuma loja do Mercado Livre cadastrada para este projeto ainda.</div>
+            )}
+          </div>
         </div>
       </section>
     </div>

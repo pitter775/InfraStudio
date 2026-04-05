@@ -53,30 +53,44 @@ export function ProjectChatsSection({
           </button>
         </div>
 
-        <div className="space-y-4 p-2 pt-4">
-          <div className="rounded-2xl border border-amber-400/14 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(15,23,42,0.18))] px-4 py-4 shadow-[0_18px_36px_rgba(2,8,23,0.16)]">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-100/85">Documentacao</p>
-                <p className="mt-2 text-sm text-slate-200">Referencia unica para todos os widgets quando o site precisar controlar criacao, atualizacao e destruicao do chat.</p>
+        <div className="grid gap-4 p-2 pt-4 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
+          <aside className="space-y-4">
+            <div className="rounded-2xl border border-amber-400/14 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(15,23,42,0.18))] px-4 py-4 shadow-[0_18px_36px_rgba(2,8,23,0.16)]">
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-100/85">Documentacao</p>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-200">Referencia unica para todos os widgets quando o site precisar controlar criacao, atualizacao e destruicao do chat.</p>
+                </div>
+                <a
+                  href="/docs/chat-widget-host-control"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-amber-400/20 bg-white/5 px-4 py-3 text-sm font-semibold text-amber-50 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  <ExternalLink size={15} />
+                  Abrir documentacao completa
+                </a>
               </div>
-              <a
-                href="/docs/chat-widget-host-control"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-2xl border border-amber-400/20 bg-white/5 px-4 py-3 text-sm font-semibold text-amber-50 transition-colors hover:bg-white/10 hover:text-white"
-              >
-                <ExternalLink size={15} />
-                Abrir documentacao completa
-              </a>
             </div>
-          </div>
+          </aside>
 
-          {widgets.length ? (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {widgets.map((widget) => {
-                return (
-                  <article key={`chat-widget-card-${widget.id ?? widget.slug}`} className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),rgba(255,255,255,0.03)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.24),0_0_0_1px_rgba(34,211,238,0.04)] transition-[background-color,border-color,color,opacity,box-shadow,transform] duration-180 ease-out">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3 px-1">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200/85">Widgets criados</p>
+                <p className="mt-2 text-sm text-slate-400">
+                  {widgets.length
+                    ? `${widgets.length} widget${widgets.length > 1 ? "s" : ""} pronto${widgets.length > 1 ? "s" : ""} para instalar e editar.`
+                    : "Nenhum widget criado ainda para este projeto."}
+                </p>
+              </div>
+            </div>
+
+            {widgets.length ? (
+              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                {widgets.map((widget) => {
+                  return (
+                    <article key={`chat-widget-card-${widget.id ?? widget.slug}`} className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),rgba(255,255,255,0.03)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.24),0_0_0_1px_rgba(34,211,238,0.04)] transition-[background-color,border-color,color,opacity,box-shadow,transform] duration-180 ease-out">
                     <div
                       aria-hidden="true"
                       className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/35 to-transparent"
@@ -162,15 +176,16 @@ export function ProjectChatsSection({
                         </div>
                       </div>
                     </div>
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">
-              Nenhum widget de chat criado ainda. Crie um widget para exibir aqui os cards com os codigos de integracao.
-            </div>
-          )}
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">
+                Nenhum widget de chat criado ainda. Crie um widget para exibir aqui os cards com os codigos de integracao.
+              </div>
+            )}
+          </div>
         </div>
       </section>
     </div>
