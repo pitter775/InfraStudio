@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, ExternalLink, LoaderCircle, MessageCircleMore, MoreHorizontal, Paperclip, PhoneCall, RefreshCcw, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, Trash2, X } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, ExternalLink, LoaderCircle, MessageCircleMore, MoreHorizontal, Paperclip, PhoneCall, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, Trash2, X } from "lucide-react";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -287,6 +287,26 @@ function formatFileSize(value: number | null | undefined) {
   return `${size} B`;
 }
 
+function resizeReplyTextarea(textarea: HTMLTextAreaElement | null) {
+  if (!textarea || typeof window === "undefined") {
+    return;
+  }
+
+  textarea.style.height = "0px";
+  const computed = window.getComputedStyle(textarea);
+  const lineHeight = Number.parseFloat(computed.lineHeight || "20") || 20;
+  const paddingTop = Number.parseFloat(computed.paddingTop || "0") || 0;
+  const paddingBottom = Number.parseFloat(computed.paddingBottom || "0") || 0;
+  const borderTop = Number.parseFloat(computed.borderTopWidth || "0") || 0;
+  const borderBottom = Number.parseFloat(computed.borderBottomWidth || "0") || 0;
+  const minHeight = Math.ceil(lineHeight + paddingTop + paddingBottom + borderTop + borderBottom);
+  const maxHeight = Math.ceil(lineHeight * 5 + paddingTop + paddingBottom + borderTop + borderBottom);
+  const nextHeight = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight);
+
+  textarea.style.height = `${nextHeight}px`;
+  textarea.style.overflowY = textarea.scrollHeight > maxHeight ? "auto" : "hidden";
+}
+
 function getAttachmentCategory(type: string | null | undefined, category?: string | null) {
   if (category === "image" || category === "video" || category === "file") {
     return category;
@@ -302,6 +322,26 @@ function getAttachmentCategory(type: string | null | undefined, category?: strin
   }
 
   return "file";
+}
+
+function truncateFileName(name: string | null | undefined, maxLength = 34) {
+  const normalized = String(name || "").trim();
+  if (!normalized) {
+    return "arquivo";
+  }
+
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  const extensionIndex = normalized.lastIndexOf(".");
+  const hasExtension = extensionIndex > 0 && extensionIndex < normalized.length - 1;
+  const extension = hasExtension ? normalized.slice(extensionIndex) : "";
+  const baseName = hasExtension ? normalized.slice(0, extensionIndex) : normalized;
+  const safeMaxLength = Math.max(maxLength, extension.length + 6);
+  const visibleBase = Math.max(8, safeMaxLength - extension.length - 3);
+
+  return `${baseName.slice(0, visibleBase)}...${extension}`;
 }
 
 function getChatMediaItems(messages: ChatMessageRecord[]) {
@@ -444,6 +484,7 @@ export default function AdminAtendimentoPage() {
   const searchParams = useSearchParams();
   const linkedHandoffContactId = searchParams.get("handoffContactId")?.trim() || null;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const replyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const conversationViewportRef = useRef<HTMLDivElement | null>(null);
   const conversationBottomRef = useRef<HTMLDivElement | null>(null);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
@@ -865,6 +906,10 @@ export default function AdminAtendimentoPage() {
   }, [selectedChatId, selectedMessages.length, loadingConversation]);
 
   useEffect(() => {
+    resizeReplyTextarea(replyTextareaRef.current);
+  }, [replyText]);
+
+  useEffect(() => {
     const requestedChatId = searchParams.get("chat")?.trim() || null;
     if (!requestedChatId || !chats.some((chat) => chat.id === requestedChatId)) {
       return;
@@ -919,18 +964,6 @@ export default function AdminAtendimentoPage() {
     setProjectName(project.nome);
     setActiveProjectId(project.id);
     setFeedback(null);
-  };
-
-  const handleRefresh = async () => {
-    if (!activeProjectId) {
-      await loadProjects();
-      return;
-    }
-
-    await loadChats(activeProjectId);
-    if (selectedChatId) {
-      await loadConversation(selectedChatId);
-    }
   };
 
   const handleSelectChat = (chatId: string) => {
@@ -1074,6 +1107,7 @@ export default function AdminAtendimentoPage() {
           .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()),
       );
       setReplyText("");
+      resizeReplyTextarea(replyTextareaRef.current);
       setSelectedAttachments([]);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -1208,7 +1242,7 @@ export default function AdminAtendimentoPage() {
 
   return (
     <>
-    <main className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+    <main className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-y-contain xl:overflow-hidden">
       <section className={`px-1 pt-1 ${mobileConversationOpen ? "hidden xl:block" : ""}`}>
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">
           <MessageCircleMore size={14} />
@@ -1267,14 +1301,6 @@ export default function AdminAtendimentoPage() {
                 Trocar projeto
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={() => void handleRefresh()}
-              className={`${compactButtonClass} border-sky-400/20 bg-sky-400/10 text-sky-50 hover:border-sky-300/30 hover:bg-sky-400/14`}
-            >
-              <RefreshCcw size={15} />
-              Atualizar
-            </button>
           </div>
         </div>
       </section>
@@ -1391,7 +1417,7 @@ export default function AdminAtendimentoPage() {
         ) : null}
       </section>
 
-      <section className={`grid min-h-0 flex-1 items-stretch gap-3 overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)] ${mobileConversationOpen ? "xl:grid-cols-[280px_minmax(0,1fr)]" : ""}`}>
+      <section className={`grid min-h-0 flex-1 items-stretch gap-3 overflow-visible pb-4 xl:overflow-hidden xl:pb-0 xl:grid-cols-[280px_minmax(0,1fr)] ${mobileConversationOpen ? "xl:grid-cols-[280px_minmax(0,1fr)]" : ""}`}>
         <div className={`flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.02] shadow-[0_18px_38px_rgba(2,8,23,0.22)] ${mobileConversationOpen ? "hidden xl:flex" : ""}`}>
           <div className="shrink-0 border-b border-white/10 px-3 py-2.5">
             <p className="text-sm font-bold text-white">Conversas do projeto</p>
@@ -1423,7 +1449,7 @@ export default function AdminAtendimentoPage() {
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-2.5 pb-24 xl:pb-2.5">
             {loadingChats ? <CenterLoader /> : null}
 
             {!loadingChats && !filteredChats.length ? (
@@ -1553,45 +1579,59 @@ export default function AdminAtendimentoPage() {
                         <MoreHorizontal size={16} />
                       </button>
                       {mobileHeaderMenuOpen ? (
-                        <div className="absolute right-0 top-11 z-20 min-w-[220px] rounded-2xl border border-white/10 bg-[#091321] p-2 shadow-2xl">
+                        <>
                           <button
                             type="button"
-                            onClick={() => {
-                              setMobileHeaderMenuOpen(false);
-                              setMediaModalOpen(true);
-                            }}
-                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-slate-100 transition-colors hover:bg-white/5"
-                          >
-                            <Paperclip size={14} />
-                            Midias
-                          </button>
-                          {!isChatUnderHumanHandoff(selectedChat) ? (
+                            onClick={() => setMobileHeaderMenuOpen(false)}
+                            className="fixed inset-0 z-40 bg-slate-950/30 xl:hidden"
+                            aria-label="Fechar menu de acoes"
+                          />
+                          <div className="fixed inset-x-4 top-[138px] z-50 rounded-2xl border border-white/10 bg-[#091321] p-2 shadow-2xl xl:hidden">
                             <button
                               type="button"
-                              onClick={() => void handleHandoffAction("claim")}
-                              className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-emerald-100 transition-colors hover:bg-emerald-500/10"
+                              onClick={() => {
+                                setMobileHeaderMenuOpen(false);
+                                setMediaModalOpen(true);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-slate-100 transition-colors hover:bg-white/5"
                             >
-                              Assumir atendimento
+                              <Paperclip size={14} />
+                              Midias
                             </button>
-                          ) : (
+                            {!isChatUnderHumanHandoff(selectedChat) ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMobileHeaderMenuOpen(false);
+                                  void handleHandoffAction("claim");
+                                }}
+                                className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-emerald-100 transition-colors hover:bg-emerald-500/10"
+                              >
+                                Assumir atendimento
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMobileHeaderMenuOpen(false);
+                                  void handleHandoffAction("release");
+                                }}
+                                className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-amber-50 transition-colors hover:bg-amber-500/10"
+                              >
+                                Liberar para IA
+                              </button>
+                            )}
                             <button
                               type="button"
-                              onClick={() => void handleHandoffAction("release")}
-                              className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-amber-50 transition-colors hover:bg-amber-500/10"
+                              onClick={() => void handleDeleteChat()}
+                              disabled={deletingChat}
+                              className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-rose-100 transition-colors hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                              Liberar para IA
+                              {deletingChat ? <LoaderCircle size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                              Limpar conversa
                             </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => void handleDeleteChat()}
-                            disabled={deletingChat}
-                            className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-rose-100 transition-colors hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {deletingChat ? <LoaderCircle size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                            Limpar conversa
-                          </button>
-                        </div>
+                          </div>
+                        </>
                       ) : null}
                     </div>
                     <div className="hidden flex-wrap items-center gap-2 xl:flex">
@@ -1668,23 +1708,39 @@ export default function AdminAtendimentoPage() {
                             <p className="mt-1.5 whitespace-pre-wrap text-xs leading-5 sm:text-[13px]">{message.conteudo}</p>
                             {message.metadata?.attachments?.length ? (
                               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                                {message.metadata.attachments.map((attachment, index) => (
-                                  <a
-                                    key={`${message.id}-attachment-${index}`}
-                                    href={attachment.publicUrl || undefined}
-                                    target={attachment.publicUrl ? "_blank" : undefined}
-                                    rel={attachment.publicUrl ? "noreferrer" : undefined}
-                                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-slate-200 transition-colors hover:bg-white/10"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <Paperclip size={12} />
-                                      <span className="truncate font-semibold">{attachment.name || "arquivo"}</span>
-                                    </div>
-                                    <div className="mt-1 text-[10px] text-slate-400">
-                                      {getAttachmentCategory(attachment.type, attachment.category)} • {formatFileSize(attachment.size)}
-                                    </div>
-                                  </a>
-                                ))}
+                                {message.metadata.attachments.map((attachment, index) => {
+                                  const attachmentCategory = getAttachmentCategory(attachment.type, attachment.category);
+                                  const truncatedName = truncateFileName(attachment.name, 28);
+
+                                  return (
+                                    <a
+                                      key={`${message.id}-attachment-${index}`}
+                                      href={attachment.publicUrl || undefined}
+                                      target={attachment.publicUrl ? "_blank" : undefined}
+                                      rel={attachment.publicUrl ? "noreferrer" : undefined}
+                                      className="overflow-hidden rounded-xl border border-white/10 bg-white/5 text-[11px] text-slate-200 transition-colors hover:bg-white/10"
+                                    >
+                                      {attachmentCategory === "image" && attachment.publicUrl ? (
+                                        <img
+                                          src={attachment.publicUrl}
+                                          alt={attachment.name || "Imagem"}
+                                          className="aspect-[4/3] w-full bg-slate-950/40 object-cover"
+                                        />
+                                      ) : null}
+                                      <div className="px-3 py-2">
+                                        <div className="flex items-center gap-2">
+                                          {attachmentCategory === "image" ? <ExternalLink size={12} /> : <Paperclip size={12} />}
+                                          <span className="truncate font-semibold" title={attachment.name || "arquivo"}>
+                                            {truncatedName}
+                                          </span>
+                                        </div>
+                                        <div className="mt-1 text-[10px] text-slate-400">
+                                          {attachmentCategory} • {formatFileSize(attachment.size)}
+                                        </div>
+                                      </div>
+                                    </a>
+                                  );
+                                })}
                               </div>
                             ) : null}
                             {message.metadata?.assets?.length ? (
@@ -1741,10 +1797,20 @@ export default function AdminAtendimentoPage() {
                     {selectedAttachments.map((attachment, index) => (
                       <span
                         key={`${attachment.name}-${index}`}
-                        className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-slate-200"
+                        className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-slate-200"
                       >
-                        <Paperclip size={12} />
-                        {attachment.name}
+                        {attachment.type.startsWith("image/") ? (
+                          <img
+                            src={URL.createObjectURL(attachment.file)}
+                            alt={attachment.name}
+                            className="h-7 w-7 shrink-0 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <Paperclip size={12} />
+                        )}
+                        <span className="truncate" title={attachment.name}>
+                          {truncateFileName(attachment.name, 30)}
+                        </span>
                         <span className="text-slate-500">{formatFileSize(attachment.size)}</span>
                         <button
                           type="button"
@@ -1797,32 +1863,39 @@ export default function AdminAtendimentoPage() {
                     >
                       <SmilePlus size={16} />
                     </button>
-                    <div
-                      className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border ${
+                    <button
+                      type="button"
+                      onClick={() => void handleHandoffAction(selectedChat && isChatUnderHumanHandoff(selectedChat) ? "release" : "claim")}
+                      disabled={!selectedChat}
+                      className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${
                         selectedChat && !isChatUnderHumanHandoff(selectedChat)
-                          ? "border-emerald-400/30 bg-emerald-500/12 text-emerald-200"
-                          : "border-white/10 bg-white/5 text-slate-500"
-                      }`}
+                          ? "border-emerald-400/30 bg-emerald-500/12 text-emerald-200 hover:bg-emerald-500/18"
+                          : "border-amber-400/20 bg-amber-500/10 text-amber-100 hover:bg-amber-500/16"
+                      } disabled:cursor-not-allowed disabled:opacity-60`}
                       title={
                         selectedChat && !isChatUnderHumanHandoff(selectedChat)
-                          ? "IA atendendo automaticamente"
-                          : "IA pausada neste contato"
+                          ? "Assumir atendimento agora"
+                          : "Liberar para IA"
                       }
                       aria-label={
                         selectedChat && !isChatUnderHumanHandoff(selectedChat)
-                          ? "IA atendendo automaticamente"
-                          : "IA pausada neste contato"
+                          ? "Assumir atendimento agora"
+                          : "Liberar para IA"
                       }
                     >
                       <Sparkles size={16} />
-                    </div>
+                    </button>
                   </div>
                   <textarea
+                    ref={replyTextareaRef}
                     value={replyText}
-                    onChange={(event) => setReplyText(event.target.value)}
+                    onChange={(event) => {
+                      setReplyText(event.target.value);
+                      resizeReplyTextarea(event.target);
+                    }}
                     placeholder="Digite sua resposta manual..."
-                    rows={2}
-                    className="max-h-32 min-h-[60px] flex-1 overflow-y-auto rounded-2xl border border-white/10 bg-slate-950/50 px-3.5 py-2.5 text-xs text-white outline-none transition-colors placeholder:text-slate-500 focus:border-cyan-400/30 sm:text-sm"
+                    rows={1}
+                    className="h-[42px] min-h-[42px] flex-1 resize-none overflow-y-hidden rounded-2xl border border-white/10 bg-slate-950/50 px-3.5 py-2.5 text-xs leading-5 text-white outline-none transition-colors placeholder:text-slate-500 focus:border-cyan-400/30 sm:text-sm"
                   />
                   <button
                     type="button"

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { canAccessAdmin, canAccessProject } from "@/lib/access";
 import { appendSystemLog } from "@/lib/chat-logs";
 import { claimHumanHandoff, getChatHandoffByChatId } from "@/lib/chat-handoffs";
+import { formatWhatsAppHumanOutboundText } from "@/lib/chat-service";
 import { appendMessage, deleteChatConversation, getChatById, getUnifiedWhatsAppOutboundContext, listUnifiedChatMessages, touchChatUpdatedAt } from "@/lib/chats";
 import { getSessionUser } from "@/lib/session";
 import { getPreferredWhatsAppChannel, getWhatsAppChannelByProject } from "@/lib/whatsapp-channels";
@@ -134,8 +135,9 @@ export async function POST(request: Request, context: RouteContext) {
           ? "preferred_channel"
           : projectChannel?.id
             ? "project_channel"
-            : "missing";
+        : "missing";
   const destinatarioWhatsapp = unifiedWhatsAppContext?.to ?? chat.identificadorExterno ?? "";
+  const outboundText = chat.canal === "whatsapp" ? formatWhatsAppHumanOutboundText(conteudo) : conteudo;
 
   if (sentByHuman && chat.projetoId) {
     await claimHumanHandoff({
@@ -154,7 +156,7 @@ export async function POST(request: Request, context: RouteContext) {
     const outbound = await sendWhatsAppServiceMessage({
       channelId: canalWhatsappId,
       to: destinatarioWhatsapp,
-      message: conteudo,
+      message: outboundText,
       attachments,
     });
 

@@ -338,6 +338,7 @@ function formatWhatsAppOutboundText(reply: string) {
 function formatWhatsAppOutboundTextSafe(reply: string) {
   return String(reply || "")
     .replace(/\r\n/g, "\n")
+    .replace(/([.!?])\s+(?=[A-Z0-9*])/g, "$1\n\n")
     .replace(/\*\*(.+?)\*\*/g, "*$1*")
     .replace(/__(.+?)__/g, "*$1*")
     .replace(/^[\-\*]\s+/gm, "â€¢ ")
@@ -350,8 +351,16 @@ function formatWhatsAppOutboundTextSafe(reply: string) {
 
       return `*${String(label || "").trim()}:* `;
     })
+    .replace(/:\s+(?=(?:\d+\.|\*[A-Z0-9]))/g, ":\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+export function formatWhatsAppHumanOutboundText(reply: string) {
+  return formatWhatsAppOutboundTextSafe(reply);
 }
 
 function stripAssistantMetaArtifacts(reply: string) {
@@ -377,7 +386,11 @@ function stripAssistantMetaArtifacts(reply: string) {
     .replace(/,\s*,+/g, ", ")
     .replace(/,\s*\./g, ".")
     .replace(/\.\s*,/g, ".")
-    .replace(/\s{2,}/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/([.!?])\s+(?=[A-Z0-9*])/g, "$1\n\n")
+    .replace(/^([A-Za-z0-9][A-Za-z0-9\s]{1,28}):\s*/gm, "$1:\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -401,7 +414,9 @@ export function sanitizeWhatsAppCustomerFacingReply(reply: string) {
     sanitized = sanitized.replace(pattern, " ");
   }
 
-  return sanitized.replace(/\s{2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  return preserveStructuredWhitespace(sanitized)
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export function buildWhatsAppMessageSequence(
@@ -560,6 +575,15 @@ export function buildContinuationMessage(input: {
     .filter(Boolean)
     .join("\n\n")
     .trim();
+}
+
+function preserveStructuredWhitespace(value: string) {
+  return String(value || "")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]{2,}/g, " ").trimEnd())
+    .join("\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n");
 }
 
 async function validateChatAgainstResolvedChannel(input: {

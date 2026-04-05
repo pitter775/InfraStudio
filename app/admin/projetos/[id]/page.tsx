@@ -2378,6 +2378,7 @@ function AgenteModal({
   const [promptExpanded, setPromptExpanded] = useState(true);
   const [connectionsExpanded, setConnectionsExpanded] = useState(false);
   const [apisExpanded, setApisExpanded] = useState(false);
+  const [mobileAgentTab, setMobileAgentTab] = useState<"summary" | "connections" | "apis" | "files">("summary");
   const promptRef = useRef<HTMLDivElement | null>(null);
   const lastPromptSyncRef = useRef("");
   const initialDraftSnapshotRef = useRef("");
@@ -2388,6 +2389,7 @@ function AgenteModal({
       setPromptExpanded(true);
       setConnectionsExpanded(true);
       setApisExpanded(false);
+      setMobileAgentTab("summary");
       initialDraftSnapshotRef.current = buildAgenteDraftSnapshot(form, pendingArquivos);
     }
   }, [open]);
@@ -2604,6 +2606,13 @@ function AgenteModal({
     updatePromptBase(element.innerHTML);
   };
 
+  const mobileAgentTabs = [
+    { id: "summary" as const, label: "Resumo" },
+    { id: "connections" as const, label: "Conexoes" },
+    { id: "apis" as const, label: "APIs" },
+    { id: "files" as const, label: "Arquivos" },
+  ];
+
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
       <div className={`max-h-[92vh] w-full overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl transition-all duration-300 ${promptExpanded ? "max-w-6xl" : "max-w-5xl"}`}>
@@ -2611,7 +2620,7 @@ function AgenteModal({
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Agente</p>
             <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar agente" : "Novo agente"}</h2>
-            <p className="mt-1 text-sm text-slate-400">Defina o agente e selecione quais APIs deste projeto ele pode usar.</p>
+            <p className="mt-1 hidden text-sm text-slate-400 sm:block">Defina o agente e selecione quais APIs deste projeto ele pode usar.</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -2638,9 +2647,28 @@ function AgenteModal({
           </div>
         </div>
 
+        <div className="border-b border-white/10 px-4 py-3 lg:hidden">
+          <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {mobileAgentTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setMobileAgentTab(tab.id)}
+                className={`shrink-0 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
+                  mobileAgentTab === tab.id
+                    ? "border-cyan-400/30 bg-cyan-500/10 text-cyan-100"
+                    : "border-white/10 bg-white/5 text-slate-300"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="flex max-h-[calc(92vh-88px)] flex-col">
           <div className={`grid flex-1 gap-0 overflow-hidden ${connectionsExpanded ? "lg:grid-cols-[1.05fr_0.95fr]" : "lg:grid-cols-[minmax(0,1fr)_112px]"}`}>
-          <div className="min-w-0 space-y-4 overflow-y-auto p-6 pb-8 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <div className={`min-w-0 space-y-4 overflow-y-auto p-6 pb-8 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${mobileAgentTab === "summary" ? "" : "hidden lg:block"}`}>
             <div>
               <FormLabel>Nome do agente</FormLabel>
               <input value={form.nome} onChange={(event) => onChange({ nome: event.target.value })} placeholder="Agente comercial principal" className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500" />
@@ -2732,7 +2760,7 @@ function AgenteModal({
                 </div>
               ) : null}
             </div>
-            <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+            <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4 hidden lg:block">
               <div className="mb-4">
                 <p className="text-sm font-semibold text-white">Runtime compilado</p>
                 <p className="mt-1 text-xs text-slate-400">Preview do kit enxuto que o orquestrador deve usar no atendimento para reduzir token sem perder o rumo.</p>
@@ -2834,7 +2862,135 @@ function AgenteModal({
             </div>
           </div>
 
-          <div className={`min-w-0 overflow-y-auto border-t border-white/10 bg-white/[0.03] transition-all duration-300 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden lg:border-t-0 ${connectionsExpanded ? "p-6 pb-8 lg:border-l" : "p-4 lg:border-l lg:px-3 lg:py-4"}`}>
+          <div className={`min-w-0 overflow-y-auto border-t border-white/10 bg-white/[0.03] transition-all duration-300 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden lg:border-t-0 ${mobileAgentTab === "summary" ? "hidden lg:block" : "block"} ${connectionsExpanded ? "p-6 pb-8 lg:border-l" : "p-4 lg:border-l lg:px-3 lg:py-4"}`}>
+            <div className="space-y-4 lg:hidden">
+              {mobileAgentTab === "connections" ? (
+                <>
+                  {renderConnectionCard(
+                    <PanelsTopLeft size={18} />,
+                    "Chat widget",
+                    "Se o widget ja existir, voce pode trazer o atendimento para este agente. Se ele estiver em outro agente, a troca remove o vinculo anterior.",
+                    widgetEntries,
+                    "Nenhum widget cadastrado neste projeto.",
+                  )}
+                  {renderConnectionCard(
+                    <MessageSquare size={18} />,
+                    "WhatsApp",
+                    "O canal WhatsApp do projeto pode ser ativado neste agente. Se hoje estiver em outro agente, o sistema transfere o vinculo.",
+                    whatsappEntries,
+                    "Nenhum canal WhatsApp cadastrado neste projeto.",
+                  )}
+                  {renderConnectionCard(
+                    <Boxes size={18} />,
+                    "Mercado Livre",
+                    "A integracao do Mercado Livre pode ficar visivel neste agente. Quando ja estiver em outro agente, a mudanca transfere o acesso.",
+                    connectorEntries,
+                    "Nenhuma integracao Mercado Livre cadastrada neste projeto.",
+                  )}
+                </>
+              ) : null}
+
+              {mobileAgentTab === "apis" ? (
+                <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+                  <div>
+                    <p className="text-sm font-semibold text-white">APIs disponiveis para este agente</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {selectedApiCount
+                        ? `${selectedApiCount} API(s) selecionada(s) para este agente.`
+                        : "Escolha quais APIs este agente pode usar no atendimento."}
+                    </p>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    {apis.length ? (
+                      apis.map((api) => (
+                        <label key={api.id} className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+                          <input type="checkbox" checked={form.apiIds.includes(api.id)} onChange={(event) => onChange({ apiIds: event.target.checked ? [...form.apiIds, api.id] : form.apiIds.filter((item) => item !== api.id) })} />
+                          <span className="font-semibold text-white">{api.nome}</span>
+                          <span className="text-slate-500">{api.metodo}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-400">Cadastre uma API neste projeto para vincular ao agente.</p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              {mobileAgentTab === "files" ? (
+                <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">Arquivos e imagens do agente</p>
+                      <p className="mt-1 text-xs text-slate-400">Imagens aparecem com miniatura para ficar mais facil revisar o que ja foi cadastrado.</p>
+                    </div>
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100">
+                      <Paperclip size={14} />
+                      Adicionar
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                        onChange={(event) => {
+                          onAddFiles(event.target.files);
+                          event.currentTarget.value = "";
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {form.arquivos.length ? (
+                    <div className="mt-4 space-y-2">
+                      {form.arquivos.map((asset) => (
+                        <div key={asset.id} className="flex items-start justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <AgenteAssetPreview categoria={asset.categoria} publicUrl={asset.publicUrl} alt={asset.nome} />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-white">{asset.nome}</p>
+                              <p className="text-xs text-slate-400">{asset.arquivoNome} â€¢ {formatFileSize(asset.tamanhoBytes)}</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => onRemoveUploadedFile(asset.id)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-100 transition-colors hover:bg-rose-500/20"
+                            aria-label="Remover arquivo"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {pendingArquivos.length ? (
+                    <div className="mt-4 space-y-2">
+                      {pendingArquivos.map((item) => (
+                        <div key={item.id} className="flex items-start justify-between gap-3 rounded-xl border border-cyan-500/15 bg-cyan-500/10 px-3 py-3">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <AgenteAssetPreview categoria={item.file.type.startsWith("image/") ? "image" : "file"} file={item.file} alt={item.file.name} />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-white">{item.file.name}</p>
+                              <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} â€¢ aguardando upload</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => onRemovePendingFile(item.id)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                            aria-label="Remover arquivo pendente"
+                          >
+                            <X size={15} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="hidden lg:block">
             <div className={`flex gap-3 ${connectionsExpanded ? "items-start justify-between" : "justify-end"}`}>
               {connectionsExpanded ? (
                 <div className="min-w-0">
@@ -3064,6 +3220,7 @@ function AgenteModal({
                 </div>
               </div>
             )}
+            </div>
           </div>
         </div>
           <ModalStickyFooter feedback={feedback}>

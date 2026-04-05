@@ -307,7 +307,7 @@ export default function AdminProjetosPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-4xl font-extrabold text-slate-50">Seus projetos</h1>
-            <p className="mt-4 max-w-3xl text-slate-400">Abra um projeto para continuar o trabalho no contexto correto.</p>
+            <p className="mt-4 hidden max-w-3xl text-slate-400 sm:block">Abra um projeto para continuar o trabalho no contexto correto.</p>
           </div>
           <button
             type="button"
@@ -323,7 +323,7 @@ export default function AdminProjetosPage() {
       {feedback ? <section className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</section> : null}
 
       {!loading && projetos.length ? (
-        <section className="grid gap-4 md:grid-cols-3">
+        <section className="grid grid-cols-3 gap-2 md:gap-4">
           {[
             {
               label: "Projetos",
@@ -352,13 +352,14 @@ export default function AdminProjetosPage() {
           ].map((item) => {
             const Icon = item.icon;
             return (
-              <div key={item.label} className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02] p-5 shadow-[0_18px_45px_rgba(2,8,23,0.18)]">
-                <div className={`pointer-events-none absolute right-4 top-4 ${item.tone} opacity-16`}>
+              <div key={item.label} className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02] p-3 shadow-[0_18px_45px_rgba(2,8,23,0.18)] md:p-5">
+                <div className={`pointer-events-none absolute right-4 top-4 hidden ${item.tone} opacity-16 md:block`}>
                   <Icon size={34} />
                 </div>
-                <div className="relative flex items-start gap-4">
-                  <p className="min-w-[56px] text-4xl font-black leading-none text-slate-100">{item.value}</p>
-                  <div className="min-w-0">
+                <div className="relative flex items-center gap-2 md:items-start md:gap-4">
+                  <Icon size={16} className={`${item.tone} shrink-0 md:hidden`} />
+                  <p className="min-w-0 text-2xl font-black leading-none text-slate-100 sm:text-3xl md:min-w-[56px] md:text-4xl">{item.value}</p>
+                  <div className="hidden min-w-0 md:block">
                     <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
                     <p className="mt-2 text-sm text-slate-400">{item.description}</p>
                   </div>
@@ -371,8 +372,8 @@ export default function AdminProjetosPage() {
 
       <section className="overflow-hidden rounded-2xl">
         <div className="px-1 py-2">
-          <h2 className="text-xl font-bold text-slate-50">Meus projetos</h2>
-          <p className="mt-2 text-sm text-slate-400">Escolha um projeto para continuar de onde você parou.</p>
+          <h2 className="hidden text-xl font-bold text-slate-50 sm:block">Meus projetos</h2>
+          <p className="mt-2 hidden text-sm text-slate-400 sm:block">Escolha um projeto para continuar de onde voce parou.</p>
         </div>
         <div className="px-1 py-4">
           {loading ? <CenterLoader /> : null}
@@ -460,7 +461,7 @@ export default function AdminProjetosPage() {
                       </Link>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
                       {[
                         {
                           label: "Agentes",
@@ -489,13 +490,14 @@ export default function AdminProjetosPage() {
                       ].map((item) => {
                         const Icon = item.icon;
                         return (
-                          <div key={`${projeto.id}-${item.label}`} className="relative overflow-hidden rounded-2xl border border-white/7 bg-white/[0.024] p-4 shadow-[0_12px_24px_rgba(2,8,23,0.18)]">
-                            <div className={`pointer-events-none absolute right-4 top-4 ${item.tone} opacity-16`}>
+                          <div key={`${projeto.id}-${item.label}`} className="relative overflow-hidden rounded-2xl border border-white/7 bg-white/[0.024] p-3 shadow-[0_12px_24px_rgba(2,8,23,0.18)] sm:p-4">
+                            <div className={`pointer-events-none absolute right-4 top-4 hidden ${item.tone} opacity-16 sm:block`}>
                               <Icon size={28} />
                             </div>
-                            <div className="relative flex flex-col items-start gap-3">
-                              <p className="text-4xl font-black leading-none text-slate-100">{item.value}</p>
-                              <div className="min-w-0">
+                            <div className="relative flex items-center gap-2 sm:flex-col sm:items-start sm:gap-3">
+                              <Icon size={15} className={`${item.tone} shrink-0 sm:hidden`} />
+                              <p className="text-2xl font-black leading-none text-slate-100 sm:text-4xl">{item.value}</p>
+                              <div className="hidden min-w-0 sm:block">
                                 <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">{item.label}</p>
                                 <p className="mt-2 text-xs leading-relaxed text-slate-400">{item.description}</p>
                               </div>
