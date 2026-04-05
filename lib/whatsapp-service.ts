@@ -97,6 +97,7 @@ export async function sendWhatsAppServiceMessage(input: SendWhatsAppServiceMessa
     error?: string;
     sent?: boolean;
     to?: string;
+    target?: string;
   };
 
   if (!response.ok) {
@@ -110,5 +111,6 @@ export async function sendWhatsAppServiceMessage(input: SendWhatsAppServiceMessa
     ok: true,
     sent: payload.sent === true,
     to: payload.to ?? null,
+    target: payload.target ?? null,
   };
 }
