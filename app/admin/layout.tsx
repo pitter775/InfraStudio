@@ -45,7 +45,7 @@ const adminLinks = [
   { href: "/admin/uso", label: "Uso por Projeto", icon: ActivitySquare },
   { href: "/admin/me", label: "Meu Perfil", icon: Settings },
   { href: "/admin/usage", label: "Uso de Tokens", icon: Coins },
-  { href: "/admin/chat-logs", label: "Logs", icon: ActivitySquare },
+  { href: "/admin/laboratorio", label: "Laboratorio", icon: ActivitySquare },
   { href: "/admin/usuarios", label: "Usuários", icon: Users },
 ] as const;
 
