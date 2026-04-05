@@ -4317,10 +4317,16 @@ function EmbeddedAgentTestChat({
   projeto,
   agente,
   origin,
+  effectiveChannelKind,
+  whatsappChannelId,
+  whatsappChannelNumber,
 }: {
   projeto: Projeto;
   agente: Agente;
   origin: string;
+  effectiveChannelKind: "admin_agent_test" | "whatsapp";
+  whatsappChannelId?: string | null;
+  whatsappChannelNumber?: string | null;
 }) {
   useEffect(() => {
     if (typeof window === "undefined" || !origin) {
@@ -4336,7 +4342,10 @@ function EmbeddedAgentTestChat({
 
     const projetoRef = projeto.id;
     const agenteRef = agente.id;
-    const testSessionId = `admin-agent-test:${projeto.id}:${agente.id}:${Date.now()}`;
+    const testSessionId =
+      effectiveChannelKind === "whatsapp"
+        ? `55${Date.now().toString().slice(-11)}`
+        : `admin-agent-test:${projeto.id}:${agente.id}:${Date.now()}`;
     const scriptId = "infrastudio-admin-agent-test-chat-sdk";
     const mountWidget = () => {
       infraChatWindow.InfraChat?.destroy();
@@ -4360,13 +4369,23 @@ function EmbeddedAgentTestChat({
             path: window.location.pathname,
           },
           channel: {
-            kind: "admin_agent_test",
+            kind: effectiveChannelKind,
           },
           admin: {
             mode: "agent_test",
             projetoId: projeto.id,
             agenteId: agente.id,
           },
+          ...(effectiveChannelKind === "whatsapp"
+            ? {
+                whatsapp: {
+                  channelId: whatsappChannelId ?? null,
+                  numeroCanal: whatsappChannelNumber ?? null,
+                  remetente: testSessionId,
+                  contactName: "Cliente teste",
+                },
+              }
+            : {}),
         },
         policy: {
           allowed: true,
@@ -4395,7 +4414,7 @@ function EmbeddedAgentTestChat({
       script?.removeEventListener("load", mountWidget);
       infraChatWindow.InfraChat?.destroy();
     };
-  }, [agente.id, origin, projeto.id]);
+  }, [agente.id, effectiveChannelKind, origin, projeto.id, whatsappChannelId, whatsappChannelNumber]);
 
   return null;
 }
@@ -7077,6 +7096,13 @@ export default function AdminProjetoDetalhePage() {
 
   const agenteAtivo = data.agentes.find((agente) => agente.ativo) ?? null;
   const activeAgentTestTarget = agentTestTarget ? data.agentes.find((agente) => agente.id === agentTestTarget.id) ?? agentTestTarget : null;
+  const activeAgentTestWhatsAppChannel = activeAgentTestTarget
+    ? data.whatsappChannels.find(
+        (channel) =>
+          channel.status === "ativo" &&
+          (channel.agenteId === activeAgentTestTarget.id || (data.agentes.length === 1 && !channel.agenteId)),
+      ) ?? null
+    : null;
   const primaryWhatsAppChannel = data.whatsappChannels[0] ?? null;
   const whatsAppQrModalChannel = whatsAppQrModalChannelId
     ? data.whatsappChannels.find((channel) => channel.id === whatsAppQrModalChannelId) ?? null
@@ -7454,6 +7480,9 @@ export default function AdminProjetoDetalhePage() {
               projeto={data.projeto}
               agente={activeAgentTestTarget}
               origin={origin}
+              effectiveChannelKind={activeAgentTestWhatsAppChannel ? "whatsapp" : "admin_agent_test"}
+              whatsappChannelId={activeAgentTestWhatsAppChannel?.id ?? null}
+              whatsappChannelNumber={activeAgentTestWhatsAppChannel?.numero ?? null}
             />
           ) : null}
           <div className="pt-2">
@@ -7584,7 +7613,7 @@ export default function AdminProjetoDetalhePage() {
                 const recentEvents = buildAgentStatusEvents(data.chats, latestProjectChat);
 
                 return (
-                  <div key={agente.id} className="xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(220px,0.33fr)_minmax(240px,0.38fr)] xl:gap-8">
+                  <div key={agente.id} className="xl:grid xl:grid-cols-[minmax(0,0.82fr)_minmax(240px,0.36fr)_minmax(260px,0.42fr)] xl:gap-8">
                   <article className={`relative flex h-full flex-col overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),rgba(255,255,255,0.03)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.24),0_0_0_1px_rgba(34,211,238,0.04)] ${premiumTransitionClass}`}>
                     <div
                       aria-hidden="true"

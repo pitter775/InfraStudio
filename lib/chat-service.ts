@@ -1676,6 +1676,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
       typeof widgetContext?.whatsapp_celular === "string" && widgetContext.whatsapp_celular.trim()
         ? widgetContext.whatsapp_celular.trim()
         : null;
+    const canOfferWhatsappShortcut = Boolean(fallbackWidgetPhone);
     const agentAtual = nextContext.agente?.id ? await getAgenteById(String(nextContext.agente.id)) : null;
     const configuredWhatsappCta =
       agentAtual?.configuracoes &&
@@ -1687,8 +1688,9 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
       Boolean(agentAtual?.configuracoes) &&
       typeof agentAtual?.configuracoes?.handoff === "object" &&
       agentAtual.configuracoes.handoff !== null;
-    const whatsappPhone = preferredChannel?.numero || fallbackWidgetPhone;
-    const hasWhatsappBias = Boolean(whatsappPhone) || Boolean(configuredWhatsappCta) || hasWhatsappHandoff;
+    const whatsappPhone = canOfferWhatsappShortcut ? preferredChannel?.numero || fallbackWidgetPhone : null;
+    const hasWhatsappBias =
+      canOfferWhatsappShortcut && (Boolean(whatsappPhone) || Boolean(configuredWhatsappCta) || hasWhatsappHandoff);
     const isFocusedMercadoLivreConversation =
       ai.metadata?.model === "mercado_livre_product_sales" &&
       Boolean(ai.metadata && "catalogoProdutoAtual" in ai.metadata && ai.metadata.catalogoProdutoAtual);

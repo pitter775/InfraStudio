@@ -118,14 +118,11 @@ export function buildNeutralGlobalFallbackReply(agent: AgenteRecord | null, cont
     context?.projeto?.nome?.trim() ||
     "este atendimento";
 
-  return [`Sigo por aqui no contexto de ${agent?.nome ?? "atendimento"}.`, `Me diga o ponto exato que voce quer validar em ${objective}.`].join("\n\n");
+  return `Me diga o ponto exato que voce quer validar em ${objective}.`;
 }
 
 export function buildMercadoLivreFocusedFallbackReply(agent: AgenteRecord | null) {
-  return [
-    `Sigo por aqui no contexto de ${agent?.nome ?? "atendimento"}.`,
-    "Como este agente esta focado na loja do Mercado Livre, me diga o produto, modelo, marca, cor ou SKU que voce quer buscar.",
-  ].join("\n\n");
+  return `Como este agente esta focado na loja do Mercado Livre, me diga o produto, modelo, marca, cor ou SKU que voce quer buscar.`;
 }
 
 function buildMercadoLivreShoppingBriefReply(message: string, agent: AgenteRecord | null) {
@@ -219,10 +216,7 @@ export function buildAgentScopedRecoveryReply(input: {
     "este atendimento";
 
   if (isWhatsAppChannel(input.context)) {
-    const baseReply = [
-      `Sigo por aqui no contexto de ${input.agent?.nome ?? "atendimento"}.`,
-      `Me diga o ponto exato que voce quer validar em ${objective}: valor, detalhes, documentos ou o que mais pesa na sua decisao.`,
-    ].join("\n\n");
+    const baseReply = `Me diga o ponto exato que voce quer validar em ${objective}: valor, detalhes, documentos ou o que mais pesa na sua decisao.`;
 
     return apiReply || apiContinuationReply ? formatHeuristicReply(apiReply || apiContinuationReply || "", input.context) : baseReply;
   }
@@ -232,10 +226,7 @@ export function buildAgentScopedRecoveryReply(input: {
   const mercadoLivreShoppingBriefReply = input.hasMercadoLivreConnector ? buildMercadoLivreShoppingBriefReply(input.message, input.agent) : null;
   const mercadoLivreSearchRecoveryReply = input.hasMercadoLivreConnector ? buildMercadoLivreSearchRecoveryReply(input.message, input.agent) : null;
   const baseReply = isInfraStudioFirstPartyContext(input.context)
-    ? [
-        `Sigo por aqui no contexto de ${input.agent?.nome ?? "atendimento"}.`,
-        `Me diga o ponto exato que voce quer validar em ${objective}: valor, detalhes, documentos ou o que mais pesa na sua decisao.`,
-      ].join("\n\n")
+    ? `Me diga o ponto exato que voce quer validar em ${objective}: valor, detalhes, documentos ou o que mais pesa na sua decisao.`
     : mercadoLivreShoppingBriefReply || mercadoLivreSearchRecoveryReply || mercadoLivreFallbackReply;
 
   return apiReply || apiContinuationReply ? formatHeuristicReply(apiReply || apiContinuationReply || "", input.context) : baseReply;
