@@ -4,6 +4,7 @@ import { appendSystemLog } from "@/lib/chat-logs";
 import { claimHumanHandoff, getChatHandoffByChatId } from "@/lib/chat-handoffs";
 import { appendMessage, deleteChatConversation, getChatById, getUnifiedWhatsAppOutboundContext, listUnifiedChatMessages, touchChatUpdatedAt } from "@/lib/chats";
 import { getSessionUser } from "@/lib/session";
+import { getPreferredWhatsAppChannel, getWhatsAppChannelByProject } from "@/lib/whatsapp-channels";
 import { sendWhatsAppServiceMessage } from "@/lib/whatsapp-service";
 
 type RouteContext = {
@@ -109,7 +110,31 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const unifiedWhatsAppContext = await getUnifiedWhatsAppOutboundContext(chat.id);
-  const canalWhatsappId = unifiedWhatsAppContext?.channelId ?? null;
+  const currentHandoff = await getChatHandoffByChatId(chat.id);
+  const preferredChannel =
+    !unifiedWhatsAppContext?.channelId && chat.projetoId
+      ? await getPreferredWhatsAppChannel({ projetoId: chat.projetoId, agenteId: chat.agenteId })
+      : null;
+  const projectChannel =
+    !unifiedWhatsAppContext?.channelId && !preferredChannel && chat.projetoId
+      ? await getWhatsAppChannelByProject({ projetoId: chat.projetoId })
+      : null;
+  const canalWhatsappId =
+    unifiedWhatsAppContext?.channelId ??
+    currentHandoff?.canalWhatsappId ??
+    preferredChannel?.id ??
+    projectChannel?.id ??
+    null;
+  const channelSource =
+    unifiedWhatsAppContext?.channelId
+      ? "chat_context"
+      : currentHandoff?.canalWhatsappId
+        ? "handoff"
+        : preferredChannel?.id
+          ? "preferred_channel"
+          : projectChannel?.id
+            ? "project_channel"
+            : "missing";
   const destinatarioWhatsapp = unifiedWhatsAppContext?.to ?? chat.identificadorExterno ?? "";
 
   if (sentByHuman && chat.projetoId) {
@@ -145,6 +170,7 @@ export async function POST(request: Request, context: RouteContext) {
           channelId: canalWhatsappId,
           to: destinatarioWhatsapp,
           target: outbound.target ?? null,
+          channelSource,
           recipientKind: unifiedWhatsAppContext?.recipientKind ?? null,
           matchedBy: unifiedWhatsAppContext?.matchedBy ?? null,
           hasText: Boolean(conteudo),
@@ -166,6 +192,7 @@ export async function POST(request: Request, context: RouteContext) {
         channelId: canalWhatsappId,
         to: outbound.to ?? destinatarioWhatsapp,
         target: outbound.target ?? null,
+        channelSource,
         recipientKind: unifiedWhatsAppContext?.recipientKind ?? null,
         matchedBy: unifiedWhatsAppContext?.matchedBy ?? null,
         hasText: Boolean(conteudo),
@@ -184,6 +211,7 @@ export async function POST(request: Request, context: RouteContext) {
         resolvedChatId: unifiedWhatsAppContext?.chatId ?? null,
         channelId: canalWhatsappId,
         to: destinatarioWhatsapp || null,
+        channelSource,
         recipientKind: unifiedWhatsAppContext?.recipientKind ?? null,
         matchedBy: unifiedWhatsAppContext?.matchedBy ?? null,
         hasText: Boolean(conteudo),
