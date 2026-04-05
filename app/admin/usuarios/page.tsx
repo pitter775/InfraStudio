@@ -292,7 +292,7 @@ export default function AdminUsuariosPage() {
                       type="button"
                       onClick={() => void handleSubmit()}
                       disabled={saving}
-                      className={`${primaryActionButtonClass} flex-1`}
+                      className={primaryActionButtonClass}
                     >
                       {saving ? <BusyIcon /> : form.id ? <Pencil size={16} /> : <Plus size={16} />}
                       {form.id ? "Salvar" : "Criar"}

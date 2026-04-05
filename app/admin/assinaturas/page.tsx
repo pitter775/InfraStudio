@@ -219,7 +219,7 @@ export default function AdminAssinaturasPage() {
                     <button
                       type="button"
                       onClick={() => void cancelar(item.assinaturaId!)}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100"
                     >
                       <XCircle size={16} />
                       Cancelar assinatura

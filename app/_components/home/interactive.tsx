@@ -188,7 +188,7 @@ export function LoginModal({ open, onClose, onLogin, authProvider }: LoginModalP
           <button
             type="submit"
             disabled={loading}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-3 font-bold text-white shadow-xl shadow-blue-900/40 transition-all hover:-translate-y-0.5 hover:from-blue-500 hover:to-cyan-400"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-3 font-bold text-white shadow-xl shadow-blue-900/40 transition-all hover:-translate-y-0.5 hover:from-blue-500 hover:to-cyan-400"
           >
             {loading ? "Entrando..." : "Entrar agora"}
             <ArrowRight size={16} />
@@ -341,7 +341,7 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
                         closeMobileMenu();
                         onLogout();
                       }}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
                     >
                       <LogOut size={16} />
                       Sair
@@ -354,7 +354,7 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
                       closeMobileMenu();
                       onOpenLogin();
                     }}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
                   >
                     <Lock size={16} />
                     Login

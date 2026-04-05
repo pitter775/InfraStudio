@@ -231,7 +231,7 @@ export function ProjectMercadoSection({
                           type="button"
                           title={copiedKey === "callback" ? "URL copiada" : "Clique para copiar"}
                           onClick={() => void handleCopyUrl("callback", mercadoLivreUrls.callback)}
-                          className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left font-mono text-[11px] text-cyan-100 transition-colors hover:border-cyan-300/25 hover:bg-cyan-500/10"
+                          className="mt-2 inline-flex max-w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left font-mono text-[11px] text-cyan-100 transition-colors hover:border-cyan-300/25 hover:bg-cyan-500/10"
                         >
                           {mercadoLivreUrls.callback}
                         </button>

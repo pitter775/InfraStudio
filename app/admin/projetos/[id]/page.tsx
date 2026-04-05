@@ -2582,7 +2582,7 @@ function AgenteModal({
                   type="button"
                   onClick={() => entry.onAssign?.()}
                   disabled={!entry.onAssign || entry.saving || saving}
-                  className={`inline-flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${
+                  className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                     entry.assignedToCurrent
                       ? "border-rose-500/20 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20"
                       : "border-cyan-500/20 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20"
@@ -3477,7 +3477,7 @@ function ApiModal({
           </div>
 
           <ModalStickyFooter feedback={feedback}>
-            <button type="button" onClick={onSubmit} disabled={saving} className={`${primaryActionButtonClass} flex-1`}>
+            <button type="button" onClick={onSubmit} disabled={saving} className={primaryActionButtonClass}>
               {saving ? <BusyIcon /> : form.id ? <Pencil size={16} /> : <Plus size={16} />}
               {form.id ? "Salvar" : "Criar"}
             </button>
@@ -3512,13 +3512,15 @@ function WidgetModal({
     return null;
   }
 
+  const isEditing = Boolean(form.id);
+
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
       <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Widget</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar" : "Novo widget"}</h2>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{isEditing ? "Editar" : "Novo widget"}</h2>
             <p className="mt-1 hidden text-sm text-slate-400 sm:block">Este widget ja nasce vinculado automaticamente ao agente ativo do projeto.</p>
           </div>
           <div className="flex items-center gap-2">
@@ -3560,15 +3562,17 @@ function WidgetModal({
                 className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
               />
             </div>
-            <div>
-              <FormLabel>Slug publico</FormLabel>
-              <input
-                value={form.slug}
-                onChange={(event) => onChange({ slug: event.target.value })}
-                placeholder="chat-site"
-                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-              />
-            </div>
+            {isEditing ? (
+              <div>
+                <FormLabel>Slug publico</FormLabel>
+                <input
+                  value={form.slug}
+                  onChange={(event) => onChange({ slug: event.target.value })}
+                  placeholder="chat-site"
+                  className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+                />
+              </div>
+            ) : null}
             <div>
               <FormLabel>Dominio ou contexto</FormLabel>
               <input
@@ -3578,19 +3582,21 @@ function WidgetModal({
                 className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
               />
             </div>
-            <div>
-              <FormLabel>WhatsApp</FormLabel>
-              <input
-                value={form.whatsappCelular}
-                onChange={(event) => onChange({ whatsappCelular: event.target.value })}
-                placeholder="+55 11 99999-9999"
-                inputMode="tel"
-                autoComplete="tel"
-                maxLength={20}
-                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-              />
-              <p className="mt-2 text-xs text-slate-400">Pode digitar ou colar livremente. O sistema limpa e salva apenas os numeros.</p>
-            </div>
+            {isEditing ? (
+              <div>
+                <FormLabel>WhatsApp</FormLabel>
+                <input
+                  value={form.whatsappCelular}
+                  onChange={(event) => onChange({ whatsappCelular: event.target.value })}
+                  placeholder="+55 11 99999-9999"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  maxLength={20}
+                  className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+                />
+                <p className="mt-2 text-xs text-slate-400">Pode digitar ou colar livremente. O sistema limpa e salva apenas os numeros.</p>
+              </div>
+            ) : null}
             <div className="grid gap-4 sm:grid-cols-[0.7fr_0.3fr]">
               <div>
                 <FormLabel>Tema</FormLabel>
@@ -3613,12 +3619,16 @@ function WidgetModal({
                 />
               </div>
             </div>
-            <div className="rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm text-slate-300">
-              Projeto selecionado
-            </div>
-            <div className="rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm text-slate-300">
-              Agente ativo selecionado automaticamente
-            </div>
+            {isEditing ? (
+              <>
+                <div className="rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm text-slate-300">
+                  Projeto selecionado
+                </div>
+                <div className="rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm text-slate-300">
+                  Agente ativo selecionado automaticamente
+                </div>
+              </>
+            ) : null}
             <label className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
               <span className="block">
                 <span className="block text-sm font-semibold text-white">Fundo</span>
@@ -3646,7 +3656,7 @@ function WidgetModal({
               type="button"
               onClick={onSubmit}
               disabled={saving}
-              className={`${primaryActionButtonClass} flex-1`}
+              className={primaryActionButtonClass}
             >
               {saving ? <BusyIcon /> : form.id ? <Pencil size={16} /> : <Plus size={16} />}
               {form.id ? "Salvar" : "Criar"}
@@ -3850,7 +3860,7 @@ function ConnectorModal({
                   type="button"
                   onClick={() => void handleAdvanceFromProduct()}
                   disabled={resolvingSeller || !form.productUrl.trim()}
-                  className={`${primaryActionButtonClass} flex-1`}
+                  className={primaryActionButtonClass}
                 >
                   {resolvingSeller ? <BusyIcon /> : <ExternalLink size={16} />}
                   Avancar
@@ -3860,7 +3870,7 @@ function ConnectorModal({
                   type="button"
                   onClick={onSubmit}
                   disabled={saving}
-                  className={`${primaryActionButtonClass} flex-1`}
+                  className={primaryActionButtonClass}
                 >
                   {saving ? <BusyIcon /> : isEditing ? <Pencil size={16} /> : <Plus size={16} />}
                   {isEditing ? "Salvar" : "Criar"}
@@ -4198,7 +4208,7 @@ function WhatsAppChannelModal({
               type="button"
               onClick={onSubmit}
               disabled={saving}
-              className={`${primaryActionButtonClass} flex-1`}
+              className={primaryActionButtonClass}
             >
               {saving ? <BusyIcon /> : form.id ? <Pencil size={16} /> : <Plus size={16} />}
               {form.id ? "Salvar" : "Criar"}
@@ -4966,6 +4976,7 @@ export default function AdminProjetoDetalhePage() {
       ...emptyWidgetForm,
       projetoId: params.id,
       agenteId: data?.agentes.find((agente) => agente.ativo)?.id ?? data?.agentes[0]?.id ?? null,
+      whatsappCelular: data?.whatsappChannels[0]?.numero ?? "",
     });
     setFeedbackWidget(null);
   };
@@ -5940,9 +5951,16 @@ export default function AdminProjetoDetalhePage() {
       data?.agentes.find((agente) => agente.ativo)?.id ??
       data?.agentes[0]?.id ??
       null;
+    const resolvedWidgetSlug = widgetForm.slug.trim() || slugifyAgentValue(widgetForm.nome.trim() || "chat-widget");
+    const resolvedWidgetWhatsApp = sanitizePhoneDigits(widgetForm.whatsappCelular || data?.whatsappChannels[0]?.numero || "");
 
     if (!resolvedWidgetAgentId) {
       setFeedbackWidget("Nao foi possivel identificar o agente ativo deste projeto para vincular o widget.");
+      return;
+    }
+
+    if (!widgetForm.nome.trim()) {
+      setFeedbackWidget("Informe o nome do widget.");
       return;
     }
 
@@ -5956,8 +5974,9 @@ export default function AdminProjetoDetalhePage() {
       },
       body: JSON.stringify({
         ...widgetForm,
+        slug: resolvedWidgetSlug,
         agenteId: resolvedWidgetAgentId,
-        whatsappCelular: sanitizePhoneDigits(widgetForm.whatsappCelular),
+        whatsappCelular: resolvedWidgetWhatsApp,
         projetoId: params.id,
       }),
     });
@@ -7308,13 +7327,13 @@ export default function AdminProjetoDetalhePage() {
       activeClass: "border-amber-400/30 bg-amber-400/14 text-amber-50 shadow-[0_10px_25px_rgba(251,191,36,0.12)]",
       inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-amber-400/18 hover:bg-amber-400/[0.08] hover:text-amber-50",
     },
-      {
-        key: "chats" as const,
-        label: "Chat widget",
-        icon: MessageSquareText,
-        count: data.stats.totalChats,
-        activeClass: "border-violet-400/30 bg-violet-400/14 text-violet-50 shadow-[0_10px_25px_rgba(167,139,250,0.12)]",
-        inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-violet-400/18 hover:bg-violet-400/[0.08] hover:text-violet-50",
+    {
+      key: "chats" as const,
+      label: "Chat widget",
+      icon: MessageSquareText,
+      count: data.stats.totalWidgets,
+      activeClass: "border-violet-400/30 bg-violet-400/14 text-violet-50 shadow-[0_10px_25px_rgba(167,139,250,0.12)]",
+      inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-violet-400/18 hover:bg-violet-400/[0.08] hover:text-violet-50",
     },
   ];
   const selectedBillingModel =
@@ -7797,7 +7816,6 @@ export default function AdminProjetoDetalhePage() {
                         <>
                           <span className="absolute inset-[-22px] rounded-full bg-cyan-400/25 blur-3xl" />
                           <span className="absolute inset-[-12px] rounded-full bg-sky-400/25 blur-2xl animate-ping" />
-                          <span className="absolute inset-[-4px] rounded-full border border-cyan-300/35 animate-pulse" />
                         </>
                       ) : null}
                       <Bot size={42} strokeWidth={1.8} className="relative" />
