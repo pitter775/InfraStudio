@@ -114,6 +114,40 @@ function persistSidebarCollapsedCookie(collapsed: boolean) {
   document.cookie = `${SIDEBAR_COOKIE_NAME}=${collapsed ? "collapsed" : "expanded"}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
 }
 
+function getUserInitials(name: string | null | undefined) {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (!parts.length) {
+    return "US";
+  }
+
+  return parts.map((part) => part[0]?.toUpperCase() || "").join("");
+}
+
+function getUserRoleLabel(user: AppUser | null) {
+  if (!user) {
+    return "";
+  }
+
+  if (user.isMaster) {
+    return "Master";
+  }
+
+  if (user.role === "admin") {
+    return "Admin";
+  }
+
+  if (user.role === "manager") {
+    return "Gestor";
+  }
+
+  return "Visualizacao";
+}
+
 type SidebarProps = {
   currentUser: AppUser | null;
   collapsed: boolean;
@@ -327,6 +361,19 @@ function Sidebar({
                     build {buildId}
                   </span>
                 </div>
+                {currentUser ? (
+                  <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(34,211,238,0.24),rgba(59,130,246,0.24))] text-sm font-bold text-white shadow-[0_0_20px_rgba(34,211,238,0.18)]">
+                      {getUserInitials(currentUser.name)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">{currentUser.name}</p>
+                      <p className="truncate text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                        {getUserRoleLabel(currentUser)}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="grid grid-cols-2 gap-2">
                   <Link
                     href="/"
@@ -358,6 +405,14 @@ function Sidebar({
                 >
                   {buildId}
                 </span>
+                {currentUser ? (
+                  <div
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(34,211,238,0.24),rgba(59,130,246,0.24))] text-xs font-bold text-white shadow-[0_0_20px_rgba(34,211,238,0.18)]"
+                    title={currentUser.name}
+                  >
+                    {getUserInitials(currentUser.name)}
+                  </div>
+                ) : null}
                 <Link
                   href="/"
                   className="infra-click-pulse inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition-colors hover:bg-white/10 hover:text-white"

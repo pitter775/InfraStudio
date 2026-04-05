@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { AppUser } from "@/lib/app-user";
+import { isAgentTestChatContext } from "@/lib/chats";
 import { getIaUsageSummaryForProjects } from "@/lib/ia-usage";
 import type { IaUsageSummary } from "@/lib/ia-usage-types";
 import { listProjetosByUsuarioWithStats, listProjetosWithStats, type ProjetoOverviewRecord } from "@/lib/projetos";
@@ -29,6 +30,8 @@ type DashboardChatRow = {
   total_tokens: number | null;
   total_custo: number | null;
   updated_at: string | null;
+  canal: string | null;
+  contexto: Record<string, unknown> | null;
 };
 
 type DashboardProject = {
@@ -132,7 +135,7 @@ export async function getDashboardOverview(user: AppUser): Promise<DashboardOver
   let widgetsQuery = supabase.from("chat_widgets").select("id, projeto_id");
   let chatsQuery = supabase
     .from("chats")
-    .select("id, titulo, projeto_id, total_tokens, total_custo, updated_at")
+    .select("id, titulo, projeto_id, total_tokens, total_custo, updated_at, canal, contexto")
     .order("updated_at", { ascending: false });
   let membershipsQuery = supabase.from("usuarios_projetos").select("usuario_id", { count: "exact" });
 
@@ -168,14 +171,16 @@ export async function getDashboardOverview(user: AppUser): Promise<DashboardOver
     id: item.id,
     projetoId: item.projeto_id,
   }));
-  const chats = ((chatsResponse.data ?? []) as DashboardChatRow[]).map((item) => ({
-    id: item.id,
-    titulo: item.titulo?.trim() || "Nova conversa",
-    totalTokens: item.total_tokens ?? 0,
-    totalCusto: Number(item.total_custo ?? 0),
-    projetoId: item.projeto_id,
-    updatedAt: item.updated_at ?? new Date().toISOString(),
-  }));
+  const chats = ((chatsResponse.data ?? []) as DashboardChatRow[])
+    .filter((item) => item.canal !== "admin_agent_test" && !isAgentTestChatContext(item.contexto))
+    .map((item) => ({
+      id: item.id,
+      titulo: item.titulo?.trim() || "Nova conversa",
+      totalTokens: item.total_tokens ?? 0,
+      totalCusto: Number(item.total_custo ?? 0),
+      projetoId: item.projeto_id,
+      updatedAt: item.updated_at ?? new Date().toISOString(),
+    }));
 
   return {
     scope: user.isMaster ? "global" : "user",

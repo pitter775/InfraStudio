@@ -2671,19 +2671,22 @@ function AgenteModal({
             <p className="mt-1 hidden text-sm text-slate-400 sm:block">Defina o agente e selecione quais APIs deste projeto ele pode usar.</p>
           </div>
           <div className="flex items-center justify-between gap-2 sm:justify-end">
-            <button
-              type="button"
-              onClick={() => onChange({ ativo: !form.ativo })}
-              disabled={saving}
-              className={`inline-flex min-w-0 items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold ${
-                form.ativo
-                  ? "border-amber-400/20 bg-amber-500/10 text-amber-50 hover:border-amber-300/30 hover:bg-amber-500/14"
-                  : "border-emerald-400/20 bg-emerald-500/10 text-emerald-50 hover:border-emerald-300/30 hover:bg-emerald-500/14"
-              } disabled:cursor-not-allowed disabled:opacity-60`}
-            >
-              <Power size={16} />
-              {form.ativo ? "Desativar" : "Ativar"}
-            </button>
+            <label className="mr-2 inline-flex cursor-pointer items-center gap-3">
+              <span className={`text-xs font-semibold uppercase tracking-[0.16em] ${form.ativo ? "text-emerald-200" : "text-slate-500"}`}>
+                {form.ativo ? "Ativo" : "Inativo"}
+              </span>
+              <span className="relative inline-flex items-center">
+                <input
+                  type="checkbox"
+                  checked={form.ativo}
+                  onChange={(event) => onChange({ ativo: event.target.checked })}
+                  disabled={saving}
+                  className="peer sr-only"
+                />
+                <span className="h-7 w-12 rounded-full bg-white/10 transition-colors peer-checked:bg-emerald-500/30" />
+                <span className="pointer-events-none absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-checked:bg-emerald-200" />
+              </span>
+            </label>
             <button
               type="button"
               onClick={handleRequestClose}
@@ -3337,8 +3340,8 @@ function ApiModal({
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">API</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar API" : "Nova API"}</h2>
-            <p className="mt-1 text-sm text-slate-400">Cadastre uma API GET, teste a resposta e escolha os campos ativos, inclusive os aninhados.</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar" : "Nova API"}</h2>
+            <p className="mt-1 hidden text-sm text-slate-400 sm:block">Cadastre uma API GET, teste a resposta e escolha os campos ativos, inclusive os aninhados.</p>
           </div>
           <div className="flex items-center gap-2">
             <label className="mr-2 inline-flex cursor-pointer items-center gap-3">
@@ -3515,8 +3518,8 @@ function WidgetModal({
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Widget</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar widget" : "Novo widget"}</h2>
-            <p className="mt-1 text-sm text-slate-400">Este widget ja nasce vinculado automaticamente ao agente ativo do projeto.</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar" : "Novo widget"}</h2>
+            <p className="mt-1 hidden text-sm text-slate-400 sm:block">Este widget ja nasce vinculado automaticamente ao agente ativo do projeto.</p>
           </div>
           <div className="flex items-center gap-2">
             <label className="mr-2 inline-flex cursor-pointer items-center gap-3">
@@ -3701,8 +3704,8 @@ function ConnectorModal({
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Mercado Livre</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{isEditing ? "Editar conexao" : "Nova conexao"}</h2>
-            <p className="mt-1 text-sm text-slate-400">
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{isEditing ? "Editar" : "Nova conexao"}</h2>
+            <p className="mt-1 hidden text-sm text-slate-400 sm:block">
               {showProductStep
                 ? "Primeiro informe um produto da loja para identificar a conta automaticamente."
                 : "Preencha os dados da sua loja para concluir a conexao com o Mercado Livre."}
@@ -4130,8 +4133,8 @@ function WhatsAppChannelModal({
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">WhatsApp oficial</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar canal" : "Novo canal"}</h2>
-            <p className="mt-1 text-sm text-slate-400">Cadastre o numero principal que vai atender este projeto.</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar" : "Novo canal"}</h2>
+            <p className="mt-1 hidden text-sm text-slate-400 sm:block">Cadastre o numero principal que vai atender este projeto.</p>
           </div>
           <div className="flex items-center gap-2">
             <label className="mr-2 inline-flex cursor-pointer items-center gap-3">

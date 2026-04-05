@@ -1,6 +1,7 @@
 import "server-only";
 
 import { AGENTE_ASSETS_BUCKET } from "@/lib/agente-assets";
+import { isAgentTestChatContext } from "@/lib/chats";
 import { appendSystemLog } from "@/lib/chat-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { purgeWhatsAppServiceSessions } from "@/lib/whatsapp-service";
@@ -97,13 +98,14 @@ async function attachProjetoStats(projetos: ProjetoRecord[]) {
   const [agentesResponse, conectoresResponse, chatsResponse, membershipsResponse] = await Promise.all([
     supabase.from("agentes").select("projeto_id, ativo").in("projeto_id", projetoIds),
     supabase.from("conectores").select("projeto_id, ativo").in("projeto_id", projetoIds),
-    supabase.from("chats").select("projeto_id").in("projeto_id", projetoIds),
+    supabase.from("chats").select("projeto_id, canal, contexto").in("projeto_id", projetoIds),
     supabase.from("usuarios_projetos").select("projeto_id, created_at, usuarios(nome, email)").in("projeto_id", projetoIds),
   ]);
 
   const agentesRows = (agentesResponse.data ?? []) as Array<{ projeto_id: string | null; ativo: boolean | null }>;
   const conectoresRows = (conectoresResponse.data ?? []) as Array<{ projeto_id: string | null; ativo: boolean | null }>;
-  const chatsRows = (chatsResponse.data ?? []) as Array<{ projeto_id: string | null }>;
+  const chatsRows = ((chatsResponse.data ?? []) as Array<{ projeto_id: string | null; canal?: string | null; contexto?: Record<string, unknown> | null }>)
+    .filter((item) => item.canal !== "admin_agent_test" && !isAgentTestChatContext(item.contexto));
   const membershipsRows = (membershipsResponse.data ?? []) as ProjetoMembershipRow[];
 
   return projetos.map<ProjetoOverviewRecord>((projeto) => {

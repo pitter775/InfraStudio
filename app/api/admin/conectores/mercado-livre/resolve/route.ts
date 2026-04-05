@@ -76,6 +76,27 @@ function buildMercadoLivreCandidateUrls(targetUrl: URL) {
   return candidates;
 }
 
+async function fetchMercadoLivrePageHtml(targetUrl: string) {
+  const response = await fetch(targetUrl, {
+    method: "GET",
+    cache: "no-store",
+    headers: {
+      "user-agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+      "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+      "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "cache-control": "no-cache",
+      "pragma": "no-cache",
+    },
+  });
+
+  return {
+    status: response.status,
+    ok: response.ok,
+    html: await response.text(),
+  };
+}
+
 export async function POST(request: Request) {
   const user = await getSessionUser();
 
@@ -114,30 +135,28 @@ export async function POST(request: Request) {
   try {
     for (const candidateUrl of candidateUrls) {
       for (let attempt = 0; attempt < 3; attempt += 1) {
-        const response = await fetch(candidateUrl, {
-          method: "GET",
-          cache: "no-store",
-          headers: {
-            "user-agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
-            "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-            "cache-control": "no-cache",
-            "pragma": "no-cache",
-          },
-        });
+        const firstSnapshot = await fetchMercadoLivrePageHtml(candidateUrl);
+        lastStatus = firstSnapshot.status;
+        let bestHtml = firstSnapshot.html;
+        let sellerId = firstSnapshot.ok ? extractSellerId(bestHtml) : null;
 
-        lastStatus = response.status;
-        const nextHtml = await response.text();
-        const sellerId = response.ok ? extractSellerId(nextHtml) : null;
+        if (!sellerId && firstSnapshot.ok) {
+          await wait(5000);
+          const delayedSnapshot = await fetchMercadoLivrePageHtml(candidateUrl);
+          lastStatus = delayedSnapshot.status;
+          if (delayedSnapshot.ok && delayedSnapshot.html) {
+            bestHtml = delayedSnapshot.html;
+            sellerId = extractSellerId(bestHtml);
+          }
+        }
 
-        if (response.ok && sellerId) {
-          html = nextHtml;
+        if (sellerId) {
+          html = bestHtml;
           break;
         }
 
         if (attempt < 2) {
-          await wait(700 * (attempt + 1));
+          await wait(1500 * (attempt + 1));
         }
       }
 

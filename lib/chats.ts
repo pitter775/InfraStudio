@@ -63,6 +63,11 @@ type ChatRow = {
 
 type ChatContext = {
   origem?: string;
+  admin?: {
+    mode?: string | null;
+    projetoId?: string | null;
+    agenteId?: string | null;
+  };
   lead?: {
     nome?: string | null;
     telefone?: string | null;
@@ -311,6 +316,23 @@ function mapMensagem(row: MensagemRow): ChatMessageRecord {
     metadata: row.metadata,
     createdAt: row.created_at ?? new Date().toISOString(),
   };
+}
+
+export function isAgentTestChatContext(contexto: Record<string, unknown> | null | undefined) {
+  if (!contexto || typeof contexto !== "object" || Array.isArray(contexto)) {
+    return false;
+  }
+
+  const admin =
+    "admin" in contexto && typeof contexto.admin === "object" && contexto.admin !== null && !Array.isArray(contexto.admin)
+      ? (contexto.admin as { mode?: string | null })
+      : null;
+
+  return admin?.mode === "agent_test";
+}
+
+export function isAgentTestChat(chat: Pick<ChatRecord, "canal" | "contexto"> | { canal?: string | null; contexto?: Record<string, unknown> | null }) {
+  return chat.canal === "admin_agent_test" || isAgentTestChatContext(chat.contexto);
 }
 
 export async function createChat(input: {
@@ -644,7 +666,7 @@ export async function listChats(projetoId?: string | null) {
     return [];
   }
 
-  const chats = data.map((row) => mapChat(row as ChatRow));
+  const chats = data.map((row) => mapChat(row as ChatRow)).filter((chat) => !isAgentTestChat(chat));
   const groupedChats = groupChatsByUnifiedIdentity(chats);
   const representativeChats = Array.from(groupedChats.values()).map((group) =>
     [...group].sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())[0],
