@@ -139,6 +139,15 @@ function normalizeWhatsAppOutboundPhone(value: string | null | undefined) {
   return null;
 }
 
+function normalizeWhatsAppAddress(value: string | null | undefined) {
+  const normalized = normalizeOptionalText(value);
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.toLowerCase().includes("@") ? normalized : null;
+}
+
 function getUnifiedConversationIdentity(chat: ChatRecord) {
   const contactSnapshot = extractChatContactSnapshot(chat.contexto, chat.identificadorExterno);
   const phoneCandidates = [
@@ -749,53 +758,79 @@ export async function getUnifiedWhatsAppOutboundContext(chatId: string) {
     return null;
   }
 
+  const selectedIdentity = getUnifiedConversationIdentity(chat);
   const whatsappChat = [...relatedChats]
     .filter((candidate) => candidate.canal === "whatsapp")
-    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
-    .find((candidate) => {
-      const whatsapp = candidate.contexto?.whatsapp;
-      return Boolean(
-        whatsapp &&
-        typeof whatsapp === "object" &&
-        !Array.isArray(whatsapp) &&
-        (typeof (whatsapp as { channelId?: string | null }).channelId === "string" ||
-          typeof (whatsapp as { remoteJid?: string | null }).remoteJid === "string" ||
-          typeof (whatsapp as { remetente?: string | null }).remetente === "string"),
-      );
-    });
+    .map((candidate) => {
+      const whatsapp =
+        candidate.contexto &&
+        typeof candidate.contexto.whatsapp === "object" &&
+        candidate.contexto.whatsapp !== null &&
+        !Array.isArray(candidate.contexto.whatsapp)
+          ? (candidate.contexto.whatsapp as {
+              channelId?: string | null;
+              remoteJid?: string | null;
+              remetente?: string | null;
+              remotePhone?: string | null;
+              rawContact?: { number?: string | null } | null;
+            })
+          : null;
+
+      const contactSnapshot = extractChatContactSnapshot(candidate.contexto, candidate.identificadorExterno);
+      const candidateIdentity = getUnifiedConversationIdentity(candidate);
+      const jid =
+        normalizeWhatsAppAddress(whatsapp?.remoteJid) ??
+        normalizeWhatsAppAddress(whatsapp?.remetente) ??
+        normalizeWhatsAppAddress(candidate.identificadorExterno);
+      const outboundPhone =
+        normalizeWhatsAppOutboundPhone(whatsapp?.remotePhone) ??
+        normalizeWhatsAppOutboundPhone(whatsapp?.rawContact?.number) ??
+        normalizeWhatsAppOutboundPhone(candidate.contatoTelefone) ??
+        normalizeWhatsAppOutboundPhone(contactSnapshot.contatoTelefone) ??
+        normalizeWhatsAppOutboundPhone(candidate.identificadorExterno);
+      const hasChannelId = typeof whatsapp?.channelId === "string" && whatsapp.channelId.trim().length > 0;
+      const identityMatch = candidateIdentity === selectedIdentity;
+      const directMatch = candidate.id === chat.id;
+
+      return {
+        candidate,
+        whatsapp,
+        jid,
+        outboundPhone,
+        hasChannelId,
+        identityMatch,
+        directMatch,
+      };
+    })
+    .filter((item) => item.hasChannelId || item.jid || item.outboundPhone)
+    .sort((left, right) => {
+      if (left.identityMatch !== right.identityMatch) {
+        return left.identityMatch ? -1 : 1;
+      }
+
+      if (left.directMatch !== right.directMatch) {
+        return left.directMatch ? -1 : 1;
+      }
+
+      if (Boolean(left.jid) !== Boolean(right.jid)) {
+        return left.jid ? -1 : 1;
+      }
+
+      return new Date(right.candidate.updatedAt).getTime() - new Date(left.candidate.updatedAt).getTime();
+    })[0];
 
   if (!whatsappChat) {
     return null;
   }
 
-  const whatsapp =
-    whatsappChat.contexto && typeof whatsappChat.contexto.whatsapp === "object" && whatsappChat.contexto.whatsapp !== null && !Array.isArray(whatsappChat.contexto.whatsapp)
-      ? (whatsappChat.contexto.whatsapp as {
-          channelId?: string | null;
-          remoteJid?: string | null;
-          remetente?: string | null;
-          remotePhone?: string | null;
-          rawContact?: { number?: string | null } | null;
-        })
-      : null;
-  const contactSnapshot = extractChatContactSnapshot(whatsappChat.contexto, whatsappChat.identificadorExterno);
-  const outboundPhone =
-    normalizeWhatsAppOutboundPhone(whatsapp?.remotePhone) ??
-    normalizeWhatsAppOutboundPhone(whatsapp?.rawContact?.number) ??
-    normalizeWhatsAppOutboundPhone(whatsappChat.contatoTelefone) ??
-    normalizeWhatsAppOutboundPhone(contactSnapshot.contatoTelefone) ??
-    normalizeWhatsAppOutboundPhone(whatsappChat.identificadorExterno);
+  const { candidate, whatsapp, jid, outboundPhone, identityMatch, directMatch } = whatsappChat;
 
   return {
-    chatId: whatsappChat.id,
+    chatId: candidate.id,
     channelId: typeof whatsapp?.channelId === "string" && whatsapp.channelId.trim() ? whatsapp.channelId.trim() : null,
-    to:
-      outboundPhone ??
-      (typeof whatsapp?.remoteJid === "string" && whatsapp.remoteJid.trim()
-        ? whatsapp.remoteJid.trim()
-        : typeof whatsapp?.remetente === "string" && whatsapp.remetente.trim()
-          ? whatsapp.remetente.trim()
-          : whatsappChat.identificadorExterno ?? ""),
+    to: jid ?? outboundPhone ?? candidate.identificadorExterno ?? "",
+    recipientKind: jid ? "jid" : outboundPhone ? "phone" : "external",
+    matchedBy: directMatch ? "selected_chat" : identityMatch ? "conversation_identity" : "fallback",
   };
 }
 

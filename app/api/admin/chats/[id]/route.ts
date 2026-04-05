@@ -141,8 +141,11 @@ export async function POST(request: Request, context: RouteContext) {
         descricao: outbound.error ?? "Nao foi possivel enviar a mensagem pelo whatsapp-service.",
         payload: {
           chatId: chat.id,
+          resolvedChatId: unifiedWhatsAppContext?.chatId ?? null,
           channelId: canalWhatsappId,
           to: destinatarioWhatsapp,
+          recipientKind: unifiedWhatsAppContext?.recipientKind ?? null,
+          matchedBy: unifiedWhatsAppContext?.matchedBy ?? null,
           hasText: Boolean(conteudo),
           attachmentCount: attachments.length,
         },
@@ -157,8 +160,28 @@ export async function POST(request: Request, context: RouteContext) {
       descricao: "Mensagem manual enviada para o WhatsApp do contato.",
       payload: {
         chatId: chat.id,
+        resolvedChatId: unifiedWhatsAppContext?.chatId ?? null,
         channelId: canalWhatsappId,
         to: outbound.to ?? destinatarioWhatsapp,
+        recipientKind: unifiedWhatsAppContext?.recipientKind ?? null,
+        matchedBy: unifiedWhatsAppContext?.matchedBy ?? null,
+        hasText: Boolean(conteudo),
+        attachmentCount: attachments.length,
+      },
+    });
+  } else {
+    await appendSystemLog({
+      projetoId: chat.projetoId,
+      tipo: "chat_whatsapp_send_skipped",
+      origem: "admin_chat.outbound",
+      descricao: "Mensagem manual registrada no chat, mas sem contexto valido para envio no WhatsApp.",
+      payload: {
+        chatId: chat.id,
+        resolvedChatId: unifiedWhatsAppContext?.chatId ?? null,
+        channelId: canalWhatsappId,
+        to: destinatarioWhatsapp || null,
+        recipientKind: unifiedWhatsAppContext?.recipientKind ?? null,
+        matchedBy: unifiedWhatsAppContext?.matchedBy ?? null,
         hasText: Boolean(conteudo),
         attachmentCount: attachments.length,
       },
