@@ -6,6 +6,7 @@ type HandoffAccessPayload = {
   projetoId: string;
   chatId: string;
   canalWhatsappId?: string | null;
+  handoffContactId?: string | null;
 };
 
 function getHandoffLinkSecret() {
@@ -31,6 +32,7 @@ export async function createHandoffAccessToken(input: HandoffAccessPayload) {
     projetoId: input.projetoId,
     chatId: input.chatId,
     canalWhatsappId: input.canalWhatsappId ?? null,
+    handoffContactId: input.handoffContactId ?? null,
   } satisfies HandoffAccessPayload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -52,6 +54,10 @@ export async function verifyHandoffAccessToken(token: string) {
     canalWhatsappId:
       typeof payload.canalWhatsappId === "string" && payload.canalWhatsappId.trim()
         ? payload.canalWhatsappId.trim()
+        : null,
+    handoffContactId:
+      typeof payload.handoffContactId === "string" && payload.handoffContactId.trim()
+        ? payload.handoffContactId.trim()
         : null,
   } satisfies HandoffAccessPayload;
 }

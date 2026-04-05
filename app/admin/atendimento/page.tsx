@@ -442,6 +442,7 @@ function ChatMediaModal({
 export default function AdminAtendimentoPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const linkedHandoffContactId = searchParams.get("handoffContactId")?.trim() || null;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const conversationViewportRef = useRef<HTMLDivElement | null>(null);
   const conversationBottomRef = useRef<HTMLDivElement | null>(null);
@@ -962,6 +963,10 @@ export default function AdminAtendimentoPage() {
         body: JSON.stringify({
           action,
           motivo: action === "claim" ? "Atendimento assumido pela inbox." : "Atendimento liberado para a IA pela inbox.",
+          metadata:
+            action === "claim" && linkedHandoffContactId
+              ? { handoffContactId: linkedHandoffContactId }
+              : undefined,
         }),
       });
 

@@ -10,11 +10,13 @@ async function buildHandoffAlertLink(input: {
   projetoId: string;
   chatId: string;
   canalWhatsappId?: string | null;
+  handoffContactId?: string | null;
 }) {
   return await createHandoffAccessLink({
     projetoId: input.projetoId,
     chatId: input.chatId,
     canalWhatsappId: input.canalWhatsappId ?? null,
+    handoffContactId: input.handoffContactId ?? null,
   });
 }
 
@@ -81,28 +83,30 @@ export async function notifyWhatsAppHandoffContacts(input: {
     };
   }
 
-  const link = await buildHandoffAlertLink({
-    projetoId: input.projetoId,
-    chatId: input.chatId,
-    canalWhatsappId: input.canalWhatsappId,
-  });
-
-  const message = buildHandoffAlertMessage({
-    projetoNome: input.projetoNome,
-    chatTitle: input.chatTitle,
-    latestUserMessage: input.latestUserMessage,
-    motivo: input.motivo,
-    link,
-  });
-
   let sent = 0;
   const failures: Array<{ numero: string; error: string }> = [];
+  const linksByContactId: Record<string, string> = {};
 
   for (const contact of contacts) {
     const phone = normalizeBrazilWhatsAppPhone(contact.numero);
     if (!phone) {
       continue;
     }
+
+    const link = await buildHandoffAlertLink({
+      projetoId: input.projetoId,
+      chatId: input.chatId,
+      canalWhatsappId: input.canalWhatsappId,
+      handoffContactId: contact.id,
+    });
+    linksByContactId[contact.id] = link;
+    const message = buildHandoffAlertMessage({
+      projetoNome: input.projetoNome,
+      chatTitle: input.chatTitle,
+      latestUserMessage: input.latestUserMessage,
+      motivo: input.motivo,
+      link,
+    });
 
     const result = await sendWhatsAppServiceMessage({
       channelId: input.canalWhatsappId,
@@ -134,15 +138,14 @@ export async function notifyWhatsAppHandoffContacts(input: {
       sent,
       totalContacts: contacts.length,
       failures,
-      link,
+      linksByContactId,
     },
   });
 
   return {
     ok: sent > 0,
     sent,
-    link,
-    message,
+    link: linksByContactId[contacts[0]?.id ?? ""] ?? null,
     failures,
   };
 }

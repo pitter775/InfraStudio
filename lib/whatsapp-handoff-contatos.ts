@@ -123,6 +123,24 @@ export async function listWhatsAppHandoffContacts(input: {
   return (data as WhatsAppHandoffContactRow[]).map((row) => mapContact(row));
 }
 
+export async function getWhatsAppHandoffContactById(id: string) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("whatsapp_handoff_contatos")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle<WhatsAppHandoffContactRow>();
+
+  if (error || !data) {
+    if (error) {
+      console.error("[whatsapp-handoff-contatos] failed to load contact by id", error);
+    }
+    return null;
+  }
+
+  return mapContact(data);
+}
+
 export async function createWhatsAppHandoffContact(input: {
   projetoId: string;
   canalWhatsappId?: string | null;

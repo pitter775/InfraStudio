@@ -24,6 +24,9 @@ export async function GET(request: Request, context: RouteContext) {
   destination.searchParams.set("projeto", payload.projetoId);
   destination.searchParams.set("chat", payload.chatId);
   destination.searchParams.set("handoff", "1");
+  if (payload.handoffContactId) {
+    destination.searchParams.set("handoffContactId", payload.handoffContactId);
+  }
 
   const user = await getSessionUser();
   if (!user) {
