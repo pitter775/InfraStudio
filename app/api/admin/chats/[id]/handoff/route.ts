@@ -95,6 +95,21 @@ export async function POST(request: Request, context: RouteContext) {
 
   const notifyCustomerAboutHumanClaim = async () => {
     if (!canalWhatsappId || !destinatarioWhatsapp) {
+      await appendSystemLog({
+        projetoId: chat.projetoId,
+        tipo: "chat_human_claim_notify_skipped",
+        origem: "admin_chat.handoff",
+        descricao: "Aviso ao cliente foi pulado porque faltou contexto de canal ou destinatario no WhatsApp.",
+        payload: {
+          chatId: chat.id,
+          channelId: canalWhatsappId,
+          to: destinatarioWhatsapp || null,
+          handoffContactId: linkedHandoffContactId,
+          hasChannelId: Boolean(canalWhatsappId),
+          hasRecipient: Boolean(destinatarioWhatsapp),
+        },
+        skipErrorGate: true,
+      });
       return;
     }
 
@@ -148,6 +163,21 @@ export async function POST(request: Request, context: RouteContext) {
 
     if (shouldNotifyCustomer) {
       await notifyCustomerAboutHumanClaim();
+    } else {
+      await appendSystemLog({
+        projetoId: chat.projetoId,
+        tipo: "chat_human_claim_notify_skipped",
+        origem: "admin_chat.handoff",
+        descricao: "Aviso ao cliente foi pulado porque o atendimento humano ja estava assumido.",
+        payload: {
+          chatId: chat.id,
+          channelId: canalWhatsappId,
+          to: destinatarioWhatsapp || null,
+          handoffContactId: linkedHandoffContactId,
+          previousStatus: currentHandoff?.status ?? null,
+        },
+        skipErrorGate: true,
+      });
     }
 
     return NextResponse.json({ handoff }, { status: 200 });
