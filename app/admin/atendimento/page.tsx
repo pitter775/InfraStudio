@@ -287,6 +287,123 @@ function formatFileSize(value: number | null | undefined) {
   return `${size} B`;
 }
 
+function getMojibakeScore(value: string) {
+  return (value.match(/Ã.|Â.|ðŸ|â€¢|â€“|â€”|â€œ|â€|�/g) ?? []).length;
+}
+
+function decodeLikelyMojibake(value: string) {
+  if (!value || typeof TextDecoder === "undefined") {
+    return value;
+  }
+
+  if (!/(?:Ã.|Â.|ðŸ|â€¢|â€“|â€”|â€œ|â€|�)/.test(value)) {
+    return value;
+  }
+
+  try {
+    const bytes = Uint8Array.from(Array.from(value).map((char) => char.charCodeAt(0) & 0xff));
+    const decoded = new TextDecoder("utf-8").decode(bytes);
+
+    return getMojibakeScore(decoded) <= getMojibakeScore(value) ? decoded : value;
+  } catch {
+    return value;
+  }
+}
+
+function normalizeChatMessageText(value: string | null | undefined) {
+  const decoded = decodeLikelyMojibake(String(value ?? ""));
+
+  return decoded
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function getChatPreviewText(value: string | null | undefined) {
+  const normalized = normalizeChatMessageText(value);
+  if (!normalized) {
+    return "Sem mensagens ainda.";
+  }
+
+  return normalized
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*\n]+)\*/g, "$1")
+    .replace(/`([^`\n]+)`/g, "$1")
+    .replace(/\s*\n+\s*/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function renderFormattedInlineText(value: string) {
+  const parts = value.split(/(\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`)/g);
+
+  return parts.map((part, index) => {
+    if (!part) {
+      return null;
+    }
+
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      return (
+        <strong key={`inline-${index}`} className="font-semibold text-white">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+
+    if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
+      return (
+        <strong key={`inline-${index}`} className="font-semibold text-white">
+          {part.slice(1, -1)}
+        </strong>
+      );
+    }
+
+    if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
+      return (
+        <code key={`inline-${index}`} className="rounded bg-black/20 px-1 py-0.5 font-mono text-[0.95em] text-cyan-100">
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+
+    return <span key={`inline-${index}`}>{part}</span>;
+  });
+}
+
+function ChatMessageBody({ content }: { content: string }) {
+  const normalized = normalizeChatMessageText(content);
+
+  if (!normalized) {
+    return null;
+  }
+
+  const lines = normalized.split("\n");
+
+  return (
+    <div className="mt-1.5 space-y-1.5 text-xs leading-5 sm:text-[13px]">
+      {lines.map((line, index) => {
+        const trimmedLine = line.trim();
+
+        if (!trimmedLine) {
+          return <div key={`line-${index}`} className="h-2" />;
+        }
+
+        const isBullet = /^([-*]|\d+\.)\s+/.test(trimmedLine);
+
+        return (
+          <p
+            key={`line-${index}`}
+            className={isBullet ? "pl-3 -indent-3 break-words" : "break-words"}
+          >
+            {renderFormattedInlineText(line)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 function resizeReplyTextarea(textarea: HTMLTextAreaElement | null) {
   if (!textarea || typeof window === "undefined") {
     return;
@@ -1509,7 +1626,7 @@ export default function AdminAtendimentoPage() {
                               {formatChatTime(chat.updatedAt)}
                             </p>
                           </div>
-                          <p className="mt-1 truncate text-[10px] leading-4 text-slate-400">{chat.ultimaMensagem || "Sem mensagens ainda."}</p>
+                          <p className="mt-1 truncate text-[10px] leading-4 text-slate-400">{getChatPreviewText(chat.ultimaMensagem)}</p>
                         </div>
                       </div>
                     </button>
@@ -1705,7 +1822,7 @@ export default function AdminAtendimentoPage() {
                             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
                               {fromUser ? "USER" : sentByHuman ? senderName : "ASSISTANT"}
                             </p>
-                            <p className="mt-1.5 whitespace-pre-wrap text-xs leading-5 sm:text-[13px]">{message.conteudo}</p>
+                            <ChatMessageBody content={message.conteudo} />
                             {message.metadata?.attachments?.length ? (
                               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                                 {message.metadata.attachments.map((attachment, index) => {
@@ -1735,7 +1852,7 @@ export default function AdminAtendimentoPage() {
                                           </span>
                                         </div>
                                         <div className="mt-1 text-[10px] text-slate-400">
-                                          {attachmentCategory} • {formatFileSize(attachment.size)}
+                                          {attachmentCategory} - {formatFileSize(attachment.size)}
                                         </div>
                                       </div>
                                     </a>

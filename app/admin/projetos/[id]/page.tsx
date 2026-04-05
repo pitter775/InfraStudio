@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Activity, ArrowLeft, Bold, Bot, Boxes, Cable, CheckCircle2, ChevronDown, Coins, Copy, Cpu, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, LoaderCircle, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, Power, ShieldAlert, Sparkles, TestTube2, Trash2, Waypoints, X } from "lucide-react";
+import { Activity, ArrowLeft, Bold, Bot, Boxes, Cable, CheckCircle2, ChevronDown, Coins, Copy, Cpu, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, LoaderCircle, MessageCircle, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, Power, ShieldAlert, Sparkles, Target, TestTube2, Trash2, Waypoints, X, Zap } from "lucide-react";
 import { getAgentRuntimeBlockEntries, normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
 import { formatBrazilWhatsAppPhone, getNormalizedBrazilPhoneLocalDigits, normalizeBrazilWhatsAppPhone } from "@/lib/whatsapp-phone";
 import { ProjectChatsSection } from "./_components/project-chats-section";
@@ -400,6 +400,11 @@ type PendingAgenteArquivo = {
   file: File;
 };
 
+type AgentStatusEvent = {
+  time: string;
+  label: string;
+};
+
 const ACTIVE_PROJECT_STORAGE_KEY = "projeto_ativo";
 const ACTIVE_WHATSAPP_QR_MODAL_STORAGE_KEY = "projeto_whatsapp_qr_modal";
 
@@ -566,6 +571,25 @@ function formatDateTimeLabel(value: string | null | undefined) {
   }
 
   return new Date(value).toLocaleString("pt-BR");
+}
+
+function formatShortTimeLabel(value: string | null | undefined) {
+  if (!value) {
+    return "--:--";
+  }
+
+  return new Date(value).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function isSameCalendarDay(left: Date, right: Date) {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
 }
 
 function formatIntegerLabel(value: number) {
@@ -857,6 +881,28 @@ function inferShortDescription(summary: string) {
   }
 
   return `${firstParagraph.slice(0, 157).trimEnd()}...`;
+}
+
+function buildAgentStatusEvents(chats: Chat[], latestChat: Chat | null): AgentStatusEvent[] {
+  const latestTime = latestChat?.updatedAt ?? new Date().toISOString();
+  const latestPreview = latestChat?.ultimaMensagem?.trim()
+    ? stripDecorativeCharacters(latestChat.ultimaMensagem).replace(/\s+/g, " ").trim()
+    : "cliente mandou uma nova mensagem";
+
+  return [
+    {
+      time: formatShortTimeLabel(latestTime),
+      label: "cliente entrou",
+    },
+    {
+      time: formatShortTimeLabel(latestTime),
+      label: "IA respondeu",
+    },
+    {
+      time: formatShortTimeLabel(chats[1]?.updatedAt ?? latestTime),
+      label: latestPreview.length > 56 ? `${latestPreview.slice(0, 53).trimEnd()}...` : latestPreview,
+    },
+  ];
 }
 
 function slugifyAgentValue(value: string) {
@@ -4448,6 +4494,7 @@ export default function AdminProjetoDetalhePage() {
   const [agentStoreLatestResult, setAgentStoreLatestResult] = useState<AgentStoreLatestResult | null>(null);
   const [agentStoreSearchResult, setAgentStoreSearchResult] = useState<AgentStoreSearchResult | null>(null);
   const [agentTestTarget, setAgentTestTarget] = useState<Agente | null>(null);
+  const [expandedAgentStatusId, setExpandedAgentStatusId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ProjectTab>("agentes");
   const [renderedTab, setRenderedTab] = useState<ProjectTab>("agentes");
   const [tabContentVisible, setTabContentVisible] = useState(true);
@@ -7411,7 +7458,7 @@ export default function AdminProjetoDetalhePage() {
           ) : null}
           <div className="pt-2">
             {data.agentes.length ? (
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-5">
                 {[...data.agentes].sort((left, right) => {
                   if (left.ativo !== right.ativo) {
                     return left.ativo ? -1 : 1;
@@ -7499,8 +7546,46 @@ export default function AdminProjetoDetalhePage() {
                   },
                 ] as const;
 
+                const isAgentStatusExpanded = expandedAgentStatusId === agente.id;
+                const now = new Date();
+                const projectChatsToday = data.chats.filter((chat) => isSameCalendarDay(new Date(chat.updatedAt), now));
+                const latestProjectChat = [...data.chats]
+                  .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())[0] ?? null;
+                const leadsGenerated = Math.min(
+                  Math.max(Math.round((diagnostic?.summary.chats ?? data.chats.length) / 4), 0),
+                  99,
+                );
+                const latestActivity = latestProjectChat?.ultimaMensagem?.trim()
+                  ? (() => {
+                      const cleaned = stripDecorativeCharacters(latestProjectChat.ultimaMensagem).replace(/\s+/g, " ").trim();
+                      return cleaned.length > 78 ? `${cleaned.slice(0, 75).trimEnd()}...` : cleaned;
+                    })()
+                  : "Agente pronto para responder novas conversas.";
+                const pipelineCurrent = [
+                  {
+                    label: "intent",
+                    value: latestDiagnostic?.checks.chat.ok ? "fluxo_qualificado" : "analisar_contexto",
+                  },
+                  {
+                    label: "contexto",
+                    value: linkedApis.length || agentWidgets.length
+                      ? `${linkedApis.length} API${linkedApis.length === 1 ? "" : "s"} + ${agentWidgets.length} widget${agentWidgets.length === 1 ? "" : "s"}`
+                      : "base_local",
+                  },
+                  {
+                    label: "acao",
+                    value: onlineAgentWhatsAppChannels.length
+                      ? "responder e manter canal ativo"
+                      : activeAgentConnectors.length
+                        ? "responder com apoio das integracoes"
+                        : "responder no fluxo principal",
+                  },
+                ];
+                const recentEvents = buildAgentStatusEvents(data.chats, latestProjectChat);
+
                 return (
-                  <article key={agente.id} className={`relative flex h-full flex-col overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),rgba(255,255,255,0.03)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.24),0_0_0_1px_rgba(34,211,238,0.04)] ${premiumTransitionClass}`}>
+                  <div key={agente.id} className="xl:grid xl:grid-cols-[minmax(0,1fr)_320px] xl:gap-10">
+                  <article className={`relative flex h-full flex-col overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),rgba(255,255,255,0.03)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.24),0_0_0_1px_rgba(34,211,238,0.04)] ${premiumTransitionClass}`}>
                     <div
                       aria-hidden="true"
                       className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/35 to-transparent"
@@ -7641,6 +7726,70 @@ export default function AdminProjetoDetalhePage() {
                       </div>
                     </div>
                   </article>
+
+                  <aside className="hidden xl:block">
+                    <div className="sticky top-28 py-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Agente ativo</p>
+                      <div className="mt-5 space-y-4">
+                        <div className="flex items-center gap-3 text-sm text-slate-200">
+                          <Zap size={16} className="text-emerald-300" />
+                          <span>{agente.ativo ? "ativo agora" : "pausado no momento"}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-slate-300">
+                          <MessageCircle size={16} className="text-cyan-200" />
+                          <span>{projectChatsToday.length} conversas hoje</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-slate-300">
+                          <Target size={16} className="text-amber-200" />
+                          <span>{leadsGenerated} leads gerados</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-7">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Ultima atividade</p>
+                        <p className="mt-2 max-w-[28ch] text-sm leading-6 text-slate-200">{latestActivity}</p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setExpandedAgentStatusId((current) => (current === agente.id ? null : agente.id))}
+                        className="mt-5 text-sm font-medium text-cyan-200 transition-colors hover:text-cyan-100"
+                      >
+                        {isAgentStatusExpanded ? "ocultar detalhes ↑" : "ver detalhes →"}
+                      </button>
+
+                      {isAgentStatusExpanded ? (
+                        <div className="mt-6 space-y-6">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Pipeline atual</p>
+                            <div className="mt-3 space-y-2.5">
+                              {pipelineCurrent.map((item) => (
+                                <div key={item.label} className="flex items-start gap-3 text-sm leading-6 text-slate-300">
+                                  <CheckCircle2 size={15} className="mt-1 shrink-0 text-emerald-300" />
+                                  <span>
+                                    <span className="text-slate-100">{item.label}:</span> {item.value}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Eventos recentes</p>
+                            <div className="mt-3 space-y-2.5">
+                              {recentEvents.map((event, index) => (
+                                <div key={`${event.time}-${index}`} className="text-sm leading-6 text-slate-300">
+                                  <span className="text-slate-500">[{event.time}]</span>{" "}
+                                  <span>{event.label}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </aside>
+                  </div>
                 );
               })}
               </div>

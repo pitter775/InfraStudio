@@ -375,56 +375,22 @@ export function ProjectWhatsAppSection({
               </div>
             );
           })() : (
-            <div className="grid gap-4 xl:col-span-2 xl:grid-cols-[minmax(0,1.15fr),420px]">
-              <div className="grid gap-4">
-                <div className="px-1 py-2">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Primeiro passo</p>
-                  <h4 className="mt-3 text-3xl font-black text-white">Crie o numero que vai atender no WhatsApp</h4>
-                  <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-                    Assim que o canal for criado, esta area passa a mostrar o QR bem grande para escanear ou o estado "WhatsApp conectado".
-                  </p>
-                </div>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Canal oficial</p>
-                    <p className="mt-3 text-lg font-bold text-white">1 numero principal</p>
-                    <p className="mt-2 text-xs leading-6 text-slate-400">A tela agora prioriza um unico WhatsApp para ficar mais clara e rapida.</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">QR em destaque</p>
-                    <p className="mt-3 text-lg font-bold text-white">Escaneamento facil</p>
-                    <p className="mt-2 text-xs leading-6 text-slate-400">Depois de criar o canal, o QR ocupa o bloco principal da direita.</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Resposta automatica</p>
-                    <p className="mt-3 text-lg font-bold text-white">Mesmo agente</p>
-                    <p className="mt-2 text-xs leading-6 text-slate-400">O atendimento reutiliza o fluxo atual do chat sem duplicar logica.</p>
-                  </div>
-                </div>
-              </div>
-              <div className="rounded-[28px] border border-white/10 bg-slate-950/42 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h4 className="text-base font-bold text-white">Criar canal oficial</h4>
-                    <p className="mt-1 text-sm text-slate-400">Abra o modal para cadastrar o numero principal.</p>
-                  </div>
-                  <div className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100">
-                    2 passos
-                  </div>
-                </div>
-                <div className="mt-5 flex flex-wrap gap-3">
+            <div className="xl:col-span-2">
+              <div className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),rgba(6,78,59,0.08)_35%,rgba(2,6,23,0.88)_75%)] px-6 py-7">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Primeiro passo</p>
+                <h4 className="mt-3 max-w-3xl text-3xl font-black text-white">Crie o numero que vai atender no WhatsApp</h4>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+                  Assim que o canal for criado, esta area passa a mostrar o QR bem grande para escanear ou o estado de conexao.
+                </p>
+                <div className="mt-5">
                   <button
                     type="button"
                     onClick={onOpenNewChannel}
-                    className={actionButtonClass}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/20 px-4 py-3 text-sm font-semibold text-emerald-50 transition-all hover:border-emerald-300/40 hover:bg-emerald-500/25"
                   >
                     <Plus size={16} />
-                    Novo canal oficial
+                    Conectar ao WhatsApp
                   </button>
-                </div>
-                <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Depois disso</p>
-                  <p className="mt-2 text-sm text-slate-300">O card principal muda para mostrar o QR em destaque ou o estado "WhatsApp conectado".</p>
                 </div>
               </div>
             </div>
