@@ -10,7 +10,7 @@ export async function GET() {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
-  const logs = await listRecentSystemLogs(null, 160);
+  const logs = await listRecentSystemLogs(null, 500);
   return NextResponse.json({ logs }, { status: 200 });
 }
 

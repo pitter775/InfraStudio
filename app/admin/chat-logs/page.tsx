@@ -184,7 +184,7 @@ export default function AdminChatLogsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [copiedLogId, setCopiedLogId] = useState<string | null>(null);
-  const [scope, setScope] = useState<"all" | "whatsapp" | "bootstrap">("whatsapp");
+  const [scope, setScope] = useState<"all" | "whatsapp" | "bootstrap">("all");
   const [levelFilter, setLevelFilter] = useState<"all" | "error" | "info">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -316,6 +316,9 @@ export default function AdminChatLogsPage() {
             <h1 className="mt-2 text-[2rem] font-extrabold text-white">Logs</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
               Laboratorio de observacao para acompanhar runtime, bootstrap e reconexao do worker do WhatsApp sem depender apenas do card do canal.
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              A tela agora carrega tudo o que foi persistido e so aplica os filtros visiveis acima.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">

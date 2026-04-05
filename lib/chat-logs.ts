@@ -38,10 +38,6 @@ function detectLevel(value: { tipo?: string | null; origem?: string | null; desc
   return /\berro\b|\berror\b|\bfailed\b|\bfailure\b|\bexception\b|\bfatal\b/.test(joined) ? "error" : "info";
 }
 
-function isErrorLogLike(value: { tipo?: string | null; origem?: string | null; descricao?: string | null }) {
-  return detectLevel(value) === "error";
-}
-
 function sanitizePayload(payload: Record<string, unknown> | null) {
   if (!payload) {
     return null;
@@ -100,10 +96,6 @@ export async function appendSystemLog(input: {
     descricao: input.descricao.trim(),
   };
 
-  if (!input.skipErrorGate && !isErrorLogLike(normalized)) {
-    return;
-  }
-
   try {
     const supabase = getSupabaseAdminClient();
     await supabase.from("logs").insert({
@@ -119,7 +111,7 @@ export async function appendSystemLog(input: {
   }
 }
 
-async function listDatabaseLogs(projetoId?: string | null, limit = 120) {
+async function listDatabaseLogs(projetoId?: string | null, limit = 500) {
   const supabase = getSupabaseAdminClient();
   let query = supabase
     .from("logs")
@@ -141,7 +133,7 @@ async function listDatabaseLogs(projetoId?: string | null, limit = 120) {
   return (data as LogRow[]).map(mapLog);
 }
 
-export async function listRecentSystemLogs(projetoId?: string | null, limit = 120): Promise<SystemLogEntry[]> {
+export async function listRecentSystemLogs(projetoId?: string | null, limit = 500): Promise<SystemLogEntry[]> {
   const [databaseLogs, runtimeLogs] = await Promise.all([
     listDatabaseLogs(projetoId, limit),
     listRecentRuntimeErrorLogs(limit),
