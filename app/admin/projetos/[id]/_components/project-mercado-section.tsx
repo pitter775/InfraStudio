@@ -102,12 +102,12 @@ export function ProjectMercadoSection({
         </div>
 
         <div className={`mt-4 grid gap-6 ${hasConnectors ? "xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start" : ""}`}>
-          <div className={`space-y-3 ${hasConnectors ? "order-2 xl:order-1" : ""}`}>
+          <div className={`space-y-3 ${hasConnectors ? "order-2 xl:order-1 xl:max-w-[920px]" : ""}`}>
             {connectors.length ? (
               connectors.map((connector) => (
                 <article
                   key={connector.id ?? connector.nome}
-                  className="relative overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),rgba(255,255,255,0.025)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.2),0_0_0_1px_rgba(34,211,238,0.03)] transition-[background-color,border-color,color,opacity,box-shadow,transform] duration-180 ease-out"
+                  className="relative overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),rgba(255,255,255,0.025)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.2),0_0_0_1px_rgba(34,211,238,0.03)] transition-[background-color,border-color,color,opacity,box-shadow,transform] duration-180 ease-out xl:max-w-[920px]"
                 >
                   <div
                     aria-hidden="true"
@@ -143,7 +143,16 @@ export function ProjectMercadoSection({
                   </div>
 
                   <div className="mt-5 border-t border-white/10 pt-4">
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      {connector.id ? (
+                        <a
+                          href={`/api/admin/conectores/${connector.id}/mercado-livre/connect`}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-50 transition-all hover:border-emerald-300/30 hover:bg-emerald-500/14"
+                        >
+                          <ExternalLink size={14} />
+                          Conectar Mercado Livre
+                        </a>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => onEditConnector(connector)}

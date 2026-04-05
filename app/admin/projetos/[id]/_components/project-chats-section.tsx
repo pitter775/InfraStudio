@@ -59,7 +59,7 @@ export function ProjectChatsSection({
         </div>
 
         <div className="grid gap-4 p-2 pt-4 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
-          <div className="order-2 space-y-4 xl:order-1">
+          <div className="order-2 space-y-4 xl:order-1 xl:max-w-[920px]">
             <div className="flex items-center justify-between gap-3 px-1">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200/85">Widgets criados</p>
@@ -72,7 +72,7 @@ export function ProjectChatsSection({
             </div>
 
             {widgets.length ? (
-              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-2 xl:max-w-[920px]">
                 {widgets.map((widget) => {
                   return (
                     <article key={`chat-widget-card-${widget.id ?? widget.slug}`} className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-cyan-400/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),rgba(255,255,255,0.03)_24%,rgba(255,255,255,0.012)_60%)] p-4 shadow-[0_18px_40px_rgba(2,8,23,0.24),0_0_0_1px_rgba(34,211,238,0.04)] transition-[background-color,border-color,color,opacity,box-shadow,transform] duration-180 ease-out">

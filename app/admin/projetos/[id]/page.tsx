@@ -3825,11 +3825,6 @@ function ConnectorModal({
                       className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
                     />
                   </div>
-                  {!isEditing ? (
-                    <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
-                      Depois de salvar, o botao <span className="font-semibold">Conectar Mercado Livre</span> sera liberado para voce concluir a conexao da conta.
-                    </div>
-                  ) : null}
                   <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4">
                     <p className="text-sm font-semibold text-white">Cadastro da conexao</p>
                     <p className="mt-1 text-xs leading-6 text-cyan-100/80">
@@ -3838,23 +3833,9 @@ function ConnectorModal({
                   </div>
                 </>
               )}
-              {!isEditing && !showProductStep ? (
-                <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
-                  Depois de salvar, o botao <span className="font-semibold">Conectar Mercado Livre</span> sera liberado para voce concluir a conexao da conta.
-                </div>
-              ) : null}
             </div>
           </div>
             <ModalStickyFooter feedback={feedback}>
-              {isEditing ? (
-                <a
-                  href={`/api/admin/conectores/${form.id}/mercado-livre/connect`}
-                  className={successActionButtonClass}
-              >
-                <ExternalLink size={15} />
-                  Conectar Mercado Livre
-                </a>
-              ) : null}
               {showProductStep ? (
                 <button
                   type="button"
@@ -6077,7 +6058,7 @@ export default function AdminProjetoDetalhePage() {
           ativo: payload.conector.ativo,
         });
         setSavingConnector(false);
-      setFeedbackConnector("Integracao criada com sucesso. Agora clique em Conectar Mercado Livre para autorizar a loja.");
+      setFeedbackConnector("Integracao criada com sucesso. Agora use o botao da conexao criada para autorizar a loja.");
       return;
     }
 
