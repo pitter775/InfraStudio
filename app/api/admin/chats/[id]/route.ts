@@ -150,6 +150,7 @@ export async function POST(request: Request, context: RouteContext) {
           hasText: Boolean(conteudo),
           attachmentCount: attachments.length,
         },
+        skipErrorGate: true,
       });
       return NextResponse.json({ error: outbound.error ?? "Nao foi possivel enviar no WhatsApp." }, { status: 502 });
     }
@@ -170,6 +171,7 @@ export async function POST(request: Request, context: RouteContext) {
         hasText: Boolean(conteudo),
         attachmentCount: attachments.length,
       },
+      skipErrorGate: true,
     });
   } else {
     await appendSystemLog({
@@ -187,6 +189,7 @@ export async function POST(request: Request, context: RouteContext) {
         hasText: Boolean(conteudo),
         attachmentCount: attachments.length,
       },
+      skipErrorGate: true,
     });
   }
 
