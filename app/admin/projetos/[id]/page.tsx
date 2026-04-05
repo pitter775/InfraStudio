@@ -371,6 +371,7 @@ type ConnectorFormState = {
   appId: string;
   clientSecret: string;
   sellerId: string;
+  productUrl: string;
   nickname: string;
   accessToken: string;
   ativo: boolean;
@@ -1574,6 +1575,7 @@ const emptyConnectorForm: ConnectorFormState = {
   appId: "",
   clientSecret: "",
   sellerId: "",
+  productUrl: "",
   nickname: "",
   accessToken: "",
   ativo: true,
@@ -3638,34 +3640,77 @@ function ConnectorModal({
   form,
   agentes,
   saving,
+  resolvingSeller,
   feedback,
   onClose,
   onChange,
+  onResolveSellerFromProduct,
   onSubmit,
 }: {
   open: boolean;
   form: ConnectorFormState;
   agentes: Agente[];
   saving: boolean;
+  resolvingSeller: boolean;
   feedback: string | null;
   onClose: () => void;
   onChange: (next: Partial<ConnectorFormState>) => void;
+  onResolveSellerFromProduct: () => Promise<boolean>;
   onSubmit: () => void;
 }) {
+  const isEditing = Boolean(form.id);
+  const [creationStep, setCreationStep] = useState<"product" | "details">("product");
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    setCreationStep(isEditing ? "details" : "product");
+  }, [isEditing, open]);
+
   if (!open) {
     return null;
   }
+
+  const handleAdvanceFromProduct = async () => {
+    const resolved = await onResolveSellerFromProduct();
+    if (resolved) {
+      setCreationStep("details");
+    }
+  };
+
+  const showProductStep = !isEditing && creationStep === "product";
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
       <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Integracao</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar integracao" : "Nova integracao"}</h2>
-            <p className="mt-1 text-sm text-slate-400">Use este cadastro para o agente buscar produtos no Mercado Livre sem expor a resposta bruta da API.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Mercado Livre</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">{isEditing ? "Editar conexao" : "Nova conexao"}</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              {showProductStep
+                ? "Primeiro informe um produto da loja para identificar a conta automaticamente."
+                : "Preencha os dados da sua loja para concluir a conexao com o Mercado Livre."}
+            </p>
           </div>
           <div className="flex items-center gap-2">
+            <label className="mr-2 inline-flex cursor-pointer items-center gap-3">
+              <span className={`text-xs font-semibold uppercase tracking-[0.16em] ${form.ativo ? "text-emerald-200" : "text-slate-500"}`}>
+                {form.ativo ? "Ativa" : "Inativa"}
+              </span>
+              <span className="relative inline-flex items-center">
+                <input
+                  type="checkbox"
+                  checked={form.ativo}
+                  onChange={(event) => onChange({ ativo: event.target.checked })}
+                  className="peer sr-only"
+                />
+                <span className="h-7 w-12 rounded-full bg-white/10 transition-colors peer-checked:bg-emerald-500/30" />
+                <span className="pointer-events-none absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-checked:bg-emerald-200" />
+              </span>
+            </label>
             <button
               type="button"
               onClick={onClose}
@@ -3679,133 +3724,135 @@ function ConnectorModal({
 
         <div className="flex max-h-[calc(92vh-88px)] flex-col">
           <div className="flex-1 overflow-y-auto px-6 pt-6 pb-28">
-          <div className="space-y-4">
-            <div>
-              <FormLabel>Nome</FormLabel>
-              <input
-                value={form.nome}
-                onChange={(event) => onChange({ nome: event.target.value })}
-                placeholder="Loja Mercado Livre"
-                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-              />
+            <div className="space-y-4">
+              {showProductStep ? (
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+                    <p className="text-sm font-semibold text-white">Etapa 1 de 2</p>
+                    <p className="mt-1 text-xs leading-6 text-cyan-100/80">
+                      Cole o link de qualquer produto da loja. O sistema vai localizar a conta e preencher o cadastro automaticamente.
+                    </p>
+                  </div>
+                  <div>
+                    <FormLabel>Produto da loja</FormLabel>
+                    <input
+                      value={form.productUrl}
+                      onChange={(event) => onChange({ productUrl: event.target.value })}
+                      placeholder="Cole a URL de um produto do Mercado Livre"
+                      className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+                    />
+                    <p className="mt-2 text-xs text-slate-400">Use um anuncio real da propria loja para identificar a conta corretamente.</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+                    <p className="text-sm font-semibold text-white">{isEditing ? "Dados da conexao" : "Etapa 2 de 2"}</p>
+                    <p className="mt-1 text-xs leading-6 text-cyan-100/80">
+                      {isEditing
+                        ? "Revise os dados da loja e conclua a conexao da conta quando quiser."
+                        : "A loja ja foi identificada. Agora basta revisar os dados e salvar."}
+                    </p>
+                  </div>
+                  <div>
+                    <FormLabel>Nome</FormLabel>
+                    <input
+                      value={form.nome}
+                      onChange={(event) => onChange({ nome: event.target.value })}
+                      placeholder="Loja Mercado Livre"
+                      className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+                    />
+                  </div>
+                  {form.sellerId ? (
+                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+                      Loja identificada com sucesso.
+                      {form.nickname.trim() ? <span className="ml-1 font-semibold text-white">{form.nickname}</span> : null}
+                    </div>
+                  ) : null}
+                  <div>
+                    <FormLabel>APP ID do Mercado Livre</FormLabel>
+                    <input
+                      value={form.appId}
+                      onChange={(event) => onChange({ appId: event.target.value })}
+                      placeholder="1234567890123456"
+                      className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+                    />
+                    <p className="mt-2 text-xs text-slate-400">Esse dado aparece no aplicativo criado no painel do Mercado Livre.</p>
+                  </div>
+                  <div>
+                    <FormLabel>CLIENT SECRET do Mercado Livre</FormLabel>
+                    <input
+                      type="password"
+                      value={form.clientSecret}
+                      onChange={(event) => onChange({ clientSecret: event.target.value })}
+                      placeholder="Cole o segredo da aplicacao"
+                      className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+                    />
+                  </div>
+                  {!isEditing ? (
+                    <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
+                      Depois de salvar, o botao <span className="font-semibold">Conectar Mercado Livre</span> sera liberado para voce concluir a conexao da conta.
+                    </div>
+                  ) : null}
+                  <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+                    <p className="text-sm font-semibold text-white">Cadastro da conexao</p>
+                    <p className="mt-1 text-xs leading-6 text-cyan-100/80">
+                      Preencha aqui os dados principais da loja. Se precisar, use o tutorial da lateral para seguir o passo a passo.
+                    </p>
+                  </div>
+                </>
+              )}
+              {!isEditing && !showProductStep ? (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
+                  Depois de salvar, o botao <span className="font-semibold">Conectar Mercado Livre</span> sera liberado para voce concluir a conexao da conta.
+                </div>
+              ) : null}
             </div>
-            <div>
-              <FormLabel>Agente</FormLabel>
-              <select
-                value={form.agenteId ?? ""}
-                onChange={(event) => onChange({ agenteId: event.target.value || null })}
-                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
-              >
-                <option value="">Selecione um agente</option>
-                {agentes.map((agente) => (
-                  <option key={agente.id} value={agente.id}>
-                    {agente.nome}
-                    {agente.ativo ? " (ativo)" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <FormLabel>APP ID do Mercado Livre</FormLabel>
-              <input
-                value={form.appId}
-                onChange={(event) => onChange({ appId: event.target.value })}
-                placeholder="1234567890123456"
-                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-              />
-              <p className="mt-2 text-xs text-slate-400">Obrigatorio para o usuario concluir o OAuth da propria conta sem depender da configuracao global do servidor.</p>
-            </div>
-            <div>
-              <FormLabel>CLIENT SECRET do Mercado Livre</FormLabel>
-              <input
-                type="password"
-                value={form.clientSecret}
-                onChange={(event) => onChange({ clientSecret: event.target.value })}
-                placeholder="Cole o segredo da aplicacao"
-                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-              />
-            </div>
-            <div>
-              <FormLabel>Seller ID</FormLabel>
-              <input
-                value={form.sellerId}
-                onChange={(event) => onChange({ sellerId: event.target.value })}
-                placeholder="123456789"
-                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-              />
-            </div>
-            <div>
-              <FormLabel>Nickname opcional</FormLabel>
-              <input
-                value={form.nickname}
-                onChange={(event) => onChange({ nickname: event.target.value })}
-                placeholder="minha_loja"
-                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-              />
-            </div>
-            <div>
-              <FormLabel>Access token do Mercado Livre</FormLabel>
-              <input
-                type="password"
-                value={form.accessToken}
-                onChange={(event) => onChange({ accessToken: event.target.value })}
-                placeholder="APP_USR-..."
-                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-              />
-              <p className="mt-2 text-xs text-slate-400">Opcional para busca publica. Necessario para listar os ultimos produtos da loja quando a API exigir autenticacao.</p>
-            </div>
-            <div>
-              <FormLabel>URL base para gestao</FormLabel>
-              <input
-                value={form.endpointBase}
-                onChange={(event) => onChange({ endpointBase: event.target.value })}
-                placeholder="https://api.mercadolibre.com"
-                className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-              />
-              <p className="mt-2 text-xs text-slate-400">Use a URL base do ambiente usado na integracao para gerir a conta e o OAuth entre usuarios.</p>
-            </div>
-            {!form.id ? (
-              <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
-                Salve a integracao primeiro para habilitar o botao <span className="font-semibold">Conectar Mercado Livre</span> e concluir o OAuth automatico.
-              </div>
-            ) : null}
-            <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4">
-              <p className="text-sm font-semibold text-white">Cadastro da integracao</p>
-              <p className="mt-1 text-xs leading-6 text-cyan-100/80">
-                Preencha aqui apenas os dados da loja. O passo a passo com callback, webhook e permissoes fica no tutorial da lateral direita da aba Mercado Livre.
-              </p>
-            </div>
-            <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
-              <input type="checkbox" checked={form.ativo} onChange={(event) => onChange({ ativo: event.target.checked })} />
-              Integracao ativa
-            </label>
-
-            
           </div>
-        </div>
-          <ModalStickyFooter feedback={feedback}>
-            {form.id ? (
-              <a
-                href={`/api/admin/conectores/${form.id}/mercado-livre/connect`}
-                className={successActionButtonClass}
+            <ModalStickyFooter feedback={feedback}>
+              {isEditing ? (
+                <a
+                  href={`/api/admin/conectores/${form.id}/mercado-livre/connect`}
+                  className={successActionButtonClass}
               >
                 <ExternalLink size={15} />
-                Conectar Mercado Livre
-              </a>
-            ) : null}
-            <button
-              type="button"
-              onClick={onSubmit}
-              disabled={saving}
-              className={`${primaryActionButtonClass} flex-1`}
-            >
-              {saving ? <BusyIcon /> : form.id ? <Pencil size={16} /> : <Plus size={16} />}
-              {form.id ? "Salvar" : "Criar"}
-            </button>
-            <button type="button" onClick={onClose} className={neutralActionButtonClass}>
-              Cancelar
-            </button>
-          </ModalStickyFooter>
+                  Conectar Mercado Livre
+                </a>
+              ) : null}
+              {showProductStep ? (
+                <button
+                  type="button"
+                  onClick={() => void handleAdvanceFromProduct()}
+                  disabled={resolvingSeller || !form.productUrl.trim()}
+                  className={`${primaryActionButtonClass} flex-1`}
+                >
+                  {resolvingSeller ? <BusyIcon /> : <ExternalLink size={16} />}
+                  Avancar
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onSubmit}
+                  disabled={saving}
+                  className={`${primaryActionButtonClass} flex-1`}
+                >
+                  {saving ? <BusyIcon /> : isEditing ? <Pencil size={16} /> : <Plus size={16} />}
+                  {isEditing ? "Salvar" : "Criar"}
+                </button>
+              )}
+              {!isEditing && !showProductStep ? (
+                <button
+                  type="button"
+                  onClick={() => setCreationStep("product")}
+                  className={neutralActionButtonClass}
+                >
+                  Voltar
+                </button>
+              ) : null}
+              <button type="button" onClick={onClose} className={neutralActionButtonClass}>
+                Cancelar
+              </button>
+            </ModalStickyFooter>
         </div>
       </div>
     </div>
@@ -4436,6 +4483,7 @@ export default function AdminProjetoDetalhePage() {
   const [savingAgente, setSavingAgente] = useState(false);
   const [savingApi, setSavingApi] = useState(false);
   const [savingConnector, setSavingConnector] = useState(false);
+  const [resolvingConnectorSeller, setResolvingConnectorSeller] = useState(false);
   const [savingWidget, setSavingWidget] = useState(false);
   const [savingWhatsAppChannel, setSavingWhatsAppChannel] = useState(false);
   const [savingBillingPlan, setSavingBillingPlan] = useState(false);
@@ -4892,6 +4940,7 @@ export default function AdminProjetoDetalhePage() {
     setConnectorForm({
       ...emptyConnectorForm,
       projetoId: params.id,
+      agenteId: data?.agentes.find((agente) => agente.ativo)?.id ?? data?.agentes[0]?.id ?? null,
     });
     setFeedbackConnector(null);
   };
@@ -5903,6 +5952,23 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const handleConnectorSubmit = async () => {
+    const resolvedConnectorAgentId =
+      connectorForm.agenteId ??
+      data?.agentes.find((agente) => agente.ativo)?.id ??
+      data?.agentes[0]?.id ??
+      null;
+    const sellerId = connectorForm.sellerId.trim();
+
+    if (!sellerId) {
+      setFeedbackConnector("Cole a URL de um produto da loja e preencha a conexao automaticamente antes de salvar.");
+      return;
+    }
+
+    if (!resolvedConnectorAgentId) {
+      setFeedbackConnector("Nao foi possivel identificar o agente ativo deste projeto para vincular a conexao.");
+      return;
+    }
+
     setSavingConnector(true);
     setFeedbackConnector(null);
 
@@ -5911,22 +5977,22 @@ export default function AdminProjetoDetalhePage() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        id: connectorForm.id,
-        nome: connectorForm.nome,
-        tipo: connectorForm.tipo,
-        projetoId: params.id,
-        agenteId: connectorForm.agenteId,
-        endpointBase: connectorForm.endpointBase,
-        configuracoes: {
-          app_id: connectorForm.appId.trim() || undefined,
-          client_secret: connectorForm.clientSecret.trim() || undefined,
-          seller_id: connectorForm.sellerId.trim(),
-          nickname: connectorForm.nickname.trim() || undefined,
-          access_token: connectorForm.accessToken.trim() || undefined,
-        },
-        ativo: connectorForm.ativo,
-      }),
+        body: JSON.stringify({
+          id: connectorForm.id,
+          nome: connectorForm.nome,
+          tipo: connectorForm.tipo,
+          projetoId: params.id,
+          agenteId: resolvedConnectorAgentId,
+          endpointBase: connectorForm.endpointBase,
+          configuracoes: {
+            app_id: connectorForm.appId.trim() || undefined,
+            client_secret: connectorForm.clientSecret.trim() || undefined,
+            seller_id: sellerId,
+            nickname: connectorForm.nickname.trim() || undefined,
+            access_token: connectorForm.accessToken.trim() || undefined,
+          },
+          ativo: connectorForm.ativo,
+        }),
     });
 
     const payload = (await response.json()) as { error?: string; conector?: Connector };
@@ -5950,15 +6016,16 @@ export default function AdminProjetoDetalhePage() {
         tipo: payload.conector.tipo === "mercado_livre" ? "mercado_livre" : "mercado_livre",
         projetoId: payload.conector.projetoId ?? params.id,
         agenteId: payload.conector.agenteId,
-        endpointBase: payload.conector.endpointBase || "https://api.mercadolibre.com",
-        appId: payload.conector.configuracoes?.app_id ?? "",
-        clientSecret: payload.conector.configuracoes?.client_secret ?? "",
-        sellerId: payload.conector.configuracoes?.seller_id ?? "",
-        nickname: payload.conector.configuracoes?.nickname ?? "",
-        accessToken: payload.conector.configuracoes?.access_token ?? "",
-        ativo: payload.conector.ativo,
-      });
-      setSavingConnector(false);
+          endpointBase: payload.conector.endpointBase || "https://api.mercadolibre.com",
+          appId: payload.conector.configuracoes?.app_id ?? "",
+          clientSecret: payload.conector.configuracoes?.client_secret ?? "",
+          sellerId: payload.conector.configuracoes?.seller_id ?? "",
+          productUrl: connectorForm.productUrl,
+          nickname: payload.conector.configuracoes?.nickname ?? "",
+          accessToken: payload.conector.configuracoes?.access_token ?? "",
+          ativo: payload.conector.ativo,
+        });
+        setSavingConnector(false);
       setFeedbackConnector("Integracao criada com sucesso. Agora clique em Conectar Mercado Livre para autorizar a loja.");
       return;
     }
@@ -6145,6 +6212,7 @@ export default function AdminProjetoDetalhePage() {
       appId: connector.configuracoes?.app_id ?? "",
       clientSecret: connector.configuracoes?.client_secret ?? "",
       sellerId: connector.configuracoes?.seller_id ?? "",
+      productUrl: "",
       nickname: connector.configuracoes?.nickname ?? "",
       accessToken: connector.configuracoes?.access_token ?? "",
       ativo: connector.ativo,
@@ -6215,6 +6283,53 @@ export default function AdminProjetoDetalhePage() {
     setWhatsAppChannelModalOpen(false);
     resetWhatsAppChannelForm();
   };
+
+  const handleResolveConnectorSellerFromProduct = async () => {
+    const productUrl = connectorForm.productUrl.trim();
+    if (!productUrl) {
+      setFeedbackConnector("Cole a URL de um produto do Mercado Livre para identificar a loja.");
+      return false;
+    }
+
+    setResolvingConnectorSeller(true);
+    setFeedbackConnector(null);
+
+    try {
+      const response = await fetch("/api/admin/conectores/mercado-livre/resolve", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: productUrl, projetoId: params.id }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        sellerId?: string;
+        nickname?: string | null;
+        productUrl?: string;
+      };
+
+      if (!response.ok || !payload.sellerId) {
+        throw new Error(payload.error ?? "Nao foi possivel identificar a loja a partir do produto informado.");
+      }
+
+        setConnectorForm((current) => ({
+          ...current,
+          sellerId: payload.sellerId ?? current.sellerId,
+          nickname: payload.nickname ?? current.nickname,
+          nome: current.nome.trim() || payload.nickname?.trim() || current.nome,
+          productUrl: payload.productUrl ?? current.productUrl,
+        }));
+        setFeedbackConnector(`Loja identificada com sucesso. Seller ID ${payload.sellerId}${payload.nickname ? ` | ${payload.nickname}` : ""}.`);
+        return true;
+      } catch (error) {
+        setFeedbackConnector(error instanceof Error ? error.message : "Nao foi possivel identificar a loja a partir do produto informado.");
+        return false;
+      } finally {
+        setResolvingConnectorSeller(false);
+      }
+    };
 
   const resetWhatsAppChannelSession = async (channel: WhatsAppChannel, serviceUrl?: string | null) => {
     const normalizedServiceUrl = serviceUrl?.replace(/\/$/, "") ?? null;
@@ -7066,6 +7181,7 @@ export default function AdminProjetoDetalhePage() {
       appId: connector.configuracoes?.app_id ?? "",
       clientSecret: connector.configuracoes?.client_secret ?? "",
       sellerId: connector.configuracoes?.seller_id ?? "",
+      productUrl: "",
       nickname: connector.configuracoes?.nickname ?? "",
       accessToken: connector.configuracoes?.access_token ?? "",
       ativo: connector.ativo,
@@ -8088,22 +8204,24 @@ export default function AdminProjetoDetalhePage() {
         onSubmit={() => void handleApiSubmit()}
         onTest={() => void handleTestApi()}
       />
-      <ConnectorModal
-        open={connectorModalOpen}
-        form={connectorForm}
-        agentes={data.agentes}
-        saving={savingConnector}
-        feedback={feedbackConnector}
-        onClose={handleCloseConnectorModal}
-        onChange={(next) =>
-          setConnectorForm((prev) => ({
-            ...prev,
+        <ConnectorModal
+          open={connectorModalOpen}
+          form={connectorForm}
+          agentes={data.agentes}
+          saving={savingConnector}
+          resolvingSeller={resolvingConnectorSeller}
+          feedback={feedbackConnector}
+          onClose={handleCloseConnectorModal}
+          onChange={(next) =>
+            setConnectorForm((prev) => ({
+              ...prev,
             ...next,
-            projetoId: params.id,
-          }))
-        }
-        onSubmit={() => void handleConnectorSubmit()}
-      />
+              projetoId: params.id,
+            }))
+          }
+          onResolveSellerFromProduct={handleResolveConnectorSellerFromProduct}
+          onSubmit={() => void handleConnectorSubmit()}
+        />
       <WhatsAppQrCodeModal
         open={Boolean(whatsAppQrModalChannelId)}
         channelNumber={whatsAppQrModalChannel ? formatWhatsAppPhone(whatsAppQrModalChannel.numero) : ""}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, CheckCircle2, LoaderCircle, Pencil, Plus, Power, Trash2, Unplug, Waypoints } from "lucide-react";
+import { Activity, CheckCircle2, Headset, LoaderCircle, Pencil, Plus, Power, QrCode, Trash2, Unplug, Waypoints } from "lucide-react";
 import { formatBrazilWhatsAppPhone, formatBrazilWhatsAppPhoneInput } from "@/lib/whatsapp-phone";
 
 type AgenteSummary = {
@@ -255,22 +255,28 @@ export function ProjectWhatsAppSection({
         </div>
         <div className="mt-4 flex gap-2 overflow-x-auto px-1 lg:hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {[
-            { id: "channel" as const, label: "Canal" },
-            { id: "handoff" as const, label: "Atendimento humano" },
-          ].map((tab) => (
+            { id: "channel" as const, label: "Conexao", icon: QrCode },
+            { id: "handoff" as const, label: "Atendimento humano", icon: Headset },
+          ].map((tab) => {
+            const TabIcon = tab.icon;
+
+            return (
             <button
               key={tab.id}
               type="button"
               onClick={() => setMobileWhatsAppTab(tab.id)}
-              className={`shrink-0 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
+              className={`shrink-0 rounded-2xl border px-3.5 py-2.5 text-xs font-semibold transition-all ${
                 mobileWhatsAppTab === tab.id
-                  ? "border-cyan-400/30 bg-cyan-500/10 text-cyan-100"
-                  : "border-white/10 bg-white/5 text-slate-300"
+                  ? "border-cyan-300/35 bg-cyan-400/16 text-cyan-50 shadow-[0_10px_24px_rgba(34,211,238,0.18)]"
+                  : "border-white/10 bg-white/[0.04] text-slate-300 hover:border-white/15 hover:bg-white/[0.07]"
               }`}
             >
-              {tab.label}
+              <span className="inline-flex items-center gap-2">
+                <TabIcon size={14} className={mobileWhatsAppTab === tab.id ? "text-cyan-100" : "text-slate-400"} />
+                {tab.label}
+              </span>
             </button>
-          ))}
+          )})}
         </div>
         <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1.35fr),minmax(340px,0.92fr)] xl:items-start">
           <div className={mobileWhatsAppTab === "channel" ? "" : "hidden lg:block"}>
