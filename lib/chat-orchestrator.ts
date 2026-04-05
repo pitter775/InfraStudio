@@ -75,6 +75,7 @@ import {
   isLikelyLeadNameReply as isLikelyLeadNameReplyFromModule,
 } from "@/lib/chat-lead-stage";
 export { shouldRefreshSummary, summarizeConversation } from "@/lib/chat-summary-stage";
+import { getPlanoProjeto, type BillingProjectPlan } from "@/lib/billing";
 import { listConectoresByAgente, MERCADO_LIVRE_CONNECTOR_TYPE } from "@/lib/conectores";
 import {
   type ProdutoDetalhadoMercadoLivre,
@@ -111,6 +112,17 @@ type SalesReplyMetadata = {
   model: string;
   agenteId: string | null;
   agenteNome: string | null;
+  billingControl?: {
+    status: "ativo" | "bloqueado";
+    limiteTokens: number | null;
+    tokensConsumidos: number;
+    alerta80: boolean;
+    alerta100: boolean;
+    bloqueado: boolean;
+    permitirExcedente: boolean;
+    excedenteTokens: number;
+    excedenteCusto: number;
+  } | null;
   routeStage?: string | null;
   heuristicStage?: HeuristicIntentStage | null;
   domainStage?: ConversationDomainStage | null;
@@ -278,6 +290,34 @@ function buildZeroUsageReply(
     assets,
     usage: { inputTokens: 0, outputTokens: 0 },
     metadata,
+  };
+}
+
+function buildBillingControlMetadata(current: BillingProjectPlan | null): SalesReplyMetadata["billingControl"] {
+  if (!current) {
+    return null;
+  }
+
+  return {
+    status: current.cicloAtual?.bloqueado || current.plano.bloqueado ? "bloqueado" : "ativo",
+    limiteTokens: current.cicloAtual?.limiteTokensTotal ?? current.plano.limiteTokensTotalMensal,
+    tokensConsumidos: current.consumoAtual.totalTokens,
+    alerta80: current.cicloAtual?.alerta80 === true,
+    alerta100: current.cicloAtual?.alerta100 === true,
+    bloqueado: current.cicloAtual?.bloqueado === true || current.plano.bloqueado,
+    permitirExcedente: current.cicloAtual?.permitirExcedente === true || current.plano.permitirExcedente,
+    excedenteTokens: current.cicloAtual?.excedenteTokens ?? 0,
+    excedenteCusto: current.cicloAtual?.excedenteCusto ?? 0,
+  };
+}
+
+function withBillingControl(result: SalesReplyResult, current: BillingProjectPlan | null): SalesReplyResult {
+  return {
+    ...result,
+    metadata: {
+      ...result.metadata,
+      billingControl: buildBillingControlMetadata(current),
+    },
   };
 }
 
@@ -609,7 +649,10 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const projectId = context?.admin?.projetoId ?? context?.projeto?.id ?? null;
   const agentId = context?.admin?.agenteId ?? context?.agente?.id ?? null;
   const lockedToAgent = context?.agente?.locked === true;
-  const resolvedAgent = agentId ? await getAgenteById(agentId) : null;
+  const [resolvedAgent, billingProjectPlan] = await Promise.all([
+    agentId ? getAgenteById(agentId) : Promise.resolve(null),
+    projectId ? getPlanoProjeto(projectId) : Promise.resolve(null),
+  ]);
   const agent =
     resolvedAgent && resolvedAgent.ativo && (!projectId || resolvedAgent.projetoId === projectId) ? resolvedAgent : null;
 
@@ -632,14 +675,14 @@ export async function generateSalesReply(history: ConversationMessage[], context
   });
 
   if (initialRouteStage === "inactive_or_invalid_agent" || !agent) {
-    return resolveGuardrailStageReply({
+    return withBillingControl(await resolveGuardrailStageReply({
       stage: "inactive_or_invalid_agent",
       conversationDomainStage: null,
       lockedToAgent,
       traceBase,
       agentId: null,
       agentName: null,
-    });
+    }), billingProjectPlan);
   }
   const activeAgent: AgenteRecord = agent;
   const runtimeAssets = buildRuntimeReplyAssets(activeAgent.arquivos ?? []);
@@ -930,11 +973,11 @@ export async function generateSalesReply(history: ConversationMessage[], context
     agentName: activeAgent.nome ?? null,
   });
   if (heuristicStageReply) {
-    return heuristicStageReply;
+    return withBillingControl(heuristicStageReply, billingProjectPlan);
   }
 
   if (orchestratorRouteStage === "guardrail_no_openai") {
-    return resolveGuardrailStageReply({
+    return withBillingControl(await resolveGuardrailStageReply({
       stage: "guardrail_no_openai",
       conversationDomainStage,
       traceBase,
@@ -943,11 +986,11 @@ export async function generateSalesReply(history: ConversationMessage[], context
         apiFallbackReply,
         agentId: activeAgent.id ?? null,
         agentName: activeAgent.nome ?? null,
-      });
+      }), billingProjectPlan);
   }
 
   if (orchestratorRouteStage === "openai") {
-    return resolveOpenAiStageReply({
+    return withBillingControl(await resolveOpenAiStageReply({
       openai,
       context,
       history,
@@ -969,10 +1012,10 @@ export async function generateSalesReply(history: ConversationMessage[], context
         apiFallbackReply,
         agentId: activeAgent.id ?? null,
         agentName: activeAgent.nome ?? null,
-      });
+      }), billingProjectPlan);
   }
 
-  return resolveGuardrailStageReply({
+  return withBillingControl(await resolveGuardrailStageReply({
     stage: "unexpected_route_fallback",
     conversationDomainStage,
     traceBase,
@@ -981,7 +1024,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
       apiFallbackReply,
       agentId: activeAgent.id ?? null,
       agentName: activeAgent.nome ?? null,
-    });
+    }), billingProjectPlan);
 }
 
 function extractPhone(message: string) {

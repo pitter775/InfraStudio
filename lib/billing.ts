@@ -22,6 +22,8 @@ type PlanoRow = {
   max_apis: number | null;
   max_whatsapp: number | null;
   ativo: boolean | null;
+  permitir_excedente: boolean | null;
+  custo_token_excedente: number | null;
 };
 
 type ProjetoPlanoRow = {
@@ -37,6 +39,8 @@ type ProjetoPlanoRow = {
   bloqueado: boolean | null;
   bloqueado_motivo: string | null;
   observacoes: string | null;
+  permitir_excedente: boolean | null;
+  custo_token_excedente: number | null;
 };
 
 type UsuarioLimiteIaRow = {
@@ -78,6 +82,15 @@ type ProjetoCicloUsoRow = {
   custo_total: number | null;
   fechado: boolean | null;
   created_at: string | null;
+  limite_tokens_total: number | null;
+  custo_token_excedente: number | null;
+  permitir_excedente: boolean | null;
+  alerta_80: boolean | null;
+  alerta_100: boolean | null;
+  bloqueado: boolean | null;
+  excedente_tokens: number | null;
+  excedente_custo: number | null;
+  plano_id: string | null;
 };
 
 type ConsumoAggregateRow = {
@@ -85,6 +98,14 @@ type ConsumoAggregateRow = {
   tokens_input?: number | null;
   tokens_output?: number | null;
   custo_total?: number | null;
+};
+
+type TokenAvulsoRow = {
+  id: string;
+  projeto_id: string;
+  tokens: number | null;
+  utilizado: boolean | null;
+  created_at: string | null;
 };
 
 export type BillingWindow = {
@@ -115,6 +136,8 @@ export type ProjetoPlanoBilling = {
   bloqueado: boolean;
   bloqueadoMotivo: string | null;
   observacoes: string | null;
+  permitirExcedente: boolean;
+  custoTokenExcedente: number;
 };
 
 export type UsuarioLimiteBilling = {
@@ -143,6 +166,8 @@ export type PlanoBillingRecord = {
   maxApis: number;
   maxWhatsapp: number;
   ativo: boolean;
+  permitirExcedente: boolean;
+  custoTokenExcedente: number;
 };
 
 export type ProjetoAssinaturaBilling = {
@@ -166,6 +191,15 @@ export type ProjetoCicloUso = {
   fechado: boolean;
   createdAt: string;
   totals: BillingUsageTotals;
+  limiteTokensTotal: number | null;
+  custoTokenExcedente: number;
+  permitirExcedente: boolean;
+  alerta80: boolean;
+  alerta100: boolean;
+  bloqueado: boolean;
+  excedenteTokens: number;
+  excedenteCusto: number;
+  planoId: string | null;
 };
 
 export type BillingProjectPlan = {
@@ -183,6 +217,16 @@ export type BillingUsageByProject = BillingProjectPlan & {
   percentualCusto: number | null;
   percentualUso: number | null;
   status: "ativo" | "bloqueado";
+};
+
+export type BillingUsageCalculation = {
+  usoAtualTokens: number;
+  limiteTokens: number | null;
+  percentualTokens: number | null;
+  usoAtualCusto: number;
+  limiteCusto: number | null;
+  percentualCusto: number | null;
+  percentualUso: number | null;
 };
 
 export type BillingSnapshot = {
@@ -239,6 +283,8 @@ function mapProjetoPlano(row: ProjetoPlanoRow): ProjetoPlanoBilling {
     bloqueado: row.bloqueado === true,
     bloqueadoMotivo: row.bloqueado_motivo?.trim() || null,
     observacoes: row.observacoes?.trim() || null,
+    permitirExcedente: row.permitir_excedente === true,
+    custoTokenExcedente: Number(row.custo_token_excedente ?? 0),
   };
 }
 
@@ -271,6 +317,8 @@ function mapPlano(row: PlanoRow): PlanoBillingRecord {
     maxApis: row.max_apis ?? 0,
     maxWhatsapp: row.max_whatsapp ?? 0,
     ativo: row.ativo !== false,
+    permitirExcedente: row.permitir_excedente === true,
+    custoTokenExcedente: Number(row.custo_token_excedente ?? 0),
   };
 }
 
@@ -316,6 +364,15 @@ function mapCycle(row: ProjetoCicloUsoRow): ProjetoCicloUso {
       totalTokens: tokensInput + tokensOutput,
       custoTotal: Number(row.custo_total ?? 0),
     },
+    limiteTokensTotal: row.limite_tokens_total ?? null,
+    custoTokenExcedente: Number(row.custo_token_excedente ?? 0),
+    permitirExcedente: row.permitir_excedente === true,
+    alerta80: row.alerta_80 === true,
+    alerta100: row.alerta_100 === true,
+    bloqueado: row.bloqueado === true,
+    excedenteTokens: Math.max(0, row.excedente_tokens ?? 0),
+    excedenteCusto: Number(row.excedente_custo ?? 0),
+    planoId: row.plano_id ?? null,
   };
 }
 
@@ -381,6 +438,185 @@ function computePercent(used: number, limit: number | null) {
   }
 
   return clampPercent((used / limit) * 100);
+}
+
+function splitUsageTokens(totalTokens: number, tokensInput: number, tokensOutput: number) {
+  if (totalTokens <= 0) {
+    return {
+      tokensInput: 0,
+      tokensOutput: 0,
+    };
+  }
+
+  const normalizedInput = Math.max(0, tokensInput);
+  const normalizedOutput = Math.max(0, tokensOutput);
+  const baseTotal = normalizedInput + normalizedOutput;
+  if (baseTotal <= 0) {
+    return {
+      tokensInput: 0,
+      tokensOutput: totalTokens,
+    };
+  }
+
+  const nextInput = Math.min(totalTokens, Math.round((normalizedInput / baseTotal) * totalTokens));
+  return {
+    tokensInput: nextInput,
+    tokensOutput: Math.max(0, totalTokens - nextInput),
+  };
+}
+
+async function consumirTokensAvulsos(projetoId: string, tokensNecessarios: number) {
+  const supabase = getSupabaseAdminClient();
+  const totalNecessario = Math.max(0, Math.round(tokensNecessarios));
+  if (totalNecessario <= 0) {
+    return 0;
+  }
+
+  const { data, error } = await supabase
+    .from("tokens_avulsos")
+    .select("id, projeto_id, tokens, utilizado, created_at")
+    .eq("projeto_id", projetoId)
+    .eq("utilizado", false)
+    .gt("tokens", 0)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("[billing] failed to load extra tokens", error);
+    return 0;
+  }
+
+  let consumidos = 0;
+  for (const row of (data ?? []) as TokenAvulsoRow[]) {
+    const saldoAtual = Math.max(0, row.tokens ?? 0);
+    if (saldoAtual <= 0 || consumidos >= totalNecessario) {
+      continue;
+    }
+
+    const desconto = Math.min(saldoAtual, totalNecessario - consumidos);
+    const proximoSaldo = saldoAtual - desconto;
+    const { error: updateError } = await supabase
+      .from("tokens_avulsos")
+      .update({
+        tokens: proximoSaldo,
+        utilizado: proximoSaldo <= 0,
+      } as never)
+      .eq("id", row.id);
+
+    if (updateError) {
+      console.error("[billing] failed to consume extra tokens", updateError);
+      continue;
+    }
+
+    consumidos += desconto;
+  }
+
+  return consumidos;
+}
+
+async function atualizarAlertasCiclo(input: {
+  cycle: ProjetoCicloUso;
+  totalTokens: number;
+}) {
+  if (input.cycle.limiteTokensTotal === null || input.cycle.limiteTokensTotal <= 0) {
+    return;
+  }
+
+  const percentualTokens = computePercent(input.totalTokens, input.cycle.limiteTokensTotal);
+  if (percentualTokens === null) {
+    return;
+  }
+
+  const patch: Record<string, boolean> = {};
+  if (!input.cycle.alerta80 && percentualTokens >= 80) {
+    patch.alerta_80 = true;
+  }
+  if (!input.cycle.alerta100 && percentualTokens >= 100) {
+    patch.alerta_100 = true;
+  }
+
+  if (!Object.keys(patch).length) {
+    return;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase.from("projetos_ciclos_uso").update(patch as never).eq("id", input.cycle.id);
+  if (error) {
+    console.error("[billing] failed to update cycle alerts", error);
+  }
+}
+
+async function atualizarBloqueioCiclo(input: {
+  cycle: ProjetoCicloUso;
+  totalTokens: number;
+}) {
+  if (input.cycle.bloqueado || input.cycle.permitirExcedente) {
+    return;
+  }
+
+  if (input.cycle.limiteTokensTotal === null || input.cycle.limiteTokensTotal <= 0) {
+    return;
+  }
+
+  if (input.totalTokens < input.cycle.limiteTokensTotal) {
+    return;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("projetos_ciclos_uso")
+    .update({
+      bloqueado: true,
+    } as never)
+    .eq("id", input.cycle.id);
+
+  if (error) {
+    console.error("[billing] failed to update cycle block", error);
+  }
+}
+
+async function atualizarExcedenteCiclo(input: {
+  cycle: ProjetoCicloUso;
+  totalTokens: number;
+}) {
+  if (!input.cycle.permitirExcedente) {
+    return;
+  }
+
+  const limite = input.cycle.limiteTokensTotal;
+  const excedenteTokens = limite === null || limite <= 0 ? 0 : Math.max(0, input.totalTokens - limite);
+  const excedenteCusto = Number((excedenteTokens * input.cycle.custoTokenExcedente).toFixed(6));
+
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("projetos_ciclos_uso")
+    .update({
+      bloqueado: false,
+      excedente_tokens: excedenteTokens,
+      excedente_custo: excedenteCusto,
+    } as never)
+    .eq("id", input.cycle.id);
+
+  if (error) {
+    console.error("[billing] failed to update cycle overage", error);
+  }
+}
+
+export function calculateBillingUsage(input: {
+  consumoAtual: BillingUsageTotals;
+  plano: Pick<ProjetoPlanoBilling, "limiteTokensTotalMensal" | "limiteCustoMensal">;
+}): BillingUsageCalculation {
+  const percentualTokens = computePercent(input.consumoAtual.totalTokens, input.plano.limiteTokensTotalMensal);
+  const percentualCusto = computePercent(input.consumoAtual.custoTotal, input.plano.limiteCustoMensal);
+
+  return {
+    usoAtualTokens: input.consumoAtual.totalTokens,
+    limiteTokens: input.plano.limiteTokensTotalMensal,
+    percentualTokens,
+    usoAtualCusto: input.consumoAtual.custoTotal,
+    limiteCusto: input.plano.limiteCustoMensal,
+    percentualCusto,
+    percentualUso: clampPercent(Math.max(percentualTokens ?? 0, percentualCusto ?? 0)),
+  };
 }
 
 export function buildCurrentMonthWindow(referenceDate = new Date()): BillingWindow {
@@ -473,17 +709,17 @@ async function listProjetosBillingBase(projetoIds?: string[]) {
   const [snapshotsResponse, assinaturasResponse, ciclosResponse, consumosResponse] = await Promise.all([
     supabase
       .from("projetos_planos")
-      .select("id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes")
+      .select("id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes, permitir_excedente, custo_token_excedente")
       .in("projeto_id", ids),
     supabase
       .from("projetos_assinaturas")
-      .select("id, projeto_id, plano_id, status, data_inicio, data_fim, renovar_automatico, created_at, updated_at, planos(id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo)")
+      .select("id, projeto_id, plano_id, status, data_inicio, data_fim, renovar_automatico, created_at, updated_at, planos(id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, permitir_excedente, custo_token_excedente)")
       .in("projeto_id", ids)
       .in("status", ["ativo", "trial"])
       .order("created_at", { ascending: false }),
     supabase
       .from("projetos_ciclos_uso")
-      .select("id, projeto_id, data_inicio, data_fim, tokens_input, tokens_output, custo_total, fechado, created_at")
+      .select("id, projeto_id, data_inicio, data_fim, tokens_input, tokens_output, custo_total, fechado, created_at, limite_tokens_total, custo_token_excedente, permitir_excedente, alerta_80, alerta_100, bloqueado, excedente_tokens, excedente_custo, plano_id")
       .in("projeto_id", ids)
       .eq("fechado", false)
       .order("data_inicio", { ascending: false }),
@@ -536,7 +772,7 @@ export async function getProjetoPlanoBilling(projetoId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("projetos_planos")
-    .select("id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes")
+    .select("id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes, permitir_excedente, custo_token_excedente")
     .eq("projeto_id", projetoId)
     .maybeSingle();
 
@@ -564,7 +800,7 @@ export async function ensureProjetoPlanoBilling(projetoId: string) {
       auto_bloquear: true,
       bloqueado: false,
     }) as never)
-    .select("id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes")
+    .select("id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes, permitir_excedente, custo_token_excedente")
     .single();
 
   if (error || !data) {
@@ -587,6 +823,8 @@ export async function updateProjetoPlanoBilling(input: {
   bloqueado?: boolean | null;
   bloqueadoMotivo?: string | null;
   observacoes?: string | null;
+  permitirExcedente?: boolean | null;
+  custoTokenExcedente?: number | string | null;
 }) {
   const supabase = getSupabaseAdminClient();
   const payload = {
@@ -601,13 +839,15 @@ export async function updateProjetoPlanoBilling(input: {
     bloqueado: input.bloqueado === true,
     bloqueado_motivo: input.bloqueadoMotivo?.trim() || null,
     observacoes: input.observacoes?.trim() || null,
+    permitir_excedente: input.permitirExcedente === true,
+    custo_token_excedente: normalizeNullableDecimal(input.custoTokenExcedente) ?? 0,
     updated_at: new Date().toISOString(),
   };
 
   const { data, error } = await supabase
     .from("projetos_planos")
     .upsert(payload as never, { onConflict: "projeto_id" })
-    .select("id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes")
+    .select("id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes, permitir_excedente, custo_token_excedente")
     .single();
 
   if (error || !data) {
@@ -639,7 +879,7 @@ export async function getAssinaturaAtivaProjeto(projetoId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("projetos_assinaturas")
-    .select("id, projeto_id, plano_id, status, data_inicio, data_fim, renovar_automatico, created_at, updated_at, planos(id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo)")
+      .select("id, projeto_id, plano_id, status, data_inicio, data_fim, renovar_automatico, created_at, updated_at, planos(id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, permitir_excedente, custo_token_excedente)")
     .eq("projeto_id", projetoId)
     .in("status", ["ativo", "trial"])
     .order("created_at", { ascending: false })
@@ -658,7 +898,7 @@ export async function getCicloAtual(projetoId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("projetos_ciclos_uso")
-    .select("id, projeto_id, data_inicio, data_fim, tokens_input, tokens_output, custo_total, fechado, created_at")
+    .select("id, projeto_id, data_inicio, data_fim, tokens_input, tokens_output, custo_total, fechado, created_at, limite_tokens_total, custo_token_excedente, permitir_excedente, alerta_80, alerta_100, bloqueado, excedente_tokens, excedente_custo, plano_id")
     .eq("projeto_id", projetoId)
     .eq("fechado", false)
     .order("data_inicio", { ascending: false })
@@ -696,6 +936,11 @@ export async function createProjetoUsageCycle(input: {
     }
   }
 
+  const [snapshot, assinaturaAtual] = await Promise.all([
+    ensureProjetoPlanoBilling(input.projetoId),
+    getAssinaturaAtivaProjeto(input.projetoId),
+  ]);
+
   const { data, error } = await supabase
     .from("projetos_ciclos_uso")
     .insert(({
@@ -706,9 +951,18 @@ export async function createProjetoUsageCycle(input: {
       tokens_output: 0,
       custo_total: 0,
       fechado: false,
+      limite_tokens_total: snapshot?.limiteTokensTotalMensal ?? null,
+      custo_token_excedente: snapshot?.custoTokenExcedente ?? 0,
+      permitir_excedente: snapshot?.permitirExcedente === true,
+      alerta_80: false,
+      alerta_100: false,
+      bloqueado: false,
+      excedente_tokens: 0,
+      excedente_custo: 0,
+      plano_id: assinaturaAtual?.planoId ?? null,
       created_at: new Date().toISOString(),
     }) as never)
-    .select("id, projeto_id, data_inicio, data_fim, tokens_input, tokens_output, custo_total, fechado, created_at")
+    .select("id, projeto_id, data_inicio, data_fim, tokens_input, tokens_output, custo_total, fechado, created_at, limite_tokens_total, custo_token_excedente, permitir_excedente, alerta_80, alerta_100, bloqueado, excedente_tokens, excedente_custo, plano_id")
     .single();
 
   if (error || !data) {
@@ -748,7 +1002,7 @@ export async function syncProjetoPlanoSnapshotFromPlan(input: {
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from("planos")
-      .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo")
+      .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, permitir_excedente, custo_token_excedente")
       .eq("id", input.planoId)
       .maybeSingle();
 
@@ -769,6 +1023,8 @@ export async function syncProjetoPlanoSnapshotFromPlan(input: {
     nomePlano: plano.nome,
     limiteTokensTotalMensal: plano.limiteTokensTotalMensal,
     limiteCustoMensal: plano.limiteCustoMensal,
+    permitirExcedente: plano.permitirExcedente,
+    custoTokenExcedente: plano.custoTokenExcedente,
     autoBloquear: true,
     bloqueado: input.clearBlock ? false : undefined,
     bloqueadoMotivo: input.clearBlock ? null : undefined,
@@ -946,9 +1202,10 @@ export async function listBillingUsageByProject(projetoIds?: string[]) {
       ? { ...cicloAtual.totals, source: "ciclo" as const }
       : { ...fallbackConsumo, source: "consumos" as const };
 
-    const percentualTokens = computePercent(consumoAtual.totalTokens, plano.limiteTokensTotalMensal);
-    const percentualCusto = computePercent(consumoAtual.custoTotal, plano.limiteCustoMensal);
-    const percentualUso = clampPercent(Math.max(percentualTokens ?? 0, percentualCusto ?? 0));
+    const usageCalculation = calculateBillingUsage({
+      consumoAtual,
+      plano,
+    });
 
     return {
       projetoId: projeto.id,
@@ -958,9 +1215,9 @@ export async function listBillingUsageByProject(projetoIds?: string[]) {
       assinaturaAtual,
       cicloAtual,
       consumoAtual,
-      percentualTokens,
-      percentualCusto,
-      percentualUso,
+      percentualTokens: usageCalculation.percentualTokens,
+      percentualCusto: usageCalculation.percentualCusto,
+      percentualUso: usageCalculation.percentualUso,
       status: modoCobranca === "ilimitado" ? "ativo" : plano.bloqueado ? "bloqueado" : "ativo",
     };
   });
@@ -980,11 +1237,19 @@ export async function registrarUso(
 ) {
   const supabase = getSupabaseAdminClient();
   const cycle = await ensureProjetoUsageCycle(projetoId);
-  const tokensInput = Math.max(0, details?.tokensInput ?? 0);
-  const tokensOutput = Math.max(0, details?.tokensOutput ?? Math.max(0, tokens - tokensInput));
-  const custoTotal = Math.max(0, Number(custo ?? 0));
+  const totalTokens = Math.max(0, Math.round(tokens));
+  const originalTokensInput = Math.max(0, details?.tokensInput ?? 0);
+  const originalTokensOutput = Math.max(0, details?.tokensOutput ?? Math.max(0, totalTokens - originalTokensInput));
+  const tokensAvulsosConsumidos = await consumirTokensAvulsos(projetoId, totalTokens);
+  const tokensCobradosPlano = Math.max(0, totalTokens - tokensAvulsosConsumidos);
+  const tokenSplit = splitUsageTokens(tokensCobradosPlano, originalTokensInput, originalTokensOutput);
+  const tokensInput = tokenSplit.tokensInput;
+  const tokensOutput = tokenSplit.tokensOutput;
+  const custoOriginal = Math.max(0, Number(custo ?? 0));
+  const custoTotal =
+    totalTokens > 0 ? Number(((custoOriginal * tokensCobradosPlano) / totalTokens).toFixed(6)) : 0;
 
-  if (cycle) {
+  if (cycle && tokensCobradosPlano > 0) {
     const { error: cycleError } = await supabase
       .from("projetos_ciclos_uso")
       .update({
@@ -996,24 +1261,40 @@ export async function registrarUso(
 
     if (cycleError) {
       console.error("[billing] failed to append usage to current cycle", cycleError);
+    } else {
+      const nextCycleTotalTokens = cycle.totals.totalTokens + tokensCobradosPlano;
+      await atualizarAlertasCiclo({
+        cycle,
+        totalTokens: nextCycleTotalTokens,
+      });
+      await atualizarExcedenteCiclo({
+        cycle,
+        totalTokens: nextCycleTotalTokens,
+      });
+      await atualizarBloqueioCiclo({
+        cycle,
+        totalTokens: nextCycleTotalTokens,
+      });
     }
   }
 
-  const { error: consumoError } = await supabase
-    .from("consumos")
-    .insert(({
-      projeto_id: projetoId,
-      usuario_id: details?.usuarioId ?? null,
-      origem: details?.origem?.trim() || "chat",
-      tokens_input: tokensInput,
-      tokens_output: tokensOutput,
-      custo_total: custoTotal,
-      referencia_id: details?.referenciaId ?? null,
-      created_at: new Date().toISOString(),
-    }) as never);
+  if (tokensCobradosPlano > 0 || custoTotal > 0) {
+    const { error: consumoError } = await supabase
+      .from("consumos")
+      .insert(({
+        projeto_id: projetoId,
+        usuario_id: details?.usuarioId ?? null,
+        origem: details?.origem?.trim() || "chat",
+        tokens_input: tokensInput,
+        tokens_output: tokensOutput,
+        custo_total: custoTotal,
+        referencia_id: details?.referenciaId ?? null,
+        created_at: new Date().toISOString(),
+      }) as never);
 
-  if (consumoError) {
-    console.error("[billing] failed to insert legacy usage row", consumoError);
+    if (consumoError) {
+      console.error("[billing] failed to insert legacy usage row", consumoError);
+    }
   }
 
   return verifyProjetoBillingAccess(projetoId);
@@ -1044,6 +1325,15 @@ export async function verifyProjetoBillingAccess(projetoId: string) {
       allowed: false,
       code: "project_manually_blocked" as const,
       message: current.plano.bloqueadoMotivo || "Projeto bloqueado para consumo de IA.",
+      current,
+    };
+  }
+
+  if (current.cicloAtual?.bloqueado) {
+    return {
+      allowed: false,
+      code: "project_tokens_total_limit_reached" as const,
+      message: "Projeto bloqueado por limite mensal total de tokens.",
       current,
     };
   }
