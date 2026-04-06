@@ -18,6 +18,17 @@ type Projeto = {
   tipo: string | null;
   descricao: string;
   status: string;
+  modeloId?: string | null;
+  modeloNome?: string | null;
+};
+
+type ModeloDisponivel = {
+  id: string;
+  nome: string;
+  provider: string;
+  custoInput: number | null;
+  custoOutput: number | null;
+  ativo: boolean;
 };
 
 type ApiCampo = {
@@ -179,6 +190,7 @@ type Connector = {
 
 type ProjetoDetalhe = {
   projeto: Projeto;
+  modelosDisponiveis: ModeloDisponivel[];
   agentes: Agente[];
   apis: Api[];
   conectores: Connector[];
@@ -4531,6 +4543,8 @@ export default function AdminProjetoDetalhePage() {
   const [testingWhatsAppHandoffAlert, setTestingWhatsAppHandoffAlert] = useState(false);
   const [updatingWhatsAppHandoffContactId, setUpdatingWhatsAppHandoffContactId] = useState<string | null>(null);
   const [feedbackBilling, setFeedbackBilling] = useState<string | null>(null);
+  const [feedbackProjeto, setFeedbackProjeto] = useState<string | null>(null);
+  const [savingProjetoModel, setSavingProjetoModel] = useState(false);
   const [agenteModalOpen, setAgenteModalOpen] = useState(false);
   const [apiModalOpen, setApiModalOpen] = useState(false);
   const [connectorModalOpen, setConnectorModalOpen] = useState(false);
@@ -4972,6 +4986,57 @@ export default function AdminProjetoDetalhePage() {
 
   const resetWhatsAppHandoffContactForm = () => {
     setWhatsAppHandoffContactForm(emptyWhatsAppHandoffContactForm);
+  };
+
+  const saveProjetoModel = async (modeloId: string | null) => {
+    if (!data) {
+      return;
+    }
+
+    setSavingProjetoModel(true);
+    setFeedbackProjeto(null);
+
+    try {
+      const response = await fetch("/api/admin/projetos", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: data.projeto.id,
+          nome: data.projeto.nome,
+          slug: data.projeto.slug,
+          tipo: data.projeto.tipo,
+          descricao: data.projeto.descricao,
+          status: data.projeto.status,
+          modeloId,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        projeto?: Projeto;
+      };
+
+      if (!response.ok || !payload.projeto) {
+        setFeedbackProjeto(payload.error ?? "Nao foi possivel salvar o modelo do projeto.");
+        return;
+      }
+
+      const savedProject = payload.projeto;
+
+      updateProjetoData((current) => ({
+        ...current,
+        projeto: {
+          ...current.projeto,
+          ...savedProject,
+          modeloNome: current.modelosDisponiveis.find((item) => item.id === (savedProject.modeloId ?? null))?.nome ?? null,
+        },
+      }));
+      setFeedbackProjeto("Modelo do projeto atualizado.");
+    } finally {
+      setSavingProjetoModel(false);
+    }
   };
 
   const loadWhatsAppHandoffContacts = async (channelId: string, options?: { silent?: boolean }) => {
@@ -7321,6 +7386,12 @@ export default function AdminProjetoDetalhePage() {
     data.billing?.pricingModels.find((item) => item.id === billingPlanForm.modeloReferencia) ??
     data.billing?.pricingModels.find((item) => item.id === data.billing?.plan.modeloReferencia) ??
     null;
+  const selectedProjectModel =
+    data.modelosDisponiveis.find((item) => item.id === data.projeto.modeloId) ??
+    data.modelosDisponiveis.find((item) => item.nome === "gpt-4o-mini") ??
+    null;
+  const selectedProjectModelInputCost = selectedProjectModel?.custoInput ?? null;
+  const selectedProjectModelOutputCost = selectedProjectModel?.custoOutput ?? null;
   const tabContentTransitionClass = `transition-[opacity] duration-150 ease-out ${tabContentVisible ? "opacity-100" : "pointer-events-none opacity-0"}`;
 
   return (
@@ -7372,8 +7443,9 @@ export default function AdminProjetoDetalhePage() {
           </div>
       </section>
 
-      {(feedbackAgente || feedbackApi || feedbackConnector || feedbackWidget || feedbackBilling) && (
+      {(feedbackProjeto || feedbackAgente || feedbackApi || feedbackConnector || feedbackWidget || feedbackBilling) && (
           <section className="grid gap-3">
+            {feedbackProjeto ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackProjeto}</div> : null}
             {feedbackAgente ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackAgente}</div> : null}
             {feedbackApi ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackApi}</div> : null}
             {feedbackConnector ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackConnector}</div> : null}
@@ -7383,6 +7455,62 @@ export default function AdminProjetoDetalhePage() {
         )}
 
       <div className="space-y-4">
+        <section className="rounded-[28px] border border-white/10 bg-white/[0.04] p-4 shadow-[0_18px_48px_rgba(2,8,23,0.22)] sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <h2 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Cpu size={18} className="text-cyan-200" />Modelo do chat</h2>
+              <p className="text-sm text-slate-400">Cada projeto escolhe o modelo usado na chamada OpenAI. Se nada for selecionado, o fallback continua em gpt-4o-mini.</p>
+            </div>
+            <div className="inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-300">
+              {selectedProjectModel ? `${selectedProjectModel.nome} · ${selectedProjectModel.provider}` : "gpt-4o-mini · openai"}
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold text-slate-200">Modelo selecionado</span>
+              <select
+                value={data.projeto.modeloId ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value.trim() || null;
+                  updateProjetoData((current) => ({
+                    ...current,
+                    projeto: {
+                      ...current.projeto,
+                      modeloId: value,
+                      modeloNome: current.modelosDisponiveis.find((item) => item.id === value)?.nome ?? null,
+                    },
+                  }));
+                  setFeedbackProjeto(null);
+                  void saveProjetoModel(value);
+                }}
+                disabled={savingProjetoModel}
+                className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40"
+              >
+                <option value="" className="bg-slate-950 text-white">Padrao (gpt-4o-mini)</option>
+                {data.modelosDisponiveis.map((modelo) => (
+                  <option key={modelo.id} value={modelo.id} className="bg-slate-950 text-white">
+                    {`${modelo.nome} (${modelo.provider})`}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/10 p-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-100/80">Modelo ativo no projeto</p>
+              <p className="mt-2 text-sm font-semibold text-white">{selectedProjectModel?.nome ?? "gpt-4o-mini"}</p>
+              <p className="mt-2 text-xs text-cyan-50/80">Input: {selectedProjectModelInputCost === null ? "--" : formatUsdLabel(selectedProjectModelInputCost)}</p>
+              <p className="mt-1 text-xs text-cyan-50/80">Output: {selectedProjectModelOutputCost === null ? "--" : formatUsdLabel(selectedProjectModelOutputCost)}</p>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+              {savingProjetoModel ? "Salvando modelo..." : "Alteracao salva automaticamente ao trocar o modelo."}
+            </div>
+          </div>
+        </section>
+
         {data.billing ? (
           <section className="space-y-4 rounded-[28px] border border-white/10 bg-white/[0.04] p-4 shadow-[0_18px_48px_rgba(2,8,23,0.22)] sm:p-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

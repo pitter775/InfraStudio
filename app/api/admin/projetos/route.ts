@@ -73,6 +73,7 @@ export async function PUT(request: Request) {
     descricao?: string;
     status?: string;
     modoCobranca?: "plano" | "manual" | "ilimitado";
+    modeloId?: string | null;
   };
 
   if (!body.id || !body.nome?.trim()) {
@@ -91,6 +92,7 @@ export async function PUT(request: Request) {
     descricao: body.descricao,
     status: body.status,
     modoCobranca: body.modoCobranca,
+    modeloId: body.modeloId,
   });
 
   if (!projeto) {

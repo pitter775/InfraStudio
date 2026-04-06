@@ -1,11 +1,23 @@
 import "server-only";
 
+import { getProjetoModeloSelecionado } from "@/lib/modelos";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type SegredoRow = {
   nome: string | null;
   valor: string | null;
 };
+
+const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
+
+async function getProjetoModelName(projetoId: string | null | undefined) {
+  if (!projetoId) {
+    return null;
+  }
+
+  const selection = await getProjetoModeloSelecionado(projetoId);
+  return selection.modelo?.nome ?? null;
+}
 
 export async function getProjetoSegredos(projetoId: string | null | undefined) {
   const secrets: Record<string, string> = {};
@@ -37,6 +49,7 @@ export async function getProjetoSegredos(projetoId: string | null | undefined) {
 
 export async function getProjetoOpenAIConfig(projetoId: string | null | undefined) {
   const secrets = await getProjetoSegredos(projetoId);
+  const projectModel = await getProjetoModelName(projetoId);
 
   return {
     apiKey:
@@ -44,10 +57,6 @@ export async function getProjetoOpenAIConfig(projetoId: string | null | undefine
       secrets.openai_api_key ??
       process.env.OPENAI_API_KEY ??
       null,
-    model:
-      secrets.OPENAI_CHAT_MODEL ??
-      secrets.openai_chat_model ??
-      process.env.OPENAI_CHAT_MODEL ??
-      "gpt-4o-mini",
+    model: projectModel ?? DEFAULT_OPENAI_MODEL,
   };
 }

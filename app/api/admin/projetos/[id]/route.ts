@@ -7,6 +7,7 @@ import { appendSystemLog } from "@/lib/chat-logs";
 import { listChatWidgets } from "@/lib/chat-widgets";
 import { listChats } from "@/lib/chats";
 import { listConectores } from "@/lib/conectores";
+import { getProjetoModeloSelecionado, listModelosDisponiveisParaProjeto } from "@/lib/modelos";
 import { getOpenAIModelPricingOptions } from "@/lib/openai-pricing";
 import { deleteProjeto, listProjetos } from "@/lib/projetos";
 import { getSessionUser } from "@/lib/session";
@@ -31,7 +32,7 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
   }
 
-  const [projetos, agentes, chats, apis, widgets, whatsappChannels, conectores, billing] = await Promise.all([
+  const [projetos, agentes, chats, apis, widgets, whatsappChannels, conectores, billing, modelosDisponiveis, projetoModeloSelecionado] = await Promise.all([
     listProjetos(),
     listAgentes(id),
     listChats(id),
@@ -40,6 +41,8 @@ export async function GET(_request: Request, context: RouteContext) {
     listWhatsAppChannels(id),
     listConectores(id),
     getProjetoBillingOverview(id),
+    listModelosDisponiveisParaProjeto(),
+    getProjetoModeloSelecionado(id),
   ]);
   const projeto = projetos.find((item) => item.id === id) ?? null;
 
@@ -49,7 +52,12 @@ export async function GET(_request: Request, context: RouteContext) {
 
   return NextResponse.json(
     {
-      projeto,
+      projeto: {
+        ...projeto,
+        modeloId: projetoModeloSelecionado.modeloId,
+        modeloNome: projetoModeloSelecionado.modelo?.nome ?? null,
+      },
+      modelosDisponiveis,
       agentes,
       apis,
       conectores,
