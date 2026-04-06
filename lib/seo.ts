@@ -5,7 +5,7 @@ const siteUrl = "https://infrastudio.pro";
 const defaultTitle = "InfraStudio";
 const defaultDescription =
   "Automacao com IA, WhatsApp inteligente e sistemas sob medida para vender mais sem aumentar a operacao manual.";
-const defaultOgImage = "/compartilhar_novo.png";
+const defaultOgImage = "/compartilhar_novo2.png";
 
 type PublicRouteConfig = {
   path: string;
