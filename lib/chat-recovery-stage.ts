@@ -70,7 +70,7 @@ export function heuristicReply(message: string, context?: ConversationContext) {
 
   if (normalized.includes("whatsapp") || normalized.includes("atendimento")) {
     return [
-      "âœ“ **Fluxo recomendado**",
+      " **Fluxo recomendado**",
       "A InfraStudio monta fluxos de WhatsApp para captar, qualificar e responder clientes com muito menos trabalho manual.",
       "",
       "â†’ Me diga seu segmento e eu ja te proponho um fluxo inicial.",
@@ -79,7 +79,7 @@ export function heuristicReply(message: string, context?: ConversationContext) {
 
   if (normalized.includes("crm") || normalized.includes("erp") || normalized.includes("integra")) {
     return [
-      "âœ“ **Isso encaixa bem em integracao**",
+      " **Isso encaixa bem em integracao**",
       "A gente costuma integrar CRM, ERP, formularios, pagamentos e atendimento para eliminar retrabalho e centralizar dados.",
       "",
       "â†’ Se quiser, me diga qual ferramenta voce usa hoje.",
@@ -88,17 +88,17 @@ export function heuristicReply(message: string, context?: ConversationContext) {
 
   if (normalized.includes("site") || normalized.includes("chat")) {
     return [
-      "âœ“ **Isso encaixa bem**",
+      " **Isso encaixa bem**",
       "Da para colocar um agente no seu site para captar leads, responder duvidas e encaminhar oportunidades para o WhatsApp do time comercial.",
     ].join("\n");
   }
 
   if (normalized.includes("preco") || normalized.includes("orcamento") || normalized.includes("valor")) {
-    return ["âœ“ **Para estimar melhor**", "Me diga em uma frase:", "- o que voce quer automatizar", "- qual etapa hoje mais trava o fechamento"].join("\n");
+    return [" **Para estimar melhor**", "Me diga em uma frase:", "- o que voce quer automatizar", "- qual etapa hoje mais trava o fechamento"].join("\n");
   }
 
   return [
-    "âœ“ **Posso te orientar por aqui**",
+    "**Melhor...**",
     "Me conta qual processo voce quer automatizar hoje.",
     "",
     "Se ajudar, pode me dizer se isso envolve:",
