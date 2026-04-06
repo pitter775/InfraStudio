@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Manrope } from "next/font/google";
+import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
-const manrope = Manrope({
+const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-sans-app",
   subsets: ["latin"],
 });
@@ -69,7 +69,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: import("react").ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body className={`${manrope.variable} ${geistMono.variable}`}>{children}</body>
+      <body className={`${plusJakartaSans.variable} ${geistMono.variable}`}>{children}</body>
     </html>
   );
 }

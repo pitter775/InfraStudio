@@ -618,6 +618,167 @@ function formatUsdLabel(value: number) {
   }).format(value);
 }
 
+function formatModelNameLabel(value: string | null | undefined) {
+  const normalized = (value ?? "").trim();
+  if (!normalized) {
+    return "GPT-4o mini";
+  }
+
+  const parts = normalized.split("-").filter(Boolean);
+  if (parts[0]?.toLowerCase() === "gpt" && parts.length >= 2) {
+    const family = `GPT-${parts[1]}`;
+    const suffix = parts
+      .slice(2)
+      .map((part) => (part.length <= 3 ? part.toUpperCase() : `${part.charAt(0).toUpperCase()}${part.slice(1)}`))
+      .join(" ");
+
+    return suffix ? `${family} ${suffix}` : family;
+  }
+
+  return parts
+    .map((part) => (part.length <= 3 ? part.toUpperCase() : `${part.charAt(0).toUpperCase()}${part.slice(1)}`))
+    .join(" ");
+}
+
+function buildModelMetaLabel(modelo: ModeloDisponivel | null) {
+  if (!modelo) {
+    return "Fallback em GPT-4o mini";
+  }
+
+  const pricing: string[] = [];
+  if (modelo.custoInput !== null) {
+    pricing.push(`in ${formatUsdLabel(modelo.custoInput)}`);
+  }
+  if (modelo.custoOutput !== null) {
+    pricing.push(`out ${formatUsdLabel(modelo.custoOutput)}`);
+  }
+
+  return [modelo.provider?.toUpperCase() || null, pricing.join(" • ") || null].filter(Boolean).join(" • ");
+}
+
+function ProjectModelDropdown({
+  modelos,
+  selectedModelId,
+  saving,
+  onChange,
+}: {
+  modelos: ModeloDisponivel[];
+  selectedModelId: string | null;
+  saving: boolean;
+  onChange: (modeloId: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const selectedModel =
+    modelos.find((item) => item.id === selectedModelId) ??
+    modelos.find((item) => item.nome === "gpt-4o-mini") ??
+    null;
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!dropdownRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [open]);
+
+  const handleSelect = (modeloId: string | null) => {
+    setOpen(false);
+    onChange(modeloId);
+  };
+
+  return (
+    <div ref={dropdownRef} className="relative z-20 shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        disabled={saving}
+        className="group inline-flex min-w-[180px] items-center justify-between gap-3 rounded-full border border-cyan-300/14 bg-[linear-gradient(135deg,rgba(15,23,42,0.86),rgba(15,23,42,0.62))] px-3.5 py-2 text-left shadow-[0_14px_32px_rgba(2,8,23,0.28),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition-all duration-200 hover:border-cyan-300/28 hover:bg-[linear-gradient(135deg,rgba(20,30,48,0.94),rgba(15,23,42,0.75))] hover:shadow-[0_18px_38px_rgba(8,47,73,0.35)] disabled:cursor-not-allowed disabled:opacity-70"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="min-w-0">
+          <span className="block truncate text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-100/72">Modelo</span>
+          <span className="mt-1 block truncate text-sm font-semibold text-white">
+            {saving ? "Salvando..." : formatModelNameLabel(selectedModel?.nome)}
+          </span>
+        </span>
+        <span className="flex items-center gap-2 text-cyan-100/72">
+          {saving ? <LoaderCircle size={15} className="animate-spin" /> : null}
+          <ChevronDown size={16} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        </span>
+      </button>
+
+      <div
+        className={`absolute right-0 top-[calc(100%+12px)] w-[min(360px,calc(100vw-2rem))] origin-top-right rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,8,23,0.94))] p-2 shadow-[0_22px_70px_rgba(2,8,23,0.45),0_0_0_1px_rgba(255,255,255,0.03)] backdrop-blur-2xl transition-all duration-200 ${open ? "pointer-events-auto translate-y-0 opacity-100" : "pointer-events-none -translate-y-2 opacity-0"}`}
+      >
+        <div className="mb-1 px-3 pt-2">
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Modelos disponiveis</p>
+        </div>
+
+        <div role="listbox" className="max-h-[320px] space-y-1 overflow-y-auto pb-1">
+          <button
+            type="button"
+            onClick={() => handleSelect(null)}
+            className={`flex w-full cursor-pointer items-start justify-between gap-3 rounded-2xl border px-3.5 py-3 text-left transition-all duration-200 ${
+              selectedModelId === null
+                ? "border-cyan-300/26 bg-cyan-400/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                : "border-transparent bg-white/[0.025] hover:border-white/10 hover:bg-white/[0.05]"
+            }`}
+          >
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-white">Padrao do sistema</span>
+              <span className="mt-1 block text-xs leading-relaxed text-slate-400">Fallback automatico em GPT-4o mini</span>
+            </span>
+            {selectedModelId === null ? <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-cyan-200" /> : null}
+          </button>
+
+          {modelos.map((modelo) => {
+            const isActive = modelo.id === selectedModelId;
+
+            return (
+              <button
+                key={modelo.id}
+                type="button"
+                onClick={() => handleSelect(modelo.id)}
+                className={`flex w-full cursor-pointer items-start justify-between gap-3 rounded-2xl border px-3.5 py-3 text-left transition-all duration-200 ${
+                  isActive
+                    ? "border-cyan-300/26 bg-cyan-400/12 shadow-[0_14px_30px_rgba(34,211,238,0.08),inset_0_1px_0_rgba(255,255,255,0.04)]"
+                    : "border-transparent bg-white/[0.025] hover:border-white/10 hover:bg-white/[0.05]"
+                }`}
+              >
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-white">{formatModelNameLabel(modelo.nome)}</span>
+                  <span className="mt-1 block text-xs leading-relaxed text-slate-400">{buildModelMetaLabel(modelo)}</span>
+                </span>
+                {isActive ? <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-cyan-200" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function createBillingPlanForm(billing: ProjetoBillingSection | null | undefined): BillingPlanFormState {
   return {
     nomePlano: billing?.plan.nomePlano ?? "padrao",
@@ -7386,12 +7547,6 @@ export default function AdminProjetoDetalhePage() {
     data.billing?.pricingModels.find((item) => item.id === billingPlanForm.modeloReferencia) ??
     data.billing?.pricingModels.find((item) => item.id === data.billing?.plan.modeloReferencia) ??
     null;
-  const selectedProjectModel =
-    data.modelosDisponiveis.find((item) => item.id === data.projeto.modeloId) ??
-    data.modelosDisponiveis.find((item) => item.nome === "gpt-4o-mini") ??
-    null;
-  const selectedProjectModelInputCost = selectedProjectModel?.custoInput ?? null;
-  const selectedProjectModelOutputCost = selectedProjectModel?.custoOutput ?? null;
   const tabContentTransitionClass = `transition-[opacity] duration-150 ease-out ${tabContentVisible ? "opacity-100" : "pointer-events-none opacity-0"}`;
 
   return (
@@ -7455,62 +7610,6 @@ export default function AdminProjetoDetalhePage() {
         )}
 
       <div className="space-y-4">
-        <section className="rounded-[28px] border border-white/10 bg-white/[0.04] p-4 shadow-[0_18px_48px_rgba(2,8,23,0.22)] sm:p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2">
-              <h2 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Cpu size={18} className="text-cyan-200" />Modelo do chat</h2>
-              <p className="text-sm text-slate-400">Cada projeto escolhe o modelo usado na chamada OpenAI. Se nada for selecionado, o fallback continua em gpt-4o-mini.</p>
-            </div>
-            <div className="inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-300">
-              {selectedProjectModel ? `${selectedProjectModel.nome} · ${selectedProjectModel.provider}` : "gpt-4o-mini · openai"}
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-slate-200">Modelo selecionado</span>
-              <select
-                value={data.projeto.modeloId ?? ""}
-                onChange={(event) => {
-                  const value = event.target.value.trim() || null;
-                  updateProjetoData((current) => ({
-                    ...current,
-                    projeto: {
-                      ...current.projeto,
-                      modeloId: value,
-                      modeloNome: current.modelosDisponiveis.find((item) => item.id === value)?.nome ?? null,
-                    },
-                  }));
-                  setFeedbackProjeto(null);
-                  void saveProjetoModel(value);
-                }}
-                disabled={savingProjetoModel}
-                className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40"
-              >
-                <option value="" className="bg-slate-950 text-white">Padrao (gpt-4o-mini)</option>
-                {data.modelosDisponiveis.map((modelo) => (
-                  <option key={modelo.id} value={modelo.id} className="bg-slate-950 text-white">
-                    {`${modelo.nome} (${modelo.provider})`}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/10 p-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-100/80">Modelo ativo no projeto</p>
-              <p className="mt-2 text-sm font-semibold text-white">{selectedProjectModel?.nome ?? "gpt-4o-mini"}</p>
-              <p className="mt-2 text-xs text-cyan-50/80">Input: {selectedProjectModelInputCost === null ? "--" : formatUsdLabel(selectedProjectModelInputCost)}</p>
-              <p className="mt-1 text-xs text-cyan-50/80">Output: {selectedProjectModelOutputCost === null ? "--" : formatUsdLabel(selectedProjectModelOutputCost)}</p>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
-              {savingProjetoModel ? "Salvando modelo..." : "Alteracao salva automaticamente ao trocar o modelo."}
-            </div>
-          </div>
-        </section>
-
         {data.billing ? (
           <section className="space-y-4 rounded-[28px] border border-white/10 bg-white/[0.04] p-4 shadow-[0_18px_48px_rgba(2,8,23,0.22)] sm:p-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -7930,8 +8029,11 @@ export default function AdminProjetoDetalhePage() {
                       <Bot size={42} strokeWidth={1.8} className="relative" />
                     </div>
 
-                    <div className="relative flex items-start justify-between gap-3 pr-12">
+                    <div className="relative flex flex-wrap items-start justify-between gap-3 pr-12">
                       <div className="min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-100/58">
+                          {agente.ativo ? "Agente do site" : "Agente do projeto"}
+                        </p>
                         <div className="flex flex-wrap items-center gap-2">
                           <h4 className="truncate text-base font-bold text-white">{agente.nome}</h4>
                           <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${agente.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
@@ -7940,6 +8042,25 @@ export default function AdminProjetoDetalhePage() {
                         </div>
                         <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descriÃ§Ã£o."}</p>
                       </div>
+                      {agente.ativo ? (
+                        <ProjectModelDropdown
+                          modelos={data.modelosDisponiveis}
+                          selectedModelId={data.projeto.modeloId ?? null}
+                          saving={savingProjetoModel}
+                          onChange={(modeloId) => {
+                            updateProjetoData((current) => ({
+                              ...current,
+                              projeto: {
+                                ...current.projeto,
+                                modeloId,
+                                modeloNome: current.modelosDisponiveis.find((item) => item.id === modeloId)?.nome ?? null,
+                              },
+                            }));
+                            setFeedbackProjeto(null);
+                            void saveProjetoModel(modeloId);
+                          }}
+                        />
+                      ) : null}
                     </div>
 
                     <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/35 px-3.5 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">

@@ -18,6 +18,18 @@
 
   body {
     @apply bg-brand-dark text-slate-200 antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv02" 1, "cv03" 1, "cv04" 1, "cv11" 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    letter-spacing: -0.02em;
+    font-weight: 600;
   }
 
   * {
