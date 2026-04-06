@@ -289,6 +289,128 @@ export function NichesSection() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-16 text-center">
           <h2 className="mb-4 text-3xl font-semibold tracking-[-0.03em] text-slate-100/88">Feito para quem busca escala</h2>
+          <section className="w-full px-6 py-20">
+            <div className="max-w-6xl mx-auto text-center">
+
+              <h2 className="text-3xl md:text-4xl font-bold text-white">
+                Planos simples, sem surpresa
+              </h2>
+
+              <p className="text-zinc-400 mt-3">
+                Escolha o plano ideal e comece na hora
+              </p>
+
+              {/* GRID */}
+              <div className="grid md:grid-cols-4 gap-6 mt-12">
+
+                {/* STARTER */}
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 text-left">
+                  <span className="text-xs text-zinc-400">Starter</span>
+
+                  <h3 className="text-white text-2xl font-bold mt-2">
+                    R$ 29,90
+                    <span className="text-sm text-zinc-400">/mês</span>
+                  </h3>
+
+                  <p className="text-zinc-400 text-sm mt-2">
+                    Ideal para começar
+                  </p>
+
+                  <ul className="mt-4 space-y-2 text-sm text-zinc-300">
+                    <li>50.000 tokens</li>
+                    <li>1 agente</li>
+                    <li>1 API</li>
+                    <li>1 WhatsApp</li>
+                  </ul>
+
+                  <button className="w-full mt-6 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white py-2 font-semibold transition">
+                    Começar agora
+                  </button>
+                </div>
+
+                {/* PRO (DESTAQUE) */}
+                <div className="relative rounded-2xl border border-blue-500/40 bg-zinc-900/60 p-6 text-left shadow-lg shadow-blue-900/20 scale-[1.03]">
+
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs bg-blue-600 px-3 py-1 rounded-full text-white">
+                    MAIS USADO
+                  </span>
+
+                  <span className="text-xs text-zinc-400">Pro</span>
+
+                  <h3 className="text-white text-2xl font-bold mt-2">
+                    R$ 79,90
+                    <span className="text-sm text-zinc-400">/mês</span>
+                  </h3>
+
+                  <p className="text-zinc-400 text-sm mt-2">
+                    Melhor custo benefício
+                  </p>
+
+                  <ul className="mt-4 space-y-2 text-sm text-zinc-300">
+                    <li>200.000 tokens</li>
+                    <li>3 agentes</li>
+                    <li>5 APIs</li>
+                    <li>1 WhatsApp</li>
+                  </ul>
+
+                  <button className="w-full mt-6 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-2 font-semibold hover:opacity-90 transition">
+                    Começar agora →
+                  </button>
+                </div>
+
+                {/* BUSINESS */}
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 text-left">
+                  <span className="text-xs text-zinc-400">Business</span>
+
+                  <h3 className="text-white text-2xl font-bold mt-2">
+                    R$ 149,90
+                    <span className="text-sm text-zinc-400">/mês</span>
+                  </h3>
+
+                  <p className="text-zinc-400 text-sm mt-2">
+                    Para operação estruturada
+                  </p>
+
+                  <ul className="mt-4 space-y-2 text-sm text-zinc-300">
+                    <li>500.000 tokens</li>
+                    <li>10 agentes</li>
+                    <li>20 APIs</li>
+                    <li>3 WhatsApp</li>
+                  </ul>
+
+                  <button className="w-full mt-6 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white py-2 font-semibold transition">
+                    Começar agora
+                  </button>
+                </div>
+
+                {/* SCALE */}
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 text-left">
+                  <span className="text-xs text-zinc-400">Scale</span>
+
+                  <h3 className="text-white text-2xl font-bold mt-2">
+                    R$ 299,90
+                    <span className="text-sm text-zinc-400">/mês</span>
+                  </h3>
+
+                  <p className="text-zinc-400 text-sm mt-2">
+                    Para alto volume
+                  </p>
+
+                  <ul className="mt-4 space-y-2 text-sm text-zinc-300">
+                    <li>1.500.000 tokens</li>
+                    <li>30 agentes</li>
+                    <li>50 APIs</li>
+                    <li>10 WhatsApp</li>
+                  </ul>
+
+                  <button className="w-full mt-6 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white py-2 font-semibold transition">
+                    Começar agora
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          </section>
           <p className="text-slate-400">Soluções adaptadas para diferentes nichos de mercado.</p>
         </div>
 
@@ -307,6 +429,8 @@ export function NichesSection() {
         </div>
       </div>
     </section>
+
+    
   );
 }
 
