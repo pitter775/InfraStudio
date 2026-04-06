@@ -311,7 +311,7 @@ export default function AdminProjetosPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
-                    <p className="mt-1 text-2xl font-black leading-none text-slate-100">{item.value}</p>
+                    <p className="mt-1 text-2xl font-bold leading-none text-slate-100">{item.value}</p>
                   </div>
                 </div>
               </div>
@@ -430,7 +430,7 @@ export default function AdminProjetosPage() {
                             <div className="flex items-center justify-between gap-2">
                               <div className="min-w-0">
                                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{item.label}</p>
-                                <p className="mt-1 text-2xl font-black leading-none text-slate-100">{item.value}</p>
+                                <p className="mt-1 text-2xl font-bold leading-none text-slate-100">{item.value}</p>
                                 <p className="mt-1 text-[11px] leading-relaxed text-slate-400">{item.description}</p>
                               </div>
                               <Icon size={18} className={`${item.tone} shrink-0`} />

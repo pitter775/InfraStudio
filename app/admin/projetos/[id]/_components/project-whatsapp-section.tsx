@@ -297,7 +297,7 @@ export function ProjectWhatsAppSection({
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Canal principal</p>
-                      <h4 className="mt-3 text-3xl font-black text-white">{formatWhatsAppPhone(channel.numero)}</h4>
+                      <h4 className="mt-3 text-3xl font-bold text-white">{formatWhatsAppPhone(channel.numero)}</h4>
                       <p className="mt-2 text-sm text-slate-300">Agente: {agente?.nome ?? "agente ativo do projeto"}</p>
                       <p className="mt-2 max-w-xl text-xs text-slate-400">
                         Recomendado: use um numero so para a IA e deixe seu WhatsApp pessoal para o atendimento humano.
@@ -384,7 +384,7 @@ export function ProjectWhatsAppSection({
             <div className="xl:col-span-2">
               <div className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),rgba(6,78,59,0.08)_35%,rgba(2,6,23,0.88)_75%)] px-6 py-7">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Primeiro passo</p>
-                <h4 className="mt-3 max-w-3xl text-3xl font-black text-white">Crie o numero que vai atender no WhatsApp</h4>
+                <h4 className="mt-3 max-w-3xl text-3xl font-bold text-white">Crie o numero que vai atender no WhatsApp</h4>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
                   Assim que o canal for criado, esta area passa a mostrar o QR bem grande para escanear ou o estado de conexao.
                 </p>

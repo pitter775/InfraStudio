@@ -348,19 +348,19 @@ export default function AdminChatLogsPage() {
         <div className="mt-5 grid gap-3 md:grid-cols-4">
           <div className="rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-3">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Logs carregados</p>
-            <p className="mt-2 text-2xl font-black text-white">{summary.total}</p>
+            <p className="mt-2 text-2xl font-bold text-white">{summary.total}</p>
           </div>
           <div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/10 px-4 py-3">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-100/80">Worker WhatsApp</p>
-            <p className="mt-2 text-2xl font-black text-cyan-50">{summary.whatsapp}</p>
+            <p className="mt-2 text-2xl font-bold text-cyan-50">{summary.whatsapp}</p>
           </div>
           <div className="rounded-2xl border border-amber-400/15 bg-amber-500/10 px-4 py-3">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-100/80">Bootstrap</p>
-            <p className="mt-2 text-2xl font-black text-amber-50">{summary.bootstrap}</p>
+            <p className="mt-2 text-2xl font-bold text-amber-50">{summary.bootstrap}</p>
           </div>
           <div className="rounded-2xl border border-rose-400/15 bg-rose-500/10 px-4 py-3">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-rose-100/80">Erros</p>
-            <p className="mt-2 text-2xl font-black text-rose-50">{summary.errors}</p>
+            <p className="mt-2 text-2xl font-bold text-rose-50">{summary.errors}</p>
           </div>
         </div>
         <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr),auto,auto]">

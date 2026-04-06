@@ -1509,7 +1509,7 @@ export default function AdminAtendimentoPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
-                        <p className="mt-1.5 text-lg font-black text-white sm:text-xl">{item.value}</p>
+                        <p className="mt-1.5 text-lg font-bold text-white sm:text-xl">{item.value}</p>
                         <p className="mt-1 text-[11px] text-slate-400">{item.detail}</p>
                       </div>
                       <Icon size={16} className={item.tone} />

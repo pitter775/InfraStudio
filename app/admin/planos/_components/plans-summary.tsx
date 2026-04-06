@@ -24,7 +24,7 @@ export function PlansSummary({ items }: PlansSummaryProps) {
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
-              <p className="mt-1 truncate text-2xl font-black text-white">{item.value}</p>
+              <p className="mt-1 truncate text-2xl font-bold text-white">{item.value}</p>
             </div>
           </div>
         );
