@@ -136,6 +136,7 @@ export default function AdrianaPageClient() {
   const [summary, setSummary] = useState<ProcessSummary | null>(null);
   const [processing, setProcessing] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "error" | "success"; message: string } | null>(null);
+  const [dragActive, setDragActive] = useState(false);
 
   const xmlCount = useMemo(
     () => selectedFiles.filter((file) => file.name.toLowerCase().endsWith(".xml")).length,
@@ -160,11 +161,14 @@ export default function AdrianaPageClient() {
     };
   }, [summary]);
 
-  const handleFilesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? []);
+  const applySelectedFiles = (files: File[]) => {
     setSelectedFiles(files);
     setSummary(null);
     setFeedback(null);
+  };
+
+  const handleFilesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    applySelectedFiles(Array.from(event.target.files ?? []));
   };
 
   const resetProcess = () => {
@@ -196,6 +200,12 @@ export default function AdrianaPageClient() {
     document.body.appendChild(link);
     link.click();
     link.remove();
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    setDragActive(false);
+    applySelectedFiles(Array.from(event.dataTransfer.files ?? []));
   };
 
   const handleProcess = async () => {
@@ -280,25 +290,7 @@ export default function AdrianaPageClient() {
   };
 
   return (
-    <main className="relative space-y-8 overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <motion.div
-          className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-fuchsia-500/18 blur-3xl"
-          animate={{ x: [0, 26, 0], y: [0, -18, 0], scale: [1, 1.08, 1] }}
-          transition={{ duration: 8, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute right-0 top-36 h-96 w-96 rounded-full bg-cyan-500/14 blur-3xl"
-          animate={{ x: [0, -30, 0], y: [0, 18, 0], scale: [1, 0.95, 1.04] }}
-          transition={{ duration: 10, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-emerald-500/10 blur-3xl"
-          animate={{ x: [0, 20, 0], y: [0, -24, 0] }}
-          transition={{ duration: 9, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
-        />
-      </div>
-
+    <main className="space-y-8">
       <AdminPageHeader
         eyebrow="Modulo Adriana"
         eyebrowIcon={<Sparkles size={14} />}
@@ -324,7 +316,7 @@ export default function AdrianaPageClient() {
               transition={{ duration: 0.24 }}
               className={`rounded-3xl border px-5 py-4 ${
                 active
-                  ? "border-fuchsia-300/45 bg-[radial-gradient(circle_at_top,rgba(244,114,182,0.24),rgba(217,70,239,0.10)_42%,rgba(15,23,42,0.88)_100%)] text-white shadow-[0_0_0_1px_rgba(244,114,182,0.12),0_0_42px_rgba(217,70,239,0.18)]"
+                  ? "border-fuchsia-200/70 bg-[radial-gradient(circle_at_top,rgba(244,114,182,0.34),rgba(217,70,239,0.18)_42%,rgba(15,23,42,0.94)_100%)] text-white shadow-[0_0_0_1px_rgba(244,114,182,0.22),0_0_52px_rgba(217,70,239,0.28),inset_0_0_32px_rgba(244,114,182,0.12)]"
                   : completed
                     ? "border-emerald-300/25 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.22),rgba(16,185,129,0.08)_40%,rgba(15,23,42,0.88)_100%)] text-emerald-100 shadow-[0_0_30px_rgba(16,185,129,0.10)]"
                     : "border-white/10 bg-white/5 text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
@@ -338,17 +330,24 @@ export default function AdrianaPageClient() {
                 <motion.div
                   className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${
                     active
-                      ? "border-fuchsia-300/40 bg-fuchsia-400/15"
+                      ? "border-fuchsia-100/70 bg-fuchsia-300/25 text-white shadow-[0_0_24px_rgba(217,70,239,0.30)]"
                       : completed
                         ? "border-emerald-300/30 bg-emerald-400/15"
                         : "border-white/10 bg-white/5"
                   }`}
-                  animate={active ? { scale: [1, 1.08, 1], rotate: [0, 4, -4, 0] } : undefined}
-                  transition={{ duration: 2.6, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
+                  animate={active ? { scale: [1, 1.08, 1], rotate: [0, 3, -3, 0] } : undefined}
+                  transition={{ duration: 2.4, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
                 >
                   <span className="text-sm font-bold">{step.id}</span>
                 </motion.div>
               </div>
+              {active ? (
+                <motion.div
+                  className="mt-4 h-1.5 rounded-full bg-gradient-to-r from-fuchsia-200 via-white to-fuchsia-300"
+                  animate={{ opacity: [0.6, 1, 0.6], scaleX: [0.96, 1, 0.96] }}
+                  transition={{ duration: 1.8, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
+                />
+              ) : null}
             </motion.div>
           );
         })}
@@ -393,11 +392,7 @@ export default function AdrianaPageClient() {
                 Selecione os XMLs e PDFs juntos. O sistema cruza pelo mesmo nome-base e gera o PDF renomeado.
               </p>
             </div>
-            <motion.div
-              className="mt-1 rounded-2xl border border-fuchsia-300/20 bg-fuchsia-400/10 p-3 text-fuchsia-200"
-              animate={{ y: [0, -5, 0], rotate: [0, 3, -3, 0] }}
-              transition={{ duration: 4, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
-            >
+            <motion.div className="mt-1 rounded-2xl border border-fuchsia-300/20 bg-fuchsia-400/10 p-3 text-fuchsia-200">
               <FolderUp size={22} />
             </motion.div>
           </div>
@@ -405,7 +400,27 @@ export default function AdrianaPageClient() {
           <motion.label
             whileHover={{ scale: 1.01, y: -3 }}
             whileTap={{ scale: 0.995 }}
-            className="relative mt-6 flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[30px] border border-dashed border-fuchsia-300/25 bg-slate-950/30 px-6 py-12 text-center transition hover:border-fuchsia-300/40 hover:bg-slate-950/40"
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragActive(true);
+            }}
+            onDragEnter={(event) => {
+              event.preventDefault();
+              setDragActive(true);
+            }}
+            onDragLeave={(event) => {
+              event.preventDefault();
+              const nextTarget = event.relatedTarget;
+              if (!nextTarget || !event.currentTarget.contains(nextTarget as Node)) {
+                setDragActive(false);
+              }
+            }}
+            onDrop={handleDrop}
+            className={`relative mt-6 flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[30px] border border-dashed px-6 py-12 text-center transition ${
+              dragActive
+                ? "border-fuchsia-200/60 bg-fuchsia-500/12"
+                : "border-fuchsia-300/25 bg-slate-950/30 hover:border-fuchsia-300/40 hover:bg-slate-950/40"
+            }`}
           >
             <motion.div
               className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-fuchsia-300/80 to-transparent"
@@ -427,8 +442,12 @@ export default function AdrianaPageClient() {
             >
               <FolderUp size={26} className="text-fuchsia-100" />
             </motion.div>
-            <p className="text-base font-semibold text-white">Selecionar XMLs e PDFs</p>
-            <p className="mt-2 text-sm text-slate-400">Arquivos locais, sem mexer em banco ou no worker.</p>
+            <p className="text-base font-semibold text-white">
+              {dragActive ? "Solte os arquivos aqui" : "Arraste e solte XMLs e PDFs aqui"}
+            </p>
+            <p className="mt-2 text-sm text-slate-400">
+              Ou clique para selecionar. Arquivos locais, sem mexer em banco ou no worker.
+            </p>
           </motion.label>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -479,11 +498,7 @@ export default function AdrianaPageClient() {
                   Replica o fluxo do PHP: valida o XML, encontra o PDF correspondente e gera o nome final.
                 </p>
               </div>
-              <motion.div
-                className="mt-1 rounded-2xl border border-cyan-300/20 bg-cyan-400/10 p-3 text-cyan-200"
-                animate={{ rotate: [0, 5, 0, -5, 0], y: [0, -4, 0] }}
-                transition={{ duration: 3.8, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
-              >
+              <motion.div className="mt-1 rounded-2xl border border-cyan-300/20 bg-cyan-400/10 p-3 text-cyan-200">
                 <FileCheck2 size={22} />
               </motion.div>
             </div>
@@ -551,11 +566,7 @@ export default function AdrianaPageClient() {
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Resultado</p>
                 <h2 className="mt-3 text-2xl font-semibold text-white">Resumo</h2>
               </div>
-              <motion.div
-                className="mt-1 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 text-amber-200"
-                animate={{ y: [0, -4, 0], rotate: [0, -4, 4, 0] }}
-                transition={{ duration: 4.2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
-              >
+              <motion.div className="mt-1 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 text-amber-200">
                 <FileWarning size={22} />
               </motion.div>
             </div>
@@ -619,11 +630,7 @@ export default function AdrianaPageClient() {
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-200">PDFs prontos</p>
                 <h2 className="mt-3 text-2xl font-semibold text-white">Arquivos renomeados</h2>
               </div>
-              <motion.div
-                className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 p-3 text-emerald-200"
-                animate={{ rotate: [0, 6, 0, -6, 0], y: [0, -3, 0] }}
-                transition={{ duration: 4, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
-              >
+              <motion.div className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 p-3 text-emerald-200">
                 <RotateCcw size={22} />
               </motion.div>
             </div>
