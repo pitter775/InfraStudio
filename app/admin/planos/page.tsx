@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { Coins, FolderKanban, ShieldAlert, Wallet } from "lucide-react";
+import { AdminPageHeader } from "@/app/admin/_components/admin-page-header";
 import { PlansList, type PlanListItem } from "./_components/plans-list";
 import { PlansSummary } from "./_components/plans-summary";
 import { ProjectUsageList, type ProjectUsageListItem } from "./_components/project-usage-list";
@@ -283,11 +284,11 @@ export default function AdminPlanosPage() {
 
   return (
     <main className="space-y-8">
-      <section className="px-1 py-2">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Planos e Consumo</p>
-        <h1 className="mt-3 text-4xl font-extrabold text-white">Gestao unificada</h1>
-        <p className="mt-3 max-w-3xl text-sm text-slate-400">Planos, consumo atual e status dos projetos em uma tela so.</p>
-      </section>
+      <AdminPageHeader
+        eyebrow="Planos e consumo"
+        title="Gestao unificada"
+        description="Planos, consumo atual e status dos projetos em uma tela so."
+      />
 
       {feedback ? (
         <section

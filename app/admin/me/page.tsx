@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LoaderCircle, Mail, Save, UserRound } from "lucide-react";
+import { AdminPageHeader } from "@/app/admin/_components/admin-page-header";
 import { getCurrentProjectUser } from "@/lib/auth";
 
 type ProfileState = {
@@ -69,9 +70,12 @@ export default function AdminMePage() {
 
   return (
     <main className="space-y-6">
-      <section className="px-1 py-2">
-        <h1 className="text-4xl font-extrabold text-white">Meu Perfil</h1>
-      </section>
+      <AdminPageHeader
+        eyebrow="Conta"
+        eyebrowIcon={<UserRound size={14} />}
+        title="Meu perfil"
+        description="Atualize seus dados de acesso sem sair do painel."
+      />
 
       {feedback ? <section className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</section> : null}
 

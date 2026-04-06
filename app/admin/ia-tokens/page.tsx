@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bot, CalendarRange, Coins, MessageSquare, Sparkles, Waypoints } from "lucide-react";
+import { AdminPageHeader } from "@/app/admin/_components/admin-page-header";
 import type { IaUsageSummary } from "@/lib/ia-usage-types";
 
 function formatInteger(value: number) {
@@ -109,25 +110,18 @@ export default function AdminIaTokensPage() {
 
   return (
     <main className="space-y-6">
-      <section className="px-1 py-2">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-blue-300">
-          <Sparkles size={14} />
-          IA Tokens
-        </div>
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <h1 className="text-4xl font-extrabold text-white">Consumo de IA da plataforma</h1>
-            <p className="mt-4 max-w-3xl text-slate-400">
-              Acompanhe o volume de tokens processados no chat, compare meses e filtre o intervalo que quiser.
-            </p>
-          </div>
-
+      <AdminPageHeader
+        eyebrow="IA tokens"
+        eyebrowIcon={<Sparkles size={14} />}
+        title="Consumo de IA da plataforma"
+        description="Acompanhe o volume de tokens processados no chat, compare meses e filtre o intervalo que quiser."
+        actions={(
           <div className="rounded-2xl border border-orange-400/20 bg-orange-500/10 px-5 py-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-200">Periodo ativo</p>
             <p className="mt-2 text-2xl font-extrabold text-white">{summary?.periodLabel ?? "Carregando..."}</p>
           </div>
-        </div>
-      </section>
+        )}
+      />
 
       <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
         <div className="flex items-center gap-3">

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BriefcaseBusiness, Cable, LoaderCircle, Lock, MessageSquareText, Plus, Shield, Bot, X } from "lucide-react";
+import { AdminPageHeader } from "@/app/admin/_components/admin-page-header";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -249,12 +250,18 @@ export default function AdminProjetosPage() {
 
   return (
     <main className="space-y-6">
-      <section className="flex items-center justify-end">
-        <button type="button" onClick={() => setModalOpen(true)} className={`${primaryActionButtonClass} px-3 py-2.5 text-xs`}>
-          <Plus size={15} />
-          Criar projeto
-        </button>
-      </section>
+      <AdminPageHeader
+        eyebrow="Projetos"
+        eyebrowIcon={<BriefcaseBusiness size={14} />}
+        title="Meus projetos"
+        description="Escolha um projeto para continuar de onde voce parou."
+        actions={(
+          <button type="button" onClick={() => setModalOpen(true)} className={`${primaryActionButtonClass} px-3 py-2.5 text-xs`}>
+            <Plus size={15} />
+            Criar projeto
+          </button>
+        )}
+      />
 
       {feedback ? <section className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</section> : null}
 
@@ -314,10 +321,6 @@ export default function AdminProjetosPage() {
       ) : null}
 
       <section className="overflow-hidden rounded-2xl">
-        <div className="px-1 py-2">
-          <h2 className="hidden text-xl font-bold text-slate-50 sm:block">Meus projetos</h2>
-          <p className="mt-2 hidden text-sm text-slate-400 sm:block">Escolha um projeto para continuar de onde voce parou.</p>
-        </div>
         <div className="px-1 py-4">
           {loading ? <CenterLoader /> : null}
           {!loading && !projetos.length ? <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/30 p-5 text-sm text-slate-400">Nenhum projeto vinculado ainda.</div> : null}

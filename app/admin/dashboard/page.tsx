@@ -579,16 +579,16 @@ export default function AdminDashboardPage() {
   return (
     <main className="space-y-5">
       <section className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-        <div className="px-2 py-2">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-200">
+        <div className="px-1 py-2">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200">
             <Activity size={13} />
             {scope === "global" ? "Dashboard" : "Meu dashboard"}
           </div>
-          <div className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] ${statusTone}`}>
+          <div className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${statusTone}`}>
             <GlobalStatusIcon size={13} />
             {globalStatus.label}
           </div>
-          <h1 className="text-[2rem] font-semibold tracking-[-0.04em] text-white sm:text-[2.15rem]">
+          <h1 className="text-[1.7rem] font-semibold tracking-[-0.04em] text-slate-100 sm:text-[1.9rem]">
             {scope === "global" ? "Visão geral da operação" : `Visão geral de ${userName}`}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">

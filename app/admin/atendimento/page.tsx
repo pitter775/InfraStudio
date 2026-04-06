@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, BriefcaseBusiness, ChevronDown, ChevronUp, Clock3, ExternalLink, LoaderCircle, MessageCircleMore, MoreHorizontal, Paperclip, PhoneCall, SendHorizonal, SmilePlus, Sparkles, SplitSquareVertical, Trash2, X } from "lucide-react";
+import { AdminPageHeader } from "@/app/admin/_components/admin-page-header";
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
@@ -1340,14 +1341,12 @@ export default function AdminAtendimentoPage() {
   if (!activeProjectId && availableProjects.length !== 1) {
     return (
       <main className="space-y-5">
-        <section className="px-1 py-2">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">
-            <MessageCircleMore size={14} />
-            Atendimento
-          </div>
-          <h1 className="text-2xl font-extrabold text-slate-50 sm:text-3xl">Selecione um projeto para abrir as conversas</h1>
-          <p className="mt-3 max-w-3xl text-sm text-slate-400 sm:text-base">A inbox unificada usa o projeto ativo para juntar chat do site e WhatsApp no mesmo lugar.</p>
-        </section>
+        <AdminPageHeader
+          eyebrow="Atendimento"
+          eyebrowIcon={<MessageCircleMore size={14} />}
+          title="Selecione um projeto para abrir as conversas"
+          description="A inbox unificada usa o projeto ativo para juntar chat do site e WhatsApp no mesmo lugar."
+        />
 
         {feedback ? <section className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{feedback}</section> : null}
 
@@ -1390,15 +1389,34 @@ export default function AdminAtendimentoPage() {
   return (
     <>
     <main className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-y-contain xl:overflow-hidden">
-      <section className={`px-1 pt-1 ${mobileConversationOpen ? "hidden xl:block" : ""}`}>
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">
-          <MessageCircleMore size={14} />
-          Atendimento
-        </div>
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-xl font-extrabold text-slate-50 sm:text-2xl">Conversas</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400 sm:text-sm">
+      <div className={mobileConversationOpen ? "hidden xl:block" : ""}>
+        <AdminPageHeader
+          eyebrow="Atendimento"
+          eyebrowIcon={<MessageCircleMore size={14} />}
+          title="Conversas"
+          actions={(
+            availableProjects.length <= 1 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    window.localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
+                  }
+                  setActiveProjectId(null);
+                  setChats([]);
+                  setSelectedChatId(null);
+                  setMessagesByChatId({});
+                  void loadProjects();
+                }}
+                className={`${compactButtonClass} border-white/10 bg-white/5 text-slate-100 hover:border-white/20 hover:bg-white/10`}
+              >
+                <BriefcaseBusiness size={15} />
+                Trocar projeto
+              </button>
+            ) : null
+          )}
+        >
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400 sm:text-sm">
               <span>Projeto ativo:</span>
               {availableProjects.length > 1 ? (
                 <label className="relative inline-flex min-w-[220px] items-center">
@@ -1426,31 +1444,9 @@ export default function AdminAtendimentoPage() {
               ) : (
                 <span className="font-semibold text-white">{resolvedProjectName}</span>
               )}
-            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {availableProjects.length <= 1 ? (
-              <button
-                type="button"
-                onClick={() => {
-                  if (typeof window !== "undefined") {
-                    window.localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
-                  }
-                  setActiveProjectId(null);
-                  setChats([]);
-                  setSelectedChatId(null);
-                  setMessagesByChatId({});
-                  void loadProjects();
-                }}
-                className={`${compactButtonClass} border-white/10 bg-white/5 text-slate-100 hover:border-white/20 hover:bg-white/10`}
-              >
-                <BriefcaseBusiness size={15} />
-                Trocar projeto
-              </button>
-            ) : null}
-          </div>
-        </div>
-      </section>
+        </AdminPageHeader>
+      </div>
 
       {feedback ? <section className={`rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100 ${mobileConversationOpen ? "hidden xl:block" : ""}`}>{feedback}</section> : null}
 

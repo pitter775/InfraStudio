@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AdminPageHeader } from "@/app/admin/_components/admin-page-header";
 import { getCurrentProjectUser } from "@/lib/auth";
 import { canAccessGlobalAdmin } from "@/lib/access";
 
@@ -310,36 +311,35 @@ export default function AdminChatLogsPage() {
   return (
     <main className="space-y-5">
       <section className="rounded-[24px] border border-white/10 bg-white/[0.05] px-5 py-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Observabilidade</p>
-            <h1 className="mt-2 text-[2rem] font-extrabold text-white">Logs</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-              Laboratorio de observacao para acompanhar runtime, bootstrap e reconexao do worker do WhatsApp sem depender apenas do card do canal.
-            </p>
-            <p className="mt-2 text-xs text-slate-500">
-              A tela agora carrega tudo o que foi persistido e so aplica os filtros visiveis acima.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => void loadLogs({ silent: true })}
-              disabled={loading || refreshing}
-              className="inline-flex items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-50 transition-colors hover:bg-cyan-500/16 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {refreshing ? "Atualizando..." : "Atualizar logs"}
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleClearLogs()}
-              disabled={loading || clearing}
-              className="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-50 transition-colors hover:bg-rose-500/16 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {clearing ? "Removendo logs..." : "Remover todos os logs"}
-            </button>
-          </div>
-        </div>
+        <AdminPageHeader
+          eyebrow="Observabilidade"
+          title="Logs"
+          description="Laboratorio de observacao para acompanhar runtime, bootstrap e reconexao do worker do WhatsApp sem depender apenas do card do canal."
+          actions={(
+            <>
+              <button
+                type="button"
+                onClick={() => void loadLogs({ silent: true })}
+                disabled={loading || refreshing}
+                className="inline-flex items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-50 transition-colors hover:bg-cyan-500/16 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {refreshing ? "Atualizando..." : "Atualizar logs"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleClearLogs()}
+                disabled={loading || clearing}
+                className="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-50 transition-colors hover:bg-rose-500/16 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {clearing ? "Removendo logs..." : "Remover todos os logs"}
+              </button>
+            </>
+          )}
+        >
+          <p className="mt-2 text-xs text-slate-500">
+            A tela agora carrega tudo o que foi persistido e so aplica os filtros visiveis acima.
+          </p>
+        </AdminPageHeader>
         {feedback ? (
           <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${feedback.includes("removidos") ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-100" : "border-rose-500/20 bg-rose-500/10 text-rose-100"}`}>
             {feedback}

@@ -7555,13 +7555,13 @@ export default function AdminProjetoDetalhePage() {
           <div className="space-y-3">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 space-y-3">
-                <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-amber-100/90">
+                <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200">
                   <Sparkles size={13} />
                   Projeto
                 </div>
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-3">
-                    <h1 className="text-[2rem] font-semibold tracking-[-0.04em] text-slate-100/88 sm:text-[2.1rem]">{data.projeto.nome}</h1>
+                    <h1 className="text-[1.7rem] font-semibold tracking-[-0.04em] text-slate-100 sm:text-[1.9rem]">{data.projeto.nome}</h1>
                     <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/15 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/90">
                       <CheckCircle2 size={12} />
                       {data.projeto.status ?? "ativo"}
