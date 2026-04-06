@@ -535,7 +535,7 @@ export default function AdminDashboardPage() {
             <GlobalStatusIcon size={13} />
             {globalStatus.label}
           </div>
-          <h1 className="text-[2rem] font-extrabold tracking-tight text-white">
+          <h1 className="text-[2rem] font-semibold tracking-[-0.04em] text-white sm:text-[2.15rem]">
             {scope === "global" ? "Visão geral da operação" : `Visão geral de ${userName}`}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">

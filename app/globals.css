@@ -30,7 +30,9 @@
   h5,
   h6 {
     letter-spacing: -0.03em;
-    font-weight: 600;
+    font-weight: 500;
+    line-height: 1.08;
+    text-wrap: balance;
   }
 
   * {

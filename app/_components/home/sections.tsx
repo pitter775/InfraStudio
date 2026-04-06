@@ -81,7 +81,7 @@ export function HeroSection({ onOpenChat }: { onOpenChat: () => void }) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="mb-8 text-4xl font-extrabold leading-[1.1] tracking-tight text-white md:text-7xl"
+            className="mb-8 text-4xl font-medium leading-[1.02] tracking-[-0.045em] text-white md:text-7xl md:font-semibold"
         >
           Crie um atendente com IA <br className="hidden md:block" /> e coloque ele{" "}
           <span className="text-gradient">onde quiser</span>
