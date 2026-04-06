@@ -2,6 +2,7 @@
 
 @theme {
   --font-sans: var(--font-sans-app), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display-app), var(--font-sans-app), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-mono-app), ui-monospace, SFMono-Regular, monospace;
 
   --color-brand-blue: #3b82f6;
@@ -20,6 +21,7 @@
     @apply bg-brand-dark text-slate-200 antialiased;
     text-rendering: optimizeLegibility;
     font-feature-settings: "cv02" 1, "cv03" 1, "cv04" 1, "cv11" 1;
+    font-weight: 400;
   }
 
   h1,
@@ -28,8 +30,9 @@
   h4,
   h5,
   h6 {
+    font-family: var(--font-display);
     letter-spacing: -0.02em;
-    font-weight: 600;
+    font-weight: 700;
   }
 
   * {
