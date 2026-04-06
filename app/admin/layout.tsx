@@ -11,6 +11,7 @@ import {
   Coins,
   ChevronLeft,
   ChevronRight,
+  FileStack,
   LayoutDashboard,
   LoaderCircle,
   LogOut,
@@ -38,11 +39,16 @@ const adminLinks = [
   { href: "/admin/atendimento", label: "Atendimento", icon: MessageCircleMore, tone: "atendimento" },
   { projectTab: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { projectTab: "mercado", label: "Mercado Livre", icon: Store },
+  { href: "/admin/adriana", label: "Adriana", icon: FileStack, tone: "adriana" },
   { href: "/admin/planos", label: "Planos", icon: Coins },
   { href: "/admin/me", label: "Meu Perfil", icon: Settings },
   { href: "/admin/laboratorio", label: "Laboratorio", icon: ActivitySquare },
   { href: "/admin/usuarios", label: "Usuários", icon: Users },
 ] as const;
+
+function canAccessAdrianaModule(user: AppUser | null) {
+  return user?.email?.trim().toLowerCase() === "dry@infrastudio";
+}
 
 function isAdminLinkActive(pathname: string, currentProjectTab: string | null, item: (typeof adminLinks)[number]) {
   if ("projectTab" in item) {
@@ -72,6 +78,10 @@ function getSidebarLinkTone(item: (typeof adminLinks)[number], active: boolean) 
       return "border border-transparent bg-transparent text-cyan-200 hover:border-cyan-300/20 hover:bg-transparent hover:text-white hover:shadow-[0_0_0_1px_rgba(103,232,249,0.10),0_0_22px_rgba(34,211,238,0.14)]";
     }
 
+    if (tone === "adriana") {
+      return "border border-transparent bg-transparent text-fuchsia-200 hover:border-fuchsia-300/20 hover:bg-transparent hover:text-white hover:shadow-[0_0_0_1px_rgba(244,114,182,0.10),0_0_22px_rgba(217,70,239,0.14)]";
+    }
+
     return "text-slate-300 hover:bg-white/[0.04] hover:text-white";
   }
 
@@ -85,6 +95,10 @@ function getSidebarLinkTone(item: (typeof adminLinks)[number], active: boolean) 
 
   if (tone === "atendimento") {
     return "border border-cyan-300/40 bg-cyan-400/18 text-white shadow-[0_0_0_1px_rgba(103,232,249,0.18),0_0_30px_rgba(34,211,238,0.30),0_18px_46px_rgba(14,165,233,0.24)]";
+  }
+
+  if (tone === "adriana") {
+    return "border border-fuchsia-300/40 bg-fuchsia-400/18 text-white shadow-[0_0_0_1px_rgba(244,114,182,0.18),0_0_28px_rgba(217,70,239,0.26),0_18px_46px_rgba(192,38,211,0.22)]";
   }
 
   return "infra-premium-pill text-white shadow-[0_0_0_1px_rgba(96,165,250,0.18),0_0_24px_rgba(37,99,235,0.22),0_18px_46px_rgba(37,99,235,0.22)]";
@@ -160,15 +174,16 @@ function Sidebar({
 }: SidebarProps) {
   const [buildId, setBuildId] = useState("...");
   const [activeProjectName, setActiveProjectName] = useState<string | null>(null);
-  const visibleLinks = currentUser && !canAccessGlobalAdmin(currentUser)
+  const visibleLinks = (currentUser && !canAccessGlobalAdmin(currentUser)
     ? adminLinks.filter((item) => {
         return ("projectTab" in item)
           || item.href === "/admin/dashboard"
           || item.href === "/admin/projetos"
           || item.href === "/admin/atendimento"
-          || item.href === "/admin/me";
+          || item.href === "/admin/me"
+          || item.href === "/admin/adriana";
       })
-    : adminLinks;
+    : adminLinks).filter((item) => !("href" in item) || item.href !== "/admin/adriana" || canAccessAdrianaModule(currentUser));
 
   useEffect(() => {
     let active = true;
@@ -506,12 +521,14 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   }, [pathname, currentProjectTab]);
 
   useEffect(() => {
-    adminLinks.forEach((item) => {
-      if ("href" in item) {
-        router.prefetch(item.href);
+    adminLinks
+      .filter((item) => !("href" in item) || item.href !== "/admin/adriana" || canAccessAdrianaModule(currentUser))
+      .forEach((item) => {
+        if ("href" in item) {
+          router.prefetch(item.href);
       }
-    });
-  }, [router]);
+      });
+  }, [currentUser, router]);
 
   useEffect(() => {
     persistSidebarCollapsedCookie(collapsed);
@@ -773,4 +790,3 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     </Suspense>
   );
 }
-
