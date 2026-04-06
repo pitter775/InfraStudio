@@ -614,9 +614,10 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
   };
 
   const initialMessages: ChatWidgetMessage[] = [
-    { id: "intro-1", text: "Olá! Sou o atendimento inicial da InfraStudio.", isAi: true },
-    { id: "intro-2", text: "Me conte rapidamente o que você quer automatizar.", isAi: true },
-    { id: "intro-3", text: "Se preferir, eu já te levo direto para o WhatsApp.", isAi: true },
+    { id: "intro-1", text: "Bem-vindo 👋", isAi: true },
+    { id: "intro-2", text: "Você já está testando a InfraStudio agora.", isAi: true },
+    { id: "intro-3", text: "Tudo que você digitar aqui é exatamente como seu cliente seria atendido.", isAi: true },
+    { id: "intro-3", text: "Manda uma dúvida ou simula um atendimento 🙂", isAi: true },
   ];
   const [messages, setMessages] = useState([...initialMessages]);
   const [draft, setDraft] = useState("");
@@ -636,7 +637,7 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
 
     return {
       id: `ai-cta-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      text: "Se preferir, eu te levo para o WhatsApp agora:",
+      text: "",
       isAi: true,
       cta,
     };
