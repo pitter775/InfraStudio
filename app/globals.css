@@ -20,7 +20,7 @@
     @apply bg-brand-dark text-slate-200 antialiased;
     text-rendering: optimizeLegibility;
     font-feature-settings: "cv02" 1, "cv03" 1, "cv04" 1, "cv11" 1;
-    font-weight: 300;
+    font-weight: 400;
   }
 
   h1,
