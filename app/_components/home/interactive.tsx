@@ -856,14 +856,14 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
         <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.04] px-5 py-4">
           <div className="flex-1">
             <div>
-              <p className="font-bold text-white">InfraStudio Chat</p>
+              <p className="font-bold text-white">Atendimento</p>
             </div>
             <button
               type="button"
               onClick={resetConversation}
               className="mt-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[10px] font-semibold text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
             >
-              Novo atendimento
+              Limpar
             </button>
           </div>
           <div className="ml-4 flex self-start">
