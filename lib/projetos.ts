@@ -445,7 +445,7 @@ export async function deleteProjeto(id: string): Promise<DeleteProjetoResult> {
   }
 
   const deletions = [
-    { label: "project billing subscriptions", execute: () => supabase.from("projetos_assinaturas").delete().eq("projeto_id", id) },
+    { label: "project legacy billing subscriptions", execute: () => supabase.from("projetos_assinaturas").delete().eq("projeto_id", id) },
     { label: "project billing cycles", execute: () => supabase.from("projetos_ciclos_uso").delete().eq("projeto_id", id) },
     { label: "project billing snapshot", execute: () => supabase.from("projetos_planos").delete().eq("projeto_id", id) },
     { label: "project legacy user limits", execute: () => supabase.from("usuarios_limites_ia").delete().eq("projeto_id", id) },

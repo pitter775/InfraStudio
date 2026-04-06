@@ -252,9 +252,9 @@ export async function deletePlano(id: string): Promise<DeletePlanoResult> {
   }
 
   const { count, error: usageError } = await supabase
-    .from("projetos_assinaturas")
+    .from("projetos_planos")
     .select("id", { count: "exact", head: true })
-    .eq("plano_id", id);
+    .eq("nome_plano", current.nome);
 
   if (usageError) {
     console.error("[planos] failed to verify plan usage", usageError);

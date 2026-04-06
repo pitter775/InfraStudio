@@ -4,7 +4,6 @@ import { getDefaultOpenAIModel, resolvePricingModel } from "@/lib/openai-pricing
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export type BillingMode = "plano" | "manual" | "ilimitado";
-export type ProjetoAssinaturaStatus = "ativo" | "cancelado" | "trial" | "suspenso";
 
 type ProjetoRow = {
   id: string;
@@ -57,19 +56,6 @@ type UsuarioLimiteIaRow = {
   bloqueado: boolean | null;
   bloqueado_motivo: string | null;
   observacoes: string | null;
-};
-
-type ProjetoAssinaturaJoinedRow = {
-  id: string;
-  projeto_id: string;
-  plano_id: string;
-  status: ProjetoAssinaturaStatus | null;
-  data_inicio: string | null;
-  data_fim: string | null;
-  renovar_automatico: boolean | null;
-  created_at: string | null;
-  updated_at: string | null;
-  planos: PlanoRow | PlanoRow[] | null;
 };
 
 type ProjetoCicloUsoRow = {
@@ -170,19 +156,6 @@ export type PlanoBillingRecord = {
   custoTokenExcedente: number;
 };
 
-export type ProjetoAssinaturaBilling = {
-  id: string;
-  projetoId: string;
-  planoId: string;
-  status: ProjetoAssinaturaStatus;
-  dataInicio: string | null;
-  dataFim: string | null;
-  renovarAutomatico: boolean;
-  createdAt: string | null;
-  updatedAt: string | null;
-  plano: PlanoBillingRecord | null;
-};
-
 export type ProjetoCicloUso = {
   id: string;
   projetoId: string;
@@ -207,7 +180,6 @@ export type BillingProjectPlan = {
   projetoNome: string;
   modoCobranca: BillingMode;
   plano: ProjetoPlanoBilling;
-  assinaturaAtual: ProjetoAssinaturaBilling | null;
   cicloAtual: ProjetoCicloUso | null;
   consumoAtual: BillingUsageTotals & { source: "ciclo" | "consumos" };
 };
@@ -248,7 +220,6 @@ export type ProjetoBillingOverview = {
   window: BillingWindow;
   modoCobranca: BillingMode;
   plano: ProjetoPlanoBilling;
-  assinaturaAtual: ProjetoAssinaturaBilling | null;
   cicloAtual: ProjetoCicloUso | null;
   consumoAtual: BillingUsageTotals & { source: "ciclo" | "consumos" };
 };
@@ -319,31 +290,6 @@ function mapPlano(row: PlanoRow): PlanoBillingRecord {
     ativo: row.ativo !== false,
     permitirExcedente: row.permitir_excedente === true,
     custoTokenExcedente: Number(row.custo_token_excedente ?? 0),
-  };
-}
-
-function normalizeJoinedPlano(value: PlanoRow | PlanoRow[] | null | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  return Array.isArray(value) ? value[0] ?? null : value;
-}
-
-function mapAssinatura(row: ProjetoAssinaturaJoinedRow): ProjetoAssinaturaBilling {
-  const plano = normalizeJoinedPlano(row.planos);
-
-  return {
-    id: row.id,
-    projetoId: row.projeto_id,
-    planoId: row.plano_id,
-    status: row.status ?? "ativo",
-    dataInicio: row.data_inicio,
-    dataFim: row.data_fim,
-    renovarAutomatico: row.renovar_automatico !== false,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    plano: plano ? mapPlano(plano) : null,
   };
 }
 
@@ -687,7 +633,6 @@ async function listProjetosBillingBase(projetoIds?: string[]) {
     return {
       projetos: [] as ProjetoRow[],
       snapshots: new Map<string, ProjetoPlanoBilling>(),
-      assinaturas: new Map<string, ProjetoAssinaturaBilling>(),
       ciclos: new Map<string, ProjetoCicloUso>(),
       fallbackUsage: new Map<string, BillingUsageTotals>(),
     };
@@ -698,7 +643,6 @@ async function listProjetosBillingBase(projetoIds?: string[]) {
     return {
       projetos,
       snapshots: new Map<string, ProjetoPlanoBilling>(),
-      assinaturas: new Map<string, ProjetoAssinaturaBilling>(),
       ciclos: new Map<string, ProjetoCicloUso>(),
       fallbackUsage: new Map<string, BillingUsageTotals>(),
     };
@@ -706,17 +650,11 @@ async function listProjetosBillingBase(projetoIds?: string[]) {
 
   const ids = projetos.map((item) => item.id);
   const window = buildCurrentMonthWindow();
-  const [snapshotsResponse, assinaturasResponse, ciclosResponse, consumosResponse] = await Promise.all([
+  const [snapshotsResponse, ciclosResponse, consumosResponse] = await Promise.all([
     supabase
       .from("projetos_planos")
       .select("id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes, permitir_excedente, custo_token_excedente")
       .in("projeto_id", ids),
-    supabase
-      .from("projetos_assinaturas")
-      .select("id, projeto_id, plano_id, status, data_inicio, data_fim, renovar_automatico, created_at, updated_at, planos(id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, permitir_excedente, custo_token_excedente)")
-      .in("projeto_id", ids)
-      .in("status", ["ativo", "trial"])
-      .order("created_at", { ascending: false }),
     supabase
       .from("projetos_ciclos_uso")
       .select("id, projeto_id, data_inicio, data_fim, tokens_input, tokens_output, custo_total, fechado, created_at, limite_tokens_total, custo_token_excedente, permitir_excedente, alerta_80, alerta_100, bloqueado, excedente_tokens, excedente_custo, plano_id")
@@ -734,13 +672,6 @@ async function listProjetosBillingBase(projetoIds?: string[]) {
   const snapshots = new Map<string, ProjetoPlanoBilling>();
   for (const row of (snapshotsResponse.data ?? []) as ProjetoPlanoRow[]) {
     snapshots.set(row.projeto_id, mapProjetoPlano(row));
-  }
-
-  const assinaturas = new Map<string, ProjetoAssinaturaBilling>();
-  for (const row of (assinaturasResponse.data ?? []) as ProjetoAssinaturaJoinedRow[]) {
-    if (!assinaturas.has(row.projeto_id)) {
-      assinaturas.set(row.projeto_id, mapAssinatura(row));
-    }
   }
 
   const ciclos = new Map<string, ProjetoCicloUso>();
@@ -765,7 +696,7 @@ async function listProjetosBillingBase(projetoIds?: string[]) {
     fallbackUsage.set(projetoId, current);
   }
 
-  return { projetos, snapshots, assinaturas, ciclos, fallbackUsage };
+  return { projetos, snapshots, ciclos, fallbackUsage };
 }
 
 export async function getProjetoPlanoBilling(projetoId: string) {
@@ -827,20 +758,41 @@ export async function updateProjetoPlanoBilling(input: {
   custoTokenExcedente?: number | string | null;
 }) {
   const supabase = getSupabaseAdminClient();
+  const current = await getProjetoPlanoBilling(input.projetoId);
   const payload = {
     projeto_id: input.projetoId,
-    nome_plano: input.nomePlano?.trim() || "padrao",
-    modelo_referencia: resolvePricingModel(input.modeloReferencia),
-    limite_tokens_input_mensal: normalizeNullableInteger(input.limiteTokensInputMensal),
-    limite_tokens_output_mensal: normalizeNullableInteger(input.limiteTokensOutputMensal),
-    limite_tokens_total_mensal: normalizeNullableInteger(input.limiteTokensTotalMensal),
-    limite_custo_mensal: normalizeNullableDecimal(input.limiteCustoMensal),
-    auto_bloquear: input.autoBloquear !== false,
-    bloqueado: input.bloqueado === true,
-    bloqueado_motivo: input.bloqueadoMotivo?.trim() || null,
-    observacoes: input.observacoes?.trim() || null,
-    permitir_excedente: input.permitirExcedente === true,
-    custo_token_excedente: normalizeNullableDecimal(input.custoTokenExcedente) ?? 0,
+    nome_plano: input.nomePlano === undefined ? current?.nomePlano ?? "padrao" : input.nomePlano?.trim() || "padrao",
+    modelo_referencia:
+      input.modeloReferencia === undefined
+        ? current?.modeloReferencia ?? getDefaultOpenAIModel()
+        : resolvePricingModel(input.modeloReferencia),
+    limite_tokens_input_mensal:
+      input.limiteTokensInputMensal === undefined
+        ? current?.limiteTokensInputMensal ?? null
+        : normalizeNullableInteger(input.limiteTokensInputMensal),
+    limite_tokens_output_mensal:
+      input.limiteTokensOutputMensal === undefined
+        ? current?.limiteTokensOutputMensal ?? null
+        : normalizeNullableInteger(input.limiteTokensOutputMensal),
+    limite_tokens_total_mensal:
+      input.limiteTokensTotalMensal === undefined
+        ? current?.limiteTokensTotalMensal ?? null
+        : normalizeNullableInteger(input.limiteTokensTotalMensal),
+    limite_custo_mensal:
+      input.limiteCustoMensal === undefined
+        ? current?.limiteCustoMensal ?? null
+        : normalizeNullableDecimal(input.limiteCustoMensal),
+    auto_bloquear: input.autoBloquear === undefined ? current?.autoBloquear !== false : input.autoBloquear !== false,
+    bloqueado: input.bloqueado === undefined ? current?.bloqueado === true : input.bloqueado === true,
+    bloqueado_motivo:
+      input.bloqueadoMotivo === undefined ? current?.bloqueadoMotivo ?? null : input.bloqueadoMotivo?.trim() || null,
+    observacoes: input.observacoes === undefined ? current?.observacoes ?? null : input.observacoes?.trim() || null,
+    permitir_excedente:
+      input.permitirExcedente === undefined ? current?.permitirExcedente === true : input.permitirExcedente === true,
+    custo_token_excedente:
+      input.custoTokenExcedente === undefined
+        ? current?.custoTokenExcedente ?? 0
+        : normalizeNullableDecimal(input.custoTokenExcedente) ?? 0,
     updated_at: new Date().toISOString(),
   };
 
@@ -873,25 +825,6 @@ export async function getUsuarioLimiteBilling(usuarioId: string, projetoId: stri
   }
 
   return data ? mapUsuarioLimite(data as UsuarioLimiteIaRow) : null;
-}
-
-export async function getAssinaturaAtivaProjeto(projetoId: string) {
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("projetos_assinaturas")
-      .select("id, projeto_id, plano_id, status, data_inicio, data_fim, renovar_automatico, created_at, updated_at, planos(id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, permitir_excedente, custo_token_excedente)")
-    .eq("projeto_id", projetoId)
-    .in("status", ["ativo", "trial"])
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    console.error("[billing] failed to load active subscription", error);
-    return null;
-  }
-
-  return data ? mapAssinatura(data as ProjetoAssinaturaJoinedRow) : null;
 }
 
 export async function getCicloAtual(projetoId: string) {
@@ -936,10 +869,7 @@ export async function createProjetoUsageCycle(input: {
     }
   }
 
-  const [snapshot, assinaturaAtual] = await Promise.all([
-    ensureProjetoPlanoBilling(input.projetoId),
-    getAssinaturaAtivaProjeto(input.projetoId),
-  ]);
+  const snapshot = await ensureProjetoPlanoBilling(input.projetoId);
 
   const { data, error } = await supabase
     .from("projetos_ciclos_uso")
@@ -959,7 +889,7 @@ export async function createProjetoUsageCycle(input: {
       bloqueado: false,
       excedente_tokens: 0,
       excedente_custo: 0,
-      plano_id: assinaturaAtual?.planoId ?? null,
+      plano_id: null,
       created_at: new Date().toISOString(),
     }) as never)
     .select("id, projeto_id, data_inicio, data_fim, tokens_input, tokens_output, custo_total, fechado, created_at, limite_tokens_total, custo_token_excedente, permitir_excedente, alerta_80, alerta_100, bloqueado, excedente_tokens, excedente_custo, plano_id")
@@ -1061,10 +991,9 @@ export async function getBillingUsageTotals(input: {
 }
 
 export async function getPlanoProjeto(projetoId: string): Promise<BillingProjectPlan | null> {
-  const [projeto, snapshot, assinaturaAtual, cicloAtual] = await Promise.all([
+  const [projeto, snapshot, cicloAtual] = await Promise.all([
     getProjetoRowById(projetoId),
     ensureProjetoPlanoBilling(projetoId),
-    getAssinaturaAtivaProjeto(projetoId),
     getCicloAtual(projetoId),
   ]);
 
@@ -1074,19 +1003,9 @@ export async function getPlanoProjeto(projetoId: string): Promise<BillingProject
 
   const fallbackConsumo = await getBillingUsageTotals({ projetoId });
   const modoCobranca = projeto.modo_cobranca ?? "plano";
-  const planoAssinado = assinaturaAtual?.plano;
 
   const plano: ProjetoPlanoBilling =
-    modoCobranca === "plano" && planoAssinado
-      ? {
-          ...snapshot,
-          nomePlano: planoAssinado.nome,
-          limiteTokensTotalMensal: planoAssinado.limiteTokensTotalMensal,
-          limiteCustoMensal: planoAssinado.limiteCustoMensal,
-          bloqueado: snapshot.bloqueado,
-          bloqueadoMotivo: snapshot.bloqueadoMotivo,
-        }
-      : modoCobranca === "ilimitado"
+    modoCobranca === "ilimitado"
         ? {
             ...snapshot,
             nomePlano: "Ilimitado",
@@ -1096,6 +1015,8 @@ export async function getPlanoProjeto(projetoId: string): Promise<BillingProject
             limiteCustoMensal: null,
             bloqueado: false,
             bloqueadoMotivo: null,
+            permitirExcedente: true,
+            custoTokenExcedente: 0,
           }
         : snapshot;
 
@@ -1104,7 +1025,6 @@ export async function getPlanoProjeto(projetoId: string): Promise<BillingProject
     projetoNome: projeto.nome?.trim() || "Projeto sem nome",
     modoCobranca,
     plano,
-    assinaturaAtual,
     cicloAtual,
     consumoAtual: cicloAtual
       ? { ...cicloAtual.totals, source: "ciclo" }
@@ -1150,7 +1070,6 @@ export async function getProjetoBillingOverview(projetoId: string, referenceDate
     window: buildCurrentMonthWindow(referenceDate),
     modoCobranca: current.modoCobranca,
     plano: current.plano,
-    assinaturaAtual: current.assinaturaAtual,
     cicloAtual: current.cicloAtual,
     consumoAtual: current.consumoAtual,
   } satisfies ProjetoBillingOverview;
@@ -1173,31 +1092,27 @@ export async function listBillingUsageByProject(projetoIds?: string[]) {
       bloqueado: false,
       bloqueadoMotivo: null,
       observacoes: null,
+      permitirExcedente: false,
+      custoTokenExcedente: 0,
     };
-    const assinaturaAtual = base.assinaturas.get(projeto.id) ?? null;
     const cicloAtual = base.ciclos.get(projeto.id) ?? null;
     const fallbackConsumo = base.fallbackUsage.get(projeto.id) ?? normalizeTotals();
     const modoCobranca = projeto.modo_cobranca ?? "plano";
     const plano: ProjetoPlanoBilling =
-      modoCobranca === "plano" && assinaturaAtual?.plano
+      modoCobranca === "ilimitado"
         ? {
             ...snapshot,
-            nomePlano: assinaturaAtual.plano.nome,
-            limiteTokensTotalMensal: assinaturaAtual.plano.limiteTokensTotalMensal,
-            limiteCustoMensal: assinaturaAtual.plano.limiteCustoMensal,
+            nomePlano: "Ilimitado",
+            limiteTokensInputMensal: null,
+            limiteTokensOutputMensal: null,
+            limiteTokensTotalMensal: null,
+            limiteCustoMensal: null,
+            bloqueado: false,
+            bloqueadoMotivo: null,
+            permitirExcedente: true,
+            custoTokenExcedente: 0,
           }
-        : modoCobranca === "ilimitado"
-          ? {
-              ...snapshot,
-              nomePlano: "Ilimitado",
-              limiteTokensInputMensal: null,
-              limiteTokensOutputMensal: null,
-              limiteTokensTotalMensal: null,
-              limiteCustoMensal: null,
-              bloqueado: false,
-              bloqueadoMotivo: null,
-            }
-          : snapshot;
+        : snapshot;
     const consumoAtual = cicloAtual
       ? { ...cicloAtual.totals, source: "ciclo" as const }
       : { ...fallbackConsumo, source: "consumos" as const };
@@ -1212,7 +1127,6 @@ export async function listBillingUsageByProject(projetoIds?: string[]) {
       projetoNome: projeto.nome?.trim() || "Projeto sem nome",
       modoCobranca,
       plano,
-      assinaturaAtual,
       cicloAtual,
       consumoAtual,
       percentualTokens: usageCalculation.percentualTokens,

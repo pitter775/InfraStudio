@@ -131,7 +131,10 @@ export async function getCurrentProjectUser() {
   }
 
   try {
-    const { payload } = await requestJson<{ user: AppUser | null }>("/api/auth/me", { method: "GET" });
+    const { payload } = await requestJson<{ user: AppUser | null }>("/api/auth/me", {
+      method: "GET",
+      cache: "no-store",
+    });
     return payload.user;
   } catch (error) {
     console.error("[auth] failed to load current user", error);

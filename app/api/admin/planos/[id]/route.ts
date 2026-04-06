@@ -81,7 +81,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     }
 
     if (result.reason === "in_use") {
-      return NextResponse.json({ error: "Nao e possivel excluir um plano vinculado a assinaturas." }, { status: 409 });
+      return NextResponse.json({ error: "Nao e possivel excluir um plano vinculado a projetos." }, { status: 409 });
     }
 
     return NextResponse.json({ error: "Nao foi possivel excluir o plano." }, { status: 500 });

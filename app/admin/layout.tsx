@@ -18,7 +18,6 @@ import {
   MessageCircle,
   MessageCircleMore,
   Globe,
-  Layers3,
   Settings,
   Store,
   UserRound,
@@ -41,10 +40,7 @@ const adminLinks = [
   { projectTab: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { projectTab: "mercado", label: "Mercado Livre", icon: Store },
   { href: "/admin/planos", label: "Planos", icon: Coins },
-  { href: "/admin/assinaturas", label: "Assinaturas", icon: Layers3 },
-  { href: "/admin/uso", label: "Uso por Projeto", icon: ActivitySquare },
   { href: "/admin/me", label: "Meu Perfil", icon: Settings },
-  { href: "/admin/usage", label: "Uso de Tokens", icon: Coins },
   { href: "/admin/laboratorio", label: "Laboratorio", icon: ActivitySquare },
   { href: "/admin/usuarios", label: "Usuários", icon: Users },
 ] as const;
@@ -208,10 +204,27 @@ function Sidebar({
 
     void loadBuildId();
 
+    const handleRefreshBuild = () => {
+      void loadBuildId();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void loadBuildId();
+      }
+    };
+
+    window.addEventListener("focus", handleRefreshBuild);
+    window.addEventListener("infrastudio:session-updated", handleRefreshBuild);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       active = false;
+      window.removeEventListener("focus", handleRefreshBuild);
+      window.removeEventListener("infrastudio:session-updated", handleRefreshBuild);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []);
+  }, [pathname, currentProjectTab]);
 
   useEffect(() => {
     let active = true;
@@ -459,8 +472,14 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   const isAtendimentoRoute = pathname.startsWith("/admin/atendimento");
 
   useEffect(() => {
+    let active = true;
+
     const loadUser = async () => {
       const user = await getCurrentProjectUser();
+      if (!active) {
+        return;
+      }
+
       if (!canAccessWorkspace(user)) {
         router.replace("/");
         return;
@@ -471,7 +490,28 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
     };
 
     void loadUser();
-  }, [router]);
+
+    const handleSessionUpdated = () => {
+      void loadUser();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void loadUser();
+      }
+    };
+
+    window.addEventListener("focus", handleSessionUpdated);
+    window.addEventListener("infrastudio:session-updated", handleSessionUpdated);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      active = false;
+      window.removeEventListener("focus", handleSessionUpdated);
+      window.removeEventListener("infrastudio:session-updated", handleSessionUpdated);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [router, pathname, currentProjectTab]);
 
   useEffect(() => {
     setMobileOpen(false);

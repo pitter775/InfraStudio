@@ -1,14 +1,17 @@
 "use client";
 
-import { ChevronRight, Coins, Eye, Plus, RefreshCw } from "lucide-react";
+import { ChevronRight, Coins } from "lucide-react";
 import { formatCurrency, formatNumber, getUsageProgressValue } from "./billing-helpers";
+import type { PlanListItem } from "./plans-list";
 
 export type ProjectUsageListItem = {
   projetoId: string;
   projetoNome: string;
+  modoCobranca: "plano" | "manual" | "ilimitado";
   plano: {
     nomePlano: string;
     limiteTokensTotalMensal: number | null;
+    limiteCustoMensal?: number | null;
     permitirExcedente?: boolean;
     bloqueado?: boolean;
   };
@@ -69,16 +72,19 @@ function resolveProjectStatus(item: ProjectUsageListItem) {
 
 type ProjectUsageListProps = {
   rows: ProjectUsageListItem[];
+  planos: PlanListItem[];
   loading: boolean;
+  updatingProjetoId: string | null;
+  onChangePlano: (projetoId: string, planoId: string) => void;
 };
 
-export function ProjectUsageList({ rows, loading }: ProjectUsageListProps) {
+export function ProjectUsageList({ rows, planos, loading, updatingProjetoId, onChangePlano }: ProjectUsageListProps) {
   return (
     <section className="space-y-4">
       <div className="flex items-end justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white">Projetos</h2>
-          <p className="mt-1 text-sm text-slate-400">Uso atual, status operacional e acoes rapidas.</p>
+          <p className="mt-1 text-sm text-slate-400">Nome, plano, uso, tokens, custo e status.</p>
         </div>
       </div>
 
@@ -93,9 +99,11 @@ export function ProjectUsageList({ rows, loading }: ProjectUsageListProps) {
               const progressValue = getUsageProgressValue(item.percentualUso);
               const tokenLimitLabel =
                 item.plano.limiteTokensTotalMensal === null ? "sem limite" : formatNumber(item.plano.limiteTokensTotalMensal);
+              const currentPlanId = planos.find((plano) => plano.nome === item.plano.nomePlano)?.id ?? "";
+              const canChangePlan = item.modoCobranca === "plano";
 
               return (
-                <article key={item.projetoId} className="grid gap-4 px-5 py-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(220px,0.9fr)_auto] lg:items-center">
+                <article key={item.projetoId} className="grid gap-4 px-5 py-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(220px,0.9fr)_minmax(180px,0.65fr)_auto] lg:items-center">
                   <div className="flex gap-4">
                     <div className={`mt-1 h-auto min-h-16 w-1.5 rounded-full ${status.tone}`} />
                     <div className="min-w-0 flex-1">
@@ -107,8 +115,9 @@ export function ProjectUsageList({ rows, loading }: ProjectUsageListProps) {
                       </div>
 
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-400">
-                        <span>Plano: {item.plano.nomePlano}</span>
-                        <span>{formatCurrency(item.consumoAtual.custoTotal)}</span>
+                        <span>Modo: {item.modoCobranca}</span>
+                        <span>Tokens: {formatNumber(item.consumoAtual.totalTokens)}</span>
+                        <span>Custo: {formatCurrency(item.consumoAtual.custoTotal)}</span>
                         {item.cicloAtual?.excedenteTokens ? <span>Excedente: {formatNumber(item.cicloAtual.excedenteTokens)}</span> : null}
                       </div>
 
@@ -129,30 +138,42 @@ export function ProjectUsageList({ rows, loading }: ProjectUsageListProps) {
                     </div>
                   </div>
 
-                  <div className="grid gap-2 text-sm text-slate-400 sm:grid-cols-2 lg:grid-cols-1">
+                  <div className="grid gap-2 text-sm text-slate-400">
+                    <div>
+                      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Plano</p>
+                      <select
+                        value={currentPlanId}
+                        onChange={(event) => onChangePlano(item.projetoId, event.target.value)}
+                        disabled={!canChangePlan || updatingProjetoId === item.projetoId}
+                        className="w-full rounded-2xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <option value="">{canChangePlan ? item.plano.nomePlano : `${item.plano.nomePlano} (${item.modoCobranca})`}</option>
+                        {planos
+                          .filter((plano) => plano.ativo)
+                          .map((plano) => (
+                            <option key={plano.id} value={plano.id}>
+                              {plano.nome}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2 text-sm text-slate-400">
                     <div className="flex items-center gap-2">
                       <Coins size={14} className="text-slate-500" />
                       <span>Custo atual: {formatCurrency(item.consumoAtual.custoTotal)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <ChevronRight size={14} className="text-slate-500" />
-                      <span>Limite: {tokenLimitLabel}</span>
+                      <span>Limite tokens: {tokenLimitLabel}</span>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 lg:justify-end">
-                    <button type="button" className="rounded-2xl bg-white/6 px-3 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10">
-                      <RefreshCw size={14} className="mr-2 inline-block" />
-                      Trocar plano
-                    </button>
-                    <button type="button" className="rounded-2xl bg-white/6 px-3 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10">
-                      <Plus size={14} className="mr-2 inline-block" />
-                      Adicionar tokens
-                    </button>
-                    <button type="button" className="rounded-2xl bg-white/6 px-3 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10">
-                      <Eye size={14} className="mr-2 inline-block" />
-                      Ver detalhes
-                    </button>
+                  <div className="flex items-center justify-start lg:justify-end">
+                    <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${status.badge}`}>
+                      {status.label}
+                    </span>
                   </div>
                 </article>
               );

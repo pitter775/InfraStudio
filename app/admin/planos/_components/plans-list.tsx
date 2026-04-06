@@ -25,7 +25,7 @@ export function PlansList({ planos, loading, onEdit }: PlansListProps) {
       <div className="flex items-end justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white">Planos</h2>
-          <p className="mt-1 text-sm text-slate-400">Lista enxuta com limites e operacao de excedente.</p>
+          <p className="mt-1 text-sm text-slate-400">Lista secundaria com limites base.</p>
         </div>
       </div>
 

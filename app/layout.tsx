@@ -55,7 +55,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: import("react").ReactNode }) {
   return (
     <html lang="pt-BR">
       <body>{children}</body>

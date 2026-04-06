@@ -111,6 +111,8 @@ export async function PATCH(request: Request, context: RouteContext) {
         bloqueado?: boolean | null;
         bloqueadoMotivo?: string | null;
         observacoes?: string | null;
+        permitirExcedente?: boolean | null;
+        custoTokenExcedente?: number | string | null;
       }
     | null;
 
@@ -126,6 +128,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     bloqueado: body?.bloqueado,
     bloqueadoMotivo: body?.bloqueadoMotivo,
     observacoes: body?.observacoes,
+    permitirExcedente: body?.permitirExcedente,
+    custoTokenExcedente: body?.custoTokenExcedente,
   });
 
   if (!plan) {

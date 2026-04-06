@@ -19,7 +19,7 @@ function buildLoginRedirect(request: NextRequest) {
   return NextResponse.redirect(redirectUrl);
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (!isProtectedPage(pathname) && !isProtectedApi(pathname)) {

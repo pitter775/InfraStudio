@@ -62,6 +62,7 @@ export default function AdminMePage() {
       email: payload.user?.email ?? current.email,
       senha: "",
     }));
+    window.dispatchEvent(new CustomEvent("infrastudio:session-updated"));
     setSaving(false);
     setFeedback("Perfil atualizado com sucesso.");
   };
