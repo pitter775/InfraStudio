@@ -268,9 +268,9 @@ export function PremiumHomeChatDemo() {
           >
             <div className="flex items-center justify-between border-b border-white/8 bg-white/[0.045] px-5 py-4">
               <div>
-                <div className="text-[24px] font-bold leading-none text-white">InfraStudio Chat</div>
+                <div className="text-[24px] font-bold leading-none text-white">Atendimento</div>
                 <div className="mt-2 inline-flex rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[11px] font-semibold text-slate-300">
-                  Novo atendimento
+                  Limpar
                 </div>
               </div>
               <div className="flex items-center gap-2">
