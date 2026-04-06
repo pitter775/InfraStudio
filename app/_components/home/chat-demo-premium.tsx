@@ -321,7 +321,7 @@ export function PremiumHomeChatDemo() {
                       chatCtaPressed ? "scale-[0.985] shadow-[0_8px_18px_-18px_rgba(16,185,129,0.85)]" : "",
                     )}
                   >
-                    Continuar no WhatsApp
+                    Continuar no WhatsApp...
                   </motion.button>
                 ) : null}
 

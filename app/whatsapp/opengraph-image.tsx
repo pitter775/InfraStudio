@@ -63,7 +63,7 @@ export default function OpenGraphImage() {
                 background: "linear-gradient(135deg, #22c55e, #06b6d4)",
                 color: "#04111d",
                 fontSize: 28,
-                fontWeight: 800,
+                fontWeight: 500,
                 letterSpacing: "-0.04em",
               }}
             >

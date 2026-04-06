@@ -711,13 +711,13 @@ function ProjectModelDropdown({
         type="button"
         onClick={() => setOpen((current) => !current)}
         disabled={saving}
-        className="group inline-flex min-w-[180px] items-center justify-between gap-3 rounded-full border border-cyan-300/14 bg-[linear-gradient(135deg,rgba(15,23,42,0.86),rgba(15,23,42,0.62))] px-3.5 py-2 text-left shadow-[0_14px_32px_rgba(2,8,23,0.28),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition-all duration-200 hover:border-cyan-300/28 hover:bg-[linear-gradient(135deg,rgba(20,30,48,0.94),rgba(15,23,42,0.75))] hover:shadow-[0_18px_38px_rgba(8,47,73,0.35)] disabled:cursor-not-allowed disabled:opacity-70"
+        className="group inline-flex min-w-[120px] items-center justify-between gap-3 rounded-full border border-cyan-300/14 bg-[linear-gradient(135deg,rgba(15,23,42,0.86),rgba(15,23,42,0.62))] px-3.5 py-2 text-left shadow-[0_14px_32px_rgba(2,8,23,0.28),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition-all duration-200 hover:border-cyan-300/28 hover:bg-[linear-gradient(135deg,rgba(20,30,48,0.94),rgba(15,23,42,0.75))] hover:shadow-[0_18px_38px_rgba(8,47,73,0.35)] disabled:cursor-not-allowed disabled:opacity-70"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
         <span className="min-w-0">
-          <span className="block truncate text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-100/72">Modelo</span>
-          <span className="mt-1 block truncate text-sm font-semibold text-white">
+          
+          <span className="mt-1 block truncate text-xs  text-cyan-200">
             {saving ? "Salvando..." : formatModelNameLabel(selectedModel?.nome)}
           </span>
         </span>
@@ -4590,7 +4590,7 @@ function EmbeddedAgentTestChat({
         ui: {
           transparent: false,
           title: agente.nome,
-          subtitle: "Testando o agente 17",
+          subtitle: "Testando o agente",
         },
         context: {
           route: {
@@ -8040,7 +8040,7 @@ export default function AdminProjetoDetalhePage() {
                             {agente.ativo ? "ativo" : "inativo"}
                           </span>
                         </div>
-                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descrição."}</p>
+                       
                       </div>
                       {agente.ativo ? (
                         <ProjectModelDropdown
