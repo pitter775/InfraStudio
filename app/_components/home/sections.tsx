@@ -50,7 +50,7 @@ function ServiceCard({
       <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 transition-transform duration-300 group-hover:scale-110">
         <Icon size={24} />
       </div>
-      <h3 className="mb-3 text-xl font-bold text-white">{title}</h3>
+      <h3 className="mb-3 text-xl font-semibold text-slate-100/88">{title}</h3>
       <p className="text-sm leading-relaxed text-slate-400">{description}</p>
     </motion.div>
   );
@@ -108,13 +108,13 @@ export function HeroSection({ onOpenChat }: { onOpenChat: () => void }) {
               event.preventDefault();
               onOpenChat();
             }}
-            className="inline-flex rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-8 py-4 font-bold text-white shadow-xl shadow-blue-600/20 transition-all hover:-translate-y-1 hover:from-blue-500 hover:to-blue-400"
+            className="inline-flex rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-8 py-4 font-medium text-slate-100/88 shadow-xl shadow-blue-600/20 transition-all hover:-translate-y-1 hover:from-blue-500 hover:to-blue-400"
           >
             Criar meu atendente
           </a>
           <a
             href="#demonstracao"
-            className="inline-flex rounded-xl border border-white/10 bg-white/5 px-8 py-4 font-bold text-white transition-all hover:bg-white/10"
+            className="inline-flex rounded-xl border border-white/10 bg-white/5 px-8 py-4 font-medium text-slate-100/88 transition-all hover:bg-white/10"
           >
             Ver funcionando
           </a>
@@ -149,7 +149,7 @@ export function ServicesSection() {
     <section id="servicos" className="bg-slate-900/30 py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-20 text-center">
-          <h2 className="mb-4 text-3xl font-bold text-white md:text-4xl">Soluções técnicas</h2>
+          <h2 className="mb-4 text-3xl font-semibold tracking-[-0.03em] text-slate-100/88 md:text-[2.35rem]">Soluções técnicas</h2>
           <p className="text-slate-400">
             Para conectar, automatizar e expandir a operação quando você precisar ir além do atendimento.
           </p>
@@ -171,7 +171,7 @@ export function DemoSection() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center gap-20 lg:flex-row">
           <div className="lg:w-1/2">
-            <h2 className="mb-8 text-3xl font-extrabold leading-tight text-white md:text-5xl">
+            <h2 className="mb-8 text-3xl font-semibold leading-tight tracking-[-0.04em] text-slate-100/88 md:text-[2.8rem]">
               Veja um atendente funcionando
             </h2>
             <p className="mb-10 text-lg leading-relaxed text-slate-400">
@@ -189,7 +189,7 @@ export function DemoSection() {
                     <CheckCircle2 size={20} />
                   </div>
                   <div>
-                    <h4 className="mb-1 font-bold text-white">{item.title}</h4>
+                    <h4 className="mb-1 font-medium text-slate-100/88">{item.title}</h4>
                     <p className="text-sm text-slate-400">{item.desc}</p>
                   </div>
                 </div>
@@ -216,7 +216,7 @@ export function BenefitsSection() {
               <div className="mb-6 flex justify-center text-blue-500 transition-transform group-hover:scale-110">
                 <item.icon size={40} strokeWidth={1.5} />
               </div>
-              <h3 className="mb-2 text-lg font-bold text-white">{item.title}</h3>
+              <h3 className="mb-2 text-lg font-semibold text-slate-100/88">{item.title}</h3>
               <p className="text-sm text-slate-500">{item.desc}</p>
             </div>
           ))}
@@ -231,7 +231,7 @@ export function ProcessSection() {
     <section id="como-funciona" className="bg-slate-900/20 py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-20 text-center">
-          <h2 className="text-3xl font-bold text-white md:text-4xl">Como funciona</h2>
+          <h2 className="text-3xl font-semibold tracking-[-0.03em] text-slate-100/88 md:text-[2.35rem]">Como funciona</h2>
         </div>
 
         <div className="relative">
@@ -245,13 +245,13 @@ export function ProcessSection() {
               >
                 <div
                   className={cn(
-                    "mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full font-bold text-white shadow-lg",
+                    "mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full font-medium text-slate-100/88 shadow-lg",
                     step.highlight ? "bg-emerald-500 shadow-emerald-500/20" : "bg-blue-600 shadow-blue-600/20",
                   )}
                 >
                   {step.n}
                 </div>
-                <h4 className="mb-3 font-bold text-white">{step.title}</h4>
+                <h4 className="mb-3 font-medium text-slate-100/88">{step.title}</h4>
                 <p className="text-xs leading-relaxed text-slate-500">{step.desc}</p>
               </div>
             ))}
@@ -267,7 +267,7 @@ export function UseCasesSection() {
     <section id="onde-usar" className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-20 text-center">
-          <h2 className="mb-4 text-3xl font-bold text-white md:text-4xl">Onde você pode usar</h2>
+          <h2 className="mb-4 text-3xl font-semibold tracking-[-0.03em] text-slate-100/88 md:text-[2.35rem]">Onde você pode usar</h2>
           <p className="text-slate-400">
             O mesmo atendente pode trabalhar em canais diferentes sem mudar a experiência visual da sua operação.
           </p>
@@ -288,7 +288,7 @@ export function NichesSection() {
     <section className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-16 text-center">
-          <h2 className="mb-4 text-3xl font-bold text-white">Feito para quem busca escala</h2>
+          <h2 className="mb-4 text-3xl font-semibold tracking-[-0.03em] text-slate-100/88">Feito para quem busca escala</h2>
           <p className="text-slate-400">Soluções adaptadas para diferentes nichos de mercado.</p>
         </div>
 
@@ -301,7 +301,7 @@ export function NichesSection() {
               <div className="mb-4 flex justify-center text-slate-400 transition-colors group-hover:text-blue-400">
                 <item.icon size={32} strokeWidth={1.5} />
               </div>
-              <h4 className="text-sm font-bold text-white">{item.label}</h4>
+              <h4 className="text-sm font-medium text-slate-100/88">{item.label}</h4>
             </div>
           ))}
         </div>
@@ -318,7 +318,7 @@ export function ContactSection() {
           <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-600/10 blur-[100px]" />
           <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-blue-600/10 blur-[100px]" />
 
-          <h2 className="mb-8 text-3xl font-extrabold tracking-tight text-white md:text-6xl">Pronto para o próximo nível?</h2>
+          <h2 className="mb-8 text-3xl font-semibold tracking-[-0.04em] text-slate-100/88 md:text-5xl">Pronto para o próximo nível?</h2>
           <p className="mx-auto mb-12 max-w-2xl text-lg leading-relaxed text-slate-400 md:text-xl">
             Fale sobre sua ideia e receba uma proposta personalizada sem compromisso. Nosso time técnico entrará em
             contato.
@@ -328,7 +328,7 @@ export function ContactSection() {
             href={`https://wa.me/${WHATSAPP_NUMBER}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-3 rounded-2xl bg-[#25D366] px-10 py-5 text-xl font-extrabold text-white shadow-2xl shadow-[#25D366]/20 transition-all hover:scale-105 hover:bg-[#20ba59]"
+            className="inline-flex items-center gap-3 rounded-2xl bg-[#25D366] px-10 py-5 text-xl font-semibold text-white shadow-2xl shadow-[#25D366]/20 transition-all hover:scale-105 hover:bg-[#20ba59]"
           >
             <Smartphone size={24} />
             Chamar no WhatsApp

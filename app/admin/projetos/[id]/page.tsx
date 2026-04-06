@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -653,7 +653,7 @@ function buildModelMetaLabel(modelo: ModeloDisponivel | null) {
     pricing.push(`out ${formatUsdLabel(modelo.custoOutput)}`);
   }
 
-  return [modelo.provider?.toUpperCase() || null, pricing.join(" • ") || null].filter(Boolean).join(" • ");
+  return [modelo.provider?.toUpperCase() || null, pricing.join(" � ") || null].filter(Boolean).join(" � ");
 }
 
 function ProjectModelDropdown({
@@ -822,7 +822,7 @@ function stripDecorativeCharacters(value: string) {
   return value
     .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
     .replace(/[\u2600-\u27BF]/gu, "")
-    .replace(/[âœ“âœ”âœ•âœ–âœ³â­ðŸ”¥ðŸ’¬ðŸ“ŒðŸŽ¯âš™ï¸â“ðŸ”]/gu, "")
+    .replace(/[✓✔✕✖✳⭐🔥💬📌🎯⚙️❓🔁]/gu, "")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
@@ -1856,7 +1856,7 @@ function DeleteProjectModal({
               <Trash2 size={13} />
               Exclusao permanente
             </div>
-            <h2 className="mt-3 text-2xl font-extrabold text-white">Remover projeto e todos os dados relacionados</h2>
+            <h2 className="mt-3 text-[1.85rem] font-semibold tracking-[-0.035em] text-slate-100/88">Remover projeto e todos os dados relacionados</h2>
             <p className="mt-2 text-sm leading-6 text-slate-300">
               Esta acao apaga o projeto <span className="font-semibold text-white">{projectName}</span> de forma permanente.
             </p>
@@ -1955,7 +1955,7 @@ function DeleteConnectorModal({
               <Trash2 size={13} />
               Exclusao permanente
             </div>
-            <h2 className="mt-3 text-2xl font-extrabold text-white">Remover loja do Mercado Livre</h2>
+            <h2 className="mt-3 text-[1.85rem] font-semibold tracking-[-0.035em] text-slate-100/88">Remover loja do Mercado Livre</h2>
             <p className="mt-2 text-sm leading-6 text-slate-300">
               Esta acao apaga a loja <span className="font-semibold text-white">{connectorName}</span> deste projeto.
             </p>
@@ -2054,7 +2054,7 @@ function DeleteAgenteModal({
               <Trash2 size={13} />
               Exclusao permanente
             </div>
-            <h2 className="mt-3 text-2xl font-extrabold text-white">Remover agente</h2>
+            <h2 className="mt-3 text-[1.85rem] font-semibold tracking-[-0.035em] text-slate-100/88">Remover agente</h2>
             <p className="mt-2 text-sm leading-6 text-slate-300">
               Esta acao apaga o agente <span className="font-semibold text-white">{agenteName}</span> deste projeto.
             </p>
@@ -2153,7 +2153,7 @@ function DeleteWhatsAppChannelModal({
               <Trash2 size={13} />
               Exclusao permanente
             </div>
-            <h2 className="mt-3 text-2xl font-extrabold text-white">Remover canal WhatsApp</h2>
+            <h2 className="mt-3 text-[1.85rem] font-semibold tracking-[-0.035em] text-slate-100/88">Remover canal WhatsApp</h2>
             <p className="mt-2 text-sm leading-6 text-slate-300">
               Esta acao apaga o canal <span className="font-semibold text-white">{channelName}</span> deste projeto.
             </p>
@@ -2254,7 +2254,7 @@ function WhatsAppQrCodeModal({
               <Activity size={13} />
               QR Code
             </div>
-            <h2 className="mt-3 text-2xl font-extrabold text-white">Escanear WhatsApp</h2>
+            <h2 className="mt-3 text-[1.85rem] font-semibold tracking-[-0.035em] text-slate-100/88">Escanear WhatsApp</h2>
             <p className="mt-2 text-sm leading-6 text-slate-300">
               Canal: <span className="font-semibold text-white">{channelNumber}</span>
             </p>
@@ -2840,7 +2840,7 @@ function AgenteModal({
         <div className="flex flex-col gap-4 border-b border-white/10 px-4 py-4 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Agente</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar" : "Novo agente"}</h2>
+            <h2 className="mt-2 text-[1.85rem] font-semibold tracking-[-0.035em] text-slate-100/88">{form.id ? "Editar" : "Novo agente"}</h2>
             <p className="mt-1 hidden text-sm text-slate-400 sm:block">Defina o agente e selecione quais APIs deste projeto ele pode usar.</p>
           </div>
           <div className="flex items-center justify-between gap-2 sm:justify-end">
@@ -3022,7 +3022,7 @@ function AgenteModal({
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{asset.nome}</p>
                           <p className="text-xs text-slate-400">
-                            {asset.arquivoNome} â€¢ {formatFileSize(asset.tamanhoBytes)}
+                            {asset.arquivoNome} • {formatFileSize(asset.tamanhoBytes)}
                           </p>
                           <a
                             href={asset.publicUrl}
@@ -3068,7 +3068,7 @@ function AgenteModal({
                         <AgenteAssetPreview categoria={item.file.type.startsWith("image/") ? "image" : "file"} file={item.file} alt={item.file.name} />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{item.file.name}</p>
-                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} â€¢ aguardando upload</p>
+                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} • aguardando upload</p>
                         </div>
                       </div>
                       <button
@@ -3171,7 +3171,7 @@ function AgenteModal({
                             <AgenteAssetPreview categoria={asset.categoria} publicUrl={asset.publicUrl} alt={asset.nome} />
                             <div className="min-w-0">
                               <p className="truncate text-sm font-semibold text-white">{asset.nome}</p>
-                              <p className="text-xs text-slate-400">{asset.arquivoNome} â€¢ {formatFileSize(asset.tamanhoBytes)}</p>
+                              <p className="text-xs text-slate-400">{asset.arquivoNome} • {formatFileSize(asset.tamanhoBytes)}</p>
                             </div>
                           </div>
                           <button
@@ -3195,7 +3195,7 @@ function AgenteModal({
                             <AgenteAssetPreview categoria={item.file.type.startsWith("image/") ? "image" : "file"} file={item.file} alt={item.file.name} />
                             <div className="min-w-0">
                               <p className="truncate text-sm font-semibold text-white">{item.file.name}</p>
-                              <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} â€¢ aguardando upload</p>
+                              <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} • aguardando upload</p>
                             </div>
                           </div>
                           <button
@@ -3351,7 +3351,7 @@ function AgenteModal({
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{asset.nome}</p>
                           <p className="text-xs text-slate-400">
-                            {asset.arquivoNome} â€¢ {formatFileSize(asset.tamanhoBytes)}
+                            {asset.arquivoNome} • {formatFileSize(asset.tamanhoBytes)}
                           </p>
                           <a
                             href={asset.publicUrl}
@@ -3396,7 +3396,7 @@ function AgenteModal({
                         <AgenteAssetPreview categoria={item.file.type.startsWith("image/") ? "image" : "file"} file={item.file} alt={item.file.name} />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-white">{item.file.name}</p>
-                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} â€¢ aguardando upload</p>
+                          <p className="text-xs text-cyan-100/80">{formatFileSize(item.file.size)} • aguardando upload</p>
                         </div>
                       </div>
                       <button
@@ -3513,7 +3513,7 @@ function ApiModal({
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">API</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar" : "Nova API"}</h2>
+            <h2 className="mt-2 text-[1.85rem] font-semibold tracking-[-0.035em] text-slate-100/88">{form.id ? "Editar" : "Nova API"}</h2>
             <p className="mt-1 hidden text-sm text-slate-400 sm:block">Cadastre uma API GET, teste a resposta e escolha os campos ativos, inclusive os aninhados.</p>
           </div>
           <div className="flex items-center gap-2">
@@ -3693,7 +3693,7 @@ function WidgetModal({
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Widget</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{isEditing ? "Editar" : "Novo widget"}</h2>
+            <h2 className="mt-2 text-[1.85rem] font-semibold tracking-[-0.035em] text-slate-100/88">{isEditing ? "Editar" : "Novo widget"}</h2>
             <p className="mt-1 hidden text-sm text-slate-400 sm:block">Este widget ja nasce vinculado automaticamente ao agente ativo do projeto.</p>
           </div>
           <div className="flex items-center gap-2">
@@ -3897,7 +3897,7 @@ function ConnectorModal({
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Mercado Livre</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{isEditing ? "Editar" : "Nova conexao"}</h2>
+            <h2 className="mt-2 text-[1.85rem] font-semibold tracking-[-0.035em] text-slate-100/88">{isEditing ? "Editar" : "Nova conexao"}</h2>
             <p className="mt-1 hidden text-sm text-slate-400 sm:block">
               {showProductStep
                 ? "Primeiro informe um produto da loja para identificar a conta automaticamente."
@@ -4084,7 +4084,7 @@ function AgentStoreSearchModal({
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-200">Teste da loja</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{agente.nome}</h2>
+            <h2 className="mt-2 text-[1.85rem] font-semibold tracking-[-0.035em] text-slate-100/88">{agente.nome}</h2>
             <p className="mt-1 text-sm text-slate-400">Este teste usa a mesma busca de produtos que o WhatsApp usa no atendimento.</p>
           </div>
           <button
@@ -4307,7 +4307,7 @@ function WhatsAppChannelModal({
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">WhatsApp oficial</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{form.id ? "Editar" : "Novo canal"}</h2>
+            <h2 className="mt-2 text-[1.85rem] font-semibold tracking-[-0.035em] text-slate-100/88">{form.id ? "Editar" : "Novo canal"}</h2>
             <p className="mt-1 hidden text-sm text-slate-400 sm:block">Cadastre o numero principal que vai atender este projeto.</p>
           </div>
           <div className="flex items-center gap-2">
@@ -4400,7 +4400,7 @@ function ChatHistoryModal({
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Conversa</p>
-                    <h2 className="mt-2 text-2xl font-extrabold text-white">{detail?.chat.titulo ?? "Load Premium"}</h2>
+                    <h2 className="mt-2 text-[1.85rem] font-semibold tracking-[-0.035em] text-slate-100/88">{detail?.chat.titulo ?? "Load Premium"}</h2>
             {detail ? <p className="mt-1 text-sm text-slate-400">Atualizada em {new Date(detail.chat.updatedAt).toLocaleString("pt-BR")}</p> : null}
           </div>
           <button
@@ -4476,7 +4476,7 @@ function WidgetCodeModal({
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Codigo do widget</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{state.widget.nome}</h2>
+            <h2 className="mt-2 text-[1.85rem] font-semibold tracking-[-0.035em] text-slate-100/88">{state.widget.nome}</h2>
             <p className="mt-1 text-sm text-slate-400">Escolha a versao do codigo e copie o snippet pronto para este widget.</p>
           </div>
           <button
@@ -7561,7 +7561,7 @@ export default function AdminProjetoDetalhePage() {
                 </div>
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-3">
-                    <h1 className="text-3xl font-black tracking-tight text-white sm:text-[2.15rem]">{data.projeto.nome}</h1>
+                    <h1 className="text-[2rem] font-semibold tracking-[-0.04em] text-slate-100/88 sm:text-[2.1rem]">{data.projeto.nome}</h1>
                     <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/15 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/90">
                       <CheckCircle2 size={12} />
                       {data.projeto.status ?? "ativo"}
@@ -7614,7 +7614,7 @@ export default function AdminProjetoDetalhePage() {
           <section className="space-y-4 rounded-[28px] border border-white/10 bg-white/[0.04] p-4 shadow-[0_18px_48px_rgba(2,8,23,0.22)] sm:p-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h2 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Coins size={18} className="text-emerald-200" />Plano e consumo de IA</h2>
+                <h2 className="inline-flex items-center gap-2 text-xl font-semibold text-slate-100/88"><Coins size={18} className="text-emerald-200" />Plano e consumo de IA</h2>
                 <p className="mt-1 text-sm text-slate-400">
                   Referencia financeira do projeto em {data.billing.windowLabel}, com {selectedBillingModel?.label ?? "GPT-4o Mini"} como base atual.
                 </p>
@@ -7628,24 +7628,24 @@ export default function AdminProjetoDetalhePage() {
             <div className="grid gap-3 xl:grid-cols-5">
               <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Modelo atual</p>
-                <p className="mt-2 text-lg font-bold text-white">{selectedBillingModel?.label ?? data.billing.plan.modeloReferencia}</p>
+                <p className="mt-2 text-lg font-medium text-slate-100/88">{selectedBillingModel?.label ?? data.billing.plan.modeloReferencia}</p>
                 <p className="mt-1 text-xs text-slate-400">{data.billing.plan.nomePlano}</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tokens input</p>
-                <p className="mt-2 text-2xl font-black text-white">{formatIntegerLabel(data.billing.currentUsage.tokensInput)}</p>
+                <p className="mt-2 text-[1.65rem] font-semibold tracking-[-0.03em] text-slate-100/86">{formatIntegerLabel(data.billing.currentUsage.tokensInput)}</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tokens output</p>
-                <p className="mt-2 text-2xl font-black text-white">{formatIntegerLabel(data.billing.currentUsage.tokensOutput)}</p>
+                <p className="mt-2 text-[1.65rem] font-semibold tracking-[-0.03em] text-slate-100/86">{formatIntegerLabel(data.billing.currentUsage.tokensOutput)}</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tokens totais</p>
-                <p className="mt-2 text-2xl font-black text-white">{formatIntegerLabel(data.billing.currentUsage.totalTokens)}</p>
+                <p className="mt-2 text-[1.65rem] font-semibold tracking-[-0.03em] text-slate-100/86">{formatIntegerLabel(data.billing.currentUsage.totalTokens)}</p>
               </div>
               <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/10 p-4">
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100/75">Custo atual</p>
-                <p className="mt-2 text-2xl font-black text-white">{formatUsdLabel(data.billing.currentUsage.custoTotal)}</p>
+                <p className="mt-2 text-[1.65rem] font-semibold tracking-[-0.03em] text-slate-100/86">{formatUsdLabel(data.billing.currentUsage.custoTotal)}</p>
               </div>
             </div>
 
@@ -7854,7 +7854,7 @@ export default function AdminProjetoDetalhePage() {
         <section className={`${renderedTab === "agentes" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
           <div className="flex flex-col gap-4 px-2 py-2 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Bot size={18} className="text-cyan-200" />Agentes do projeto</h3>
+              <h3 className="inline-flex items-center gap-2 text-xl font-semibold text-slate-100/88"><Bot size={18} className="text-cyan-200" />Agentes do projeto</h3>
               <p className="mt-1 text-sm text-slate-400">O agente ativo atende este projeto e pode consumir as APIs marcadas.</p>
             </div>
             {!data.agentes.length ? (
@@ -7912,7 +7912,7 @@ export default function AdminProjetoDetalhePage() {
                 ].filter(Boolean);
                 const miniSummary = miniSummaryParts.length
                   ? `Configurado com ${miniSummaryParts.join(", ")}.`
-                  : "Ainda sem canais, APIs ou integraÃ§Ãµes vinculadas.";
+                  : "Ainda sem canais, APIs ou integrações vinculadas.";
                 const agentCardPreview = (() => {
                   const source = normalizeAgentText(agente.promptBase || agente.descricao || "");
                   if (!source) {
@@ -8035,12 +8035,12 @@ export default function AdminProjetoDetalhePage() {
                           {agente.ativo ? "Agente do site" : "Agente do projeto"}
                         </p>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="truncate text-base font-bold text-white">{agente.nome}</h4>
+                          <h4 className="truncate text-base font-medium text-slate-100/88">{agente.nome}</h4>
                           <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${agente.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
                             {agente.ativo ? "ativo" : "inativo"}
                           </span>
                         </div>
-                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descriÃ§Ã£o."}</p>
+                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-400">{agente.descricao || "Sem descrição."}</p>
                       </div>
                       {agente.ativo ? (
                         <ProjectModelDropdown
@@ -8130,7 +8130,7 @@ export default function AdminProjetoDetalhePage() {
                                   diagnostic.connections.whatsappChannels.length ? `${diagnostic.connections.whatsappChannels.length} WhatsApp` : null,
                                   diagnostic.connections.connectors.length ? `${diagnostic.connections.connectors.length} fonte(s)` : null,
                                   diagnostic.connections.apis.length ? `${diagnostic.connections.apis.length} API(s)` : null,
-                                ].filter(Boolean).join(" | ") || "sem vÃ­nculos diretos"}
+                                ].filter(Boolean).join(" | ") || "sem vínculos diretos"}
                               </span>
                             </p>
                             {diagnostic.warnings.length ? (
@@ -8242,7 +8242,7 @@ export default function AdminProjetoDetalhePage() {
         <section className={`${renderedTab === "apis" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
           <div className="flex flex-col gap-4 px-2 py-2 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="inline-flex items-center gap-2 text-xl font-bold text-white"><Activity size={18} className="text-sky-200" />APIs do projeto</h3>
+              <h3 className="inline-flex items-center gap-2 text-xl font-semibold text-slate-100/88"><Activity size={18} className="text-sky-200" />APIs do projeto</h3>
               <p className="mt-1 text-sm text-slate-400">Gerencie as APIs externas, teste o retorno e controle os campos ativos.</p>
             </div>
             <button type="button" onClick={openNewApiModal} className={`${headerActionButtonClass} ${premiumInteractiveClass}`}>
@@ -8257,7 +8257,7 @@ export default function AdminProjetoDetalhePage() {
                       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-3">
-                        <h4 className="text-base font-bold text-white">{api.nome}</h4>
+                        <h4 className="text-base font-medium text-slate-100/88">{api.nome}</h4>
                         <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200">{api.metodo}</span>
                         <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${api.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
                           {api.ativo ? "ativa" : "inativa"}

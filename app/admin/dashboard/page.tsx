@@ -359,6 +359,58 @@ function FocusProjectCard({
   );
 }
 
+function BaseSummaryPanel({
+  agentes,
+  apis,
+  widgets,
+  chats,
+  totalChatTokens,
+  averageTokensPerChat,
+}: {
+  agentes: number;
+  apis: number;
+  widgets: number;
+  chats: number;
+  totalChatTokens: number;
+  averageTokensPerChat: number;
+}) {
+  return (
+    <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/18 to-cyan-400/10 text-cyan-100">
+          <Layers3 size={18} />
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Base consolidada</p>
+          <h2 className="mt-1 text-lg font-bold text-white">Resumo rapido</h2>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-[18px] border border-white/8 bg-slate-950/30 px-4 py-3">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Recursos</p>
+          <p className="mt-1 text-lg font-bold text-white">{formatInteger(agentes + apis + widgets)}</p>
+          <p className="mt-1 text-xs text-slate-400">{formatInteger(agentes)} agentes | {formatInteger(apis)} APIs | {formatInteger(widgets)} widgets</p>
+        </div>
+        <div className="rounded-[18px] border border-white/8 bg-slate-950/30 px-4 py-3">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Historico</p>
+          <p className="mt-1 text-lg font-bold text-white">{formatInteger(chats)}</p>
+          <p className="mt-1 text-xs text-slate-400">{formatCompact(totalChatTokens)} tokens acumulados</p>
+        </div>
+        <div className="rounded-[18px] border border-white/8 bg-slate-950/30 px-4 py-3 sm:col-span-2">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Media por chat</p>
+              <p className="mt-1 text-lg font-bold text-white">{formatInteger(averageTokensPerChat)}</p>
+            </div>
+            <p className="text-xs text-slate-400">tokens no periodo filtrado</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [state, setState] = useState<DashboardState>({
@@ -459,6 +511,7 @@ export default function AdminDashboardPage() {
   const maxTopChatTokens = Math.max(...(usage?.topChats ?? []).map((chat) => chat.totalTokens), 1);
   const maxTopAgentTokens = Math.max(...(usage?.topAgents ?? []).map((item) => item.totalTokens), 1);
   const focusProject = projectRows[0] ?? null;
+  const averageTokensPerChat = usage?.activeChats ? Math.round((usage.totalTokens || 0) / usage.activeChats) : 0;
   const statusTone =
     globalStatus.tone === "ok"
       ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
@@ -643,6 +696,42 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
+      {!isCompactUserView ? (
+        <section className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+          <BaseSummaryPanel
+            agentes={agentes.length}
+            apis={apis.length}
+            widgets={widgets.length}
+            chats={chats.length}
+            totalChatTokens={totalChatTokens}
+            averageTokensPerChat={averageTokensPerChat}
+          />
+
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Canais</p>
+                <h2 className="mt-1 text-lg font-bold text-white">Consumo por canal</h2>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-right">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Top</p>
+                <p className="text-sm font-bold text-white">{formatInteger(channelUsage.length)} canais</p>
+              </div>
+            </div>
+            <ChannelUsageChart data={channelUsage} currency={usage?.costCurrency ?? "USD"} />
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {channelUsage.map((channel) => (
+                <div key={channel.canal} className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
+                  <p className="text-sm font-bold text-white">{channel.label}</p>
+                  <p className="mt-2 text-lg font-extrabold text-white">{formatCompact(channel.totalTokens)}</p>
+                  <p className="mt-1 text-xs text-slate-400">{formatInteger(channel.totalChats)} chats</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
         {isCompactUserView ? (
           <div className="xl:col-span-2">
@@ -751,8 +840,8 @@ export default function AdminDashboardPage() {
       </section>
 
       {!isCompactUserView ? (
-      <section className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
-        <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
+      <section className="grid gap-4 xl:grid-cols-[1fr]">
+        <div className="hidden rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/18 to-cyan-400/10 text-cyan-100">
               <Layers3 size={18} />
@@ -832,8 +921,8 @@ export default function AdminDashboardPage() {
       </section>
       ) : null}
 
-      <section className={`grid gap-4 ${isCompactUserView ? "xl:grid-cols-[1fr]" : "xl:grid-cols-[1.08fr_0.92fr]"}`}>
-        <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
+      <section className="grid gap-4 xl:grid-cols-[1fr]">
+        <div className="hidden rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Canais</p>
