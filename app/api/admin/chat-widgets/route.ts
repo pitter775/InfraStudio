@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canAccessAdmin } from "@/lib/access";
+import { canAccessAdmin, canAccessGlobalAdmin } from "@/lib/access";
 import { getAgenteById, listAgentes } from "@/lib/agentes";
 import { listApis } from "@/lib/apis";
 import { createChatWidget, deleteChatWidget, getChatWidgetById, getChatWidgetByProjectAgentBinding, listChatWidgets, updateChatWidget } from "@/lib/chat-widgets";
@@ -23,7 +23,7 @@ type ChatWidgetBody = {
 export async function GET() {
   const user = await getSessionUser();
 
-  if (!user?.isMaster || !canAccessAdmin(user)) {
+  if (!canAccessGlobalAdmin(user) || !canAccessAdmin(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
@@ -69,7 +69,7 @@ async function validateWidgetBinding(projetoId: string, agenteId: string, curren
 export async function POST(request: Request) {
   const user = await getSessionUser();
 
-  if (!user?.isMaster || !canAccessAdmin(user)) {
+  if (!canAccessGlobalAdmin(user) || !canAccessAdmin(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const user = await getSessionUser();
 
-  if (!user?.isMaster || !canAccessAdmin(user)) {
+  if (!canAccessGlobalAdmin(user) || !canAccessAdmin(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
@@ -164,7 +164,7 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   const user = await getSessionUser();
 
-  if (!user?.isMaster || !canAccessAdmin(user)) {
+  if (!canAccessGlobalAdmin(user) || !canAccessAdmin(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 

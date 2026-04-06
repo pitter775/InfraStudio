@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "manager" | "viewer";
+export type UserRole = "admin" | "viewer";
 
 export type UserStatus = "ativo" | "pendente";
 
@@ -10,7 +10,6 @@ export type AppUser = {
   status: UserStatus;
   provider?: string;
   providerId?: string;
-  isMaster?: boolean;
   currentProjectId?: string | null;
   memberships?: Array<{
     projetoId: string | null;

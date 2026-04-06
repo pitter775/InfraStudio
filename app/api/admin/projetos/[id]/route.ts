@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canAccessAdmin, canAccessProject, canManageProject } from "@/lib/access";
+import { canAccessAdmin, canAccessGlobalAdmin, canAccessProject, canManageProject } from "@/lib/access";
 import { listAgentes } from "@/lib/agentes";
 import { listApis } from "@/lib/apis";
 import { getProjetoBillingOverview, updateProjetoPlanoBilling } from "@/lib/billing";
@@ -142,8 +142,8 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   const user = await getSessionUser();
 
-  if (!user?.isMaster || !canAccessAdmin(user)) {
-    return NextResponse.json({ error: "Apenas o master pode excluir projetos." }, { status: 403 });
+  if (!canAccessGlobalAdmin(user) || !canAccessAdmin(user)) {
+    return NextResponse.json({ error: "Apenas admin pode excluir projetos." }, { status: 403 });
   }
 
   const { id } = await context.params;

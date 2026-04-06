@@ -129,19 +129,7 @@ function getUserRoleLabel(user: AppUser | null) {
     return "";
   }
 
-  if (user.isMaster) {
-    return "Master";
-  }
-
-  if (user.role === "admin") {
-    return "Admin";
-  }
-
-  if (user.role === "manager") {
-    return "Gestor";
-  }
-
-  return "Visualizacao";
+  return user.role === "admin" ? "Admin" : "Usuario";
 }
 
 type SidebarProps = {

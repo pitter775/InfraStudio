@@ -202,9 +202,7 @@ export default function AdminUsuariosPage() {
               Permissão insuficiente
             </div>
             <h2 className="text-2xl font-bold text-white">Seu perfil não tem acesso administrativo</h2>
-            <p className="mt-3 max-w-xl text-slate-300">
-              Neste momento, o painel libera acesso apenas para o usuário master configurado na aplicação.
-            </p>
+            <p className="mt-3 max-w-xl text-slate-300">Este painel agora libera acesso apenas para perfil admin.</p>
           </div>
         ) : (
           <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
@@ -358,8 +356,8 @@ export default function AdminUsuariosPage() {
                         <td className="px-6 py-4 font-semibold text-white">{user.name}</td>
                         <td className="px-6 py-4">{user.email}</td>
                         <td className="px-6 py-4">
-                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${user.isMaster ? "bg-amber-500/15 text-amber-300" : user.role === "admin" ? "bg-cyan-500/15 text-cyan-200" : "bg-slate-800 text-slate-300"}`}>
-                            {user.isMaster ? "master" : user.role === "admin" ? "admin" : "comum"}
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${user.role === "admin" ? "bg-cyan-500/15 text-cyan-200" : "bg-slate-800 text-slate-300"}`}>
+                            {user.role === "admin" ? "admin" : "comum"}
                           </span>
                         </td>
                         <td className="px-6 py-4">

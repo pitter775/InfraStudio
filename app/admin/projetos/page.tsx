@@ -361,7 +361,7 @@ export default function AdminProjetosPage() {
                           </div>
                           <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-4 py-3">
                             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Modo de cobrança</p>
-                            {currentUser?.isMaster ? (
+                            {currentUser?.role === "admin" ? (
                               <select
                                 value={projeto.modoCobranca}
                                 onChange={(event) => void handleModoCobrancaChange(projeto, event.target.value as Projeto["modoCobranca"])}

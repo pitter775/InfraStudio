@@ -25,7 +25,7 @@ function parseConfiguracoes(value: unknown) {
 }
 
 function resolveRequestedProjectId(user: Awaited<ReturnType<typeof getSessionUser>>, projetoId: string | null | undefined) {
-  if (user?.isMaster) {
+  if (user?.role === "admin") {
     return projetoId ?? null;
   }
 
@@ -40,7 +40,7 @@ export async function GET() {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
-  const projetoId = user?.isMaster ? null : resolveCurrentProjectId(user);
+  const projetoId = user?.role === "admin" ? null : resolveCurrentProjectId(user);
   const agentes = await listAgentes(projetoId);
   return NextResponse.json({ agentes }, { status: 200 });
 }

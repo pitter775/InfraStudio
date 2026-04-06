@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { AppUser } from "@/lib/app-user";
+import { canAccessGlobalAdmin } from "@/lib/access";
 import { isAgentTestChatContext } from "@/lib/chats";
 import { getIaUsageSummaryForProjects } from "@/lib/ia-usage";
 import type { IaUsageSummary } from "@/lib/ia-usage-types";
@@ -76,7 +77,7 @@ function getMonthRange(date = new Date()) {
 }
 
 async function listScopedProjects(user: AppUser) {
-  return user.isMaster ? await listProjetosWithStats() : await listProjetosByUsuarioWithStats(user.id);
+  return canAccessGlobalAdmin(user) ? await listProjetosWithStats() : await listProjetosByUsuarioWithStats(user.id);
 }
 
 function mapProjects(projects: ProjetoOverviewRecord[]): DashboardProject[] {
@@ -116,7 +117,7 @@ export async function getDashboardOverview(user: AppUser): Promise<DashboardOver
     recentActivity: [],
   };
 
-  if (!projectIds.length && !user.isMaster) {
+  if (!projectIds.length && !canAccessGlobalAdmin(user)) {
     return {
       scope: "user",
       userName: user.name,
@@ -139,7 +140,7 @@ export async function getDashboardOverview(user: AppUser): Promise<DashboardOver
     .order("updated_at", { ascending: false });
   let membershipsQuery = supabase.from("usuarios_projetos").select("usuario_id", { count: "exact" });
 
-  if (!user.isMaster) {
+  if (!canAccessGlobalAdmin(user)) {
     agentesQuery = agentesQuery.in("projeto_id", projectIds);
     apisQuery = apisQuery.in("projeto_id", projectIds);
     widgetsQuery = widgetsQuery.in("projeto_id", projectIds);
@@ -153,7 +154,7 @@ export async function getDashboardOverview(user: AppUser): Promise<DashboardOver
     widgetsQuery,
     chatsQuery,
     membershipsQuery,
-    getIaUsageSummaryForProjects(user.isMaster ? null : projectIds, {
+    getIaUsageSummaryForProjects(canAccessGlobalAdmin(user) ? null : projectIds, {
       startDate: range.startDate,
       endDate: range.endDate,
     }),
@@ -183,9 +184,9 @@ export async function getDashboardOverview(user: AppUser): Promise<DashboardOver
     }));
 
   return {
-    scope: user.isMaster ? "global" : "user",
+    scope: canAccessGlobalAdmin(user) ? "global" : "user",
     userName: user.name,
-    usersCount: membershipsResponse.count ?? (user.isMaster ? 0 : 1),
+    usersCount: membershipsResponse.count ?? (canAccessGlobalAdmin(user) ? 0 : 1),
     projetos: mapProjects(projectRows),
     agentes,
     apis,

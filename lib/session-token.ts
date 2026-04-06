@@ -9,7 +9,6 @@ export type SessionPayload = {
   name: string;
   role: AppUser["role"];
   status: AppUser["status"];
-  isMaster?: boolean;
   currentProjectId?: string | null;
   memberships?: AppUser["memberships"];
 };
@@ -30,7 +29,6 @@ export async function signSessionToken(user: AppUser) {
     name: user.name,
     role: user.role,
     status: user.status,
-    isMaster: user.isMaster,
     currentProjectId: user.currentProjectId ?? null,
     memberships: user.memberships ?? [],
   } satisfies Omit<SessionPayload, "sub">)
@@ -50,7 +48,6 @@ export async function verifySessionToken(token: string) {
     name: String(payload.name),
     role: payload.role as AppUser["role"],
     status: payload.status as AppUser["status"],
-    isMaster: Boolean(payload.isMaster),
     currentProjectId: typeof payload.currentProjectId === "string" ? payload.currentProjectId : null,
     memberships: Array.isArray(payload.memberships) ? (payload.memberships as AppUser["memberships"]) : [],
   } satisfies AppUser;

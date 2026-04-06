@@ -22,7 +22,7 @@ export async function POST(_request: Request, context: RouteContext) {
       payload: {
         userId: user?.id ?? null,
         email: user?.email ?? null,
-        isMaster: user?.isMaster ?? false,
+        role: user?.role ?? null,
       },
     });
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });

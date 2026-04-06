@@ -83,7 +83,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const projetoId = searchParams.get("projetoId")?.trim() || null;
 
-  if (projetoId && !user?.isMaster && !canManageProject(user, projetoId)) {
+  if (projetoId && !canManageProject(user, projetoId)) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
   }
 

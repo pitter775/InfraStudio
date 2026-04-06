@@ -220,7 +220,7 @@ export default function AdminDashboardPage() {
       const payload = (await response.json()) as Partial<DashboardState>;
       setState({
         usersCount: payload.usersCount ?? 0,
-        scope: payload.scope ?? (currentUser.isMaster ? "global" : "user"),
+        scope: payload.scope ?? (currentUser.role === "admin" ? "global" : "user"),
         userName: payload.userName ?? currentUser.name,
         projetos: payload.projetos ?? [],
         agentes: payload.agentes ?? [],

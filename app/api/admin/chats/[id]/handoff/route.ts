@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canAccessAdmin, canAccessProject } from "@/lib/access";
+import { canAccessAdmin, canAccessProject, canAccessGlobalAdmin } from "@/lib/access";
 import { claimHumanHandoff, getChatHandoffByChatId, releaseHumanHandoff, requestHumanHandoff } from "@/lib/chat-handoffs";
 import { getChatById, getUnifiedWhatsAppOutboundContext } from "@/lib/chats";
 import { appendSystemLog } from "@/lib/chat-logs";
@@ -28,7 +28,7 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Conversa nao encontrada." }, { status: 404 });
   }
 
-  if (!user?.isMaster && !canAccessProject(user, chat.projetoId)) {
+  if (!canAccessGlobalAdmin(user) && !canAccessProject(user, chat.projetoId)) {
     return NextResponse.json({ error: "Acesso negado para esta conversa." }, { status: 403 });
   }
 
@@ -50,7 +50,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Conversa nao encontrada." }, { status: 404 });
   }
 
-  if (!chat.projetoId || (!user?.isMaster && !canAccessProject(user, chat.projetoId))) {
+  if (!chat.projetoId || (!canAccessGlobalAdmin(user) && !canAccessProject(user, chat.projetoId))) {
     return NextResponse.json({ error: "Acesso negado para esta conversa." }, { status: 403 });
   }
 

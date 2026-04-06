@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canAccessAdmin, canManageProject, resolveCurrentProjectId } from "@/lib/access";
+import { canAccessAdmin, canAccessGlobalAdmin, canManageProject, resolveCurrentProjectId } from "@/lib/access";
 import { getAgenteById } from "@/lib/agentes";
 import { getSessionUser } from "@/lib/session";
 import { createWhatsAppChannel, deleteWhatsAppChannel, getWhatsAppChannelById, getWhatsAppChannelByProject, listWhatsAppChannels, updateWhatsAppChannel, WhatsAppChannelError } from "@/lib/whatsapp-channels";
@@ -13,7 +13,7 @@ type WhatsAppChannelBody = {
 };
 
 function resolveRequestedProjectId(user: Awaited<ReturnType<typeof getSessionUser>>, projetoId: string | null | undefined) {
-  if (user?.isMaster) {
+  if (canAccessGlobalAdmin(user)) {
     return projetoId ?? null;
   }
 

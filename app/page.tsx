@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence } from "motion/react";
-import { getAuthProviderLabel, getCurrentProjectUser, signInWithProjectAuth, signOutProjectAuth } from "@/lib/auth";
+import { getCurrentProjectUser, signInWithProjectAuth, signOutProjectAuth } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
 import { isAdminUser } from "@/lib/access";
 import { DEFAULT_CHAT_AGENT, DEFAULT_CHAT_PROJECT } from "@/app/_components/home/data";
@@ -33,7 +33,6 @@ function HomePageContent() {
   const [chatDocked, setChatDocked] = useState(false);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
-  const authProvider = getAuthProviderLabel();
   const embeddedProjeto = searchParams.get("projeto")?.trim() || DEFAULT_CHAT_PROJECT;
   const embeddedAgente = searchParams.get("agente")?.trim() || DEFAULT_CHAT_AGENT;
   const returnTo = searchParams.get("returnTo")?.trim() || null;
@@ -132,7 +131,6 @@ function HomePageContent() {
           open={loginModalOpen}
           onClose={() => setLoginModalOpen(false)}
           onLogin={handleLogin}
-          authProvider={authProvider}
         />
       </AnimatePresence>
 

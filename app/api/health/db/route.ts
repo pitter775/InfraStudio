@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { isMasterUserIdentity } from "@/lib/access";
 import { debugFindUsuarioByEmail, findUsuarioWithPasswordByEmail } from "@/lib/usuarios";
 
 export async function GET(request: Request) {
@@ -51,13 +50,9 @@ export async function GET(request: Request) {
           ativo: usuario?.ativo ?? null,
           hasPassword: Boolean(usuario?.senha),
           passwordLooksHashed: Boolean(usuario?.senha?.startsWith("$2")),
-          isMasterByConfig: usuario
-            ? isMasterUserIdentity({
-                id: usuario.id,
-                email: usuario.email ?? "",
-                providerId: usuario.provider_id ?? undefined,
-              })
-            : false,
+          isAdmin: Boolean(
+            usuario?.usuarios_projetos?.some((membership) => (membership.papel ?? "").trim().toLowerCase() === "admin"),
+          ),
         },
       },
       { status: 200 },

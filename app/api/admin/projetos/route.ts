@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canAccessWorkspace, canManageProject } from "@/lib/access";
+import { canAccessGlobalAdmin, canAccessWorkspace, canManageProject } from "@/lib/access";
 import { createProjetoForUsuario, listProjetosByUsuarioWithStats, listProjetosWithStats, updateProjeto } from "@/lib/projetos";
 import { createSession } from "@/lib/session";
 import { getUsuarioById } from "@/lib/usuarios";
@@ -12,7 +12,7 @@ export async function GET() {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
   }
 
-  const projetos = user?.isMaster ? await listProjetosWithStats() : await listProjetosByUsuarioWithStats(user!.id);
+  const projetos = canAccessGlobalAdmin(user) ? await listProjetosWithStats() : await listProjetosByUsuarioWithStats(user!.id);
   return NextResponse.json({ projetos }, { status: 200 });
 }
 

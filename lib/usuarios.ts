@@ -32,8 +32,8 @@ type UsuarioRow = {
 };
 
 function normalizeRole(role: string | null | undefined): AppUser["role"] {
-  if (role === "admin" || role === "manager") {
-    return role;
+  if (role === "admin") {
+    return "admin";
   }
 
   return "viewer";
@@ -58,7 +58,7 @@ export function mapUsuarioToAppUser(row: Omit<UsuarioRow, "senha">): AppUser {
     email: row.email?.trim() || "",
     provider: row.provider ?? undefined,
     providerId: row.provider_id ?? undefined,
-    role: memberships[0]?.papel ?? "viewer",
+    role: memberships.some((item) => item.papel === "admin") ? "admin" : "viewer",
     status: normalizeStatus(row.ativo),
     currentProjectId: memberships[0]?.projetoId ?? null,
     memberships,

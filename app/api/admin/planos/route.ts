@@ -15,7 +15,7 @@ export async function GET() {
       payload: {
         email: user?.email ?? null,
         userId: user?.id ?? null,
-        isMaster: user?.isMaster ?? false,
+        role: user?.role ?? null,
       },
     });
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
