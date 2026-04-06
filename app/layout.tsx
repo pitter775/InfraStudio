@@ -1,14 +1,9 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Inter, Sora } from "next/font/google";
+import { Geist_Mono, Outfit } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+const outfit = Outfit({
   variable: "--font-sans-app",
-  subsets: ["latin"],
-});
-
-const sora = Sora({
-  variable: "--font-display-app",
   subsets: ["latin"],
 });
 
@@ -74,7 +69,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: import("react").ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body className={`${inter.variable} ${sora.variable} ${geistMono.variable}`}>{children}</body>
+      <body className={`${outfit.variable} ${geistMono.variable}`}>{children}</body>
     </html>
   );
 }
