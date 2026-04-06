@@ -133,9 +133,9 @@ export function LoginModal({ open, onClose, onLogin }: LoginModalProps) {
             <Lock size={14} />
             Acesso rápido
           </div>
-          <h2 className="text-2xl font-extrabold text-white">Entrar na área reservada</h2>
+          <h2 className="text-2xl text-white">Acesse sua conta</h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-400">
-            Este login usa a tabela `usuarios` da aplicacao e mantem a autenticacao desacoplada do provedor do banco.
+          Gerencie seus projetos, agentes e integrações em um só lugar.
           </p>
         </div>
 
@@ -175,13 +175,33 @@ export function LoginModal({ open, onClose, onLogin }: LoginModalProps) {
           ) : null}
 
           <button
-            type="submit"
-            disabled={loading}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-3 font-bold text-white shadow-xl shadow-blue-900/40 transition-all hover:-translate-y-0.5 hover:from-blue-500 hover:to-cyan-400"
-          >
-            {loading ? "Entrando..." : "Entrar agora"}
-            <ArrowRight size={16} />
-          </button>
+  type="submit"
+  disabled={loading}
+  className="
+  relative overflow-hidden
+  inline-flex items-center justify-center gap-2
+  rounded-2xl
+  bg-gradient-to-r from-blue-600 to-cyan-500
+  px-5 py-3 text-white
+
+  shadow-md shadow-blue-900/20
+
+  transition duration-200 ease-out transform-gpu
+
+
+  hover:from-blue-500 hover:to-cyan-400
+  hover:shadow-lg hover:shadow-blue-500/20
+
+  active:scale-[0.97]
+
+  disabled:opacity-70 disabled:cursor-not-allowed
+  "
+>
+  <span className="absolute inset-0 rounded-2xl bg-white/10 opacity-0 transition duration-300 hover:opacity-100"></span>
+
+  {loading ? "Entrando..." : "Entrar agora"}
+  <ArrowRight size={16} />
+</button>
         </form>
       </motion.div>
     </div>
@@ -369,7 +389,7 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
               <img src="/logo.png" alt="InfraStudio Logo" className="h-full w-full object-contain" />
             </div>
             <div>
-              <span className="block text-2xl font-extrabold tracking-tight text-white">InfraStudio</span>
+              <span className="block text-2xl font-bold tracking-tight text-white">InfraStudio</span>
               <span className="hidden text-xs uppercase tracking-[0.11em] text-slate-500 sm:block">Smart Systems Lab</span>
             </div>
           </div>
@@ -1440,7 +1460,7 @@ export function FloatingChatButton({ open, hidden, onToggle }: { open: boolean; 
       type="button"
       onClick={onToggle}
       className={cn(
-        "fixed bottom-5 right-4 z-[70] inline-flex h-15 w-15 items-center justify-center rounded-full bg-[#2563eb] text-white shadow-2xl shadow-blue-950/35 transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-[#1d4ed8] sm:bottom-6 sm:right-6",
+        "fixed bottom-5 right-4 z-[70] inline-flex h-15 w-15 items-center justify-center rounded-full bg-[#2563eb] text-white shadow-2xl shadow-blue-950/35 transition-all duration-200 font-bold hover:scale-[1.02] hover:bg-[#1d4ed8] sm:bottom-6 sm:right-6",
         hidden ? "pointer-events-none opacity-0 scale-90" : "opacity-100 scale-100",
       )}
       aria-label={open ? "Fechar chat" : "Abrir chat"}

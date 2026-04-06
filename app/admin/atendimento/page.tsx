@@ -576,7 +576,7 @@ function ChatMediaModal({
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Midias e anexos</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{chatTitle}</h2>
+            <h2 className="mt-2 text-2xl font-bold text-white">{chatTitle}</h2>
             <p className="mt-1 text-sm text-slate-400">Tudo que foi anexado nesta conversa fica reunido aqui.</p>
           </div>
           <button

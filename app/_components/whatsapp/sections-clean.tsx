@@ -47,7 +47,7 @@ export function HeroSection({ onPrimaryClick }: { onPrimaryClick: () => void }) 
             <button
               type="button"
               onClick={onPrimaryClick}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#22c55e,#06b6d4)] px-6 py-3.5 text-sm font-semibold text-slate-950 shadow-[0_18px_60px_rgba(6,182,212,0.35)] transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#22c55e,#06b6d4)] px-6 py-3.5 text-sm font-semibold text-slate-950 shadow-[0_18px_60px_rgba(6,182,212,0.35)] transition-all duration-200 font-bold hover:brightness-110"
             >
               Testar grátis agora
               <ChevronRight size={16} />
@@ -241,5 +241,5 @@ function WhatsappFace() {
 }
 
 export function FinalCtaSection({ onPrimaryClick }: { onPrimaryClick: () => void }) {
-  return <section id="cta-final" className="px-4 pb-16 pt-8 sm:px-6 sm:pb-20"><div className="mx-auto max-w-5xl rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(3,7,18,0.98))] px-5 py-8 text-center shadow-[0_30px_100px_rgba(2,6,23,0.45)] sm:rounded-[32px] sm:px-10 sm:py-10"><p className="text-sm font-semibold uppercase tracking-[0.24em] text-cyan-200/80">CTA final</p><h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Pronto para automatizar seu WhatsApp?</h2><button type="button" onClick={onPrimaryClick} className="mt-8 inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#22c55e,#06b6d4)] px-6 py-3.5 text-sm font-semibold text-slate-950 shadow-[0_18px_60px_rgba(6,182,212,0.35)] transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110">Testar grátis agora<ChevronRight size={16} /></button></div></section>;
+  return <section id="cta-final" className="px-4 pb-16 pt-8 sm:px-6 sm:pb-20"><div className="mx-auto max-w-5xl rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(3,7,18,0.98))] px-5 py-8 text-center shadow-[0_30px_100px_rgba(2,6,23,0.45)] sm:rounded-[32px] sm:px-10 sm:py-10"><p className="text-sm font-semibold uppercase tracking-[0.24em] text-cyan-200/80">CTA final</p><h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Pronto para automatizar seu WhatsApp?</h2><button type="button" onClick={onPrimaryClick} className="mt-8 inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#22c55e,#06b6d4)] px-6 py-3.5 text-sm font-semibold text-slate-950 shadow-[0_18px_60px_rgba(6,182,212,0.35)] transition-all duration-200 font-bold hover:brightness-110">Testar grátis agora<ChevronRight size={16} /></button></div></section>;
 }

@@ -118,7 +118,7 @@ export default function AdminIaTokensPage() {
         actions={(
           <div className="rounded-2xl border border-orange-400/20 bg-orange-500/10 px-5 py-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-200">Periodo ativo</p>
-            <p className="mt-2 text-2xl font-extrabold text-white">{summary?.periodLabel ?? "Carregando..."}</p>
+            <p className="mt-2 text-2xl font-bold text-white">{summary?.periodLabel ?? "Carregando..."}</p>
           </div>
         )}
       />
@@ -194,7 +194,7 @@ export default function AdminIaTokensPage() {
                 <Icon size={20} />
               </div>
               <p className="text-sm uppercase tracking-[0.18em] text-slate-400">{item.label}</p>
-              <p className="mt-3 text-3xl font-extrabold text-white">{item.value}</p>
+              <p className="mt-3 text-3xl font-bold text-white">{item.value}</p>
               <p className="mt-2 text-sm text-slate-400">{item.detail}</p>
             </div>
           );
@@ -205,7 +205,7 @@ export default function AdminIaTokensPage() {
         <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-5">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Total geral no periodo</p>
-            <p className="mt-3 text-3xl font-extrabold text-white">{formatTokensWithCost(summary.totalTokens, summary.totalCost, summary.costCurrency)}</p>
+            <p className="mt-3 text-3xl font-bold text-white">{formatTokensWithCost(summary.totalTokens, summary.totalCost, summary.costCurrency)}</p>
             <p className="mt-2 text-sm text-cyan-50">
               Entre {summary.startDate.split("-").reverse().join("/")} e {summary.endDate.split("-").reverse().join("/")}
             </p>
@@ -233,7 +233,7 @@ export default function AdminIaTokensPage() {
             {summary?.topChats.length ? (
               summary.topChats.map((chat, index) => (
                 <div key={chat.chatId} className="grid gap-4 px-6 py-5 md:grid-cols-[48px_minmax(0,1.3fr)_180px_140px] md:items-center">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500/10 text-lg font-extrabold text-orange-200">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500/10 text-lg font-bold text-orange-200">
                     {index + 1}
                   </div>
                   <div className="min-w-0">
@@ -286,7 +286,7 @@ export default function AdminIaTokensPage() {
                         <p className="mt-1 text-sm text-slate-400">{formatInteger(origin.mensagens)} mensagens com consumo</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-extrabold text-white">{formatInteger(origin.totalTokens)} tokens</p>
+                        <p className="text-lg font-bold text-white">{formatInteger(origin.totalTokens)} tokens</p>
                         <p className="mt-1 text-xs text-emerald-300">
                           {origin.custo > 0 ? formatCurrency(origin.custo, summary.costCurrency) : "Sem valor monetario salvo"}
                         </p>
@@ -315,7 +315,7 @@ export default function AdminIaTokensPage() {
                         <p className="font-semibold text-white">{agent.agenteNome}</p>
                         <p className="mt-1 text-sm text-slate-400">{formatInteger(agent.chats)} chats com consumo</p>
                       </div>
-                      <p className="text-lg font-extrabold text-white">{formatInteger(agent.totalTokens)} tokens</p>
+                      <p className="text-lg font-bold text-white">{formatInteger(agent.totalTokens)} tokens</p>
                     </div>
                   </div>
                 ))
@@ -357,7 +357,7 @@ export default function AdminIaTokensPage() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-extrabold text-white">{formatInteger(item.totalTokens)} tokens</p>
+                        <p className="text-lg font-bold text-white">{formatInteger(item.totalTokens)} tokens</p>
                         <p className="mt-1 text-xs text-emerald-300">
                           {item.custo > 0 ? formatCurrency(item.custo, summary.costCurrency) : "Sem valor monetario salvo"}
                         </p>

@@ -341,7 +341,7 @@ export default function AdminPlanosPage() {
 
             <div className="border-b border-white/8 px-8 py-6">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Planos</p>
-              <h3 className="mt-3 text-3xl font-extrabold text-white">{editingPlanoId ? "Editar plano" : "Novo plano"}</h3>
+              <h3 className="mt-3 text-3xl font-bold text-white">{editingPlanoId ? "Editar plano" : "Novo plano"}</h3>
               <p className="mt-2 max-w-2xl text-sm text-slate-400">Modal largo para evoluir o CRUD de planos sem criar outra tela.</p>
             </div>
 

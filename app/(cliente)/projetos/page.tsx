@@ -115,7 +115,7 @@ export default function ClienteProjetosPage() {
     <main className="mx-auto max-w-6xl space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <section className="space-y-3">
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Area do cliente</p>
-        <h1 className="text-3xl font-extrabold text-white sm:text-4xl">Projetos e consumo</h1>
+        <h1 className="text-3xl font-bold text-white sm:text-4xl">Projetos e consumo</h1>
         <p className="max-w-3xl text-sm text-slate-400">Visao por projeto com plano atual, uso do ciclo e custo acumulado.</p>
       </section>
 

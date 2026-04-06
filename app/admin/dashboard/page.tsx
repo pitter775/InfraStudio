@@ -617,7 +617,7 @@ export default function AdminDashboardPage() {
                     <Icon size={30} />
                   </div>
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
-                  <p className="mt-2 text-2xl font-extrabold text-white">{item.value}</p>
+                  <p className="mt-2 text-2xl font-bold text-white">{item.value}</p>
                   <p className="mt-1 text-xs text-slate-400">{item.detail}</p>
                 </div>
               );
@@ -668,7 +668,7 @@ export default function AdminDashboardPage() {
             <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
               <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Projecao</p>
               <h3 className="mt-1 text-base font-bold text-white">Ritmo do ciclo atual</h3>
-              <p className="mt-3 text-2xl font-extrabold text-white">{formatCompact(Math.round(projection?.averageDailyTokens ?? 0))}</p>
+              <p className="mt-3 text-2xl font-bold text-white">{formatCompact(Math.round(projection?.averageDailyTokens ?? 0))}</p>
               <p className="mt-1 text-xs text-slate-400">tokens por dia em media</p>
               <div className="mt-4 space-y-2 text-sm">
                 <div className="flex items-center justify-between gap-3">
@@ -723,7 +723,7 @@ export default function AdminDashboardPage() {
               {channelUsage.map((channel) => (
                 <div key={channel.canal} className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
                   <p className="text-sm font-bold text-white">{channel.label}</p>
-                  <p className="mt-2 text-lg font-extrabold text-white">{formatCompact(channel.totalTokens)}</p>
+                  <p className="mt-2 text-lg font-bold text-white">{formatCompact(channel.totalTokens)}</p>
                   <p className="mt-1 text-xs text-slate-400">{formatInteger(channel.totalChats)} chats</p>
                 </div>
               ))}
@@ -938,7 +938,7 @@ export default function AdminDashboardPage() {
             {channelUsage.map((channel) => (
               <div key={channel.canal} className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
                 <p className="text-sm font-bold text-white">{channel.label}</p>
-                <p className="mt-2 text-lg font-extrabold text-white">{formatCompact(channel.totalTokens)}</p>
+                <p className="mt-2 text-lg font-bold text-white">{formatCompact(channel.totalTokens)}</p>
                 <p className="mt-1 text-xs text-slate-400">{formatInteger(channel.totalChats)} chats</p>
               </div>
             ))}

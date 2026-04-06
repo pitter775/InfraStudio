@@ -452,7 +452,7 @@ export default function AdminProjetosPage() {
           <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
               <div>
-                <h2 className="text-2xl font-extrabold text-white">Criar projeto</h2>
+                <h2 className="text-2xl font-bold text-white">Criar projeto</h2>
               </div>
               <button type="button" onClick={() => setModalOpen(false)} className={`${neutralActionButtonClass} px-3`} aria-label="Fechar modal">
                 <X size={18} />

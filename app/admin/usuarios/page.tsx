@@ -176,7 +176,7 @@ export default function AdminUsuariosPage() {
           <Users size={14} />
           Usuários
         </div>
-        <h1 className="text-4xl font-extrabold text-white">Gestão de usuários</h1>
+        <h1 className="text-4xl font-bold text-white">Gestão de usuários</h1>
         <p className="mt-4 max-w-2xl text-slate-400">
           Cadastre, edite, ative ou remova usuários da aplicação diretamente pela tabela `usuarios`.
         </p>

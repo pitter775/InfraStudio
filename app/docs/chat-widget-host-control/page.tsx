@@ -342,14 +342,14 @@ export default function ChatWidgetHostControlDocsPage() {
                       <img src="/logo.png" alt="InfraStudio" className="h-full w-full object-contain" />
                     </div>
                     <div>
-                      <p className="text-2xl font-extrabold tracking-tight text-white">InfraStudio</p>
+                      <p className="text-2xl font-bold tracking-tight text-white">InfraStudio</p>
                       <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Smart Systems Lab</p>
                     </div>
                   </div>
                 </a>
 
                 <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-300">InfraStudio Docs</p>
-                <h1 className="mt-3 text-2xl font-extrabold text-white">Host-controlled chat widget</h1>
+                <h1 className="mt-3 text-2xl font-bold text-white">Host-controlled chat widget</h1>
                 <p className="mt-3 text-sm leading-6 text-slate-400">
                   Navegacao rapida para uma documentacao longa, no estilo de docs de produto.
                 </p>

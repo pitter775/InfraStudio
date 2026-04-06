@@ -30,7 +30,7 @@ export function ProjectDetailModal({ item, open, onClose, onAction }: ProjectDet
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Detalhe do projeto</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <h2 className="truncate text-2xl font-extrabold text-white">{item.projetoNome}</h2>
+              <h2 className="truncate text-2xl font-bold text-white">{item.projetoNome}</h2>
               <StatusBadge status={status} />
             </div>
             <p className="mt-2 text-sm text-slate-400">Periodo: {item.billing?.windowLabel ?? "ciclo atual"}</p>

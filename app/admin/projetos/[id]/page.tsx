@@ -2958,7 +2958,7 @@ function AgenteModal({
                 contentEditable
                 suppressContentEditableWarning
                 onInput={(event) => updatePromptBase(event.currentTarget.innerHTML)}
-                className={`w-full overflow-y-auto rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none transition-all duration-300 [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-base [&_h3]:font-bold [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-2 [&_strong]:font-extrabold [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 ${promptExpanded ? "min-h-[560px]" : "min-h-[290px]"}`}
+                className={`w-full overflow-y-auto rounded-xl border border-white/10 bg-slate-950/50 px-4 py-4 text-sm text-white outline-none transition-all duration-300 [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-base [&_h3]:font-bold [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-2 [&_strong]:font-bold [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 ${promptExpanded ? "min-h-[560px]" : "min-h-[290px]"}`}
               />
               <p className="mt-2 text-xs text-slate-400">Preencha o resumo do agente. O slug e a descricao curta sao gerados automaticamente em segundo plano.</p>
             </div>

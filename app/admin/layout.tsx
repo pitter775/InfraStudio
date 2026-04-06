@@ -280,7 +280,7 @@ function Sidebar({
               </div>
               {!collapsed ? (
                 <div className="min-w-0">
-                  <p className="truncate text-lg font-extrabold text-white">InfraStudio</p>
+                  <p className="truncate text-lg font-bold text-white">InfraStudio</p>
                   {activeProjectName ? (
                     <p className="mt-0.5 truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200/80">
                       {activeProjectName}
@@ -683,7 +683,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
               <div>
-                <h2 className="text-2xl font-extrabold text-white">Escolher projeto</h2>
+                <h2 className="text-2xl font-bold text-white">Escolher projeto</h2>
                 <p className="mt-1 text-sm text-slate-400">
                   Selecione o projeto para abrir a aba de {projectPickerTab === "mercado" ? "Mercado Livre" : "WhatsApp"}.
                 </p>

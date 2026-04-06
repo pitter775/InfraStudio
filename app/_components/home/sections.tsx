@@ -108,7 +108,7 @@ export function HeroSection({ onOpenChat }: { onOpenChat: () => void }) {
               event.preventDefault();
               onOpenChat();
             }}
-            className="inline-flex rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-8 py-4 font-medium text-slate-100/88 shadow-xl shadow-blue-600/20 transition-all hover:-translate-y-1 hover:from-blue-500 hover:to-blue-400"
+            className="inline-flex rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-8 py-4 font-medium text-slate-100/88 shadow-md shadow-blue-600/20 transition-all hover:-translate-y-1 hover:from-blue-500 hover:to-blue-400"
           >
             Criar meu atendente
           </a>
