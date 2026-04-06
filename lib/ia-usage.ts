@@ -3,6 +3,7 @@ import "server-only";
 import { buildCurrentMonthWindow, listBillingUsageByProject } from "@/lib/billing";
 import type {
   AgentUsageAggregate,
+  DailyUsagePoint,
   ChatUsageAggregate,
   IaUsageSummary,
   RecentUsageItem,
@@ -128,6 +129,34 @@ function sumTokenUsage(items: Array<{ tokensInput: number; tokensOutput: number;
   );
 }
 
+function buildDailyUsageSeed(startDate: string, endDate: string) {
+  const points = new Map<string, DailyUsagePoint>();
+  const [startYear, startMonth, startDay] = startDate.split("-").map(Number);
+  const [endYear, endMonth, endDay] = endDate.split("-").map(Number);
+  const cursor = new Date(startYear, startMonth - 1, startDay);
+  const end = new Date(endYear, endMonth - 1, endDay);
+
+  while (cursor <= end) {
+    const year = cursor.getFullYear();
+    const month = String(cursor.getMonth() + 1).padStart(2, "0");
+    const day = String(cursor.getDate()).padStart(2, "0");
+    const date = `${year}-${month}-${day}`;
+
+    points.set(date, {
+      date,
+      label: cursor.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+      tokensInput: 0,
+      tokensOutput: 0,
+      totalTokens: 0,
+      cost: 0,
+    });
+
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return points;
+}
+
 export async function getTokenUsageOverview(user: AppUser): Promise<TokenUsageOverview> {
   const admin = isGlobalAdminUser(user);
   const supabase = getSupabaseAdminClient();
@@ -231,6 +260,7 @@ export async function getIaUsageSummaryForProjects(
       processedMessages: 0,
       activeChats: 0,
       activeAgents: 0,
+      dailyUsage: [],
       topChats: [],
       topAgents: [],
       topOrigins: [],
@@ -257,6 +287,7 @@ export async function getIaUsageSummaryForProjects(
       processedMessages: 0,
       activeChats: 0,
       activeAgents: 0,
+      dailyUsage: [],
       topChats: [],
       topAgents: [],
       topOrigins: [],
@@ -288,6 +319,7 @@ export async function getIaUsageSummaryForProjects(
       processedMessages: 0,
       activeChats: 0,
       activeAgents: 0,
+      dailyUsage: [],
       topChats: [],
       topAgents: [],
       topOrigins: [],
@@ -302,11 +334,23 @@ export async function getIaUsageSummaryForProjects(
   const tokensOutput = processedMessages.reduce((sum, message) => sum + (message.tokens_output ?? 0), 0);
   const totalCost = processedMessages.reduce((sum, message) => sum + resolveMessageCost(message), 0);
   const hasCostData = processedMessages.some((message) => resolveMessageCost(message) > 0);
+  const dailyUsageMap = buildDailyUsageSeed(startDate, endDate);
 
   const perChat = new Map<string, ChatUsageAggregate>();
   for (const message of processedMessages) {
     const chatId = message.chat_id!;
     const chat = chatMap.get(chatId);
+    const messageDate = (message.created_at ?? "").slice(0, 10);
+    const messageCost = resolveMessageCost(message);
+    const dailyUsage = dailyUsageMap.get(messageDate);
+
+    if (dailyUsage) {
+      dailyUsage.tokensInput += message.tokens_input ?? 0;
+      dailyUsage.tokensOutput += message.tokens_output ?? 0;
+      dailyUsage.totalTokens += (message.tokens_input ?? 0) + (message.tokens_output ?? 0);
+      dailyUsage.cost += messageCost;
+    }
+
     const existing = perChat.get(chatId);
     const aggregate =
       existing ??
@@ -328,7 +372,7 @@ export async function getIaUsageSummaryForProjects(
     aggregate.tokensInput += message.tokens_input ?? 0;
     aggregate.tokensOutput += message.tokens_output ?? 0;
     aggregate.totalTokens += (message.tokens_input ?? 0) + (message.tokens_output ?? 0);
-    aggregate.custo += resolveMessageCost(message);
+    aggregate.custo += messageCost;
     perChat.set(chatId, aggregate);
   }
 
@@ -371,6 +415,7 @@ export async function getIaUsageSummaryForProjects(
     perOrigin.set(origin, aggregate);
   }
   const topOrigins = [...perOrigin.values()].sort((a, b) => b.totalTokens - a.totalTokens).slice(0, 8);
+  const dailyUsage = [...dailyUsageMap.values()];
 
   const recentActivity = processedMessages.slice(0, 8).map((message) => {
     const chat = chatMap.get(message.chat_id!);
@@ -409,6 +454,7 @@ export async function getIaUsageSummaryForProjects(
     processedMessages: processedMessages.length,
     activeChats: perChat.size,
     activeAgents: perAgent.size,
+    dailyUsage,
     topChats,
     topAgents,
     topOrigins,

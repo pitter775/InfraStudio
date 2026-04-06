@@ -8,6 +8,7 @@ import { BriefcaseBusiness, Cable, LoaderCircle, Lock, MessageSquareText, Plus, 
 import { canAccessWorkspace } from "@/lib/access";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
+import { formatCurrency, formatNumber, getUsageProgressValue } from "@/app/admin/planos/_components/billing-helpers";
 
 const ACTIVE_PROJECT_STORAGE_KEY = "projeto_ativo";
 
@@ -25,12 +26,17 @@ type Projeto = {
     planoAtual: string;
     usoPercentual: number | null;
     bloqueado: boolean;
+    totalTokens: number;
+    custoTotal: number;
+    limiteTokensTotalMensal: number | null;
   };
   stats: {
     totalAgentes: number;
     agentesAtivos: number;
     totalConectores: number;
     conectoresAtivos: number;
+    totalMercadoLivre: number;
+    totalWhatsAppChannels: number;
     totalChats: number;
   };
 };
@@ -91,24 +97,41 @@ export default function AdminProjetosPage() {
       fetch("/api/admin/projetos", { cache: "no-store" }).then((response) => response.json()),
       fetch("/api/admin/uso", { cache: "no-store" }).then((response) => response.json()).catch(() => ({ uso: [] })),
     ]);
+
     const billingMap = new Map(
       ((usoResponse.uso ?? []) as Array<{
         projetoId: string;
-        plano: { nomePlano: string; bloqueado: boolean };
+        plano: { nomePlano: string; bloqueado: boolean; limiteTokensTotalMensal: number | null };
+        consumoAtual: { totalTokens: number; custoTotal: number };
         percentualUso: number | null;
         status: "ativo" | "bloqueado";
       }>).map((item) => [
         item.projetoId,
         {
-          planoAtual: item.plano.nomePlano,
+          planoAtual: item.plano.nomePlano?.trim() || "Ilimitado",
           usoPercentual: item.percentualUso,
           bloqueado: item.status === "bloqueado" || item.plano.bloqueado,
+          totalTokens: item.consumoAtual.totalTokens,
+          custoTotal: item.consumoAtual.custoTotal,
+          limiteTokensTotalMensal: item.plano.limiteTokensTotalMensal,
         },
       ]),
     );
 
     const payload = projetosResponse as { projetos?: Projeto[] };
-    setProjetos((payload.projetos ?? []).map((projeto) => ({ ...projeto, billing: billingMap.get(projeto.id) })));
+    setProjetos(
+      (payload.projetos ?? []).map((projeto) => ({
+        ...projeto,
+        billing: billingMap.get(projeto.id) ?? {
+          planoAtual: "Ilimitado",
+          usoPercentual: null,
+          bloqueado: false,
+          totalTokens: 0,
+          custoTotal: 0,
+          limiteTokensTotalMensal: null,
+        },
+      })),
+    );
     setLoading(false);
   };
 
@@ -148,7 +171,7 @@ export default function AdminProjetosPage() {
     const payload = (await response.json()) as { error?: string; projeto?: Projeto };
 
     if (!response.ok) {
-      setFeedback(payload.error ?? "Não foi possível criar o projeto.");
+      setFeedback(payload.error ?? "Nao foi possivel criar o projeto.");
       setSaving(false);
       return;
     }
@@ -158,11 +181,21 @@ export default function AdminProjetosPage() {
         ...current,
         {
           ...payload.projeto!,
+          billing: {
+            planoAtual: "Ilimitado",
+            usoPercentual: null,
+            bloqueado: false,
+            totalTokens: 0,
+            custoTotal: 0,
+            limiteTokensTotalMensal: null,
+          },
           stats: payload.projeto?.stats ?? {
             totalAgentes: 0,
             agentesAtivos: 0,
             totalConectores: 0,
             conectoresAtivos: 0,
+            totalMercadoLivre: 0,
+            totalWhatsAppChannels: 0,
             totalChats: 0,
           },
         },
@@ -172,40 +205,6 @@ export default function AdminProjetosPage() {
     setModalOpen(false);
     setSaving(false);
     setFeedback("Projeto criado com sucesso.");
-  };
-
-  const handleModoCobrancaChange = async (projeto: Projeto, modoCobranca: "plano" | "manual" | "ilimitado") => {
-    const response = await fetch("/api/admin/projetos", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: projeto.id,
-        nome: projeto.nome,
-        slug: projeto.slug,
-        tipo: projeto.tipo,
-        descricao: projeto.descricao,
-        status: projeto.status,
-        modoCobranca,
-      }),
-    });
-    const payload = (await response.json()) as { error?: string; projeto?: Projeto };
-
-    if (!response.ok) {
-      setFeedback(payload.error ?? "Não foi possível atualizar o modo de cobrança.");
-      return;
-    }
-
-    setProjetos((current) =>
-      current.map((item) =>
-        item.id === projeto.id
-          ? {
-              ...item,
-              modoCobranca,
-            }
-          : item,
-      ),
-    );
-    setFeedback("Modo de cobrança atualizado.");
   };
 
   if (loading && !currentUser) {
@@ -226,7 +225,7 @@ export default function AdminProjetosPage() {
             <Lock size={14} />
             Acesso bloqueado
           </div>
-          <h2 className="text-2xl font-bold text-white">Você ainda não fez login</h2>
+          <h2 className="text-2xl font-bold text-white">Voce ainda nao fez login</h2>
           <p className="mt-3 max-w-xl text-slate-300">Entre para acessar seus projetos.</p>
         </section>
       </main>
@@ -239,10 +238,10 @@ export default function AdminProjetosPage() {
         <section className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-8">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-rose-400/20 bg-slate-950/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-rose-200">
             <Shield size={14} />
-            Permissão insuficiente
+            Permissao insuficiente
           </div>
           <h2 className="text-2xl font-bold text-white">Sem acesso ao ambiente</h2>
-          <p className="mt-3 max-w-xl text-slate-300">Seu usuário precisa estar autenticado para criar ou acessar projetos.</p>
+          <p className="mt-3 max-w-xl text-slate-300">Seu usuario precisa estar autenticado para criar ou acessar projetos.</p>
         </section>
       </main>
     );
@@ -250,69 +249,62 @@ export default function AdminProjetosPage() {
 
   return (
     <main className="space-y-6">
-      <section className="px-1 py-2">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-amber-200">
-          <BriefcaseBusiness size={14} />
-          Projetos
-        </div>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-4xl font-extrabold text-slate-50">Seus projetos</h1>
-            <p className="mt-4 hidden max-w-3xl text-slate-400 sm:block">Abra um projeto para continuar o trabalho no contexto correto.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setModalOpen(true)}
-            className={primaryActionButtonClass}
-          >
-            <Plus size={16} />
-            Criar projeto
-          </button>
-        </div>
+      <section className="flex items-center justify-end">
+        <button type="button" onClick={() => setModalOpen(true)} className={`${primaryActionButtonClass} px-3 py-2.5 text-xs`}>
+          <Plus size={15} />
+          Criar projeto
+        </button>
       </section>
 
       {feedback ? <section className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedback}</section> : null}
 
       {!loading && projetos.length ? (
-        <section className="grid grid-cols-3 gap-2 md:gap-4">
+        <section className="grid grid-cols-2 gap-2 lg:grid-cols-5">
           {[
             {
               label: "Projetos",
               value: projetos.length,
-              description: "Workspaces disponíveis para abrir e operar.",
               icon: BriefcaseBusiness,
               tone: "text-amber-200",
-              glow: "bg-amber-400/16",
             },
             {
               label: "Agentes",
               value: projetos.reduce((sum, projeto) => sum + projeto.stats.totalAgentes, 0),
-              description: "Total consolidado de agentes em todos os projetos visíveis.",
               icon: Bot,
               tone: "text-cyan-200",
-              glow: "bg-cyan-400/16",
             },
             {
               label: "Chats",
               value: projetos.reduce((sum, projeto) => sum + projeto.stats.totalChats, 0),
-              description: "Conversas acumuladas nos projetos vinculados.",
               icon: MessageSquareText,
               tone: "text-emerald-200",
-              glow: "bg-emerald-400/16",
+            },
+            {
+              label: "WhatsApp",
+              value: projetos.reduce((sum, projeto) => sum + projeto.stats.totalWhatsAppChannels, 0),
+              icon: Cable,
+              tone: "text-lime-200",
+            },
+            {
+              label: "Mercado Livre",
+              value: projetos.reduce((sum, projeto) => sum + projeto.stats.totalMercadoLivre, 0),
+              icon: Cable,
+              tone: "text-orange-200",
             },
           ].map((item) => {
             const Icon = item.icon;
             return (
-              <div key={item.label} className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02] p-3 shadow-[0_18px_45px_rgba(2,8,23,0.18)] md:p-5">
-                <div className={`pointer-events-none absolute right-4 top-4 hidden ${item.tone} opacity-16 md:block`}>
-                  <Icon size={34} />
+              <div key={item.label} className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-3 shadow-[0_18px_45px_rgba(2,8,23,0.18)]">
+                <div className={`pointer-events-none absolute right-3 top-3 ${item.tone} opacity-16`}>
+                  <Icon size={20} />
                 </div>
-                <div className="relative flex items-center gap-2 md:items-start md:gap-4">
-                  <Icon size={16} className={`${item.tone} shrink-0 md:hidden`} />
-                  <p className="min-w-0 text-2xl font-black leading-none text-slate-100 sm:text-3xl md:min-w-[56px] md:text-4xl">{item.value}</p>
-                  <div className="hidden min-w-0 md:block">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
-                    <p className="mt-2 text-sm text-slate-400">{item.description}</p>
+                <div className="relative flex items-center gap-3">
+                  <div className={`rounded-xl border border-white/8 bg-white/[0.03] p-2 ${item.tone}`}>
+                    <Icon size={14} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
+                    <p className="mt-1 text-2xl font-black leading-none text-slate-100">{item.value}</p>
                   </div>
                 </div>
               </div>
@@ -332,56 +324,66 @@ export default function AdminProjetosPage() {
           {projetos.length ? (
             <div className="grid gap-4 xl:grid-cols-2">
               {projetos.map((projeto) => (
-                <div key={projeto.id} className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.026),rgba(255,255,255,0.012))] p-6 shadow-[0_18px_38px_rgba(2,8,23,0.22)]">
-                  <div className="flex flex-col gap-6">
-                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <div key={projeto.id} className="rounded-[22px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.026),rgba(255,255,255,0.012))] p-4 shadow-[0_18px_38px_rgba(2,8,23,0.22)]">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <h3 className="text-2xl font-bold text-slate-50">{projeto.nome}</h3>
-                          <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-200">{projeto.status}</span>
-                          <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${projeto.billing?.bloqueado ? "bg-rose-500/15 text-rose-200" : "bg-emerald-500/15 text-emerald-300"}`}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-lg font-bold text-slate-50">{projeto.nome}</h3>
+                          <span className="rounded-full bg-cyan-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">{projeto.status}</span>
+                          <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${projeto.billing?.bloqueado ? "bg-rose-500/15 text-rose-200" : "bg-emerald-500/15 text-emerald-300"}`}>
                             {projeto.billing?.bloqueado ? "bloqueado" : "ativo"}
                           </span>
                           {projeto.tipo ? (
-                            <span className="rounded-full bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-300">{projeto.tipo}</span>
+                            <span className="rounded-full bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">{projeto.tipo}</span>
                           ) : null}
                         </div>
-                        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">{projeto.descricao || "Sem descrição."}</p>
-                        <div className="mt-4 grid gap-3 md:grid-cols-3">
-                          <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-4 py-3">
-                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Plano atual</p>
-                            <p className="mt-2 text-sm font-semibold text-white">{projeto.billing?.planoAtual ?? "Sem plano"}</p>
-                            <p className="mt-2 text-xs text-slate-400">Gestao centralizada em Planos.</p>
+
+                        <p className="mt-2 line-clamp-2 max-w-3xl text-xs leading-relaxed text-slate-400">{projeto.descricao || "Sem descricao."}</p>
+
+                        <div className="mt-3 grid gap-2 md:grid-cols-4">
+                          <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-3 py-2.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Plano</p>
+                            <p className="mt-1 text-sm font-semibold text-white">{projeto.billing?.planoAtual ?? "Ilimitado"}</p>
                           </div>
-                          <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-4 py-3">
-                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Uso atual</p>
-                            <p className="mt-2 text-sm font-semibold text-white">
+                          <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-3 py-2.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Uso</p>
+                            <p className="mt-1 text-sm font-semibold text-white">
                               {projeto.billing?.usoPercentual === null || projeto.billing?.usoPercentual === undefined ? "Sem limite" : `${Math.round(projeto.billing.usoPercentual)}%`}
                             </p>
                           </div>
-                          <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-4 py-3">
-                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Modo de cobrança</p>
-                            {currentUser?.role === "admin" ? (
-                              <select
-                                value={projeto.modoCobranca}
-                                onChange={(event) => void handleModoCobrancaChange(projeto, event.target.value as Projeto["modoCobranca"])}
-                                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 text-sm text-white outline-none"
-                              >
-                                <option value="plano">plano</option>
-                                <option value="manual">manual</option>
-                                <option value="ilimitado">ilimitado</option>
-                              </select>
-                            ) : (
-                              <p className="mt-2 text-sm font-semibold text-white">{projeto.modoCobranca}</p>
-                            )}
+                          <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-3 py-2.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Tokens</p>
+                            <p className="mt-1 text-sm font-semibold text-white">{formatNumber(projeto.billing?.totalTokens)}</p>
+                          </div>
+                          <div className="rounded-2xl border border-white/8 bg-slate-950/30 px-3 py-2.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Custo</p>
+                            <p className="mt-1 text-sm font-semibold text-white">{formatCurrency(projeto.billing?.custoTotal ?? 0)}</p>
                           </div>
                         </div>
+
+                        <div className="mt-3">
+                          <div className="mb-1.5 flex items-center justify-between gap-3 text-[11px]">
+                            <span className="text-slate-400">
+                              {formatNumber(projeto.billing?.totalTokens)} / {projeto.billing?.limiteTokensTotalMensal === null ? "sem limite" : formatNumber(projeto.billing?.limiteTokensTotalMensal)} tokens
+                            </span>
+                            <span className="font-semibold text-white">
+                              {projeto.billing?.usoPercentual === null || projeto.billing?.usoPercentual === undefined ? "ilimitado" : `${Math.round(projeto.billing.usoPercentual)}%`}
+                            </span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-white/8">
+                            <div
+                              className={`h-full rounded-full transition-all ${projeto.billing?.bloqueado ? "bg-rose-500" : "bg-emerald-500"}`}
+                              style={{ width: `${getUsageProgressValue(projeto.billing?.usoPercentual ?? 0)}%` }}
+                            />
+                          </div>
+                        </div>
+
                         {projeto.criadorNome || projeto.criadorEmail ? (
-                          <p className="mt-2 text-xs text-slate-500">
-                            Criado por {projeto.criadorNome ?? projeto.criadorEmail}
-                          </p>
+                          <p className="mt-2 text-[11px] text-slate-500">Criado por {projeto.criadorNome ?? projeto.criadorEmail}</p>
                         ) : null}
                       </div>
+
                       <Link
                         href={`/admin/projetos/${projeto.id}`}
                         onClick={() => {
@@ -389,13 +391,13 @@ export default function AdminProjetosPage() {
                             window.localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, projeto.id);
                           }
                         }}
-                        className={primaryActionButtonClass}
+                        className={`${primaryActionButtonClass} px-3 py-2.5 text-xs`}
                       >
                         Abrir projeto
                       </Link>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
+                    <div className="grid grid-cols-3 gap-2">
                       {[
                         {
                           label: "Agentes",
@@ -403,38 +405,32 @@ export default function AdminProjetosPage() {
                           description: `${projeto.stats.agentesAtivos} ativos`,
                           icon: Bot,
                           tone: "text-cyan-200",
-                          glow: "bg-cyan-400/14",
                         },
                         {
-                          label: "Integrações",
+                          label: "Integracoes",
                           value: projeto.stats.totalConectores,
                           description: `${projeto.stats.conectoresAtivos} ativas`,
                           icon: Cable,
                           tone: "text-violet-200",
-                          glow: "bg-violet-400/14",
                         },
                         {
                           label: "Chats",
                           value: projeto.stats.totalChats,
-                          description: "Histórico do projeto",
+                          description: "Historico do projeto",
                           icon: MessageSquareText,
                           tone: "text-emerald-200",
-                          glow: "bg-emerald-400/14",
                         },
                       ].map((item) => {
                         const Icon = item.icon;
                         return (
-                          <div key={`${projeto.id}-${item.label}`} className="relative overflow-hidden rounded-2xl border border-white/7 bg-white/[0.024] p-3 shadow-[0_12px_24px_rgba(2,8,23,0.18)] sm:p-4">
-                            <div className={`pointer-events-none absolute right-4 top-4 hidden ${item.tone} opacity-16 sm:block`}>
-                              <Icon size={28} />
-                            </div>
-                            <div className="relative flex items-center gap-2 sm:flex-col sm:items-start sm:gap-3">
-                              <Icon size={15} className={`${item.tone} shrink-0 sm:hidden`} />
-                              <p className="text-2xl font-black leading-none text-slate-100 sm:text-4xl">{item.value}</p>
-                              <div className="hidden min-w-0 sm:block">
-                                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">{item.label}</p>
-                                <p className="mt-2 text-xs leading-relaxed text-slate-400">{item.description}</p>
+                          <div key={`${projeto.id}-${item.label}`} className="rounded-2xl border border-white/7 bg-white/[0.024] p-3 shadow-[0_12px_24px_rgba(2,8,23,0.18)]">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{item.label}</p>
+                                <p className="mt-1 text-2xl font-black leading-none text-slate-100">{item.value}</p>
+                                <p className="mt-1 text-[11px] leading-relaxed text-slate-400">{item.description}</p>
                               </div>
+                              <Icon size={18} className={`${item.tone} shrink-0`} />
                             </div>
                           </div>
                         );
@@ -460,24 +456,24 @@ export default function AdminProjetosPage() {
               </button>
             </div>
             <div className="px-6 py-6">
-            <div className="grid gap-4">
-              <input value={form.nome} onChange={(event) => setForm((current) => ({ ...current, nome: event.target.value }))} placeholder="Nome" className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
-              <input value={form.slug} onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))} placeholder="Slug" className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
-              <input value={form.tipo} onChange={(event) => setForm((current) => ({ ...current, tipo: event.target.value }))} placeholder="Tipo" className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
-              <select value={form.modoCobranca} onChange={(event) => setForm((current) => ({ ...current, modoCobranca: event.target.value as ProjetoFormState["modoCobranca"] }))} className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none">
-                <option value="plano">plano</option>
-                <option value="manual">manual</option>
-                <option value="ilimitado">ilimitado</option>
-              </select>
-              <textarea value={form.descricao} onChange={(event) => setForm((current) => ({ ...current, descricao: event.target.value }))} placeholder="Descrição" rows={4} className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
-            </div>
-            <div className="mt-6 flex gap-3">
-              <button type="button" onClick={() => setModalOpen(false)} className={neutralActionButtonClass}>Cancelar</button>
-              <button type="button" onClick={() => void handleSubmit()} disabled={saving} className={primaryActionButtonClass}>
-                {saving ? <BusyIcon /> : <Plus size={16} />}
-                Criar
-              </button>
-            </div>
+              <div className="grid gap-4">
+                <input value={form.nome} onChange={(event) => setForm((current) => ({ ...current, nome: event.target.value }))} placeholder="Nome" className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
+                <input value={form.slug} onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))} placeholder="Slug" className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
+                <input value={form.tipo} onChange={(event) => setForm((current) => ({ ...current, tipo: event.target.value }))} placeholder="Tipo" className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
+                <select value={form.modoCobranca} onChange={(event) => setForm((current) => ({ ...current, modoCobranca: event.target.value as ProjetoFormState["modoCobranca"] }))} className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none">
+                  <option value="plano">plano</option>
+                  <option value="manual">manual</option>
+                  <option value="ilimitado">ilimitado</option>
+                </select>
+                <textarea value={form.descricao} onChange={(event) => setForm((current) => ({ ...current, descricao: event.target.value }))} placeholder="Descricao" rows={4} className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none" />
+              </div>
+              <div className="mt-6 flex gap-3">
+                <button type="button" onClick={() => setModalOpen(false)} className={neutralActionButtonClass}>Cancelar</button>
+                <button type="button" onClick={() => void handleSubmit()} disabled={saving} className={primaryActionButtonClass}>
+                  {saving ? <BusyIcon /> : <Plus size={16} />}
+                  Criar
+                </button>
+              </div>
             </div>
           </div>
         </div>

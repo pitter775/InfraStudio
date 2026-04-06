@@ -12,6 +12,7 @@ import {
   Users,
   Waypoints,
 } from "lucide-react";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { getCurrentProjectUser } from "@/lib/auth";
 import type { IaUsageSummary } from "@/lib/ia-usage-types";
 
@@ -98,42 +99,80 @@ function summarizeTitle(value: string, max = 34) {
   return `${compact.slice(0, max - 1).trimEnd()}...`;
 }
 
-function MiniAreaChart({ values }: { values: number[] }) {
-  if (!values.length || values.every((value) => value <= 0)) {
-    return <div className="h-24 rounded-2xl border border-white/8 bg-white/[0.03]" />;
+function formatChartTokens(value: number) {
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}M`;
   }
 
-  const width = 320;
-  const height = 96;
-  const max = Math.max(...values, 1);
-  const step = values.length > 1 ? width / (values.length - 1) : width;
-  const points = values.map((value, index) => {
-    const x = index * step;
-    const y = height - (value / max) * (height - 12) - 6;
-    return `${x},${y}`;
-  });
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(1)}k`;
+  }
 
-  const line = points.join(" ");
-  const area = `0,${height} ${line} ${width},${height}`;
+  return formatInteger(value);
+}
+
+function DailyUsageChart({ usage }: { usage: IaUsageSummary | null }) {
+  const data = usage?.dailyUsage ?? [];
+  const hasUsage = data.some((item) => item.totalTokens > 0);
+
+  if (!hasUsage) {
+    return <div className="h-[280px] rounded-[24px] border border-white/8 bg-white/[0.03]" />;
+  }
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-24 w-full overflow-visible">
-      <defs>
-        <linearGradient id="dashboard-area-fill" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="rgba(56,189,248,0.38)" />
-          <stop offset="100%" stopColor="rgba(56,189,248,0.02)" />
-        </linearGradient>
-      </defs>
-      <path d={`M ${area}`} fill="url(#dashboard-area-fill)" />
-      <polyline
-        points={line}
-        fill="none"
-        stroke="rgba(103,232,249,0.95)"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <div className="h-[280px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
+          <defs>
+            <linearGradient id="dashboardTokensStroke" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor="#22d3ee" />
+              <stop offset="100%" stopColor="#3b82f6" />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="rgba(148,163,184,0.12)" vertical={false} />
+          <XAxis
+            dataKey="label"
+            tick={{ fill: "rgba(148,163,184,0.85)", fontSize: 11 }}
+            tickLine={false}
+            axisLine={false}
+            minTickGap={24}
+          />
+          <YAxis
+            tickFormatter={formatChartTokens}
+            tick={{ fill: "rgba(148,163,184,0.85)", fontSize: 11 }}
+            tickLine={false}
+            axisLine={false}
+            width={48}
+          />
+          <Tooltip
+            cursor={{ stroke: "rgba(34,211,238,0.2)", strokeWidth: 1 }}
+            contentStyle={{
+              borderRadius: "18px",
+              border: "1px solid rgba(255,255,255,0.08)",
+              backgroundColor: "rgba(2,6,23,0.94)",
+              color: "#fff",
+            }}
+            formatter={(value, name) => {
+              const numericValue = Number(value ?? 0);
+              return [
+                name === "cost" ? formatCurrency(numericValue, usage?.costCurrency ?? "USD") : `${formatInteger(numericValue)} tokens`,
+                name === "cost" ? "Custo" : "Tokens",
+              ];
+            }}
+            labelFormatter={(label) => `Dia ${label}`}
+          />
+          <Line
+            type="monotone"
+            dataKey="totalTokens"
+            name="tokens"
+            stroke="url(#dashboardTokensStroke)"
+            strokeWidth={3}
+            dot={false}
+            activeDot={{ r: 4, fill: "#67e8f9", stroke: "#082f49", strokeWidth: 2 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -239,7 +278,8 @@ export default function AdminDashboardPage() {
   const activeProjects = projetos.filter((projeto) => projeto.status === "ativo").length;
   const totalChatTokens = chats.reduce((sum, chat) => sum + Number(chat.totalTokens ?? 0), 0);
   const totalChatCost = chats.reduce((sum, chat) => sum + Number(chat.totalCusto ?? 0), 0);
-  const topChatSeries = (usage?.topChats ?? []).slice(0, 6).reverse().map((chat) => chat.totalTokens);
+  const peakDailyTokens = Math.max(...(usage?.dailyUsage ?? []).map((item) => item.totalTokens), 0);
+  const latestDailyUsage = [...(usage?.dailyUsage ?? [])].reverse().find((item) => item.totalTokens > 0) ?? null;
 
   const projectRows = projetos
     .map((projeto) => {
@@ -352,29 +392,30 @@ export default function AdminDashboardPage() {
           <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Pulso de IA</p>
-                <h2 className="mt-1 text-lg font-bold text-white">{usage?.periodLabel ?? "Mes atual"}</h2>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Tendencia de consumo</p>
+                <h2 className="mt-1 text-lg font-bold text-white">Tokens por dia</h2>
+                <p className="mt-1 text-xs text-slate-400">{usage?.periodLabel ?? "Mes atual"}</p>
               </div>
               <div className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-right">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Mensagens</p>
-                <p className="text-sm font-bold text-white">{formatInteger(usage?.processedMessages ?? 0)}</p>
+                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Pico diario</p>
+                <p className="text-sm font-bold text-white">{formatCompact(peakDailyTokens)}</p>
               </div>
             </div>
-            <MiniAreaChart values={topChatSeries} />
+            <DailyUsageChart usage={usage} />
             <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
               <div className="relative rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
                 <div className="pointer-events-none absolute right-3 top-3 text-cyan-200/20">
                   <Sparkles size={18} />
                 </div>
-                <p className="text-slate-500">Entrada</p>
-                <p className="mt-1 font-bold text-white">{formatCompact(usage?.tokensInput ?? 0)}</p>
+                <p className="text-slate-500">Ultimo dia</p>
+                <p className="mt-1 font-bold text-white">{formatCompact(latestDailyUsage?.totalTokens ?? 0)}</p>
               </div>
               <div className="relative rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
                 <div className="pointer-events-none absolute right-3 top-3 text-indigo-200/20">
                   <Waypoints size={18} />
                 </div>
-                <p className="text-slate-500">Saída</p>
-                <p className="mt-1 font-bold text-white">{formatCompact(usage?.tokensOutput ?? 0)}</p>
+                <p className="text-slate-500">Mensagens</p>
+                <p className="mt-1 font-bold text-white">{formatInteger(usage?.processedMessages ?? 0)}</p>
               </div>
               <div className="relative rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
                 <div className="pointer-events-none absolute right-3 top-3 text-emerald-200/20">

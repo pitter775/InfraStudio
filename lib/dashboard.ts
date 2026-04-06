@@ -111,6 +111,7 @@ export async function getDashboardOverview(user: AppUser): Promise<DashboardOver
     processedMessages: 0,
     activeChats: 0,
     activeAgents: 0,
+    dailyUsage: [],
     topChats: [],
     topAgents: [],
     topOrigins: [],

@@ -45,6 +45,15 @@ export type RecentUsageItem = {
   createdAt: string;
 };
 
+export type DailyUsagePoint = {
+  date: string;
+  label: string;
+  tokensInput: number;
+  tokensOutput: number;
+  totalTokens: number;
+  cost: number;
+};
+
 export type IaUsageSummary = {
   periodLabel: string;
   startDate: string;
@@ -59,6 +68,7 @@ export type IaUsageSummary = {
   processedMessages: number;
   activeChats: number;
   activeAgents: number;
+  dailyUsage: DailyUsagePoint[];
   topChats: ChatUsageAggregate[];
   topAgents: AgentUsageAggregate[];
   topOrigins: UsageOriginAggregate[];

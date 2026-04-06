@@ -3,6 +3,7 @@ import "server-only";
 import { AGENTE_ASSETS_BUCKET } from "@/lib/agente-assets";
 import { isAgentTestChatContext } from "@/lib/chats";
 import { appendSystemLog } from "@/lib/chat-logs";
+import { MERCADO_LIVRE_CONNECTOR_TYPE } from "@/lib/conectores";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { purgeWhatsAppServiceSessions } from "@/lib/whatsapp-service";
 
@@ -26,6 +27,8 @@ export type ProjetoOverviewRecord = ProjetoRecord & {
     agentesAtivos: number;
     totalConectores: number;
     conectoresAtivos: number;
+    totalMercadoLivre: number;
+    totalWhatsAppChannels: number;
     totalChats: number;
   };
 };
@@ -98,15 +101,17 @@ async function attachProjetoStats(projetos: ProjetoRecord[]) {
   const supabase = getSupabaseAdminClient();
   const projetoIds = projetos.map((projeto) => projeto.id);
 
-  const [agentesResponse, conectoresResponse, chatsResponse, membershipsResponse] = await Promise.all([
+  const [agentesResponse, conectoresResponse, whatsappChannelsResponse, chatsResponse, membershipsResponse] = await Promise.all([
     supabase.from("agentes").select("projeto_id, ativo").in("projeto_id", projetoIds),
-    supabase.from("conectores").select("projeto_id, ativo").in("projeto_id", projetoIds),
+    supabase.from("conectores").select("projeto_id, ativo, tipo").in("projeto_id", projetoIds),
+    supabase.from("whatsapp_canais").select("projeto_id").in("projeto_id", projetoIds),
     supabase.from("chats").select("projeto_id, canal, contexto").in("projeto_id", projetoIds),
     supabase.from("usuarios_projetos").select("projeto_id, created_at, usuarios(nome, email)").in("projeto_id", projetoIds),
   ]);
 
   const agentesRows = (agentesResponse.data ?? []) as Array<{ projeto_id: string | null; ativo: boolean | null }>;
-  const conectoresRows = (conectoresResponse.data ?? []) as Array<{ projeto_id: string | null; ativo: boolean | null }>;
+  const conectoresRows = (conectoresResponse.data ?? []) as Array<{ projeto_id: string | null; ativo: boolean | null; tipo: string | null }>;
+  const whatsappRows = (whatsappChannelsResponse.data ?? []) as Array<{ projeto_id: string | null }>;
   const chatsRows = ((chatsResponse.data ?? []) as Array<{ projeto_id: string | null; canal?: string | null; contexto?: Record<string, unknown> | null }>)
     .filter((item) => item.canal !== "admin_agent_test" && !isAgentTestChatContext(item.contexto));
   const membershipsRows = (membershipsResponse.data ?? []) as ProjetoMembershipRow[];
@@ -114,6 +119,8 @@ async function attachProjetoStats(projetos: ProjetoRecord[]) {
   return projetos.map<ProjetoOverviewRecord>((projeto) => {
     const agentes = agentesRows.filter((item) => item.projeto_id === projeto.id);
     const conectores = conectoresRows.filter((item) => item.projeto_id === projeto.id);
+    const mercadoLivre = conectores.filter((item) => (item.tipo ?? "").trim() === MERCADO_LIVRE_CONNECTOR_TYPE);
+    const whatsappChannels = whatsappRows.filter((item) => item.projeto_id === projeto.id);
     const chats = chatsRows.filter((item) => item.projeto_id === projeto.id);
     const criador = membershipsRows
       .filter((item) => item.projeto_id === projeto.id)
@@ -129,6 +136,8 @@ async function attachProjetoStats(projetos: ProjetoRecord[]) {
         agentesAtivos: agentes.filter((item) => item.ativo !== false).length,
         totalConectores: conectores.length,
         conectoresAtivos: conectores.filter((item) => item.ativo !== false).length,
+        totalMercadoLivre: mercadoLivre.length,
+        totalWhatsAppChannels: whatsappChannels.length,
         totalChats: chats.length,
       },
     };

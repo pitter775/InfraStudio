@@ -9,7 +9,7 @@ import { listChats } from "@/lib/chats";
 import { listConectores } from "@/lib/conectores";
 import { getProjetoModeloSelecionado, listModelosDisponiveisParaProjeto } from "@/lib/modelos";
 import { getOpenAIModelPricingOptions } from "@/lib/openai-pricing";
-import { deleteProjeto, listProjetos } from "@/lib/projetos";
+import { deleteProjeto, listProjetos, updateProjeto } from "@/lib/projetos";
 import { getSessionUser } from "@/lib/session";
 import { listWhatsAppChannels } from "@/lib/whatsapp-channels";
 
@@ -101,6 +101,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const body = (await request.json().catch(() => null)) as
     | {
+        modoCobranca?: "plano" | "manual" | "ilimitado";
         nomePlano?: string | null;
         modeloReferencia?: string | null;
         limiteTokensInputMensal?: number | string | null;
@@ -115,6 +116,29 @@ export async function PATCH(request: Request, context: RouteContext) {
         custoTokenExcedente?: number | string | null;
       }
     | null;
+
+  if (body?.modoCobranca) {
+    const projetos = await listProjetos();
+    const projetoAtual = projetos.find((item) => item.id === id);
+
+    if (!projetoAtual) {
+      return NextResponse.json({ error: "Projeto nao encontrado." }, { status: 404 });
+    }
+
+    const projeto = await updateProjeto({
+      id,
+      nome: projetoAtual.nome,
+      slug: projetoAtual.slug,
+      tipo: projetoAtual.tipo,
+      descricao: projetoAtual.descricao,
+      status: projetoAtual.status,
+      modoCobranca: body.modoCobranca,
+    });
+
+    if (!projeto) {
+      return NextResponse.json({ error: "Nao foi possivel atualizar o modo de cobranca do projeto." }, { status: 500 });
+    }
+  }
 
   const plan = await updateProjetoPlanoBilling({
     projetoId: id,

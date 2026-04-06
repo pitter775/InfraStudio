@@ -1,5 +1,16 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
+import { Geist_Mono, Manrope } from "next/font/google";
 import "./globals.css";
+
+const manrope = Manrope({
+  variable: "--font-sans-app",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-mono-app",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://infrastudio.vercel.app"),
@@ -58,8 +69,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: import("react").ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body className={`${manrope.variable} ${geistMono.variable}`}>{children}</body>
     </html>
   );
 }
-

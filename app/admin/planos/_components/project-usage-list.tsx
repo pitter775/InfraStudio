@@ -73,12 +73,24 @@ function resolveProjectStatus(item: ProjectUsageListItem) {
 type ProjectUsageListProps = {
   rows: ProjectUsageListItem[];
   planos: PlanListItem[];
+  unlimitedPlanId: string;
   loading: boolean;
   updatingProjetoId: string | null;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
   onChangePlano: (projetoId: string, planoId: string) => void;
 };
 
-export function ProjectUsageList({ rows, planos, loading, updatingProjetoId, onChangePlano }: ProjectUsageListProps) {
+export function ProjectUsageList({
+  rows,
+  planos,
+  unlimitedPlanId,
+  loading,
+  updatingProjetoId,
+  searchValue,
+  onSearchChange,
+  onChangePlano,
+}: ProjectUsageListProps) {
   return (
     <section className="space-y-4">
       <div className="flex items-end justify-between gap-4">
@@ -86,6 +98,15 @@ export function ProjectUsageList({ rows, planos, loading, updatingProjetoId, onC
           <h2 className="text-xl font-bold text-white">Projetos</h2>
           <p className="mt-1 text-sm text-slate-400">Nome, plano, uso, tokens, custo e status.</p>
         </div>
+      </div>
+
+      <div className="rounded-3xl bg-white/[0.04] p-3">
+        <input
+          value={searchValue}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder="Buscar projeto"
+          className="w-full rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-2.5 text-sm text-white outline-none placeholder:text-slate-500"
+        />
       </div>
 
       <div className="overflow-hidden rounded-3xl bg-white/[0.04]">
@@ -99,36 +120,38 @@ export function ProjectUsageList({ rows, planos, loading, updatingProjetoId, onC
               const progressValue = getUsageProgressValue(item.percentualUso);
               const tokenLimitLabel =
                 item.plano.limiteTokensTotalMensal === null ? "sem limite" : formatNumber(item.plano.limiteTokensTotalMensal);
-              const currentPlanId = planos.find((plano) => plano.nome === item.plano.nomePlano)?.id ?? "";
-              const canChangePlan = item.modoCobranca === "plano";
+              const currentPlanId =
+                item.modoCobranca === "ilimitado"
+                  ? unlimitedPlanId
+                  : planos.find((plano) => plano.nome === item.plano.nomePlano)?.id ?? unlimitedPlanId;
 
               return (
-                <article key={item.projetoId} className="grid gap-4 px-5 py-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(220px,0.9fr)_minmax(180px,0.65fr)_auto] lg:items-center">
-                  <div className="flex gap-4">
-                    <div className={`mt-1 h-auto min-h-16 w-1.5 rounded-full ${status.tone}`} />
+                <article key={item.projetoId} className="grid gap-3 px-4 py-4 lg:grid-cols-[minmax(0,1.2fr)_220px_170px_auto] lg:items-center">
+                  <div className="flex gap-3">
+                    <div className={`mt-1 h-auto min-h-12 w-1.5 rounded-full ${status.tone}`} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-base font-semibold text-white">{item.projetoNome}</h3>
+                        <h3 className="truncate text-sm font-semibold text-white">{item.projetoNome}</h3>
                         <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${status.badge}`}>
                           {status.label}
                         </span>
                       </div>
 
-                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-400">
-                        <span>Modo: {item.modoCobranca}</span>
+                      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
+                        <span>{item.modoCobranca}</span>
                         <span>Tokens: {formatNumber(item.consumoAtual.totalTokens)}</span>
                         <span>Custo: {formatCurrency(item.consumoAtual.custoTotal)}</span>
                         {item.cicloAtual?.excedenteTokens ? <span>Excedente: {formatNumber(item.cicloAtual.excedenteTokens)}</span> : null}
                       </div>
 
-                      <div className="mt-4">
-                        <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+                      <div className="mt-3">
+                        <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
                           <span className="text-slate-300">
                             {formatNumber(item.consumoAtual.totalTokens)} / {tokenLimitLabel} tokens
                           </span>
                           <span className="font-medium text-white">{item.percentualUso === null ? "ilimitado" : `${Math.round(item.percentualUso)}%`}</span>
                         </div>
-                        <div className="h-2.5 overflow-hidden rounded-full bg-white/8">
+                        <div className="h-2 overflow-hidden rounded-full bg-white/8">
                           <div
                             className={`h-full rounded-full transition-all ${status.tone}`}
                             style={{ width: `${progressValue}%` }}
@@ -138,16 +161,16 @@ export function ProjectUsageList({ rows, planos, loading, updatingProjetoId, onC
                     </div>
                   </div>
 
-                  <div className="grid gap-2 text-sm text-slate-400">
+                  <div className="grid gap-1.5 text-sm text-slate-400">
                     <div>
-                      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Plano</p>
+                      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Plano</p>
                       <select
                         value={currentPlanId}
                         onChange={(event) => onChangePlano(item.projetoId, event.target.value)}
-                        disabled={!canChangePlan || updatingProjetoId === item.projetoId}
+                        disabled={updatingProjetoId === item.projetoId}
                         className="w-full rounded-2xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        <option value="">{canChangePlan ? item.plano.nomePlano : `${item.plano.nomePlano} (${item.modoCobranca})`}</option>
+                        <option value={unlimitedPlanId}>Ilimitado</option>
                         {planos
                           .filter((plano) => plano.ativo)
                           .map((plano) => (
@@ -159,7 +182,7 @@ export function ProjectUsageList({ rows, planos, loading, updatingProjetoId, onC
                     </div>
                   </div>
 
-                  <div className="grid gap-2 text-sm text-slate-400">
+                  <div className="grid gap-1.5 text-xs text-slate-400">
                     <div className="flex items-center gap-2">
                       <Coins size={14} className="text-slate-500" />
                       <span>Custo atual: {formatCurrency(item.consumoAtual.custoTotal)}</span>
