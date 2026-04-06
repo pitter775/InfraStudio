@@ -6,7 +6,7 @@ const SESSION_KEY = "infrastudio-auth-user";
 
 type AuthResult = {
   error: string | null;
-  mode: "mock" | "database";
+  mode: "mock" | "custom";
   user: AppUser | null;
 };
 
@@ -67,16 +67,16 @@ async function requestJson<T>(input: RequestInfo, init?: RequestInit) {
   return { response, payload };
 }
 
-function isDatabaseConfigured() {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
+function isCustomAuthConfigured() {
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.APP_AUTH_SECRET);
 }
 
 export function getAuthProviderLabel() {
-  return isDatabaseConfigured() ? "database" : "mock";
+  return isCustomAuthConfigured() ? "custom" : "mock";
 }
 
 export async function signInWithProjectAuth(email: string, password: string): Promise<AuthResult> {
-  if (!isDatabaseConfigured()) {
+  if (!isCustomAuthConfigured()) {
     const mockUser = getMockUserByCredentials(email, password);
 
     if (mockUser) {
@@ -103,14 +103,14 @@ export async function signInWithProjectAuth(email: string, password: string): Pr
 
     if (!response.ok) {
       return {
-        mode: "database",
+        mode: "custom",
         user: null,
         error: payload.error ?? "Não foi possível autenticar agora.",
       };
     }
 
     return {
-      mode: "database",
+      mode: "custom",
       user: payload.user,
       error: null,
     };
@@ -118,7 +118,7 @@ export async function signInWithProjectAuth(email: string, password: string): Pr
     console.error("[auth] login request failed", error);
 
     return {
-      mode: "database",
+      mode: "custom",
       user: null,
       error: "Não foi possível autenticar agora.",
     };
@@ -126,7 +126,7 @@ export async function signInWithProjectAuth(email: string, password: string): Pr
 }
 
 export async function getCurrentProjectUser() {
-  if (!isDatabaseConfigured()) {
+  if (!isCustomAuthConfigured()) {
     return getMockSession();
   }
 
@@ -140,7 +140,7 @@ export async function getCurrentProjectUser() {
 }
 
 export async function signOutProjectAuth() {
-  if (!isDatabaseConfigured()) {
+  if (!isCustomAuthConfigured()) {
     clearMockSession();
     return;
   }
@@ -155,7 +155,7 @@ export async function signOutProjectAuth() {
 }
 
 export async function listProjectUsers() {
-  if (!isDatabaseConfigured()) {
+  if (!isCustomAuthConfigured()) {
     return mockUsers.map<AppUser>((user) =>
       applyAccessProfile({
         id: user.id,

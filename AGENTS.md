@@ -35,7 +35,8 @@ Hoje ele opera quatro frentes conectadas:
 - framework: Next.js App Router
 - linguagem: TypeScript
 - UI: React 19 + Tailwind CSS 4
-- auth e dados: Supabase
+- auth: JWT proprio + tabela `usuarios`
+- dados: Supabase como banco de dados
 - seguranca: JWT com `jose`
 - hash de senha: `bcryptjs`
 - IA: OpenAI Responses API
@@ -63,14 +64,18 @@ Hoje ele opera quatro frentes conectadas:
 
 - `C:\Projetos\infrastudio\app\`
   paginas, layouts e rotas
+- `C:\Projetos\infrastudio\app\(cliente)\`
+  area do cliente com visoes por projeto
 - `C:\Projetos\infrastudio\app\admin\`
   painel administrativo
 - `C:\Projetos\infrastudio\app\api\`
   endpoints HTTP finos
+- `C:\Projetos\infrastudio\middleware.ts`
+  protecao de rotas e APIs com JWT proprio
 - `C:\Projetos\infrastudio\lib\`
   regra de negocio, chat, handoff, logs, integracoes
 - `C:\Projetos\infrastudio\lib\supabase\`
-  clientes e env do Supabase
+  acesso administrativo e env do Supabase como banco
 - `C:\Projetos\infrastudio\database\`
   snapshot manual + seeds SQL
 - `C:\Projetos\infrastudio\public\`
@@ -159,6 +164,13 @@ Hoje ele opera quatro frentes conectadas:
 - `C:\Projetos\infrastudio\app\admin\chat-logs\page.tsx`
 - `C:\Projetos\infrastudio\app\admin\planos\page.tsx`
 - `C:\Projetos\infrastudio\app\admin\planos\_components\*`
+- `C:\Projetos\infrastudio\app\(cliente)\projetos\page.tsx`
+- `C:\Projetos\infrastudio\app\(cliente)\projetos\_components\*`
+- `C:\Projetos\infrastudio\lib\session.ts`
+- `C:\Projetos\infrastudio\lib\session-token.ts`
+- `C:\Projetos\infrastudio\app\api\auth\login\route.ts`
+- `C:\Projetos\infrastudio\app\api\auth\me\route.ts`
+- `C:\Projetos\infrastudio\app\api\auth\logout\route.ts`
 
 ## 7. Estado atual da inteligencia do chat
 
@@ -330,6 +342,16 @@ Arquivos mais sensiveis para refactor:
 - a tela unificada prioriza resumo no topo, lista simples de planos e lista principal de projetos
 - status visual de uso segue cores por estado operacional: verde, amarelo, laranja, vermelho e azul para excedente
 - a listagem de projetos em `admin/planos` usa dados prontos de `/api/admin/uso`, sem recalculo local de billing
+- a area do cliente agora possui `app/(cliente)/projetos/page.tsx` com visao por projeto
+- a visao do cliente mostra nome do projeto, plano atual, barra de uso, tokens usados, limite, custo e status visual
+- o detalhe do projeto abre em modal e exibe uso detalhado, custo, limite do plano e status atual
+- as acoes `trocar plano` e `comprar tokens` existem como placeholders no frontend
+- a tela do cliente consome apenas APIs existentes e nao recalcula billing no frontend
+- o login principal usa `usuarios.email` + `usuarios.senha` e cria sessao JWT propria
+- a verificacao de sessao foi centralizada em `lib/session-token.ts`
+- `middleware.ts` agora protege paginas `/admin`, `/projetos` e APIs internas com JWT proprio
+- usuarios inativos nao conseguem autenticar
+- o app nao depende mais de Supabase Auth como fonte principal; Supabase fica como banco
 
 ## 12. O que sempre lembrar antes de mexer
 

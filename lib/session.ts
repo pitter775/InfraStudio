@@ -1,48 +1,12 @@
 import "server-only";
 
-import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { AppUser } from "@/lib/app-user";
-
-const SESSION_COOKIE = "infrastudio-session";
-
-type SessionPayload = {
-  sub: string;
-  email: string;
-  name: string;
-  role: AppUser["role"];
-  status: AppUser["status"];
-  isMaster?: boolean;
-  currentProjectId?: string | null;
-  memberships?: AppUser["memberships"];
-};
-
-function getSessionSecret() {
-  const secret = process.env.APP_AUTH_SECRET;
-
-  if (!secret) {
-    throw new Error("APP_AUTH_SECRET is not configured.");
-  }
-
-  return new TextEncoder().encode(secret);
-}
+import { SESSION_COOKIE, signSessionToken, verifySessionToken } from "@/lib/session-token";
 
 export async function createSession(user: AppUser) {
   const cookieStore = await cookies();
-  const token = await new SignJWT({
-    email: user.email,
-    name: user.name,
-    role: user.role,
-    status: user.status,
-    isMaster: user.isMaster,
-    currentProjectId: user.currentProjectId ?? null,
-    memberships: user.memberships ?? [],
-  } satisfies Omit<SessionPayload, "sub">)
-    .setProtectedHeader({ alg: "HS256" })
-    .setSubject(user.id)
-    .setIssuedAt()
-    .setExpirationTime("7d")
-    .sign(getSessionSecret());
+  const token = await signSessionToken(user);
 
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
@@ -67,18 +31,7 @@ export async function getSessionUser() {
   }
 
   try {
-    const { payload } = await jwtVerify(token, getSessionSecret());
-
-    return {
-      id: String(payload.sub),
-      email: String(payload.email),
-      name: String(payload.name),
-      role: payload.role as AppUser["role"],
-      status: payload.status as AppUser["status"],
-      isMaster: Boolean(payload.isMaster),
-      currentProjectId: typeof payload.currentProjectId === "string" ? payload.currentProjectId : null,
-      memberships: Array.isArray(payload.memberships) ? (payload.memberships as AppUser["memberships"]) : [],
-    } satisfies AppUser;
+    return await verifySessionToken(token);
   } catch (error) {
     console.error("[session] failed to verify session", error);
     return null;

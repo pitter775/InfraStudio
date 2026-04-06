@@ -77,7 +77,7 @@ export function ExternalChatEmbed({
 type LoginModalProps = {
   open: boolean;
   onClose: () => void;
-  authProvider: "mock" | "database";
+  authProvider: "mock" | "custom";
   onLogin: (email: string, password: string) => Promise<string | null>;
 };
 
@@ -136,8 +136,8 @@ export function LoginModal({ open, onClose, onLogin, authProvider }: LoginModalP
           </div>
           <h2 className="text-2xl font-extrabold text-white">Entrar na área reservada</h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-400">
-            {authProvider === "database"
-              ? "Este login usa a tabela `usuarios` da aplicação e mantém a autenticação desacoplada do provedor do banco."
+            {authProvider === "custom"
+              ? "Este login usa a tabela `usuarios` da aplicacao e mantem a autenticacao desacoplada do provedor do banco."
               : "Enquanto as envs de banco e sessão não forem preenchidas, este login continua usando o modo demo local."}
           </p>
         </div>
@@ -171,7 +171,7 @@ export function LoginModal({ open, onClose, onLogin, authProvider }: LoginModalP
             />
           </div>
 
-          {authProvider === "database" ? null : (
+          {authProvider === "custom" ? null : (
             <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/8 p-4 text-sm text-emerald-100">
               <p className="font-semibold">Acesso demo</p>
               <p className="mt-1 text-emerald-200/80">Email: admin@infrastudio.com</p>

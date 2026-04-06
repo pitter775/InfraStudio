@@ -25,13 +25,17 @@ export async function POST(request: Request) {
     const { email, password } = (await request.json()) as { email?: string; password?: string };
 
     if (!email || !password) {
-      return NextResponse.json({ error: "Email e senha são obrigatórios." }, { status: 400 });
+      return NextResponse.json({ error: "Email e senha sao obrigatorios." }, { status: 400 });
     }
 
     const usuario = await findUsuarioWithPasswordByEmail(email.trim().toLowerCase());
 
     if (!usuario || !passwordMatches(password, usuario.senha)) {
-      return NextResponse.json({ error: "Email ou senha inválidos." }, { status: 401 });
+      return NextResponse.json({ error: "Email ou senha invalidos." }, { status: 401 });
+    }
+
+    if (usuario.ativo === false) {
+      return NextResponse.json({ error: "Usuario inativo." }, { status: 403 });
     }
 
     const appUser = mapUsuarioToAppUser(usuario);
@@ -41,6 +45,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ user: appUser }, { status: 200 });
   } catch (error) {
     console.error("[auth] login failed", error);
-    return NextResponse.json({ error: "Não foi possível autenticar agora." }, { status: 500 });
+    return NextResponse.json({ error: "Nao foi possivel autenticar agora." }, { status: 500 });
   }
 }
