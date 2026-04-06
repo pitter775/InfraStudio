@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Outfit } from "next/font/google";
+import { seoConfig } from "@/lib/seo";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -13,24 +14,25 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://infrastudio.vercel.app"),
+  metadataBase: new URL(seoConfig.siteUrl),
   title: {
-    default: "InfraStudio",
-    template: "%s | InfraStudio",
+    default: seoConfig.defaultTitle,
+    template: seoConfig.titleTemplate,
   },
-  description: "Sistemas, automa??es e IA para ajudar sua empresa a vender mais com menos opera??o manual.",
-  applicationName: "InfraStudio",
+  description: seoConfig.defaultDescription,
+  applicationName: seoConfig.siteName,
   keywords: [
-    "automa??o",
-    "intelig?ncia artificial",
+    "automacao",
+    "inteligencia artificial",
     "whatsapp",
-    "integracao de APIs",
+    "integracao de apis",
     "sistemas sob medida",
-    "InfraStudio",
+    "atendimento com ia",
+    seoConfig.siteName,
   ],
-  authors: [{ name: "InfraStudio" }],
-  creator: "InfraStudio",
-  publisher: "InfraStudio",
+  authors: [{ name: seoConfig.siteName }],
+  creator: seoConfig.siteName,
+  publisher: seoConfig.siteName,
   alternates: {
     canonical: "/",
   },
@@ -45,13 +47,13 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "pt_BR",
-    url: "https://infrastudio.vercel.app",
-    siteName: "InfraStudio",
-    title: "InfraStudio",
-    description: "Sistemas, automa??es e IA para ajudar sua empresa a vender mais com menos opera??o manual.",
+    url: seoConfig.siteUrl,
+    siteName: seoConfig.siteName,
+    title: seoConfig.defaultTitle,
+    description: seoConfig.defaultDescription,
     images: [
       {
-        url: "/compartilhar.png",
+        url: seoConfig.defaultOgImage,
         width: 1200,
         height: 630,
         alt: "InfraStudio - imagem de compartilhamento",
@@ -60,9 +62,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "InfraStudio",
-    description: "Sistemas, automa??es e IA para ajudar sua empresa a vender mais com menos opera??o manual.",
-    images: ["/compartilhar.png"],
+    title: seoConfig.defaultTitle,
+    description: seoConfig.defaultDescription,
+    images: [seoConfig.defaultOgImage],
   },
 };
 

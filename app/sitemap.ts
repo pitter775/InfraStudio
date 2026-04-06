@@ -1,14 +1,13 @@
 import type { MetadataRoute } from "next";
+import { absoluteUrl, publicRoutes } from "@/lib/seo";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://infrastudio.vercel.app";
+  const lastModified = new Date();
 
-  return [
-    {
-      url: baseUrl,
-      lastModified: new Date(),
-      changeFrequency: "weekly",
-      priority: 1,
-    },
-  ];
+  return publicRoutes.map((route) => ({
+    url: absoluteUrl(route.path),
+    lastModified,
+    changeFrequency: route.changeFrequency,
+    priority: route.priority,
+  }));
 }

@@ -171,7 +171,7 @@ export default function OpenGraphImage() {
                 fontWeight: 700,
               }}
             >
-              infrastudio.vercel.app/whatsapp
+              infrastudio.pro/whatsapp
             </div>
           </div>
         </div>

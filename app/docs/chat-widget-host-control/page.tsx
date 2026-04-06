@@ -1,3 +1,13 @@
+import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = buildPageMetadata({
+  title: "Documentacao do Chat Widget Host-Controlled",
+  description:
+    "Guia tecnico para integrar o chat widget da InfraStudio com controle de host, isolamento de contexto e regras claras de ciclo de vida.",
+  path: "/docs/chat-widget-host-control",
+});
+
 const lifecycleEvents = ["mounted", "context_updated", "hidden", "shown", "destroyed", "blocked_by_route", "blocked_by_policy"];
 
 const integrationPrinciples = [
@@ -56,7 +66,7 @@ const configTable = [
     field: "apiBase",
     required: "Obrigatorio na pratica",
     description: "URL base onde o SDK vai chamar `/api/chat` e `/api/chat/config`. Se omitido, ele tenta usar o `src` do script como default.",
-    example: "'https://infrastudio.vercel.app'",
+    example: "'https://infrastudio.pro'",
   },
   {
     field: "strictHostControl",
@@ -191,13 +201,13 @@ const minimalExample = [
   "window.InfraChat.mount({",
   "  projeto: 'infrastudio',",
   "  agente: 'agente-comercial-principal',",
-  "  apiBase: 'https://infrastudio.vercel.app',",
+  "  apiBase: 'https://infrastudio.pro',",
   "  strictHostControl: true,",
   "});",
 ].join("\n");
 
 const practicalExample = [
-  "<script src=\"https://infrastudio.vercel.app/chat.js\" data-projeto=\"infrastudio\" data-agente=\"agente-comercial-principal\"></script>",
+  "<script src=\"https://infrastudio.pro/chat.js\" data-projeto=\"infrastudio\" data-agente=\"agente-comercial-principal\"></script>",
   "<script>",
   "  const isAllowedRoute = window.location.pathname.startsWith('/imoveis/');",
   "  const hasUnlockedChat = window.__unlockChat === true;",
@@ -208,7 +218,7 @@ const practicalExample = [
   "    window.InfraChat.mount({",
   "      projeto: 'infrastudio',",
   "      agente: 'agente-comercial-principal',",
-  "      apiBase: 'https://infrastudio.vercel.app',",
+  "      apiBase: 'https://infrastudio.pro',",
   "      strictHostControl: true,",
   "      context: {",
   "        tenant: { id: 'cliente-a', nome: 'Cliente A' },",

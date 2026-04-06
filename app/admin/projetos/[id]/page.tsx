@@ -653,7 +653,7 @@ function buildModelMetaLabel(modelo: ModeloDisponivel | null) {
     pricing.push(`out ${formatUsdLabel(modelo.custoOutput)}`);
   }
 
-  return [modelo.provider?.toUpperCase() || null, pricing.join(" � ") || null].filter(Boolean).join(" � ");
+  return [modelo.provider?.toUpperCase() || null, pricing.join(" | ") || null].filter(Boolean).join(" | ");
 }
 
 function ProjectModelDropdown({
@@ -822,7 +822,7 @@ function stripDecorativeCharacters(value: string) {
   return value
     .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
     .replace(/[\u2600-\u27BF]/gu, "")
-    .replace(/[✓✔✕✖✳⭐🔥💬📌🎯⚙️❓🔁]/gu, "")
+    .replace(/[\\u2713\\u2714\\u2715\\u2716\\u2733\\u2B50\\u{1F525}\\u{1F4AC}\\u{1F4CC}\\u{1F3AF}\\u2699\\uFE0F\\u2753\\u{1F501}]/gu, "")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
