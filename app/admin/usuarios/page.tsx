@@ -303,7 +303,7 @@ export default function AdminUsuariosPage() {
                       }}
                       className={neutralActionButtonClass}
                     >
-                      Limpar
+                      Novo
                     </button>
                   </div>
 

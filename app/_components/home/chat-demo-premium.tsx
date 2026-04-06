@@ -270,7 +270,7 @@ export function PremiumHomeChatDemo() {
               <div>
                 <div className="text-[24px] font-bold leading-none text-white">Atendimento</div>
                 <div className="mt-2 inline-flex rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[11px] font-semibold text-slate-300">
-                  Limpar
+                  Novo
                 </div>
               </div>
               <div className="flex items-center gap-2">
