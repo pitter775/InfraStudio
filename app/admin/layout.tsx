@@ -24,7 +24,6 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { FooterSection } from "@/app/_components/home/sections";
 import { getCurrentProjectUser, signOutProjectAuth } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
 import { canAccessGlobalAdmin, canAccessWorkspace } from "@/lib/access";
@@ -676,7 +675,6 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
               </motion.div>
             </AnimatePresence>
           </div>
-          {isAtendimentoRoute ? null : <FooterSection />}
          </div>
       </div>
 
