@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import JSZip from "jszip";
 import { Download, FileCheck2, FileWarning, FolderUp, LoaderCircle, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import { AdminPageHeader } from "@/app/admin/_components/admin-page-header";
 
@@ -26,6 +27,8 @@ type ProcessSummary = {
   totalXml: number;
   processed: ProcessedFile[];
   missing: MissingMatch[];
+  zipName: string;
+  zipUrl: string;
 };
 
 const STEPS = [
@@ -131,6 +134,10 @@ export default function AdrianaPageClient() {
 
   useEffect(() => {
     return () => {
+      if (summary?.zipUrl) {
+        URL.revokeObjectURL(summary.zipUrl);
+      }
+
       summary?.processed.forEach((file) => {
         URL.revokeObjectURL(file.downloadUrl);
       });
@@ -145,6 +152,10 @@ export default function AdrianaPageClient() {
   };
 
   const resetProcess = () => {
+    if (summary?.zipUrl) {
+      URL.revokeObjectURL(summary.zipUrl);
+    }
+
     summary?.processed.forEach((file) => {
       URL.revokeObjectURL(file.downloadUrl);
     });
@@ -162,6 +173,19 @@ export default function AdrianaPageClient() {
     const link = document.createElement("a");
     link.href = file.downloadUrl;
     link.download = file.newName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const handleDownloadZip = () => {
+    if (!summary?.zipUrl) {
+      return;
+    }
+
+    const link = document.createElement("a");
+    link.href = summary.zipUrl;
+    link.download = summary.zipName;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -218,11 +242,23 @@ export default function AdrianaPageClient() {
         });
       }
 
+      const zip = new JSZip();
+      processed.forEach((file) => {
+        const pdfBlob = fetch(file.downloadUrl).then((response) => response.blob());
+        zip.file(file.newName, pdfBlob);
+      });
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const zipUrl = URL.createObjectURL(zipBlob);
+      const zipName = `adriana-renomeados-${new Date().toISOString().slice(0, 10)}.zip`;
+
       setSummary({
         totalPdf: pdfFiles.length,
         totalXml: xmlFiles.length,
         processed,
         missing,
+        zipName,
+        zipUrl,
       });
       setFeedback({
         tone: "success",
@@ -315,24 +351,6 @@ export default function AdrianaPageClient() {
             </div>
           </div>
 
-          {selectedFiles.length ? (
-            <div className="mt-6 rounded-3xl border border-white/10 bg-slate-950/40 p-4">
-              <p className="text-sm font-semibold text-white">Arquivos selecionados</p>
-              <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
-                {selectedFiles.map((file) => (
-                  <div
-                    key={`${file.name}-${file.size}-${file.lastModified}`}
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/5 px-3 py-3 text-sm"
-                  >
-                    <span className="truncate text-slate-200">{file.name}</span>
-                    <span className="shrink-0 text-xs uppercase tracking-[0.16em] text-slate-500">
-                      {file.name.split(".").pop()}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
         </div>
 
         <div className="space-y-6">
@@ -357,6 +375,23 @@ export default function AdrianaPageClient() {
               {processing ? <LoaderCircle size={18} className="animate-spin" /> : <Sparkles size={18} />}
               {processing ? "Processando..." : "Processar lote"}
             </button>
+
+            {summary?.processed.length ? (
+              <button
+                type="button"
+                onClick={handleDownloadZip}
+                className="mt-4 inline-flex w-full animate-pulse items-center justify-center gap-2 rounded-2xl border border-emerald-300/25 bg-emerald-500/15 px-5 py-4 text-sm font-semibold text-emerald-50 shadow-[0_0_0_1px_rgba(110,231,183,0.18),0_0_28px_rgba(16,185,129,0.18)] transition hover:bg-emerald-500/25"
+              >
+                <Download size={18} />
+                Baixar ZIP dos PDFs renomeados
+              </button>
+            ) : null}
+
+            {summary?.processed.length ? (
+              <p className="mt-3 text-center text-sm text-emerald-200">
+                ZIP pronto para download logo acima.
+              </p>
+            ) : null}
           </section>
 
           <section className="rounded-[30px] border border-white/10 bg-white/5 p-6">
@@ -414,14 +449,9 @@ export default function AdrianaPageClient() {
                       <p className="truncate text-sm font-semibold text-white">{file.newName}</p>
                       <p className="mt-1 truncate text-sm text-slate-400">Origem: {file.originalName}</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDownload(file)}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-300/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/20"
-                    >
-                      <Download size={16} />
-                      Baixar PDF
-                    </button>
+                    <span className="inline-flex items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100">
+                      Incluido no ZIP
+                    </span>
                   </div>
                 ))
               ) : (
