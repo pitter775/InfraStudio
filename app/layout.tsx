@@ -70,8 +70,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: import("react").ReactNode }) {
   return (
-    <html lang="pt-BR">
-      <body className={`${outfit.variable} ${geistMono.variable}`}>{children}</body>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body className={`${outfit.variable} ${geistMono.variable}`} suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }

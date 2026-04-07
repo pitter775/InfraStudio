@@ -325,8 +325,8 @@ export default function AdminPlanosPage() {
       </section>
 
       {planModalOpen ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <div className="relative w-full max-w-5xl rounded-[32px] border border-white/10 bg-slate-950 shadow-2xl">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 p-3 sm:p-4 backdrop-blur-sm">
+          <div className="relative max-h-[calc(100vh-1.5rem)] w-full max-w-5xl overflow-y-auto rounded-[28px] border border-white/10 bg-slate-950 shadow-2xl sm:max-h-[calc(100vh-2rem)] sm:rounded-[32px]">
             <button
               type="button"
               onClick={() => {
@@ -334,18 +334,20 @@ export default function AdminPlanosPage() {
                 setEditingPlanoId(null);
                 setPlanoForm(emptyPlanoForm);
               }}
-              className="absolute right-5 top-5 rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"
+              className="absolute right-4 top-4 rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition hover:bg-white/10 hover:text-white sm:right-5 sm:top-5"
             >
               <X size={16} />
             </button>
 
-            <div className="border-b border-white/8 px-8 py-6">
+            <div className="border-b border-white/8 px-5 py-5 sm:px-8 sm:py-6">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Planos</p>
-              <h3 className="mt-3 text-3xl font-bold text-white">{editingPlanoId ? "Editar plano" : "Novo plano"}</h3>
-              <p className="mt-2 max-w-2xl text-sm text-slate-400">Modal largo para evoluir o CRUD de planos sem criar outra tela.</p>
+              <h3 className="mt-3 text-2xl font-bold text-white sm:text-3xl">{editingPlanoId ? "Editar plano" : "Novo plano"}</h3>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                Modal largo para evoluir o CRUD de planos sem criar outra tela.
+              </p>
             </div>
 
-            <div className="grid gap-6 px-8 py-8 lg:grid-cols-2">
+            <div className="grid gap-5 px-5 py-5 sm:px-8 sm:py-8 lg:grid-cols-2">
               <label className="grid gap-2 text-sm text-slate-300">
                 <span>Nome</span>
                 <input value={planoForm.nome} onChange={(event) => setPlanoForm((current) => ({ ...current, nome: event.target.value }))} className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none" />
@@ -387,7 +389,7 @@ export default function AdminPlanosPage() {
               </label>
             </div>
 
-            <div className="flex items-center justify-end gap-3 border-t border-white/8 px-8 py-6">
+            <div className="flex flex-col-reverse gap-3 border-t border-white/8 px-5 py-5 sm:flex-row sm:items-center sm:justify-end sm:px-8 sm:py-6">
               <button
                 type="button"
                 onClick={() => {

@@ -100,7 +100,7 @@ export function ProjectUsageList({
         </div>
       </div>
 
-      <div className="rounded-3xl bg-white/[0.04] p-3">
+      <div className="rounded-3xl border border-white/8 bg-white/[0.04] p-3">
         <input
           value={searchValue}
           onChange={(event) => onSearchChange(event.target.value)}
@@ -109,7 +109,7 @@ export function ProjectUsageList({
         />
       </div>
 
-      <div className="overflow-hidden rounded-3xl bg-white/[0.04]">
+      <div className="overflow-hidden rounded-3xl border border-white/8 bg-white/[0.04]">
         {loading ? <div className="px-5 py-5 text-sm text-slate-400">Carregando projetos...</div> : null}
         {!loading && !rows.length ? <div className="px-5 py-5 text-sm text-slate-400">Nenhum projeto encontrado.</div> : null}
 
@@ -126,9 +126,12 @@ export function ProjectUsageList({
                   : planos.find((plano) => plano.nome === item.plano.nomePlano)?.id ?? unlimitedPlanId;
 
               return (
-                <article key={item.projetoId} className="grid gap-3 px-4 py-4 lg:grid-cols-[minmax(0,1.2fr)_220px_170px_auto] lg:items-center">
+                <article
+                  key={item.projetoId}
+                  className="grid gap-4 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,1.2fr)_220px_170px] lg:items-center"
+                >
                   <div className="flex gap-3">
-                    <div className={`mt-1 h-auto min-h-12 w-1.5 rounded-full ${status.tone}`} />
+                    <div className={`mt-1 h-auto min-h-12 w-1 rounded-full ${status.tone} sm:w-1.5`} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="truncate text-sm font-semibold text-white">{item.projetoNome}</h3>
@@ -182,21 +185,15 @@ export function ProjectUsageList({
                     </div>
                   </div>
 
-                  <div className="grid gap-1.5 text-xs text-slate-400">
-                    <div className="flex items-center gap-2">
+                  <div className="grid gap-2 text-xs text-slate-400">
+                    <div className="flex items-center gap-2 rounded-2xl border border-white/8 bg-slate-950/30 px-3 py-2">
                       <Coins size={14} className="text-slate-500" />
                       <span>Custo atual: {formatCurrency(item.consumoAtual.custoTotal)}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 rounded-2xl border border-white/8 bg-slate-950/30 px-3 py-2">
                       <ChevronRight size={14} className="text-slate-500" />
                       <span>Limite tokens: {tokenLimitLabel}</span>
                     </div>
-                  </div>
-
-                  <div className="flex items-center justify-start lg:justify-end">
-                    <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${status.badge}`}>
-                      {status.label}
-                    </span>
                   </div>
                 </article>
               );

@@ -28,7 +28,7 @@ type PlansListProps = {
 export function PlansList({ planos, loading, onCreate, onEdit, onToggleActive, onDelete }: PlansListProps) {
   return (
     <section className="space-y-4">
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-white">Planos</h2>
           <p className="mt-1 text-sm text-slate-400">Base de planos editavel na propria tela.</p>
@@ -37,22 +37,22 @@ export function PlansList({ planos, loading, onCreate, onEdit, onToggleActive, o
         <button
           type="button"
           onClick={onCreate}
-          className="inline-flex items-center gap-2 rounded-2xl bg-sky-500/15 px-4 py-2 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20"
+          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-sky-500/15 px-4 py-2.5 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20 sm:justify-start"
         >
           <Plus size={15} />
           Novo plano
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-3xl bg-white/[0.04]">
+      <div className="overflow-hidden rounded-3xl border border-white/8 bg-white/[0.04]">
         {loading ? <div className="px-5 py-5 text-sm text-slate-400">Carregando planos...</div> : null}
         {!loading && !planos.length ? <div className="px-5 py-5 text-sm text-slate-400">Nenhum plano encontrado.</div> : null}
 
         {!loading ? (
           <div className="divide-y divide-white/8">
             {planos.map((plano) => (
-              <div key={plano.id} className="flex flex-col gap-4 px-5 py-4">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div key={plano.id} className="px-4 py-4 sm:px-5">
+                <div className="flex flex-col gap-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate text-base font-semibold text-white">{plano.nome}</p>
@@ -64,24 +64,37 @@ export function PlansList({ planos, loading, onCreate, onEdit, onToggleActive, o
                       </span>
                     </div>
 
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-400">
-                      <span>{formatCurrency(plano.precoMensal)}/mes</span>
-                      <span>{plano.limiteTokensTotalMensal === null ? "sem limite" : `${formatNumber(plano.limiteTokensTotalMensal)} tokens`}</span>
-                      <span>{plano.limiteCustoMensal === null ? "sem limite de custo" : `${formatCurrency(plano.limiteCustoMensal)} custo`}</span>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                      <div className="rounded-2xl border border-white/8 bg-slate-950/35 px-3 py-2.5">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Preco</p>
+                        <p className="mt-1 text-sm font-semibold text-white">{formatCurrency(plano.precoMensal)}/mes</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/8 bg-slate-950/35 px-3 py-2.5">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Tokens</p>
+                        <p className="mt-1 text-sm font-semibold text-white">
+                          {plano.limiteTokensTotalMensal === null ? "Sem limite" : formatNumber(plano.limiteTokensTotalMensal)}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-white/8 bg-slate-950/35 px-3 py-2.5">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Custo</p>
+                        <p className="mt-1 text-sm font-semibold text-white">
+                          {plano.limiteCustoMensal === null ? "Sem limite" : formatCurrency(plano.limiteCustoMensal)}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                       <span>Agentes: {formatNumber(plano.maxAgentes)}</span>
                       <span>APIs: {formatNumber(plano.maxApis)}</span>
                       <span>WhatsApp: {formatNumber(plano.maxWhatsapp)}</span>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid gap-2 sm:grid-cols-3">
                     <button
                       type="button"
                       onClick={() => onEdit(plano.id)}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-white/6 px-3 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white/6 px-3 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-white/10"
                     >
                       <PencilLine size={15} />
                       Editar
@@ -90,7 +103,7 @@ export function PlansList({ planos, loading, onCreate, onEdit, onToggleActive, o
                     <button
                       type="button"
                       onClick={() => onToggleActive(plano.id, !plano.ativo)}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-white/6 px-3 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white/6 px-3 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-white/10"
                     >
                       <Power size={15} />
                       {plano.ativo ? "Inativar" : "Ativar"}
@@ -99,7 +112,7 @@ export function PlansList({ planos, loading, onCreate, onEdit, onToggleActive, o
                     <button
                       type="button"
                       onClick={() => onDelete(plano.id)}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-rose-500/10 px-3 py-2 text-sm font-medium text-rose-100 transition hover:bg-rose-500/15"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-rose-500/10 px-3 py-2.5 text-sm font-medium text-rose-100 transition hover:bg-rose-500/15"
                     >
                       <Trash2 size={15} />
                       Excluir
