@@ -221,13 +221,18 @@
 
 
 
+/* =========================
+   BORDA ANIMADA PREMIUM
+========================= */
 
 .plano-hover {
   position: relative;
   border-radius: 16px;
   padding: 1px;
+  transition: all .3s ease;
 }
 
+/* borda animada */
 .plano-hover::before {
   content: "";
   position: absolute;
@@ -235,9 +240,20 @@
   border-radius: 16px;
   padding: 1px;
 
-  background: linear-gradient(270deg, #00f0ff, #7a5cff, #ff00c8, #00f0ff);
-  background-size: 600% 600%;
+  /* 🌈 gradient mais rico */
+  background: linear-gradient(
+    270deg,
+    #00f0ff,
+    #7a5cff,
+    #ff00c8,
+    #ff7a00,
+    #00ff9d,
+    #00f0ff
+  );
 
+  background-size: 1000% 1000%;
+
+  /* máscara pra virar só borda */
   -webkit-mask: 
     linear-gradient(#000 0 0) content-box, 
     linear-gradient(#000 0 0);
@@ -248,17 +264,27 @@
   transition: opacity .3s ease;
 }
 
+/* animação fluida (movimento circular) */
 @keyframes borderAnim {
   0% { background-position: 0% 50%; }
+  25% { background-position: 50% 0%; }
   50% { background-position: 100% 50%; }
+  75% { background-position: 50% 100%; }
   100% { background-position: 0% 50%; }
 }
 
+/* ativa no hover */
 .plano-hover:hover::before {
   opacity: 1;
-  animation: borderAnim 4s linear infinite;
+  animation: borderAnim 2.5s linear infinite;
 }
 
+/* glow leve */
+.plano-hover:hover {
+  box-shadow: 
+    0 0 20px rgba(122, 92, 255, 0.3),
+    0 0 40px rgba(0, 240, 255, 0.2);
+}
 
 
 @keyframes rippleAnim {
