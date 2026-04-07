@@ -288,7 +288,6 @@ export function NichesSection() {
     <section className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-16 text-center">
-          <h2 className="mb-4 text-3xl font-semibold tracking-[-0.03em] text-slate-100/88">Feito para quem busca escala</h2>
           <section className="w-full px-6 py-20">
             <div className="max-w-6xl mx-auto text-center">
 
@@ -304,7 +303,8 @@ export function NichesSection() {
               <div className="grid md:grid-cols-4 gap-6 mt-12">
 
                 {/* STARTER */}
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 text-left">
+                <div className="plano-hover">
+                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 text-left">
                   <span className="text-xs text-zinc-400">Starter</span>
 
                   <h3 className="text-white text-2xl font-bold mt-2">
@@ -326,7 +326,7 @@ export function NichesSection() {
                   <button className="w-full mt-6 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white py-2 font-semibold transition">
                     Começar agora
                   </button>
-                </div>
+                </div> </div>
 
                 {/* PRO (DESTAQUE) */}
                 <div className="relative rounded-2xl border border-blue-500/40 bg-zinc-900/60 p-6 text-left shadow-lg shadow-blue-900/20 scale-[1.03]">
@@ -411,7 +411,7 @@ export function NichesSection() {
               </div>
             </div>
           </section>
-          <p className="text-slate-400">Soluções adaptadas para diferentes nichos de mercado.</p>
+          <p className="text-slate-400 font-semibold ">Soluções adaptadas para diferentes nichos de mercado.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">

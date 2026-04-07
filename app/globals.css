@@ -218,6 +218,49 @@
   pointer-events: none;
 }
 
+
+
+
+
+.plano-hover {
+  position: relative;
+  border-radius: 16px;
+  padding: 1px;
+}
+
+.plano-hover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  padding: 1px;
+
+  background: linear-gradient(270deg, #00f0ff, #7a5cff, #ff00c8, #00f0ff);
+  background-size: 600% 600%;
+
+  -webkit-mask: 
+    linear-gradient(#000 0 0) content-box, 
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  opacity: 0;
+  transition: opacity .3s ease;
+}
+
+@keyframes borderAnim {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.plano-hover:hover::before {
+  opacity: 1;
+  animation: borderAnim 4s linear infinite;
+}
+
+
+
 @keyframes rippleAnim {
   to {
     transform: scale(3);
