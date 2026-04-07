@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowRight, CheckCircle2, Smartphone } from "lucide-react";
 import {
@@ -110,11 +110,11 @@ function PlanCard({ plan, active = false, mobile = false }: { plan: PlanItem; ac
     <div
       className={cn(
         "relative rounded-2xl bg-brand-dark p-6 text-left transition-all duration-300",
-        mobile ? "w-[82vw] max-w-[320px] snap-center shrink-0" : plan.widthClass,
+        mobile ? "w-full max-w-none" : plan.widthClass,
         isFeatured
           ? "border border-blue-500/40 shadow-lg shadow-blue-900/20"
           : "border border-zinc-800",
-        active ? "scale-100 opacity-100" : mobile ? "scale-[0.94] opacity-55" : "",
+        active ? "scale-100 opacity-100" : "",
       )}
     >
       {plan.badge && isFeatured ? (
@@ -419,68 +419,16 @@ export function UseCasesSection() {
 
 export function NichesSection() {
   const [activePlanIndex, setActivePlanIndex] = useState(2);
-  const mobilePlansRef = useRef<HTMLDivElement | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
+  const planCount = PLAN_ITEMS.length;
 
-  useEffect(() => {
-    const container = mobilePlansRef.current;
-    if (!container) return;
+  const goToPlan = (index: number) => {
+    const normalizedIndex = (index + planCount) % planCount;
+    setActivePlanIndex(normalizedIndex);
+  };
 
-    const getTargetLeft = (card: HTMLElement) =>
-      card.offsetLeft - container.clientWidth / 2 + card.clientWidth / 2;
-
-    const updateActivePlan = () => {
-      const cards = Array.from(container.querySelectorAll<HTMLElement>("[data-plan-index]"));
-      if (!cards.length) return;
-
-      const containerRect = container.getBoundingClientRect();
-      const containerCenter = containerRect.left + containerRect.width / 2;
-
-      let nextIndex = 0;
-      let minDistance = Number.POSITIVE_INFINITY;
-
-      cards.forEach((card) => {
-        const rect = card.getBoundingClientRect();
-        const cardCenter = rect.left + rect.width / 2;
-        const distance = Math.abs(containerCenter - cardCenter);
-
-        if (distance < minDistance) {
-          minDistance = distance;
-          nextIndex = Number(card.dataset.planIndex);
-        }
-      });
-
-      setActivePlanIndex((current) => (current === nextIndex ? current : nextIndex));
-    };
-
-    const centerCard = (index: number, behavior: ScrollBehavior) => {
-      const card = container.querySelector<HTMLElement>(`[data-plan-index="${index}"]`);
-      if (!card) return;
-
-      container.scrollTo({ left: Math.max(getTargetLeft(card), 0), behavior });
-    };
-
-    centerCard(2, "auto");
-    updateActivePlan();
-
-    let frame = 0;
-    const handleScroll = () => {
-      cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(updateActivePlan);
-    };
-
-    const handleResize = () => {
-      updateActivePlan();
-    };
-
-    container.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      cancelAnimationFrame(frame);
-      container.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
+  const goToPreviousPlan = () => goToPlan(activePlanIndex - 1);
+  const goToNextPlan = () => goToPlan(activePlanIndex + 1);
 
   return (
     <section className="py-24">
@@ -497,40 +445,76 @@ export function NichesSection() {
               Infraestrutura digital de última geração projetada para empresas que exigem performance, segurança e inovação constante.
               </p>
 
-              <div
-                ref={mobilePlansRef}
-                className="mt-12 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-4 md:hidden [&::-webkit-scrollbar]:hidden"
-                style={{ scrollbarWidth: "none" }}
-              >
-                {PLAN_ITEMS.map((plan, index) => (
-                  <div key={plan.name} data-plan-index={index}>
-                    <PlanCard plan={plan} active={index === activePlanIndex} mobile />
+              <div className="mt-12 px-1 md:hidden">
+                <div
+                  className="overflow-hidden"
+                  onTouchStart={(event) => {
+                    touchStartXRef.current = event.touches[0]?.clientX ?? null;
+                  }}
+                  onTouchEnd={(event) => {
+                    const startX = touchStartXRef.current;
+                    const endX = event.changedTouches[0]?.clientX ?? null;
+                    touchStartXRef.current = null;
+
+                    if (startX === null || endX === null) return;
+
+                    const deltaX = endX - startX;
+                    if (Math.abs(deltaX) < 40) return;
+
+                    if (deltaX > 0) {
+                      goToPreviousPlan();
+                      return;
+                    }
+
+                    goToNextPlan();
+                  }}
+                >
+                  <div
+                    className="flex transition-transform duration-500 ease-out"
+                    style={{ transform: `translateX(-${activePlanIndex * 100}%)` }}
+                  >
+                    {PLAN_ITEMS.map((plan, index) => (
+                      <div key={plan.name} className="w-full shrink-0 px-2">
+                        <PlanCard plan={plan} active={index === activePlanIndex} mobile />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
 
-              <div className="mt-3 flex justify-center gap-2 md:hidden">
-                {PLAN_ITEMS.map((plan, index) => (
+                <div className="mt-4 flex items-center justify-between gap-3">
                   <button
-                    key={plan.name}
                     type="button"
-                    aria-label={`Ir para plano ${plan.name}`}
-                    className={cn(
-                      "h-2.5 rounded-full transition-all duration-300",
-                      index === activePlanIndex ? "w-8 bg-cyan-400" : "w-2.5 bg-zinc-700",
-                    )}
-                    onClick={() => {
-                      const container = mobilePlansRef.current;
-                      const card = container?.querySelector<HTMLElement>(`[data-plan-index="${index}"]`);
-                      if (!container || !card) return;
+                    aria-label="Plano anterior"
+                    className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white"
+                    onClick={goToPreviousPlan}
+                  >
+                    ←
+                  </button>
 
-                      const targetLeft =
-                        card.offsetLeft - container.clientWidth / 2 + card.clientWidth / 2;
+                  <div className="flex justify-center gap-2">
+                    {PLAN_ITEMS.map((plan, index) => (
+                      <button
+                        key={plan.name}
+                        type="button"
+                        aria-label={`Ir para plano ${plan.name}`}
+                        className={cn(
+                          "h-2.5 rounded-full transition-all duration-300",
+                          index === activePlanIndex ? "w-8 bg-cyan-400" : "w-2.5 bg-zinc-700",
+                        )}
+                        onClick={() => goToPlan(index)}
+                      />
+                    ))}
+                  </div>
 
-                      container.scrollTo({ left: Math.max(targetLeft, 0), behavior: "smooth" });
-                    }}
-                  />
-                ))}
+                  <button
+                    type="button"
+                    aria-label="Próximo plano"
+                    className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white"
+                    onClick={goToNextPlan}
+                  >
+                    →
+                  </button>
+                </div>
               </div>
 
               {/* GRID */}
