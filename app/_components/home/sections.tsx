@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowRight, CheckCircle2, Smartphone } from "lucide-react";
 import {
@@ -27,6 +28,139 @@ const FOOTER_LINK_TARGETS: Record<string, string> = {
   Contato: "/#contato",
   Carreiras: "/#contato",
 };
+
+type PlanItem = {
+  name: string;
+  price: string;
+  description: string;
+  features: string[];
+  cta: string;
+  widthClass: string;
+  desktopWrapperClass: string;
+  accentClass: string;
+  featured?: boolean;
+  badge?: string;
+  solidCheck?: boolean;
+};
+
+const PLAN_ITEMS: PlanItem[] = [
+  {
+    name: "Free",
+    price: "R$ 0",
+    description: "Ideal para testar",
+    features: ["até 10.000 créditos de IA", "1 agentes", "1 APIs", "1 WhatsApp"],
+    cta: "Testar grátis",
+    widthClass: "w-[240px]",
+    desktopWrapperClass:
+      "relative scale-90 -translate-y-2 opacity-100 z-10 backdrop-brightness-50 hover:scale-100 hover:z-[999]",
+    accentClass: "text-emerald-500",
+  },
+  {
+    name: "Starter",
+    price: "R$ 29,90",
+    description: "Ideal para começar",
+    features: ["até 50.000 créditos de IA", "1 agente", "1 API", "1 WhatsApp"],
+    cta: "Começar agora",
+    widthClass: "w-[260px]",
+    desktopWrapperClass:
+      "scale-95 opacity-100 z-20 -translate-y-2 hover:scale-105 hover:z-[999]",
+    accentClass: "text-gradient",
+  },
+  {
+    name: "Pro",
+    price: "R$ 79,90",
+    description: "Melhor custo benefício",
+    features: ["até 200.000 créditos de IA", "3 agentes", "5 APIs", "1 WhatsApp"],
+    cta: "Começar agora →",
+    widthClass: "w-[250px]",
+    desktopWrapperClass: "scale-100 z-30 -translate-y-2 hover:scale-115",
+    accentClass: "text-gradient",
+    featured: true,
+    badge: "MAIS USADO",
+  },
+  {
+    name: "Business",
+    price: "R$ 149,90",
+    description: "Escalando",
+    features: ["até 500.000 créditos de IA", "10 agentes", "30 APIs", "10 WhatsApp"],
+    cta: "Começar agora",
+    widthClass: "w-[260px]",
+    desktopWrapperClass:
+      "scale-95 opacity-100 z-20 -translate-y-2 translate-x-2 hover:scale-100 hover:z-[999]",
+    accentClass: "text-gradient",
+  },
+  {
+    name: "Scale",
+    price: "R$ 299,90",
+    description: "Top",
+    features: ["até 1.500.000 créditos", "30 agentes", "100 APIs", "20 WhatsApp"],
+    cta: "Começar agora",
+    widthClass: "w-[240px]",
+    desktopWrapperClass:
+      "scale-90 opacity-70 z-10 -translate-y-2 hover:scale-100 hover:opacity-100 hover:z-[999]",
+    accentClass: "text-gradient",
+    solidCheck: true,
+  },
+];
+
+function PlanCard({ plan, active = false, mobile = false }: { plan: PlanItem; active?: boolean; mobile?: boolean }) {
+  const isFeatured = plan.featured || active;
+
+  return (
+    <div
+      className={cn(
+        "relative rounded-2xl bg-brand-dark p-6 text-left transition-all duration-300",
+        mobile ? "w-[82vw] max-w-[320px] snap-center shrink-0" : plan.widthClass,
+        isFeatured
+          ? "border border-blue-500/40 shadow-lg shadow-blue-900/20"
+          : "border border-zinc-800",
+        active ? "scale-100 opacity-100" : mobile ? "scale-[0.94] opacity-55" : "",
+      )}
+    >
+      {plan.badge && isFeatured ? (
+        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-3 py-1 text-xs text-white">
+          {plan.badge}
+        </span>
+      ) : null}
+
+      <span className={cn("font-bold", plan.accentClass)}>{plan.name}</span>
+
+      <h3 className="mt-2 text-2xl font-bold text-white">
+        {plan.price}
+        <span className="text-sm text-zinc-400">/mês</span>
+      </h3>
+
+      <p className="mt-2 text-sm text-zinc-400">{plan.description}</p>
+
+      <ul className="mt-4 space-y-2 text-sm text-zinc-300">
+        {plan.features.map((feature) => (
+          <li key={feature} className="flex items-center gap-2">
+            <span
+              className={cn(
+                "flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold",
+                plan.solidCheck ? "bg-cyan-400 text-black" : "bg-cyan-400/20 text-cyan-300",
+              )}
+            >
+              ✓
+            </span>
+            {feature}
+          </li>
+        ))}
+      </ul>
+
+      <button
+        className={cn(
+          "mt-6 w-full rounded-xl py-2 font-semibold text-white transition",
+          isFeatured
+            ? "bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-90"
+            : "bg-zinc-800 hover:bg-zinc-700",
+        )}
+      >
+        {plan.cta}
+      </button>
+    </div>
+  );
+}
 
 function ServiceCard({
   icon: Icon,
@@ -284,6 +418,70 @@ export function UseCasesSection() {
 }
 
 export function NichesSection() {
+  const [activePlanIndex, setActivePlanIndex] = useState(2);
+  const mobilePlansRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const container = mobilePlansRef.current;
+    if (!container) return;
+
+    const getTargetLeft = (card: HTMLElement) =>
+      card.offsetLeft - container.clientWidth / 2 + card.clientWidth / 2;
+
+    const updateActivePlan = () => {
+      const cards = Array.from(container.querySelectorAll<HTMLElement>("[data-plan-index]"));
+      if (!cards.length) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const containerCenter = containerRect.left + containerRect.width / 2;
+
+      let nextIndex = 0;
+      let minDistance = Number.POSITIVE_INFINITY;
+
+      cards.forEach((card) => {
+        const rect = card.getBoundingClientRect();
+        const cardCenter = rect.left + rect.width / 2;
+        const distance = Math.abs(containerCenter - cardCenter);
+
+        if (distance < minDistance) {
+          minDistance = distance;
+          nextIndex = Number(card.dataset.planIndex);
+        }
+      });
+
+      setActivePlanIndex((current) => (current === nextIndex ? current : nextIndex));
+    };
+
+    const centerCard = (index: number, behavior: ScrollBehavior) => {
+      const card = container.querySelector<HTMLElement>(`[data-plan-index="${index}"]`);
+      if (!card) return;
+
+      container.scrollTo({ left: Math.max(getTargetLeft(card), 0), behavior });
+    };
+
+    centerCard(2, "auto");
+    updateActivePlan();
+
+    let frame = 0;
+    const handleScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(updateActivePlan);
+    };
+
+    const handleResize = () => {
+      updateActivePlan();
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      container.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
   return (
     <section className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -299,8 +497,44 @@ export function NichesSection() {
               Infraestrutura digital de última geração projetada para empresas que exigem performance, segurança e inovação constante.
               </p>
 
+              <div
+                ref={mobilePlansRef}
+                className="mt-12 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-4 md:hidden [&::-webkit-scrollbar]:hidden"
+                style={{ scrollbarWidth: "none" }}
+              >
+                {PLAN_ITEMS.map((plan, index) => (
+                  <div key={plan.name} data-plan-index={index}>
+                    <PlanCard plan={plan} active={index === activePlanIndex} mobile />
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-3 flex justify-center gap-2 md:hidden">
+                {PLAN_ITEMS.map((plan, index) => (
+                  <button
+                    key={plan.name}
+                    type="button"
+                    aria-label={`Ir para plano ${plan.name}`}
+                    className={cn(
+                      "h-2.5 rounded-full transition-all duration-300",
+                      index === activePlanIndex ? "w-8 bg-cyan-400" : "w-2.5 bg-zinc-700",
+                    )}
+                    onClick={() => {
+                      const container = mobilePlansRef.current;
+                      const card = container?.querySelector<HTMLElement>(`[data-plan-index="${index}"]`);
+                      if (!container || !card) return;
+
+                      const targetLeft =
+                        card.offsetLeft - container.clientWidth / 2 + card.clientWidth / 2;
+
+                      container.scrollTo({ left: Math.max(targetLeft, 0), behavior: "smooth" });
+                    }}
+                  />
+                ))}
+              </div>
+
               {/* GRID */}
-              <div className="flex justify-center items-end -space-x-7 mt-19">
+              <div className="mt-19 hidden justify-center items-end -space-x-7 md:flex">
 
                 {/* FREE */}
                 <div className="plano-hover relative scale-90  -translate-y-2  opacity-100 z-10 transition-all backdrop-brightness-50 duration-300 hover:scale-100 hover:opacity-100 hover:z-[999]">
