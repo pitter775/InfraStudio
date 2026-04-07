@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowRight, CheckCircle2, Smartphone } from "lucide-react";
 import {
@@ -110,20 +110,33 @@ function PlanCard({ plan, active = false, mobile = false }: { plan: PlanItem; ac
     <div
       className={cn(
         "relative rounded-2xl bg-brand-dark p-6 text-left transition-all duration-300",
-        mobile ? "w-full max-w-none" : plan.widthClass,
+        mobile ? "w-full max-w-none overflow-hidden pt-10" : plan.widthClass,
         isFeatured
           ? "border border-blue-500/40 shadow-lg shadow-blue-900/20"
           : "border border-zinc-800",
         active ? "scale-100 opacity-100" : "",
       )}
     >
+      {mobile && active ? (
+        <>
+          <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[linear-gradient(135deg,rgba(37,99,235,0.24),rgba(34,211,238,0.12),transparent_68%)]" />
+          <div className="pointer-events-none absolute inset-[1px] rounded-2xl border border-cyan-300/25 shadow-[0_0_28px_rgba(34,211,238,0.14)]" />
+        </>
+      ) : null}
+
       {plan.badge && isFeatured ? (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-3 py-1 text-xs text-white">
+        <span
+          className={cn(
+            "absolute rounded-full bg-blue-600 px-3 py-1 text-xs text-white",
+            mobile ? "right-4 top-4" : "-top-3 left-1/2 -translate-x-1/2",
+          )}
+        >
           {plan.badge}
         </span>
       ) : null}
 
-      <span className={cn("font-bold", plan.accentClass)}>{plan.name}</span>
+      <div className="relative z-10">
+        <span className={cn("font-bold", plan.accentClass)}>{plan.name}</span>
 
       <h3 className="mt-2 text-2xl font-bold text-white">
         {plan.price}
@@ -158,6 +171,7 @@ function PlanCard({ plan, active = false, mobile = false }: { plan: PlanItem; ac
       >
         {plan.cta}
       </button>
+      </div>
     </div>
   );
 }
@@ -419,11 +433,27 @@ export function UseCasesSection() {
 
 export function NichesSection() {
   const [activePlanIndex, setActivePlanIndex] = useState(2);
-  const touchStartXRef = useRef<number | null>(null);
+  const mobilePlansRef = useRef<HTMLDivElement | null>(null);
+  const scrollFrameRef = useRef<number>(0);
   const planCount = PLAN_ITEMS.length;
+
+  useEffect(() => {
+    const container = mobilePlansRef.current;
+    const card = container?.querySelector<HTMLElement>(`[data-plan-index="${activePlanIndex}"]`);
+    if (!container || !card) return;
+
+    container.scrollLeft = card.offsetLeft;
+  }, []);
 
   const goToPlan = (index: number) => {
     const normalizedIndex = (index + planCount) % planCount;
+    const container = mobilePlansRef.current;
+    const card = container?.querySelector<HTMLElement>(`[data-plan-index="${normalizedIndex}"]`);
+
+    if (container && card) {
+      container.scrollTo({ left: card.offsetLeft, behavior: "smooth" });
+    }
+
     setActivePlanIndex(normalizedIndex);
   };
 
@@ -447,38 +477,39 @@ export function NichesSection() {
 
               <div className="mt-12 px-1 md:hidden">
                 <div
-                  className="overflow-hidden"
-                  onTouchStart={(event) => {
-                    touchStartXRef.current = event.touches[0]?.clientX ?? null;
-                  }}
-                  onTouchEnd={(event) => {
-                    const startX = touchStartXRef.current;
-                    const endX = event.changedTouches[0]?.clientX ?? null;
-                    touchStartXRef.current = null;
+                  ref={mobilePlansRef}
+                  className="flex snap-x snap-mandatory gap-0 overflow-x-auto scroll-smooth pb-2 [&::-webkit-scrollbar]:hidden"
+                  style={{ scrollbarWidth: "none" }}
+                  onScroll={(event) => {
+                    cancelAnimationFrame(scrollFrameRef.current);
+                    scrollFrameRef.current = window.requestAnimationFrame(() => {
+                      const container = event.currentTarget;
+                      const cards = Array.from(container.querySelectorAll<HTMLElement>("[data-plan-index]"));
+                      if (!cards.length) return;
 
-                    if (startX === null || endX === null) return;
+                      const containerCenter = container.scrollLeft + container.clientWidth / 2;
+                      let nextIndex = 0;
+                      let minDistance = Number.POSITIVE_INFINITY;
 
-                    const deltaX = endX - startX;
-                    if (Math.abs(deltaX) < 40) return;
+                      cards.forEach((card) => {
+                        const cardCenter = card.offsetLeft + card.clientWidth / 2;
+                        const distance = Math.abs(containerCenter - cardCenter);
 
-                    if (deltaX > 0) {
-                      goToPreviousPlan();
-                      return;
-                    }
+                        if (distance < minDistance) {
+                          minDistance = distance;
+                          nextIndex = Number(card.dataset.planIndex);
+                        }
+                      });
 
-                    goToNextPlan();
+                      setActivePlanIndex((current) => (current === nextIndex ? current : nextIndex));
+                    });
                   }}
                 >
-                  <div
-                    className="flex transition-transform duration-500 ease-out"
-                    style={{ transform: `translateX(-${activePlanIndex * 100}%)` }}
-                  >
                     {PLAN_ITEMS.map((plan, index) => (
-                      <div key={plan.name} className="w-full shrink-0 px-2">
+                      <div key={plan.name} data-plan-index={index} className="w-full shrink-0 snap-center px-2">
                         <PlanCard plan={plan} active={index === activePlanIndex} mobile />
                       </div>
                     ))}
-                  </div>
                 </div>
 
                 <div className="mt-4 flex items-center justify-between gap-3">
