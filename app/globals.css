@@ -230,6 +230,14 @@
   border-radius: 16px;
   padding: 1px;
   transition: all .3s ease;
+  opacity: 1;
+  /* z-index: 0; */
+}
+
+.plano-hover > * {
+  position: relative;
+  z-index: 999;
+  opacity: 1;
 }
 
 /* borda animada */

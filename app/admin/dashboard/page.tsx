@@ -623,7 +623,48 @@ export default function AdminDashboardPage() {
               );
             })}
           </div>
+
+          {!isCompactUserView ? (
+        <section className=" mt-5  grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+          <BaseSummaryPanel
+            agentes={agentes.length}
+            apis={apis.length}
+            widgets={widgets.length}
+            chats={chats.length}
+            totalChatTokens={totalChatTokens}
+            averageTokensPerChat={averageTokensPerChat}
+          />
+
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Canais</p>
+                <h2 className="mt-1 text-lg font-bold text-white">Consumo por canal</h2>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-right">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Top</p>
+                <p className="text-sm font-bold text-white">{formatInteger(channelUsage.length)} canais</p>
+              </div>
+            </div>
+            <ChannelUsageChart data={channelUsage} currency={usage?.costCurrency ?? "USD"} />
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {channelUsage.map((channel) => (
+                <div key={channel.canal} className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
+                  <p className="text-sm font-bold text-white">{channel.label}</p>
+                  <p className="mt-2 text-lg font-bold text-white">{formatCompact(channel.totalTokens)}</p>
+                  <p className="mt-1 text-xs text-slate-400">{formatInteger(channel.totalChats)} chats</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+
+      
         </div>
+
+        
 
         <div className="grid gap-3">
           <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
@@ -696,41 +737,7 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
-      {!isCompactUserView ? (
-        <section className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
-          <BaseSummaryPanel
-            agentes={agentes.length}
-            apis={apis.length}
-            widgets={widgets.length}
-            chats={chats.length}
-            totalChatTokens={totalChatTokens}
-            averageTokensPerChat={averageTokensPerChat}
-          />
 
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Canais</p>
-                <h2 className="mt-1 text-lg font-bold text-white">Consumo por canal</h2>
-              </div>
-              <div className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-right">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Top</p>
-                <p className="text-sm font-bold text-white">{formatInteger(channelUsage.length)} canais</p>
-              </div>
-            </div>
-            <ChannelUsageChart data={channelUsage} currency={usage?.costCurrency ?? "USD"} />
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              {channelUsage.map((channel) => (
-                <div key={channel.canal} className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
-                  <p className="text-sm font-bold text-white">{channel.label}</p>
-                  <p className="mt-2 text-lg font-bold text-white">{formatCompact(channel.totalTokens)}</p>
-                  <p className="mt-1 text-xs text-slate-400">{formatInteger(channel.totalChats)} chats</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      ) : null}
 
       <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
         {isCompactUserView ? (

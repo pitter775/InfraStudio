@@ -288,130 +288,244 @@ export function NichesSection() {
     <section className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-16 text-center">
-          <section className="w-full px-6 py-20">
+          <section className="w-full px-6 ">
             <div className="max-w-6xl mx-auto text-center">
 
               <h2 className="text-3xl md:text-4xl font-bold text-white">
-                Planos simples, sem surpresa
+                Escalando sem limites
               </h2>
 
               <p className="text-zinc-400 mt-3">
-                Escolha o plano ideal e comece na hora
+              Infraestrutura digital de última geração projetada para empresas que exigem performance, segurança e inovação constante.
               </p>
 
               {/* GRID */}
-              <div className="grid md:grid-cols-4 gap-6 mt-12">
+              <div className="flex justify-center items-end -space-x-7 mt-19">
+
+                {/* FREE */}
+                <div className="plano-hover relative scale-90  -translate-y-2  opacity-100 z-10 transition-all backdrop-brightness-50 duration-300 hover:scale-100 hover:opacity-100 hover:z-[999]">
+                  <div className="rounded-2xl border border-zinc-700 bg-brand-dark  p-6 text-left w-[240px]">
+
+                    <span className=" text-emerald-500 font-bold">Free</span>
+
+                    <h3 className="text-white text-2xl font-bold mt-2">
+                      R$ 0
+                      <span className="text-sm text-zinc-400">/mês</span>
+                    </h3>
+
+                    <p className="text-zinc-400 text-sm mt-2">
+                      Ideal para testar
+                    </p>
+
+                    <ul className="mt-4 space-y-2 text-sm text-zinc-300">
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        até 10.000 créditos de IA
+                      </li>
+
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        1 agentes
+                      </li>
+
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        1 APIs
+                      </li>
+
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        1 WhatsApp
+                      </li>
+                    </ul>
+
+                    <button className="w-full mt-6 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white py-2 font-semibold transition">
+                      Testar grátis
+                    </button>
+                  </div>
+                </div>
 
                 {/* STARTER */}
-                <div className="plano-hover">
-                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 text-left">
-                  <span className="text-xs text-zinc-400">Starter</span>
+                <div className="plano-hover scale-95  opacity-100 z-20 -translate-y-2 transition-all duration-300 hover:scale-105  hover:opacity-100 hover:z-[999]">
+                  <div className="rounded-2xl border border-zinc-800 bg-brand-dark p-6 text-left w-[260px]">
 
-                  <h3 className="text-white text-2xl font-bold mt-2">
-                    R$ 29,90
-                    <span className="text-sm text-zinc-400">/mês</span>
-                  </h3>
+                    <span className="text-gradient font-bold">Starter</span>
 
-                  <p className="text-zinc-400 text-sm mt-2">
-                    Ideal para começar
-                  </p>
+                    <h3 className="text-white text-2xl font-bold mt-2">
+                      R$ 29,90
+                      <span className="text-sm text-zinc-400">/mês</span>
+                    </h3>
 
-                  <ul className="mt-4 space-y-2 text-sm text-zinc-300">
-                    <li>50.000 tokens</li>
-                    <li>1 agente</li>
-                    <li>1 API</li>
-                    <li>1 WhatsApp</li>
-                  </ul>
+                    <p className="text-zinc-400 text-sm mt-2">
+                      Ideal para começar
+                    </p>
 
-                  <button className="w-full mt-6 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white py-2 font-semibold transition">
-                    Começar agora
-                  </button>
-                </div> </div>
+                    <ul className="mt-4 space-y-2 text-sm text-zinc-300">
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        até 50.000 créditos de IA
+                      </li>
 
-                {/* PRO (DESTAQUE) */}
-                <div className="relative rounded-2xl border border-blue-500/40 bg-zinc-900/60 p-6 text-left shadow-lg shadow-blue-900/20 scale-[1.03]">
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        1 agente
+                      </li>
 
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs bg-blue-600 px-3 py-1 rounded-full text-white">
-                    MAIS USADO
-                  </span>
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        1 API
+                      </li>
 
-                  <span className="text-xs text-zinc-400">Pro</span>
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        1 WhatsApp
+                      </li>
+                    </ul>
 
-                  <h3 className="text-white text-2xl font-bold mt-2">
-                    R$ 79,90
-                    <span className="text-sm text-zinc-400">/mês</span>
-                  </h3>
+                    <button className="w-full mt-6 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white py-2 font-semibold transition">
+                      Começar agora
+                    </button>
+                  </div>
+                </div>
 
-                  <p className="text-zinc-400 text-sm mt-2">
-                    Melhor custo benefício
-                  </p>
+                {/* PRO (CENTRO) */}
+                <div className="plano-hover scale-100 z-30 -translate-y-2 transition-all duration-300 hover:scale-115">
+                  <div className="relative rounded-2xl border border-blue-500/40 bg-brand-dark p-6 text-left w-[250px] shadow-lg shadow-blue-900/20 hover:z-[999]">
 
-                  <ul className="mt-4 space-y-2 text-sm text-zinc-300">
-                    <li>200.000 tokens</li>
-                    <li>3 agentes</li>
-                    <li>5 APIs</li>
-                    <li>1 WhatsApp</li>
-                  </ul>
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs bg-blue-600 px-3 py-1 rounded-full text-white">
+                      MAIS USADO
+                    </span>
 
-                  <button className="w-full mt-6 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-2 font-semibold hover:opacity-90 transition">
-                    Começar agora →
-                  </button>
+                    <span className="text-gradient font-bold">Pro</span>
+
+                    <h3 className="text-white text-2xl font-bold mt-2">
+                      R$ 79,90
+                      <span className="text-sm text-zinc-400">/mês</span>
+                    </h3>
+
+                    <p className="text-zinc-400 text-sm mt-2">
+                      Melhor custo benefício
+                    </p>
+
+                    <ul className="mt-4 space-y-2 text-sm text-zinc-300">
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        até 200.000 créditos de IA
+                      </li>
+
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        3 agentes
+                      </li>
+
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        5 APIs
+                      </li>
+
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        1 WhatsApp
+                      </li>
+                    </ul>
+
+                    <button className="w-full mt-6 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-2 font-semibold hover:opacity-90 transition">
+                      Começar agora →
+                    </button>
+                  </div>
                 </div>
 
                 {/* BUSINESS */}
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 text-left">
-                  <span className="text-xs text-zinc-400">Business</span>
+                <div className="plano-hover scale-95 opacity-100 z-20 -translate-y-2 translate-x-2  transition-all duration-300 hover:scale-100 hover:opacity-100 hover:z-[999]">
+                  <div className="rounded-2xl border border-zinc-800 bg-brand-dark p-6 text-left w-[260px]">
 
-                  <h3 className="text-white text-2xl font-bold mt-2">
-                    R$ 149,90
-                    <span className="text-sm text-zinc-400">/mês</span>
-                  </h3>
+                    <span className="text-gradient font-bold">Business</span>
 
-                  <p className="text-zinc-400 text-sm mt-2">
-                    Para operação estruturada
-                  </p>
+                    <h3 className="text-white text-2xl font-bold mt-2">
+                      R$ 149,90
+                      <span className="text-sm text-zinc-400">/mês</span>
+                    </h3>
 
-                  <ul className="mt-4 space-y-2 text-sm text-zinc-300">
-                    <li>500.000 tokens</li>
-                    <li>10 agentes</li>
-                    <li>20 APIs</li>
-                    <li>3 WhatsApp</li>
-                  </ul>
+                    <p className="text-zinc-400 text-sm mt-2">
+                      Escalando
+                    </p>
 
-                  <button className="w-full mt-6 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white py-2 font-semibold transition">
-                    Começar agora
-                  </button>
+                    <ul className="mt-4 space-y-2 text-sm text-zinc-300">
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        até 500.000 créditos de IA
+                      </li>
+
+                      
+
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        10 agentes
+                      </li>
+
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        30 APIs
+                      </li>
+
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        10 WhatsApp
+                      </li>
+                    </ul>
+
+                    <button className="w-full mt-6 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white py-2 font-semibold transition">
+                      Começar agora
+                    </button>
+                  </div>
                 </div>
 
                 {/* SCALE */}
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 text-left">
-                  <span className="text-xs text-zinc-400">Scale</span>
+                <div className="plano-hover scale-90 opacity-70 z-10 -translate-y-2  transition-all duration-300 hover:scale-100 hover:opacity-100 hover:z-50 hover:z-[999]">
+                  <div className="rounded-2xl border border-zinc-800 bg-brand-dark  p-6 text-left w-[240px]">
 
-                  <h3 className="text-white text-2xl font-bold mt-2">
-                    R$ 299,90
-                    <span className="text-sm text-zinc-400">/mês</span>
-                  </h3>
+                    <span className="text-gradient font-bold">Scale</span>
 
-                  <p className="text-zinc-400 text-sm mt-2">
-                    Para alto volume
-                  </p>
+                    <h3 className="text-white text-2xl font-bold mt-2">
+                      R$ 299,90
+                      <span className="text-sm text-zinc-400">/mês</span>
+                    </h3>
 
-                  <ul className="mt-4 space-y-2 text-sm text-zinc-300">
-                    <li>1.500.000 tokens</li>
-                    <li>30 agentes</li>
-                    <li>50 APIs</li>
-                    <li>10 WhatsApp</li>
-                  </ul>
+                    <p className="text-zinc-400 text-sm mt-2">
+                      Top
+                    </p>
 
-                  <button className="w-full mt-6 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white py-2 font-semibold transition">
-                    Começar agora
-                  </button>
+                    <ul className="mt-4 space-y-2 text-sm text-zinc-300">
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400 flex items-center justify-center text-[10px] text-black font-bold">✓</span>
+                        até 1.500.000 créditos 
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        30 agentes
+                      </li>
+
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        100 APIs
+                      </li>
+
+                      <li className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-cyan-400/20 flex items-center justify-center text-[10px] text-cyan-300 font-bold">✓</span>
+                        20 WhatsApp
+                      </li>
+                    </ul>
+
+                    <button className="w-full mt-6 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white py-2 font-semibold transition">
+                      Começar agora
+                    </button>
+                  </div>
                 </div>
 
-              </div>
+                </div>
             </div>
           </section>
-          <p className="text-slate-400 font-semibold ">Soluções adaptadas para diferentes nichos de mercado.</p>
+          <p className="text-slate-400 mt-15 font-semibold ">Soluções adaptadas para diferentes nichos de mercado.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
