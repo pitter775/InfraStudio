@@ -55,6 +55,71 @@ function ServiceCard({
   );
 }
 
+function UseCaseCard({
+  icon: Icon,
+  title,
+  description,
+  salesPitch,
+  delay,
+  backgroundImage,
+  backgroundPosition = "center center",
+  glowColor,
+}: (typeof USE_CASE_ITEMS)[number]) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ delay }}
+      className="group relative min-h-[520px] overflow-hidden rounded-[28px] bg-transparent transition-all duration-300 ease-out hover:-translate-y-1"
+    >
+      <div
+        className="absolute inset-0 scale-[1.06] bg-cover bg-no-repeat blur-[2px] saturate-[0.96] transition-all duration-500 ease-out group-hover:scale-[1.1] group-hover:brightness-110"
+        style={{
+          backgroundImage: `url(${backgroundImage})`,
+          backgroundPosition,
+        }}
+      />
+      {/* <div className="absolute inset-0 bg-black/16" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.42),rgba(0,0,0,0.18),rgba(0,0,0,0.02))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_34%)] opacity-30" />
+      <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[#020817]/58 via-[#020817]/22 to-transparent" /> */}
+
+      <div className="relative z-10 flex h-full flex-col justify-between p-7">
+        <div
+          className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/15 bg-black/18 text-[#f8fafc] backdrop-blur-xl transition-transform duration-300 group-hover:scale-[1.04]"
+          style={{
+            boxShadow: `0 0 0 1px rgba(255,255,255,0.04)`,
+          }}
+        >
+          <Icon size={24} />
+        </div>
+
+        <div className="max-w-[18rem] rounded-3xl bg-black/12 p-5 backdrop-blur-xl">
+          <h3
+            className="mb-3 text-[1.9rem] font-semibold leading-tight tracking-[-0.04em] text-white"
+            style={{ textShadow: "0 2px 14px rgba(0,0,0,0.45)" }}
+          >
+            {title}
+          </h3>
+          <p
+            className="text-sm leading-7 text-white/92"
+            style={{ textShadow: "0 2px 12px rgba(0,0,0,0.38)" }}
+          >
+            {description}
+          </p>
+          <p
+            className="mt-4 text-sm font-medium leading-6 text-white"
+            style={{ textShadow: "0 2px 12px rgba(0,0,0,0.38)" }}
+          >
+            {salesPitch}
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export function HeroSection({ onOpenChat }: { onOpenChat: () => void }) {
   return (
     <section className="relative overflow-hidden pb-20 pt-32 md:pb-32 md:pt-48">
@@ -272,9 +337,9 @@ export function UseCasesSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-4">
           {USE_CASE_ITEMS.map((item) => (
-            <ServiceCard key={item.title} {...item} />
+            <UseCaseCard key={item.title} {...item} />
           ))}
         </div>
       </div>

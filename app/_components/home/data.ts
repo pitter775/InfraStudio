@@ -71,6 +71,13 @@ export type ServiceItem = {
   delay: number;
 };
 
+export type UseCaseItem = ServiceItem & {
+  backgroundImage: string;
+  backgroundPosition?: string;
+  glowColor: string;
+  salesPitch: string;
+};
+
 export const SERVICE_ITEMS: ServiceItem[] = [
   {
     icon: Code2,
@@ -110,30 +117,50 @@ export const SERVICE_ITEMS: ServiceItem[] = [
   },
 ];
 
-export const USE_CASE_ITEMS: ServiceItem[] = [
+export const USE_CASE_ITEMS: UseCaseItem[] = [
   {
     icon: Smartphone,
     title: "WhatsApp",
-    description: "Atenda clientes automaticamente no canal que eles mais usam no dia a dia.",
+    description:
+      "Atenda clientes automaticamente no canal que eles mais usam no dia a dia, com respostas rápidas, continuidade no contexto e menos perda de oportunidade.",
     delay: 0.1,
+    backgroundImage: "/bg_whatsapp.png",
+    backgroundPosition: "center center",
+    glowColor: "rgba(34, 197, 94, 0.28)",
+    salesPitch: "Venda, suporte e triagem no mesmo fluxo sem depender de resposta manual.",
   },
   {
     icon: MessageSquare,
     title: "Site",
-    description: "Responda visitantes em tempo real enquanto eles navegam pela sua página.",
+    description:
+      "Responda visitantes em tempo real enquanto eles navegam pela sua página, tirando dúvidas no momento exato em que o lead está pronto para avançar.",
     delay: 0.2,
+    backgroundImage: "/bg_site.png",
+    backgroundPosition: "center center",
+    glowColor: "rgba(59, 130, 246, 0.28)",
+    salesPitch: "Transforme tráfego em conversa qualificada sem deixar o visitante esfriar.",
   },
   {
     icon: Puzzle,
     title: "Sistema",
-    description: "Leve o atendente para dentro do seu fluxo interno ou painel operacional.",
+    description:
+      "Leve o atendente para dentro do seu fluxo interno ou painel operacional, automatizando consultas, apoio à equipe e execução guiada dentro da operação.",
     delay: 0.3,
+    backgroundImage: "/bg_sistema.png",
+    backgroundPosition: "center center",
+    glowColor: "rgba(168, 85, 247, 0.28)",
+    salesPitch: "Mais produtividade para o time e menos gargalo em processos repetitivos.",
   },
   {
     icon: ShoppingBag,
     title: "Loja (Mercado Livre)",
-    description: "Automatize respostas e ganhe velocidade no atendimento da sua operação.",
+    description:
+      "Automatize respostas e ganhe velocidade no atendimento da sua operação, mantendo padrão comercial, agilidade e escala nos contatos da loja.",
     delay: 0.4,
+    backgroundImage: "/bg_mercadolivre.png",
+    backgroundPosition: "center center",
+    glowColor: "rgba(250, 204, 21, 0.18)",
+    salesPitch: "Atenda mais rápido, reduza fila e aumente conversão sem aumentar a equipe.",
   },
 ];
 

@@ -1,0 +1,18 @@
+{
+  "nome": "Demonstração",
+  "plano": "free",
+  "agentes": [
+    {
+      "nome": "Vendedor de Camisetas",
+      "descricao": "Agente focado em vendas",
+      "prompt_base": "Você é um vendedor especialista em camisetas. Seja direto, amigável e focado em conversão. Sempre leve para o WhatsApp."
+    }
+  ],
+  "apis": [
+    {
+      "nome": "Produtos Camisetas",
+      "url": "https://api.escuelajs.co/api/v1/products/?categoryId=2",
+      "metodo": "GET"
+    }
+  ]
+}
