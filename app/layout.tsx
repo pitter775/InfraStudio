@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Outfit } from "next/font/google";
+import Script from "next/script";
 import { seoConfig } from "@/lib/seo";
 import "./globals.css";
 
@@ -71,6 +72,20 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: import("react").ReactNode }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-WFVDDS2QY2"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-WFVDDS2QY2');
+          `}
+        </Script>
+      </head>
       <body className={`${outfit.variable} ${geistMono.variable}`} suppressHydrationWarning>
         {children}
       </body>

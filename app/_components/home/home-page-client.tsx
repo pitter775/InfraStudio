@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "motion/react";
-import { getCurrentProjectUser, signInWithProjectAuth, signOutProjectAuth } from "@/lib/auth";
+import { getCurrentProjectUser, registerWithProjectAuth, signInWithProjectAuth, signOutProjectAuth } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
 import { isAdminUser } from "@/lib/access";
 import { DEFAULT_CHAT_AGENT, DEFAULT_CHAT_PROJECT } from "@/app/_components/home/data";
@@ -10,20 +10,20 @@ import {
   ChatWidget,
   ExternalChatEmbed,
   FloatingChatButton,
-  LoginModal,
   Navbar,
 } from "@/app/_components/home/interactive";
+import { LoginModal } from "@/app/_components/home/login-modal";
 import {
   BenefitsSection,
   ContactSection,
   DemoSection,
   FooterSection,
   HeroSection,
-  NichesSection,
   ProcessSection,
   ServicesSection,
   UseCasesSection,
 } from "@/app/_components/home/sections";
+import { NichesSection } from "@/app/_components/home/plans-section";
 
 type HomePageClientProps = {
   projeto?: string;
@@ -31,6 +31,7 @@ type HomePageClientProps = {
   returnTo?: string;
   handoffError?: string;
   embed?: string;
+  authNotice?: string;
 };
 
 export function HomePageClient({
@@ -39,6 +40,7 @@ export function HomePageClient({
   returnTo,
   handoffError,
   embed,
+  authNotice,
 }: HomePageClientProps) {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -54,6 +56,18 @@ export function HomePageClient({
     resolvedHandoffError === "invalid_link"
       ? "Este link de atendimento expirou ou nao e mais valido. Peca um novo aviso no WhatsApp."
       : null;
+  const authNoticeMessage =
+    authNotice === "email_verified"
+      ? "Email confirmado com sucesso. Agora voce ja pode entrar."
+      : authNotice === "email_expired"
+        ? "Seu link de confirmacao expirou."
+        : authNotice === "email_already_verified"
+          ? "Este email ja foi confirmado."
+          : authNotice === "email_invalid"
+            ? "Link de confirmacao invalido."
+            : authNotice === "social_oauth_error"
+              ? "Nao foi possivel concluir o login social."
+            : null;
 
   useEffect(() => {
     const loadUser = async () => {
@@ -94,6 +108,15 @@ export function HomePageClient({
     setCurrentUser(null);
   };
 
+  const handleRegister = async (input: {
+    nome: string;
+    email: string;
+    senha: string;
+    confirmarSenha: string;
+  }) => {
+    return await registerWithProjectAuth(input);
+  };
+
   const openPreferredChat = () => {
     if (externalWidgetTestMode) {
       window.dispatchEvent(
@@ -128,6 +151,14 @@ export function HomePageClient({
         </div>
       ) : null}
 
+      {authNoticeMessage ? (
+        <div className="mx-auto mt-6 w-full max-w-5xl px-6">
+          <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+            {authNoticeMessage}
+          </div>
+        </div>
+      ) : null}
+
       <HeroSection onOpenChat={openPreferredChat} />
       <DemoSection />
       <ProcessSection />
@@ -143,6 +174,7 @@ export function HomePageClient({
           open={loginModalOpen}
           onClose={() => setLoginModalOpen(false)}
           onLogin={handleLogin}
+          onRegister={handleRegister}
         />
       </AnimatePresence>
 

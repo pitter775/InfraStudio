@@ -1,5 +1,7 @@
 import "server-only";
 
+import { getBillingPlanCatalogById } from "@/lib/billing-plan-catalog";
+import { appendSystemLog } from "@/lib/chat-logs";
 import { getDefaultOpenAIModel, resolvePricingModel } from "@/lib/openai-pricing";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -17,9 +19,6 @@ type PlanoRow = {
   preco_mensal: number | null;
   limite_tokens_total_mensal: number | null;
   limite_custo_mensal: number | null;
-  max_agentes: number | null;
-  max_apis: number | null;
-  max_whatsapp: number | null;
   ativo: boolean | null;
   permitir_excedente: boolean | null;
   custo_token_excedente: number | null;
@@ -28,6 +27,7 @@ type PlanoRow = {
 type ProjetoPlanoRow = {
   id: string;
   projeto_id: string;
+  plano_id?: string | null;
   nome_plano: string | null;
   modelo_referencia: string | null;
   limite_tokens_input_mensal: number | null;
@@ -38,8 +38,8 @@ type ProjetoPlanoRow = {
   bloqueado: boolean | null;
   bloqueado_motivo: string | null;
   observacoes: string | null;
-  permitir_excedente: boolean | null;
-  custo_token_excedente: number | null;
+  permitir_excedente?: boolean | null;
+  custo_token_excedente?: number | null;
 };
 
 type UsuarioLimiteIaRow = {
@@ -112,6 +112,7 @@ export type BillingUsageTotals = {
 export type ProjetoPlanoBilling = {
   id: string;
   projetoId: string;
+  planoId: string | null;
   nomePlano: string;
   modeloReferencia: string;
   limiteTokensInputMensal: number | null;
@@ -148,9 +149,6 @@ export type PlanoBillingRecord = {
   precoMensal: number;
   limiteTokensTotalMensal: number | null;
   limiteCustoMensal: number | null;
-  maxAgentes: number;
-  maxApis: number;
-  maxWhatsapp: number;
   ativo: boolean;
   permitirExcedente: boolean;
   custoTokenExcedente: number;
@@ -240,10 +238,59 @@ export type BillingDecision = {
   snapshot: BillingSnapshot;
 };
 
+const PROJETO_PLANO_SELECT_CORE =
+  "id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes";
+const PROJETO_PLANO_SELECT_WITH_PLAN_ID = `${PROJETO_PLANO_SELECT_CORE}, plano_id`;
+const PROJETO_PLANO_SELECT_WITH_OVERAGE = `${PROJETO_PLANO_SELECT_WITH_PLAN_ID}, permitir_excedente, custo_token_excedente`;
+
+function isProjetoPlanoOptionalColumnError(error: { message?: string | null; details?: string | null; hint?: string | null } | null | undefined) {
+  const source = `${error?.message ?? ""} ${error?.details ?? ""} ${error?.hint ?? ""}`.toLowerCase();
+  return source.includes("permitir_excedente") || source.includes("custo_token_excedente") || source.includes("plano_id");
+}
+
+async function selectProjetoPlanoCompat(
+  buildQuery: (selectClause: string) => {
+    maybeSingle?: () => unknown;
+    single?: () => unknown;
+  },
+  mode: "single" | "maybeSingle",
+) {
+  const execute = async (selectClause: string) => {
+    const query = buildQuery(selectClause);
+    return (mode === "single" ? await query.single!() : await query.maybeSingle!()) as {
+      data: unknown;
+      error: unknown;
+    };
+  };
+
+  let response = await execute(PROJETO_PLANO_SELECT_WITH_OVERAGE);
+  if (response.error && isProjetoPlanoOptionalColumnError(response.error as { message?: string | null; details?: string | null; hint?: string | null })) {
+    response = await execute(PROJETO_PLANO_SELECT_CORE);
+  }
+
+  return response;
+}
+
+async function selectProjetoPlanosCompat(buildQuery: (selectClause: string) => unknown) {
+  let response = (await buildQuery(PROJETO_PLANO_SELECT_WITH_OVERAGE)) as {
+    data: unknown;
+    error: unknown;
+  };
+  if (response.error && isProjetoPlanoOptionalColumnError(response.error as { message?: string | null; details?: string | null; hint?: string | null })) {
+    response = (await buildQuery(PROJETO_PLANO_SELECT_CORE)) as {
+      data: unknown;
+      error: unknown;
+    };
+  }
+
+  return response;
+}
+
 function mapProjetoPlano(row: ProjetoPlanoRow): ProjetoPlanoBilling {
   return {
     id: row.id,
     projetoId: row.projeto_id,
+    planoId: row.plano_id ?? null,
     nomePlano: row.nome_plano?.trim() || "padrao",
     modeloReferencia: row.modelo_referencia?.trim() || getDefaultOpenAIModel(),
     limiteTokensInputMensal: row.limite_tokens_input_mensal ?? null,
@@ -257,6 +304,33 @@ function mapProjetoPlano(row: ProjetoPlanoRow): ProjetoPlanoBilling {
     permitirExcedente: row.permitir_excedente === true,
     custoTokenExcedente: Number(row.custo_token_excedente ?? 0),
   };
+}
+
+async function appendBillingFailureLog(input: {
+  projetoId?: string | null;
+  etapa: string;
+  error: unknown;
+  payload?: Record<string, unknown> | null;
+}) {
+  const details =
+    typeof input.error === "object" && input.error !== null
+      ? (input.error as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown })
+      : null;
+
+  await appendSystemLog({
+    projetoId: input.projetoId ?? null,
+    tipo: "billing_error",
+    origem: "lib_billing",
+    descricao: `Falha no billing em ${input.etapa}.`,
+    payload: {
+      etapa: input.etapa,
+      code: details?.code ?? null,
+      message: details?.message ?? (input.error instanceof Error ? input.error.message : String(input.error)),
+      details: details?.details ?? null,
+      hint: details?.hint ?? null,
+      ...input.payload,
+    },
+  });
 }
 
 function mapUsuarioLimite(row: UsuarioLimiteIaRow): UsuarioLimiteBilling {
@@ -284,9 +358,6 @@ function mapPlano(row: PlanoRow): PlanoBillingRecord {
     precoMensal: Number(row.preco_mensal ?? 0),
     limiteTokensTotalMensal: row.limite_tokens_total_mensal ?? null,
     limiteCustoMensal: row.limite_custo_mensal ?? null,
-    maxAgentes: row.max_agentes ?? 0,
-    maxApis: row.max_apis ?? 0,
-    maxWhatsapp: row.max_whatsapp ?? 0,
     ativo: row.ativo !== false,
     permitirExcedente: row.permitir_excedente === true,
     custoTokenExcedente: Number(row.custo_token_excedente ?? 0),
@@ -650,11 +721,11 @@ async function listProjetosBillingBase(projetoIds?: string[]) {
 
   const ids = projetos.map((item) => item.id);
   const window = buildCurrentMonthWindow();
-  const [snapshotsResponse, ciclosResponse, consumosResponse] = await Promise.all([
-    supabase
-      .from("projetos_planos")
-      .select("id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes, permitir_excedente, custo_token_excedente")
-      .in("projeto_id", ids),
+  const snapshotsResponse = await selectProjetoPlanosCompat((selectClause) =>
+    supabase.from("projetos_planos").select(selectClause).in("projeto_id", ids),
+  );
+
+  const [ciclosResponse, consumosResponse] = await Promise.all([
     supabase
       .from("projetos_ciclos_uso")
       .select("id, projeto_id, data_inicio, data_fim, tokens_input, tokens_output, custo_total, fechado, created_at, limite_tokens_total, custo_token_excedente, permitir_excedente, alerta_80, alerta_100, bloqueado, excedente_tokens, excedente_custo, plano_id")
@@ -701,11 +772,10 @@ async function listProjetosBillingBase(projetoIds?: string[]) {
 
 export async function getProjetoPlanoBilling(projetoId: string) {
   const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("projetos_planos")
-    .select("id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes, permitir_excedente, custo_token_excedente")
-    .eq("projeto_id", projetoId)
-    .maybeSingle();
+  const { data, error } = await selectProjetoPlanoCompat(
+    (selectClause) => supabase.from("projetos_planos").select(selectClause).eq("projeto_id", projetoId),
+    "maybeSingle",
+  );
 
   if (error) {
     console.error("[billing] failed to load project snapshot", error);
@@ -722,20 +792,41 @@ export async function ensureProjetoPlanoBilling(projetoId: string) {
   }
 
   const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("projetos_planos")
-    .insert(({
-      projeto_id: projetoId,
-      nome_plano: "padrao",
-      modelo_referencia: getDefaultOpenAIModel(),
-      auto_bloquear: true,
-      bloqueado: false,
-    }) as never)
-    .select("id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes, permitir_excedente, custo_token_excedente")
-    .single();
+  const insertPayload = {
+    projeto_id: projetoId,
+    plano_id: null,
+    nome_plano: "padrao",
+    modelo_referencia: getDefaultOpenAIModel(),
+    auto_bloquear: true,
+    bloqueado: false,
+  };
+  const { error: insertError } = await supabase.from("projetos_planos").insert(insertPayload as never);
+
+  if (insertError) {
+    console.error("[billing] failed to ensure project snapshot", insertError);
+    await appendBillingFailureLog({
+      projetoId,
+      etapa: "ensure_projeto_plano_insert",
+      error: insertError,
+      payload: {
+        hasPlanoIdColumn: "plano_id" in insertPayload,
+      },
+    });
+    return null;
+  }
+
+  const { data, error } = await selectProjetoPlanoCompat(
+    (selectClause) => supabase.from("projetos_planos").select(selectClause).eq("projeto_id", projetoId),
+    "single",
+  );
 
   if (error || !data) {
     console.error("[billing] failed to ensure project snapshot", error);
+    await appendBillingFailureLog({
+      projetoId,
+      etapa: "ensure_projeto_plano_select",
+      error: error ?? new Error("Projeto plano nao retornado apos insert."),
+    });
     return null;
   }
 
@@ -744,6 +835,7 @@ export async function ensureProjetoPlanoBilling(projetoId: string) {
 
 export async function updateProjetoPlanoBilling(input: {
   projetoId: string;
+  planoId?: string | null;
   nomePlano?: string | null;
   modeloReferencia?: string | null;
   limiteTokensInputMensal?: number | string | null;
@@ -761,6 +853,7 @@ export async function updateProjetoPlanoBilling(input: {
   const current = await getProjetoPlanoBilling(input.projetoId);
   const payload = {
     projeto_id: input.projetoId,
+    plano_id: input.planoId === undefined ? current?.planoId ?? null : input.planoId,
     nome_plano: input.nomePlano === undefined ? current?.nomePlano ?? "padrao" : input.nomePlano?.trim() || "padrao",
     modelo_referencia:
       input.modeloReferencia === undefined
@@ -796,14 +889,40 @@ export async function updateProjetoPlanoBilling(input: {
     updated_at: new Date().toISOString(),
   };
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("projetos_planos")
     .upsert(payload as never, { onConflict: "projeto_id" })
-    .select("id, projeto_id, nome_plano, modelo_referencia, limite_tokens_input_mensal, limite_tokens_output_mensal, limite_tokens_total_mensal, limite_custo_mensal, auto_bloquear, bloqueado, bloqueado_motivo, observacoes, permitir_excedente, custo_token_excedente")
+    .select(PROJETO_PLANO_SELECT_WITH_OVERAGE)
     .single();
+
+  if (error && isProjetoPlanoOptionalColumnError(error)) {
+    const {
+      permitir_excedente: _permitirExcedente,
+      custo_token_excedente: _custoTokenExcedente,
+      plano_id: _planoId,
+      ...legacyPayload
+    } = payload;
+    const fallbackResponse = await supabase
+      .from("projetos_planos")
+      .upsert(legacyPayload as never, { onConflict: "projeto_id" })
+      .select(PROJETO_PLANO_SELECT_CORE)
+      .single();
+    data = fallbackResponse.data;
+    error = fallbackResponse.error;
+  }
 
   if (error || !data) {
     console.error("[billing] failed to update project snapshot", error);
+    await appendBillingFailureLog({
+      projetoId: input.projetoId,
+      etapa: "update_projeto_plano_snapshot",
+      error: error ?? new Error("Projeto plano nao retornado apos upsert."),
+      payload: {
+        planoId: input.planoId ?? null,
+        nomePlano: input.nomePlano ?? null,
+        modoCompat: Boolean(error && isProjetoPlanoOptionalColumnError(error)),
+      },
+    });
     return null;
   }
 
@@ -889,7 +1008,7 @@ export async function createProjetoUsageCycle(input: {
       bloqueado: false,
       excedente_tokens: 0,
       excedente_custo: 0,
-      plano_id: null,
+      plano_id: snapshot?.planoId ?? null,
       created_at: new Date().toISOString(),
     }) as never)
     .select("id, projeto_id, data_inicio, data_fim, tokens_input, tokens_output, custo_total, fechado, created_at, limite_tokens_total, custo_token_excedente, permitir_excedente, alerta_80, alerta_100, bloqueado, excedente_tokens, excedente_custo, plano_id")
@@ -898,6 +1017,58 @@ export async function createProjetoUsageCycle(input: {
   if (error || !data) {
     console.error("[billing] failed to create usage cycle", error);
     return null;
+  }
+
+  return mapCycle(data as ProjetoCicloUsoRow);
+}
+
+export async function syncProjetoUsageCycleWithSnapshot(projetoId: string, snapshot?: ProjetoPlanoBilling | null) {
+  const cycle = await getCicloAtual(projetoId);
+  if (!cycle) {
+    return null;
+  }
+
+  const currentSnapshot = snapshot ?? (await getProjetoPlanoBilling(projetoId));
+  if (!currentSnapshot) {
+    return cycle;
+  }
+
+  const totalTokens = cycle.totals.totalTokens;
+  const limiteTokensTotal = currentSnapshot.limiteTokensTotalMensal;
+  const permitirExcedente = currentSnapshot.permitirExcedente === true;
+  const custoTokenExcedente = currentSnapshot.custoTokenExcedente ?? 0;
+  const excedenteTokens =
+    permitirExcedente && limiteTokensTotal !== null && limiteTokensTotal > 0 ? Math.max(0, totalTokens - limiteTokensTotal) : 0;
+  const excedenteCusto = Number((excedenteTokens * custoTokenExcedente).toFixed(6));
+  const alerta80 = limiteTokensTotal !== null && limiteTokensTotal > 0 ? totalTokens / limiteTokensTotal >= 0.8 : false;
+  const alerta100 = limiteTokensTotal !== null && limiteTokensTotal > 0 ? totalTokens / limiteTokensTotal >= 1 : false;
+  const bloqueado = permitirExcedente
+    ? false
+    : limiteTokensTotal !== null && limiteTokensTotal > 0
+      ? totalTokens >= limiteTokensTotal
+      : false;
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("projetos_ciclos_uso")
+    .update({
+      limite_tokens_total: limiteTokensTotal,
+      custo_token_excedente: custoTokenExcedente,
+      permitir_excedente: permitirExcedente,
+      alerta_80: alerta80,
+      alerta_100: alerta100,
+      bloqueado,
+      excedente_tokens: excedenteTokens,
+      excedente_custo: excedenteCusto,
+      plano_id: currentSnapshot.planoId ?? null,
+    } as never)
+    .eq("id", cycle.id)
+    .select("id, projeto_id, data_inicio, data_fim, tokens_input, tokens_output, custo_total, fechado, created_at, limite_tokens_total, custo_token_excedente, permitir_excedente, alerta_80, alerta_100, bloqueado, excedente_tokens, excedente_custo, plano_id")
+    .single();
+
+  if (error || !data) {
+    console.error("[billing] failed to sync usage cycle with snapshot", error);
+    return cycle;
   }
 
   return mapCycle(data as ProjetoCicloUsoRow);
@@ -929,19 +1100,12 @@ export async function syncProjetoPlanoSnapshotFromPlan(input: {
   let plano = input.plano ?? null;
 
   if (!plano && input.planoId) {
-    const supabase = getSupabaseAdminClient();
-    const { data, error } = await supabase
-      .from("planos")
-      .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, permitir_excedente, custo_token_excedente")
-      .eq("id", input.planoId)
-      .maybeSingle();
+    plano = await getBillingPlanCatalogById(input.planoId);
 
-    if (error || !data) {
-      console.error("[billing] failed to load plan for snapshot sync", error);
+    if (!plano) {
+      console.error("[billing] failed to load plan for snapshot sync");
       return null;
     }
-
-    plano = mapPlano(data as PlanoRow);
   }
 
   if (!plano) {
@@ -950,6 +1114,7 @@ export async function syncProjetoPlanoSnapshotFromPlan(input: {
 
   return updateProjetoPlanoBilling({
     projetoId: input.projetoId,
+    planoId: plano.id,
     nomePlano: plano.nome,
     limiteTokensTotalMensal: plano.limiteTokensTotalMensal,
     limiteCustoMensal: plano.limiteCustoMensal,
@@ -1082,6 +1247,7 @@ export async function listBillingUsageByProject(projetoIds?: string[]) {
     const snapshot = base.snapshots.get(projeto.id) ?? {
       id: "",
       projetoId: projeto.id,
+      planoId: null,
       nomePlano: "padrao",
       modeloReferencia: getDefaultOpenAIModel(),
       limiteTokensInputMensal: null,
@@ -1102,6 +1268,7 @@ export async function listBillingUsageByProject(projetoIds?: string[]) {
       modoCobranca === "ilimitado"
         ? {
             ...snapshot,
+            planoId: null,
             nomePlano: "Ilimitado",
             limiteTokensInputMensal: null,
             limiteTokensOutputMensal: null,
@@ -1211,7 +1378,7 @@ export async function registrarUso(
     }
   }
 
-  return verifyProjetoBillingAccess(projetoId);
+  return verificarLimite(projetoId);
 }
 
 export async function verifyProjetoBillingAccess(projetoId: string) {
@@ -1322,6 +1489,7 @@ export async function verificarLimite(projetoId: string) {
   const reason = access.message;
   const next = await updateProjetoPlanoBilling({
     projetoId,
+    planoId: access.current.plano.planoId,
     nomePlano: access.current.plano.nomePlano,
     modeloReferencia: access.current.plano.modeloReferencia,
     limiteTokensInputMensal: access.current.plano.limiteTokensInputMensal,

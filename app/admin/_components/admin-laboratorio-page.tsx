@@ -321,7 +321,7 @@ export default function AdminChatLogsPage() {
                 type="button"
                 onClick={() => void loadLogs({ silent: true })}
                 disabled={loading || refreshing}
-                className="inline-flex items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-50 transition-colors hover:bg-cyan-500/16 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-3 text-sm font-semibold text-slate-100 transition-colors hover:bg-slate-900/70 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {refreshing ? "Atualizando..." : "Atualizar logs"}
               </button>
@@ -350,9 +350,9 @@ export default function AdminChatLogsPage() {
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Logs carregados</p>
             <p className="mt-2 text-2xl font-bold text-white">{summary.total}</p>
           </div>
-          <div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/10 px-4 py-3">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-100/80">Worker WhatsApp</p>
-            <p className="mt-2 text-2xl font-bold text-cyan-50">{summary.whatsapp}</p>
+          <div className="rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Worker WhatsApp</p>
+            <p className="mt-2 text-2xl font-bold text-white">{summary.whatsapp}</p>
           </div>
           <div className="rounded-2xl border border-amber-400/15 bg-amber-500/10 px-4 py-3">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-100/80">Bootstrap</p>
@@ -368,7 +368,7 @@ export default function AdminChatLogsPage() {
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="Buscar por channelId, numero, origem, tipo ou texto do evento"
-            className="w-full rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/30"
+            className="w-full rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-white/20"
           />
           <div className="flex flex-wrap gap-2">
             {[
@@ -382,7 +382,7 @@ export default function AdminChatLogsPage() {
                 onClick={() => setScope(option.id as "all" | "whatsapp" | "bootstrap")}
                 className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${
                   scope === option.id
-                    ? "border-cyan-400/25 bg-cyan-500/14 text-cyan-50"
+                    ? "border-white/12 bg-slate-900/80 text-white"
                     : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
                 }`}
               >
@@ -436,7 +436,7 @@ export default function AdminChatLogsPage() {
             log.level === "error"
               ? "border-red-500/35 bg-[linear-gradient(90deg,rgba(239,68,68,0.2),rgba(127,29,29,0.16))] text-red-100 shadow-[inset_3px_0_0_rgba(248,113,113,0.85)]"
               : isWorkerLog
-                ? "border-cyan-500/20 bg-[linear-gradient(90deg,rgba(6,182,212,0.14),rgba(8,47,73,0.12))] text-cyan-50 shadow-[inset_3px_0_0_rgba(34,211,238,0.55)]"
+                ? "border-white/10 bg-[linear-gradient(90deg,rgba(15,23,42,0.96),rgba(2,6,23,0.92))] text-slate-100 shadow-[inset_3px_0_0_rgba(34,211,238,0.35)]"
                 : "border-white/8 bg-white/[0.03] text-slate-300";
           const subtleTextClass = log.level === "error" ? "text-red-200/80" : "text-slate-500";
           const separatorClass = log.level === "error" ? "text-red-300/35" : "text-slate-600";
@@ -474,7 +474,7 @@ export default function AdminChatLogsPage() {
               {workerChannelId || workerPhone ? (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {workerChannelId ? (
-                    <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-100">
+                    <span className="rounded-full border border-white/10 bg-slate-900/80 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-200">
                       channel {workerChannelId}
                     </span>
                   ) : null}

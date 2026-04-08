@@ -26,6 +26,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       returnTo={readSearchParam(params.returnTo)}
       handoffError={readSearchParam(params.handoff_error)}
       embed={readSearchParam(params.embed)}
+      authNotice={readSearchParam(params.auth_notice)}
     />
   );
 }

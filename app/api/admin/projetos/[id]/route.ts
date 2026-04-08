@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { canAccessAdmin, canAccessGlobalAdmin, canAccessProject, canManageProject } from "@/lib/access";
 import { listAgentes } from "@/lib/agentes";
 import { listApis } from "@/lib/apis";
-import { getProjetoBillingOverview, updateProjetoPlanoBilling } from "@/lib/billing";
+import { getProjetoBillingOverview, updateProjetoPlanoBilling } from "@/lib/billing-access";
+import { applyProjectBillingSelection } from "@/lib/billing-project-snapshot";
 import { appendSystemLog } from "@/lib/chat-logs";
 import { listChatWidgets } from "@/lib/chat-widgets";
 import { listChats } from "@/lib/chats";
@@ -101,7 +102,9 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const body = (await request.json().catch(() => null)) as
     | {
+        applyPlano?: boolean | null;
         modoCobranca?: "plano" | "manual" | "ilimitado";
+        planoId?: string | null;
         nomePlano?: string | null;
         modeloReferencia?: string | null;
         limiteTokensInputMensal?: number | string | null;
@@ -116,6 +119,77 @@ export async function PATCH(request: Request, context: RouteContext) {
         custoTokenExcedente?: number | string | null;
       }
     | null;
+
+  await appendSystemLog({
+    projetoId: id,
+    tipo: "billing_update_try",
+    origem: "api_admin_projetos",
+    descricao: "Tentativa de atualizar billing do projeto.",
+    payload: {
+      modoCobranca: body?.modoCobranca ?? null,
+      planoId: body?.planoId ?? null,
+      nomePlano: body?.nomePlano ?? null,
+      limiteTokensTotalMensal: body?.limiteTokensTotalMensal ?? null,
+      limiteCustoMensal: body?.limiteCustoMensal ?? null,
+      permitirExcedente: body?.permitirExcedente ?? null,
+      autoBloquear: body?.autoBloquear ?? null,
+      bloqueado: body?.bloqueado ?? null,
+      userId: user?.id ?? null,
+      userEmail: user?.email ?? null,
+      applyPlano: body?.applyPlano ?? null,
+    },
+  });
+
+  if (body?.applyPlano === true && body?.modoCobranca && (body.modoCobranca === "ilimitado" || body.planoId)) {
+    const result = await applyProjectBillingSelection({
+      projetoId: id,
+      modoCobranca: body.modoCobranca,
+      planoId: body.planoId,
+    });
+
+    if (!result.ok) {
+      await appendSystemLog({
+        projetoId: id,
+        tipo: "billing_update_error",
+        origem: "api_admin_projetos",
+        descricao: "Falha ao aplicar plano centralizado no projeto.",
+        payload: {
+          modoCobranca: body.modoCobranca,
+          planoId: body.planoId ?? null,
+          reason: result.reason,
+        },
+      });
+
+      const status =
+        result.reason === "free_plan_limit_reached"
+          ? 409
+          : result.reason === "project_owner_missing" || result.reason === "plan_not_found"
+            ? 400
+            : 500;
+      const errorMessage =
+        result.reason === "free_plan_limit_reached"
+          ? "Cada usuario pode ter apenas um projeto com plano free."
+          : result.reason === "project_owner_missing"
+            ? "Este projeto precisa de um dono principal antes de receber plano free."
+            : "Nao foi possivel aplicar o plano ao projeto.";
+
+      return NextResponse.json({ error: errorMessage }, { status });
+    }
+
+    await appendSystemLog({
+      projetoId: id,
+      tipo: "billing_update_ok",
+      origem: "api_admin_projetos",
+      descricao: "Plano aplicado ao projeto com sucesso.",
+      payload: {
+        modoCobranca: body.modoCobranca,
+        planoId: result.plan.planoId,
+        nomePlano: result.plan.nomePlano,
+      },
+    });
+
+    return NextResponse.json({ plan: result.plan }, { status: 200 });
+  }
 
   if (body?.modoCobranca) {
     const projetos = await listProjetos();
@@ -136,12 +210,24 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
 
     if (!projeto) {
+      await appendSystemLog({
+        projetoId: id,
+        tipo: "billing_update_error",
+        origem: "api_admin_projetos",
+        descricao: "Falha ao atualizar modo de cobranca do projeto.",
+        payload: {
+          modoCobranca: body.modoCobranca,
+          planoId: body?.planoId ?? null,
+          nomePlano: body?.nomePlano ?? null,
+        },
+      });
       return NextResponse.json({ error: "Nao foi possivel atualizar o modo de cobranca do projeto." }, { status: 500 });
     }
   }
 
   const plan = await updateProjetoPlanoBilling({
     projetoId: id,
+    planoId: body?.planoId,
     nomePlano: body?.nomePlano,
     modeloReferencia: body?.modeloReferencia,
     limiteTokensInputMensal: body?.limiteTokensInputMensal,
@@ -157,8 +243,31 @@ export async function PATCH(request: Request, context: RouteContext) {
   });
 
   if (!plan) {
+    await appendSystemLog({
+      projetoId: id,
+      tipo: "billing_update_error",
+      origem: "api_admin_projetos",
+      descricao: "Falha ao salvar snapshot de billing do projeto.",
+      payload: {
+        modoCobranca: body?.modoCobranca ?? null,
+        planoId: body?.planoId ?? null,
+        nomePlano: body?.nomePlano ?? null,
+      },
+    });
     return NextResponse.json({ error: "Nao foi possivel salvar o plano do projeto." }, { status: 500 });
   }
+
+  await appendSystemLog({
+    projetoId: id,
+    tipo: "billing_update_ok",
+    origem: "api_admin_projetos",
+    descricao: "Billing do projeto atualizado com sucesso.",
+    payload: {
+      modoCobranca: body?.modoCobranca ?? null,
+      planoId: plan.planoId,
+      nomePlano: plan.nomePlano,
+    },
+  });
 
   return NextResponse.json({ plan }, { status: 200 });
 }

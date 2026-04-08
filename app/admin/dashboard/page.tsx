@@ -475,6 +475,16 @@ export default function AdminDashboardPage() {
     void loadDashboard();
   }, []);
 
+  if (loading) {
+    return (
+      <main className="space-y-6">
+        <section className="rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-4 text-sm text-slate-400">
+          Carregando dados consolidados do dashboard...
+        </section>
+      </main>
+    );
+  }
+
   const { usersCount, scope, userName, projetos, agentes, apis, widgets, chats, usage, projection, globalStatus, channelUsage } = state;
   const activeProjects = projetos.filter((projeto) => projeto.status === "ativo").length;
   const totalChatTokens = chats.reduce((sum, chat) => sum + Number(chat.totalTokens ?? 0), 0);
@@ -847,7 +857,7 @@ export default function AdminDashboardPage() {
       </section>
 
       {!isCompactUserView ? (
-      <section className="grid gap-4 xl:grid-cols-[1fr]">
+      <section className="hidden grid gap-4 xl:grid-cols-[1fr]">
         <div className="hidden rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/18 to-cyan-400/10 text-cyan-100">
@@ -928,7 +938,48 @@ export default function AdminDashboardPage() {
       </section>
       ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-[1fr]">
+      <section className="grid gap-4 lg:grid-cols-2">
+        {!isCompactUserView ? (
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500/18 to-amber-400/10 text-orange-100">
+              <Waypoints size={18} />
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Atividade recente</p>
+              <h2 className="mt-1 text-lg font-bold text-white">Ãšltimas mensagens com consumo</h2>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {(usage?.recentActivity ?? []).slice(0, 6).map((item) => (
+              <div key={item.id} className="flex items-start justify-between gap-4 rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-white">{summarizeTitle(item.titulo, 42)}</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {item.leadNome ?? "Lead nÃ£o identificado"} | {item.agenteNome ?? "Sem agente"}
+                  </p>
+                  <p className="mt-2 text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                    {item.role} | {formatDateTime(item.createdAt)}
+                  </p>
+                  <p className="mt-2 text-[11px] text-cyan-200">{item.origemLabel ?? "Sem classificacao"}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-white">{formatCompact(item.totalTokens)}</p>
+                  <p className="mt-1 text-[11px] text-emerald-300">{item.custo > 0 ? formatCurrency(item.custo, usage?.costCurrency ?? "USD") : "sem valor"}</p>
+                </div>
+              </div>
+            ))}
+
+            {!(usage?.recentActivity ?? []).length && (
+              <div className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-5 text-sm text-slate-400">
+                Nenhuma atividade recente com consumo de IA neste intervalo.
+              </div>
+            )}
+          </div>
+        </div>
+        ) : null}
+
         <div className="hidden rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
@@ -995,12 +1046,6 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       </section>
-
-      {loading ? (
-        <section className="rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-4 text-sm text-slate-400">
-          Carregando dados consolidados do dashboard...
-        </section>
-      ) : null}
     </main>
   );
 }

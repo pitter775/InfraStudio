@@ -15,6 +15,7 @@ type UsuarioFormState = {
   ativo: boolean;
   papel: "admin" | "viewer";
   projetoId?: string | null;
+  projetoIds: string[];
 };
 
 type ProjetoOption = {
@@ -29,6 +30,7 @@ const emptyForm: UsuarioFormState = {
   ativo: true,
   papel: "viewer",
   projetoId: null,
+  projetoIds: [],
 };
 
 const primaryActionButtonClass =
@@ -54,39 +56,55 @@ export default function AdminUsuariosPage() {
   const [form, setForm] = useState<UsuarioFormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersLoadError, setUsersLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
-      const user = await getCurrentProjectUser();
-      setCurrentUser(user);
+      try {
+        const user = await getCurrentProjectUser();
+        setCurrentUser(user);
 
-      if (!canAccessGlobalAdmin(user)) {
-        return;
+        if (!canAccessGlobalAdmin(user)) {
+          setUsersLoading(false);
+          return;
+        }
+
+        const [{ users: projectUsers, error: usersError }, projectsPayload] = await Promise.all([
+          listProjectUsers(),
+          fetch("/api/admin/projetos", { cache: "no-store" }).then((response) => response.json()),
+        ]);
+
+        setUsers(projectUsers);
+        setUsersLoadError(usersError);
+        setProjects((projectsPayload.projetos ?? []).map((project: { id: string; nome: string }) => ({ id: project.id, nome: project.nome })));
+      } catch (error) {
+        setUsers([]);
+        setUsersLoadError(error instanceof Error ? error.message : "Nao foi possivel carregar os usuarios.");
+      } finally {
+        setUsersLoading(false);
       }
-
-      const [projectUsers, projectsPayload] = await Promise.all([
-        listProjectUsers(),
-        fetch("/api/admin/projetos", { cache: "no-store" }).then((response) => response.json()),
-      ]);
-
-      setUsers(projectUsers);
-      setProjects((projectsPayload.projetos ?? []).map((project: { id: string; nome: string }) => ({ id: project.id, nome: project.nome })));
     };
 
     void loadData();
   }, []);
 
   const isAllowed = canAccessGlobalAdmin(currentUser);
+  const isProjectRequired = form.papel !== "admin";
 
   const refreshUsers = async () => {
-    setUsers(await listProjectUsers());
+    setUsersLoading(true);
+    const { users: nextUsers, error } = await listProjectUsers();
+    setUsers(nextUsers);
+    setUsersLoadError(error);
+    setUsersLoading(false);
   };
 
   const handleSubmit = async () => {
     setSaving(true);
     setFeedback(null);
 
-    if (!form.projetoId) {
+    if (isProjectRequired && form.projetoIds.length === 0) {
       setFeedback("Selecione um projeto para vincular o usuario.");
       setSaving(false);
       return;
@@ -123,9 +141,23 @@ export default function AdminUsuariosPage() {
       senha: "",
       ativo: user.status === "ativo",
       papel: user.role === "admin" ? "admin" : "viewer",
-      projetoId: user.memberships?.[0]?.projetoId ?? currentUser?.currentProjectId ?? null,
+      projetoId: user.memberships?.[0]?.projetoId ?? null,
+      projetoIds: (user.memberships ?? []).map((membership) => membership.projetoId).filter(Boolean) as string[],
     });
     setFeedback(null);
+  };
+
+  const toggleProject = (projectId: string) => {
+    setForm((prev) => {
+      const exists = prev.projetoIds.includes(projectId);
+      const projetoIds = exists ? prev.projetoIds.filter((id) => id !== projectId) : [...prev.projetoIds, projectId];
+
+      return {
+        ...prev,
+        projetoIds,
+        projetoId: projetoIds[0] ?? null,
+      };
+    });
   };
 
   const handleDelete = async (user: AppUser) => {
@@ -251,19 +283,38 @@ export default function AdminUsuariosPage() {
                   </label>
 
                   <label className="space-y-2">
-                    <span className="text-sm font-semibold text-slate-300">Projeto</span>
-                    <select
-                      value={form.projetoId ?? ""}
-                      onChange={(event) => setForm((prev) => ({ ...prev, projetoId: event.target.value || null }))}
-                      className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white outline-none"
-                    >
-                      <option value="">Selecione um projeto</option>
-                      {projects.map((project) => (
-                        <option key={project.id} value={project.id}>
-                          {project.nome}
-                        </option>
-                      ))}
-                    </select>
+                    <span className="text-sm font-semibold text-slate-300">
+                      Projetos {isProjectRequired ? <span className="text-rose-300">*</span> : <span className="text-slate-500">(opcional)</span>}
+                    </span>
+                    <div className="max-h-56 space-y-2 overflow-y-auto rounded-xl border border-white/10 bg-slate-950/40 p-3">
+                      {projects.map((project) => {
+                        const checked = form.projetoIds.includes(project.id);
+
+                        return (
+                          <label
+                            key={project.id}
+                            className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm transition ${
+                              checked
+                                ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-100"
+                                : "border-white/8 bg-white/5 text-slate-300 hover:border-white/15 hover:bg-white/8"
+                            }`}
+                          >
+                            <span className="truncate">{project.nome}</span>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleProject(project.id)}
+                              className="h-4 w-4 rounded border-white/20 bg-slate-950/50 text-cyan-400"
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      {isProjectRequired
+                        ? "Usuarios comuns precisam nascer vinculados a pelo menos um projeto."
+                        : "Admin global pode ser criado sem projeto e vinculado depois."}
+                    </p>
                   </label>
 
                   <label className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
@@ -351,50 +402,70 @@ export default function AdminUsuariosPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map((user) => (
-                      <tr key={user.id} className="border-t border-white/5 text-sm text-slate-300">
-                        <td className="px-6 py-4 font-semibold text-white">{user.name}</td>
-                        <td className="px-6 py-4">{user.email}</td>
-                        <td className="px-6 py-4">
-                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${user.role === "admin" ? "bg-cyan-500/15 text-cyan-200" : "bg-slate-800 text-slate-300"}`}>
-                            {user.role === "admin" ? "admin" : "comum"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <button
-                            type="button"
-                            onClick={() => void handleToggleStatus(user)}
-                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                              user.status === "ativo"
-                                ? "bg-emerald-500/15 text-emerald-300"
-                                : "bg-amber-500/15 text-amber-300"
-                            }`}
-                          >
-                            {user.status}
-                          </button>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleEdit(user)}
-                              className={`${warningActionButtonClass} px-3 py-2`}
-                              title="Editar"
-                            >
-                              <Pencil size={15} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleDelete(user)}
-                              className={`${dangerActionButtonClass} px-3 py-2`}
-                              title="Excluir"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
+                    {usersLoading ? (
+                      <tr className="border-t border-white/5 text-sm text-slate-300">
+                        <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                          Carregando usuarios...
                         </td>
                       </tr>
-                    ))}
+                    ) : usersLoadError ? (
+                      <tr className="border-t border-white/5 text-sm text-slate-300">
+                        <td colSpan={5} className="px-6 py-8 text-center text-rose-200">
+                          {usersLoadError}
+                        </td>
+                      </tr>
+                    ) : users.length ? (
+                      users.map((user) => (
+                        <tr key={user.id} className="border-t border-white/5 text-sm text-slate-300">
+                          <td className="px-6 py-4 font-semibold text-white">{user.name}</td>
+                          <td className="px-6 py-4">{user.email}</td>
+                          <td className="px-6 py-4">
+                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${user.role === "admin" ? "bg-cyan-500/15 text-cyan-200" : "bg-slate-800 text-slate-300"}`}>
+                              {user.role === "admin" ? "admin" : "comum"}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <button
+                              type="button"
+                              onClick={() => void handleToggleStatus(user)}
+                              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                user.status === "ativo"
+                                  ? "bg-emerald-500/15 text-emerald-300"
+                                  : "bg-amber-500/15 text-amber-300"
+                              }`}
+                            >
+                              {user.status}
+                            </button>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleEdit(user)}
+                                className={`${warningActionButtonClass} px-3 py-2`}
+                                title="Editar"
+                              >
+                                <Pencil size={15} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleDelete(user)}
+                                className={`${dangerActionButtonClass} px-3 py-2`}
+                                title="Excluir"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="border-t border-white/5 text-sm text-slate-300">
+                        <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                          Nenhum usuario encontrado.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

@@ -711,44 +711,39 @@ function ProjectModelDropdown({
         type="button"
         onClick={() => setOpen((current) => !current)}
         disabled={saving}
-        className="group inline-flex min-w-[120px] items-center justify-between gap-3 rounded-full border border-cyan-300/14 bg-[linear-gradient(135deg,rgba(15,23,42,0.86),rgba(15,23,42,0.62))] px-3.5 py-2 text-left shadow-[0_14px_32px_rgba(2,8,23,0.28),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition-all duration-200 hover:border-cyan-300/28 hover:bg-[linear-gradient(135deg,rgba(20,30,48,0.94),rgba(15,23,42,0.75))] hover:shadow-[0_18px_38px_rgba(8,47,73,0.35)] disabled:cursor-not-allowed disabled:opacity-70"
+        className="group inline-flex min-w-[104px] max-w-[148px] items-center justify-between gap-2 rounded-full border border-cyan-300/14 bg-[linear-gradient(135deg,rgba(15,23,42,0.86),rgba(15,23,42,0.62))] px-3 py-1.5 text-left shadow-[0_14px_32px_rgba(2,8,23,0.28),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition-all duration-200 hover:border-cyan-300/28 hover:bg-[linear-gradient(135deg,rgba(20,30,48,0.94),rgba(15,23,42,0.75))] hover:shadow-[0_18px_38px_rgba(8,47,73,0.35)] disabled:cursor-not-allowed disabled:opacity-70"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className="min-w-0">
-          
-          <span className="mt-1 block truncate text-xs  text-cyan-200">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[11px] font-medium text-cyan-200">
             {saving ? "Salvando..." : formatModelNameLabel(selectedModel?.nome)}
           </span>
         </span>
-        <span className="flex items-center gap-2 text-cyan-100/72">
-          {saving ? <LoaderCircle size={15} className="animate-spin" /> : null}
-          <ChevronDown size={16} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        <span className="flex items-center gap-1.5 text-cyan-100/72">
+          {saving ? <LoaderCircle size={13} className="animate-spin" /> : null}
+          <ChevronDown size={14} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
         </span>
       </button>
 
       <div
-        className={`absolute right-0 top-[calc(100%+12px)] w-[min(360px,calc(100vw-2rem))] origin-top-right rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,8,23,0.94))] p-2 shadow-[0_22px_70px_rgba(2,8,23,0.45),0_0_0_1px_rgba(255,255,255,0.03)] backdrop-blur-2xl transition-all duration-200 ${open ? "pointer-events-auto translate-y-0 opacity-100" : "pointer-events-none -translate-y-2 opacity-0"}`}
+        className={`absolute left-1/2 top-[calc(100%+10px)] z-30 w-[min(1120px,calc(100vw-2.5rem))] -translate-x-1/2 origin-top rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,8,23,0.94))] p-1.5 shadow-[0_22px_70px_rgba(2,8,23,0.45),0_0_0_1px_rgba(255,255,255,0.03)] backdrop-blur-2xl transition-all duration-200 ${open ? "pointer-events-auto translate-y-0 opacity-100" : "pointer-events-none -translate-y-2 opacity-0"}`}
       >
-        <div className="mb-1 px-3 pt-2">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Modelos disponiveis</p>
-        </div>
-
-        <div role="listbox" className="max-h-[320px] space-y-1 overflow-y-auto pb-1">
+        <div role="listbox" className="max-h-[340px] space-y-1 overflow-y-auto pb-1">
           <button
             type="button"
             onClick={() => handleSelect(null)}
-            className={`flex w-full cursor-pointer items-start justify-between gap-3 rounded-2xl border px-3.5 py-3 text-left transition-all duration-200 ${
+            className={`flex w-full cursor-pointer items-start justify-between gap-2 rounded-[18px] border px-3 py-2.5 text-left transition-all duration-200 ${
               selectedModelId === null
                 ? "border-cyan-300/26 bg-cyan-400/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 : "border-transparent bg-white/[0.025] hover:border-white/10 hover:bg-white/[0.05]"
             }`}
           >
             <span className="min-w-0">
-              <span className="block text-sm font-semibold text-white">Padrao do sistema</span>
-              <span className="mt-1 block text-xs leading-relaxed text-slate-400">Fallback automatico em GPT-4o mini</span>
+              <span className="block text-[13px] font-semibold text-white">Padrao do sistema</span>
+              <span className="mt-0.5 block text-[11px] leading-snug text-slate-400">Fallback automatico em GPT-4o mini</span>
             </span>
-            {selectedModelId === null ? <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-cyan-200" /> : null}
+            {selectedModelId === null ? <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-cyan-200" /> : null}
           </button>
 
           {modelos.map((modelo) => {
@@ -759,17 +754,17 @@ function ProjectModelDropdown({
                 key={modelo.id}
                 type="button"
                 onClick={() => handleSelect(modelo.id)}
-                className={`flex w-full cursor-pointer items-start justify-between gap-3 rounded-2xl border px-3.5 py-3 text-left transition-all duration-200 ${
+                className={`flex w-full cursor-pointer items-start justify-between gap-2 rounded-[18px] border px-3 py-2.5 text-left transition-all duration-200 ${
                   isActive
                     ? "border-cyan-300/26 bg-cyan-400/12 shadow-[0_14px_30px_rgba(34,211,238,0.08),inset_0_1px_0_rgba(255,255,255,0.04)]"
                     : "border-transparent bg-white/[0.025] hover:border-white/10 hover:bg-white/[0.05]"
                 }`}
               >
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-white">{formatModelNameLabel(modelo.nome)}</span>
-                  <span className="mt-1 block text-xs leading-relaxed text-slate-400">{buildModelMetaLabel(modelo)}</span>
+                  <span className="block text-[13px] font-semibold text-white">{formatModelNameLabel(modelo.nome)}</span>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-slate-400">{buildModelMetaLabel(modelo)}</span>
                 </span>
-                {isActive ? <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-cyan-200" /> : null}
+                {isActive ? <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-cyan-200" /> : null}
               </button>
             );
           })}
@@ -4541,6 +4536,181 @@ function WidgetCodeModal({
   );
 }
 
+function BillingPlanModal({
+  open,
+  billing,
+  selectedBillingModel,
+  billingPlanForm,
+  savingBillingPlan,
+  premiumInteractiveClass,
+  feedbackBilling,
+  onClose,
+  onChange,
+  onSave,
+}: {
+  open: boolean;
+  billing: ProjetoBillingSection | null;
+  selectedBillingModel: BillingPricingModel | null;
+  billingPlanForm: BillingPlanFormState;
+  savingBillingPlan: boolean;
+  premiumInteractiveClass: string;
+  feedbackBilling: string | null;
+  onClose: () => void;
+  onChange: (next: Partial<BillingPlanFormState>) => void;
+  onSave: () => void;
+}) {
+  if (!open || !billing) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
+      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-200">Plano</p>
+            <h2 className="mt-2 inline-flex items-center gap-2 text-[1.85rem] font-semibold tracking-[-0.035em] text-slate-100/88">
+              <Coins size={20} className="text-emerald-200" />
+              Plano e consumo de IA
+            </h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Referencia financeira do projeto em {billing.windowLabel}, com {selectedBillingModel?.label ?? "GPT-4o Mini"} como base atual.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-300">
+              <ShieldAlert size={13} className={billingPlanForm.bloqueado ? "text-rose-300" : billingPlanForm.autoBloquear ? "text-amber-200" : "text-emerald-200"} />
+              {billingPlanForm.bloqueado ? "Bloqueio manual ativo" : billingPlanForm.autoBloquear ? "Bloqueio automatico ativo" : "Bloqueio automatico desligado"}
+            </div>
+            <button type="button" onClick={onClose} className={`${neutralActionButtonClass} px-3`} aria-label="Fechar modal">
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="space-y-4">
+            {feedbackBilling ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{feedbackBilling}</div> : null}
+
+            <div className="grid gap-3 xl:grid-cols-5">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Modelo atual</p>
+                <p className="mt-2 text-lg font-medium text-slate-100/88">{selectedBillingModel?.label ?? billing.plan.modeloReferencia}</p>
+                <p className="mt-1 text-xs text-slate-400">{billing.plan.nomePlano}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tokens input</p>
+                <p className="mt-2 text-[1.65rem] font-semibold tracking-[-0.03em] text-slate-100/86">{formatIntegerLabel(billing.currentUsage.tokensInput)}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tokens output</p>
+                <p className="mt-2 text-[1.65rem] font-semibold tracking-[-0.03em] text-slate-100/86">{formatIntegerLabel(billing.currentUsage.tokensOutput)}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tokens totais</p>
+                <p className="mt-2 text-[1.65rem] font-semibold tracking-[-0.03em] text-slate-100/86">{formatIntegerLabel(billing.currentUsage.totalTokens)}</p>
+              </div>
+              <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/10 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100/75">Custo atual</p>
+                <p className="mt-2 text-[1.65rem] font-semibold tracking-[-0.03em] text-slate-100/86">{formatUsdLabel(billing.currentUsage.custoTotal)}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-slate-200">Nome do plano</span>
+                  <input value={billingPlanForm.nomePlano} onChange={(event) => onChange({ nomePlano: event.target.value })} disabled={!billing.canManage} className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60" />
+                </label>
+                <label className="grid gap-2">
+                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-200"><Cpu size={15} className="text-cyan-200" />Modelo de referencia</span>
+                  <select value={billingPlanForm.modeloReferencia} onChange={(event) => onChange({ modeloReferencia: event.target.value })} disabled={!billing.canManage} className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60">
+                    {billing.pricingModels.map((item) => (
+                      <option key={item.id} value={item.id} className="bg-slate-950 text-white">
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-slate-200">Limite mensal de tokens input</span>
+                  <input value={billingPlanForm.limiteTokensInputMensal} onChange={(event) => onChange({ limiteTokensInputMensal: event.target.value })} disabled={!billing.canManage} inputMode="numeric" placeholder="vazio = sem limite" className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60" />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-slate-200">Limite mensal de tokens output</span>
+                  <input value={billingPlanForm.limiteTokensOutputMensal} onChange={(event) => onChange({ limiteTokensOutputMensal: event.target.value })} disabled={!billing.canManage} inputMode="numeric" placeholder="vazio = sem limite" className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60" />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-slate-200">Limite mensal total de tokens</span>
+                  <input value={billingPlanForm.limiteTokensTotalMensal} onChange={(event) => onChange({ limiteTokensTotalMensal: event.target.value })} disabled={!billing.canManage} inputMode="numeric" placeholder="vazio = sem limite" className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60" />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-slate-200">Limite mensal de custo (USD)</span>
+                  <input value={billingPlanForm.limiteCustoMensal} onChange={(event) => onChange({ limiteCustoMensal: event.target.value.replace(",", ".") })} disabled={!billing.canManage} inputMode="decimal" placeholder="vazio = sem limite" className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60" />
+                </label>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/10 p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-100/80">Tabela usada na referencia</p>
+                  <p className="mt-2 text-sm font-semibold text-white">{selectedBillingModel?.label ?? "GPT-4o Mini"}</p>
+                  <p className="mt-2 text-xs text-cyan-50/80">Input: {formatUsdLabel(selectedBillingModel?.inputPerMillionUsd ?? 0)} por 1M tokens</p>
+                  <p className="mt-1 text-xs text-cyan-50/80">Output: {formatUsdLabel(selectedBillingModel?.outputPerMillionUsd ?? 0)} por 1M tokens</p>
+                </div>
+
+                <label className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                  <span>
+                    <span className="block text-sm font-semibold text-white">Bloqueio automatico</span>
+                    <span className="mt-1 block text-xs text-slate-400">Interrompe consumo ao bater os limites configurados.</span>
+                  </span>
+                  <span className="relative inline-flex items-center">
+                    <input type="checkbox" checked={billingPlanForm.autoBloquear} onChange={(event) => onChange({ autoBloquear: event.target.checked })} disabled={!billing.canManage} className="peer sr-only" />
+                    <span className="h-7 w-12 rounded-full bg-white/10 transition-colors peer-checked:bg-emerald-500/30" />
+                    <span className="pointer-events-none absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-checked:bg-emerald-200" />
+                  </span>
+                </label>
+
+                <label className="flex items-center justify-between gap-3 rounded-2xl border border-rose-400/15 bg-rose-500/10 px-4 py-3">
+                  <span>
+                    <span className="block text-sm font-semibold text-white">Bloqueio manual</span>
+                    <span className="mt-1 block text-xs text-rose-100/75">Forca a parada do uso mesmo sem atingir o limite.</span>
+                  </span>
+                  <span className="relative inline-flex items-center">
+                    <input type="checkbox" checked={billingPlanForm.bloqueado} onChange={(event) => onChange({ bloqueado: event.target.checked })} disabled={!billing.canManage} className="peer sr-only" />
+                    <span className="h-7 w-12 rounded-full bg-white/10 transition-colors peer-checked:bg-rose-500/30" />
+                    <span className="pointer-events-none absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-checked:bg-rose-200" />
+                  </span>
+                </label>
+
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-slate-200">Motivo do bloqueio</span>
+                  <textarea value={billingPlanForm.bloqueadoMotivo} onChange={(event) => onChange({ bloqueadoMotivo: event.target.value })} disabled={!billing.canManage} rows={3} className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60" />
+                </label>
+
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-slate-200">Observacoes financeiras</span>
+                  <textarea value={billingPlanForm.observacoes} onChange={(event) => onChange({ observacoes: event.target.value })} disabled={!billing.canManage} rows={4} className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60" />
+                </label>
+
+                {billing.canManage ? (
+                  <button type="button" onClick={onSave} disabled={savingBillingPlan} className={`inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-3 text-sm font-semibold text-white ${premiumInteractiveClass} disabled:cursor-not-allowed disabled:opacity-60`}>
+                    {savingBillingPlan ? <BusyIcon /> : <Coins size={16} />}
+                    Salvar
+                  </button>
+                ) : (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+                    Voce pode visualizar o plano, mas nao tem permissao para alterar as definicoes financeiras deste projeto.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EmbeddedAgentTestChat({
   projeto,
   agente,
@@ -4711,6 +4881,7 @@ export default function AdminProjetoDetalhePage() {
   const [connectorModalOpen, setConnectorModalOpen] = useState(false);
   const [widgetModalOpen, setWidgetModalOpen] = useState(false);
   const [whatsAppChannelModalOpen, setWhatsAppChannelModalOpen] = useState(false);
+  const [billingModalOpen, setBillingModalOpen] = useState(false);
   const [agentConnectionSavingKey, setAgentConnectionSavingKey] = useState<string | null>(null);
   const [chatHistoryOpen, setChatHistoryOpen] = useState(false);
   const [chatHistoryLoading, setChatHistoryLoading] = useState(false);
@@ -7585,14 +7756,26 @@ export default function AdminProjetoDetalhePage() {
                 </div>
               </div>
 
-              <Link
-                href="/admin/projetos"
-                className="infra-click-pulse inline-flex h-11 w-11 items-center justify-center self-start rounded-2xl border border-white/10 bg-white/5 text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/10"
-                aria-label="Voltar para projetos"
-                title="Voltar para projetos"
-              >
-                <ArrowLeft size={18} />
-              </Link>
+              <div className="flex flex-col items-end gap-3 self-start">
+                <Link
+                  href="/admin/projetos"
+                  className="infra-click-pulse inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/10"
+                  aria-label="Voltar para projetos"
+                  title="Voltar para projetos"
+                >
+                  <ArrowLeft size={18} />
+                </Link>
+                {data.billing ? (
+                  <button
+                    type="button"
+                    onClick={() => setBillingModalOpen(true)}
+                    className="infra-click-pulse inline-flex items-center gap-2 rounded-2xl border border-emerald-400/15 bg-emerald-500/[0.08] px-4 py-2.5 text-sm font-semibold text-emerald-100 transition-all hover:border-emerald-300/30 hover:bg-emerald-500/[0.14]"
+                  >
+                    <Coins size={16} />
+                    Plano
+                  </button>
+                ) : null}
+              </div>
             </div>
 
           </div>
@@ -7610,203 +7793,6 @@ export default function AdminProjetoDetalhePage() {
         )}
 
       <div className="space-y-4">
-        {data.billing ? (
-          <section className="space-y-4 rounded-[28px] border border-white/10 bg-white/[0.04] p-4 shadow-[0_18px_48px_rgba(2,8,23,0.22)] sm:p-5">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h2 className="inline-flex items-center gap-2 text-xl font-semibold text-slate-100/88"><Coins size={18} className="text-emerald-200" />Plano e consumo de IA</h2>
-                <p className="mt-1 text-sm text-slate-400">
-                  Referencia financeira do projeto em {data.billing.windowLabel}, com {selectedBillingModel?.label ?? "GPT-4o Mini"} como base atual.
-                </p>
-              </div>
-              <div className="inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-300">
-                <ShieldAlert size={13} className={billingPlanForm.bloqueado ? "text-rose-300" : billingPlanForm.autoBloquear ? "text-amber-200" : "text-emerald-200"} />
-                {billingPlanForm.bloqueado ? "Bloqueio manual ativo" : billingPlanForm.autoBloquear ? "Bloqueio automatico ativo" : "Bloqueio automatico desligado"}
-              </div>
-            </div>
-
-            <div className="grid gap-3 xl:grid-cols-5">
-              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Modelo atual</p>
-                <p className="mt-2 text-lg font-medium text-slate-100/88">{selectedBillingModel?.label ?? data.billing.plan.modeloReferencia}</p>
-                <p className="mt-1 text-xs text-slate-400">{data.billing.plan.nomePlano}</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tokens input</p>
-                <p className="mt-2 text-[1.65rem] font-semibold tracking-[-0.03em] text-slate-100/86">{formatIntegerLabel(data.billing.currentUsage.tokensInput)}</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tokens output</p>
-                <p className="mt-2 text-[1.65rem] font-semibold tracking-[-0.03em] text-slate-100/86">{formatIntegerLabel(data.billing.currentUsage.tokensOutput)}</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Tokens totais</p>
-                <p className="mt-2 text-[1.65rem] font-semibold tracking-[-0.03em] text-slate-100/86">{formatIntegerLabel(data.billing.currentUsage.totalTokens)}</p>
-              </div>
-              <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/10 p-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100/75">Custo atual</p>
-                <p className="mt-2 text-[1.65rem] font-semibold tracking-[-0.03em] text-slate-100/86">{formatUsdLabel(data.billing.currentUsage.custoTotal)}</p>
-              </div>
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold text-slate-200">Nome do plano</span>
-                  <input
-                    value={billingPlanForm.nomePlano}
-                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, nomePlano: event.target.value }))}
-                    disabled={!data.billing.canManage}
-                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </label>
-                <label className="grid gap-2">
-                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-200"><Cpu size={15} className="text-cyan-200" />Modelo de referencia</span>
-                  <select
-                    value={billingPlanForm.modeloReferencia}
-                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, modeloReferencia: event.target.value }))}
-                    disabled={!data.billing.canManage}
-                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {data.billing.pricingModels.map((item) => (
-                      <option key={item.id} value={item.id} className="bg-slate-950 text-white">
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold text-slate-200">Limite mensal de tokens input</span>
-                  <input
-                    value={billingPlanForm.limiteTokensInputMensal}
-                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, limiteTokensInputMensal: event.target.value }))}
-                    disabled={!data.billing.canManage}
-                    inputMode="numeric"
-                    placeholder="vazio = sem limite"
-                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </label>
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold text-slate-200">Limite mensal de tokens output</span>
-                  <input
-                    value={billingPlanForm.limiteTokensOutputMensal}
-                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, limiteTokensOutputMensal: event.target.value }))}
-                    disabled={!data.billing.canManage}
-                    inputMode="numeric"
-                    placeholder="vazio = sem limite"
-                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </label>
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold text-slate-200">Limite mensal total de tokens</span>
-                  <input
-                    value={billingPlanForm.limiteTokensTotalMensal}
-                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, limiteTokensTotalMensal: event.target.value }))}
-                    disabled={!data.billing.canManage}
-                    inputMode="numeric"
-                    placeholder="vazio = sem limite"
-                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </label>
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold text-slate-200">Limite mensal de custo (USD)</span>
-                  <input
-                    value={billingPlanForm.limiteCustoMensal}
-                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, limiteCustoMensal: event.target.value.replace(",", ".") }))}
-                    disabled={!data.billing.canManage}
-                    inputMode="decimal"
-                    placeholder="vazio = sem limite"
-                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </label>
-              </div>
-
-              <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/10 p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-100/80">Tabela usada na referencia</p>
-                  <p className="mt-2 text-sm font-semibold text-white">{selectedBillingModel?.label ?? "GPT-4o Mini"}</p>
-                  <p className="mt-2 text-xs text-cyan-50/80">Input: {formatUsdLabel(selectedBillingModel?.inputPerMillionUsd ?? 0)} por 1M tokens</p>
-                  <p className="mt-1 text-xs text-cyan-50/80">Output: {formatUsdLabel(selectedBillingModel?.outputPerMillionUsd ?? 0)} por 1M tokens</p>
-                </div>
-
-                <label className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-                  <span>
-                    <span className="block text-sm font-semibold text-white">Bloqueio automatico</span>
-                    <span className="mt-1 block text-xs text-slate-400">Interrompe consumo ao bater os limites configurados.</span>
-                  </span>
-                  <span className="relative inline-flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={billingPlanForm.autoBloquear}
-                      onChange={(event) => setBillingPlanForm((current) => ({ ...current, autoBloquear: event.target.checked }))}
-                      disabled={!data.billing.canManage}
-                      className="peer sr-only"
-                    />
-                    <span className="h-7 w-12 rounded-full bg-white/10 transition-colors peer-checked:bg-emerald-500/30" />
-                    <span className="pointer-events-none absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-checked:bg-emerald-200" />
-                  </span>
-                </label>
-
-                <label className="flex items-center justify-between gap-3 rounded-2xl border border-rose-400/15 bg-rose-500/10 px-4 py-3">
-                  <span>
-                    <span className="block text-sm font-semibold text-white">Bloqueio manual</span>
-                    <span className="mt-1 block text-xs text-rose-100/75">Forca a parada do uso mesmo sem atingir o limite.</span>
-                  </span>
-                  <span className="relative inline-flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={billingPlanForm.bloqueado}
-                      onChange={(event) => setBillingPlanForm((current) => ({ ...current, bloqueado: event.target.checked }))}
-                      disabled={!data.billing.canManage}
-                      className="peer sr-only"
-                    />
-                    <span className="h-7 w-12 rounded-full bg-white/10 transition-colors peer-checked:bg-rose-500/30" />
-                    <span className="pointer-events-none absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-checked:bg-rose-200" />
-                  </span>
-                </label>
-
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold text-slate-200">Motivo do bloqueio</span>
-                  <textarea
-                    value={billingPlanForm.bloqueadoMotivo}
-                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, bloqueadoMotivo: event.target.value }))}
-                    disabled={!data.billing.canManage}
-                    rows={3}
-                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </label>
-
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold text-slate-200">Observacoes financeiras</span>
-                  <textarea
-                    value={billingPlanForm.observacoes}
-                    onChange={(event) => setBillingPlanForm((current) => ({ ...current, observacoes: event.target.value }))}
-                    disabled={!data.billing.canManage}
-                    rows={4}
-                    className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </label>
-
-                {data.billing.canManage ? (
-                  <button
-                    type="button"
-                    onClick={() => void handleSaveBillingPlan()}
-                    disabled={savingBillingPlan}
-                    className={`inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-3 text-sm font-semibold text-white ${premiumInteractiveClass} disabled:cursor-not-allowed disabled:opacity-60`}
-                  >
-                    {savingBillingPlan ? <BusyIcon /> : <Coins size={16} />}
-                    Salvar
-                  </button>
-                ) : (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
-                    Voce pode visualizar o plano, mas nao tem permissao para alterar as definicoes financeiras deste projeto.
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-        ) : null}
-
         <div ref={tabsAnchorRef} className="mt-8" style={{ minHeight: tabsBarHeight ? `${tabsBarHeight}px` : undefined }}>
           <section
             ref={tabsBarRef}
@@ -8615,6 +8601,18 @@ export default function AdminProjetoDetalhePage() {
           setWhatsAppChannelPendingDelete(null);
         }}
         onConfirm={() => void confirmDeleteWhatsAppChannel()}
+      />
+      <BillingPlanModal
+        open={billingModalOpen}
+        billing={data.billing}
+        selectedBillingModel={selectedBillingModel}
+        billingPlanForm={billingPlanForm}
+        savingBillingPlan={savingBillingPlan}
+        premiumInteractiveClass={premiumInteractiveClass}
+        feedbackBilling={feedbackBilling}
+        onClose={() => setBillingModalOpen(false)}
+        onChange={(next) => setBillingPlanForm((current) => ({ ...current, ...next }))}
+        onSave={() => void handleSaveBillingPlan()}
       />
     </main>
   );

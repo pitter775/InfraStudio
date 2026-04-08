@@ -22,6 +22,7 @@ Usar este arquivo como contexto curto para entender e evoluir o projeto com segu
 - nao recalcular custo no frontend
 - billing fica centralizado no backend
 - evitar mexer em `C:\Projetos\infrastudio\lib\billing.ts` sem necessidade clara
+- politica atual de limite: ao atingir o limite o projeto deve bloquear novas interacoes; avisos e fluxos mais sofisticados ficam para depois
 
 ## 2. Realidade atual
 

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { appendSystemLog } from "@/lib/chat-logs";
+import { syncProjetoSnapshotsForPlan } from "@/lib/billing-plan-catalog";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type PlanoRow = {
@@ -9,11 +10,10 @@ type PlanoRow = {
   preco_mensal: number | null;
   limite_tokens_total_mensal: number | null;
   limite_custo_mensal: number | null;
-  max_agentes: number | null;
-  max_apis: number | null;
-  max_whatsapp: number | null;
+  is_free: boolean | null;
   ativo: boolean | null;
   permitir_excedente: boolean | null;
+  custo_token_excedente: number | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -24,11 +24,10 @@ export type PlanoRecord = {
   precoMensal: number;
   limiteTokensTotalMensal: number | null;
   limiteCustoMensal: number | null;
-  maxAgentes: number;
-  maxApis: number;
-  maxWhatsapp: number;
+  isFree: boolean;
   ativo: boolean;
   permitirExcedente: boolean;
+  custoTokenExcedente: number;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -66,11 +65,10 @@ function mapPlano(row: PlanoRow): PlanoRecord {
     precoMensal: Number(row.preco_mensal ?? 0),
     limiteTokensTotalMensal: row.limite_tokens_total_mensal ?? null,
     limiteCustoMensal: row.limite_custo_mensal ?? null,
-    maxAgentes: row.max_agentes ?? 0,
-    maxApis: row.max_apis ?? 0,
-    maxWhatsapp: row.max_whatsapp ?? 0,
+    isFree: row.is_free === true,
     ativo: row.ativo !== false,
     permitirExcedente: row.permitir_excedente === true,
+    custoTokenExcedente: Number(row.custo_token_excedente ?? 0),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -94,7 +92,7 @@ export async function listPlanos() {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("planos")
-    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, permitir_excedente, created_at, updated_at")
+    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, is_free, ativo, permitir_excedente, custo_token_excedente, created_at, updated_at")
     .order("preco_mensal", { ascending: true })
     .order("nome", { ascending: true });
 
@@ -136,7 +134,7 @@ export async function getPlanoById(id: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("planos")
-    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, permitir_excedente, created_at, updated_at")
+    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, is_free, ativo, permitir_excedente, custo_token_excedente, created_at, updated_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -155,9 +153,7 @@ export async function createPlano(input: {
   precoMensal?: number | string | null;
   limiteTokensTotalMensal?: number | string | null;
   limiteCustoMensal?: number | string | null;
-  maxAgentes?: number | string | null;
-  maxApis?: number | string | null;
-  maxWhatsapp?: number | string | null;
+  isFree?: boolean | null;
   ativo?: boolean | null;
 }) {
   const supabase = getSupabaseAdminClient();
@@ -169,14 +165,12 @@ export async function createPlano(input: {
       preco_mensal: Number(input.precoMensal ?? 0),
       limite_tokens_total_mensal: normalizeNullableInteger(input.limiteTokensTotalMensal),
       limite_custo_mensal: normalizeNullableDecimal(input.limiteCustoMensal),
-      max_agentes: normalizeNullableInteger(input.maxAgentes) ?? 0,
-      max_apis: normalizeNullableInteger(input.maxApis) ?? 0,
-      max_whatsapp: normalizeNullableInteger(input.maxWhatsapp) ?? 0,
+      is_free: input.isFree === true,
       ativo: input.ativo !== false,
       created_at: now,
       updated_at: now,
     }) as never)
-    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, permitir_excedente, created_at, updated_at")
+    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, is_free, ativo, permitir_excedente, custo_token_excedente, created_at, updated_at")
     .single();
 
   if (error || !data) {
@@ -193,9 +187,7 @@ export async function updatePlano(input: {
   precoMensal?: number | string | null;
   limiteTokensTotalMensal?: number | string | null;
   limiteCustoMensal?: number | string | null;
-  maxAgentes?: number | string | null;
-  maxApis?: number | string | null;
-  maxWhatsapp?: number | string | null;
+  isFree?: boolean | null;
   ativo?: boolean | null;
 }) {
   const supabase = getSupabaseAdminClient();
@@ -217,14 +209,13 @@ export async function updatePlano(input: {
         input.limiteCustoMensal === undefined
           ? current.limiteCustoMensal
           : normalizeNullableDecimal(input.limiteCustoMensal),
-      max_agentes: input.maxAgentes === undefined ? current.maxAgentes : normalizeNullableInteger(input.maxAgentes) ?? 0,
-      max_apis: input.maxApis === undefined ? current.maxApis : normalizeNullableInteger(input.maxApis) ?? 0,
-      max_whatsapp: input.maxWhatsapp === undefined ? current.maxWhatsapp : normalizeNullableInteger(input.maxWhatsapp) ?? 0,
+      is_free: input.isFree === undefined ? current.isFree : input.isFree === true,
       ativo: input.ativo === undefined ? current.ativo : input.ativo === true,
+      custo_token_excedente: current.custoTokenExcedente,
       updated_at: new Date().toISOString(),
     }) as never)
     .eq("id", input.id)
-    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, max_agentes, max_apis, max_whatsapp, ativo, permitir_excedente, created_at, updated_at")
+    .select("id, nome, preco_mensal, limite_tokens_total_mensal, limite_custo_mensal, is_free, ativo, permitir_excedente, custo_token_excedente, created_at, updated_at")
     .single();
 
   if (error || !data) {
@@ -232,7 +223,9 @@ export async function updatePlano(input: {
     return null;
   }
 
-  return mapPlano(data as PlanoRow);
+  const plano = mapPlano(data as PlanoRow);
+  await syncProjetoSnapshotsForPlan(plano);
+  return plano;
 }
 
 export async function setPlanoAtivo(id: string, ativo: boolean) {
@@ -254,7 +247,7 @@ export async function deletePlano(id: string): Promise<DeletePlanoResult> {
   const { count, error: usageError } = await supabase
     .from("projetos_planos")
     .select("id", { count: "exact", head: true })
-    .eq("nome_plano", current.nome);
+    .or(`plano_id.eq.${id},nome_plano.eq.${current.nome}`);
 
   if (usageError) {
     console.error("[planos] failed to verify plan usage", usageError);

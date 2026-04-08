@@ -16,14 +16,12 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const { id } = await context.params;
   const body = (await request.json().catch(() => null)) as
-    | {
+      | {
         nome?: string | null;
         precoMensal?: number | string | null;
         limiteTokensTotalMensal?: number | string | null;
         limiteCustoMensal?: number | string | null;
-        maxAgentes?: number | string | null;
-        maxApis?: number | string | null;
-        maxWhatsapp?: number | string | null;
+        isFree?: boolean | null;
         ativo?: boolean | null;
       }
     | null;
@@ -34,9 +32,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     precoMensal: body?.precoMensal,
     limiteTokensTotalMensal: body?.limiteTokensTotalMensal,
     limiteCustoMensal: body?.limiteCustoMensal,
-    maxAgentes: body?.maxAgentes,
-    maxApis: body?.maxApis,
-    maxWhatsapp: body?.maxWhatsapp,
+    isFree: body?.isFree,
     ativo: body?.ativo,
   });
 

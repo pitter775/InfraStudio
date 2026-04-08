@@ -75,7 +75,7 @@ import {
   isLikelyLeadNameReply as isLikelyLeadNameReplyFromModule,
 } from "@/lib/chat-lead-stage";
 export { shouldRefreshSummary, summarizeConversation } from "@/lib/chat-summary-stage";
-import { getPlanoProjeto, type BillingProjectPlan } from "@/lib/billing";
+import { getPlanoProjeto, type BillingProjectPlan } from "@/lib/billing-access";
 import { listConectoresByAgente, MERCADO_LIVRE_CONNECTOR_TYPE } from "@/lib/conectores";
 import {
   type ProdutoDetalhadoMercadoLivre,

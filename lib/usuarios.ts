@@ -27,6 +27,8 @@ type UsuarioRow = {
   senha: string | null;
   provider: string | null;
   provider_id: string | null;
+  role: string | null;
+  email_verificado: boolean | null;
   ativo: boolean | null;
   usuarios_projetos: UsuarioProjetoRow[] | null;
 };
@@ -51,25 +53,35 @@ export function mapUsuarioToAppUser(row: Omit<UsuarioRow, "senha">): AppUser {
       projetoSlug: Array.isArray(item.projetos) ? item.projetos[0]?.slug ?? null : item.projetos?.slug ?? null,
       papel: normalizeRole(item.papel),
     })) ?? [];
+  const globalRole = normalizeRole(row.role);
 
   return applyAccessProfile({
     id: row.id,
-    name: row.nome?.trim() || "Usuário",
+    name: row.nome?.trim() || "Usuario",
     email: row.email?.trim() || "",
     provider: row.provider ?? undefined,
     providerId: row.provider_id ?? undefined,
-    role: memberships.some((item) => item.papel === "admin") ? "admin" : "viewer",
+    role: globalRole === "admin" || memberships.some((item) => item.papel === "admin") ? "admin" : "viewer",
     status: normalizeStatus(row.ativo),
     currentProjectId: memberships[0]?.projetoId ?? null,
     memberships,
   });
 }
 
+const usuarioSelectFields =
+  "id, nome, email, senha, provider, provider_id, role, email_verificado, ativo, usuarios_projetos(papel, projeto_id, projetos(nome, slug))";
+
+const usuarioSelectFieldsNoPassword =
+  "id, nome, email, provider, provider_id, role, email_verificado, ativo, usuarios_projetos(papel, projeto_id, projetos(nome, slug))";
+
+const usuarioSelectFieldsCompact =
+  "id, nome, email, provider, provider_id, role, email_verificado, ativo, usuarios_projetos(papel, projeto_id)";
+
 export async function findUsuarioWithPasswordByEmail(email: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("usuarios")
-    .select("id, nome, email, senha, provider, provider_id, ativo, usuarios_projetos(papel, projeto_id, projetos(nome, slug))")
+    .select(usuarioSelectFields)
     .eq("email", email)
     .maybeSingle<UsuarioRow>();
 
@@ -85,11 +97,28 @@ export async function debugFindUsuarioByEmail(email: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("usuarios")
-    .select("id, nome, email, senha, provider, provider_id, ativo")
+    .select("id, nome, email, senha, provider, provider_id, role, email_verificado, ativo")
     .eq("email", email)
     .maybeSingle();
 
   return { data, error };
+}
+
+export async function findUsuarioByProvider(provider: string, providerId: string) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("usuarios")
+    .select(usuarioSelectFieldsNoPassword)
+    .eq("provider", provider)
+    .eq("provider_id", providerId)
+    .maybeSingle<UsuarioRow>();
+
+  if (error) {
+    console.error("[usuarios] failed to find usuario by provider", error);
+    return null;
+  }
+
+  return data ? mapUsuarioToAppUser(data as Omit<UsuarioRow, "senha">) : null;
 }
 
 export async function touchUsuarioLogin(usuarioId: string) {
@@ -112,7 +141,7 @@ export async function listUsuarios() {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("usuarios")
-    .select("id, nome, email, provider, provider_id, ativo, usuarios_projetos(papel, projeto_id, projetos(nome, slug))")
+    .select(usuarioSelectFieldsNoPassword)
     .order("nome", { ascending: true });
 
   if (error || !data) {
@@ -127,7 +156,7 @@ export async function getUsuarioById(usuarioId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("usuarios")
-    .select("id, nome, email, provider, provider_id, ativo, usuarios_projetos(papel, projeto_id, projetos(nome, slug))")
+    .select(usuarioSelectFieldsNoPassword)
     .eq("id", usuarioId)
     .maybeSingle();
 
@@ -143,7 +172,7 @@ export async function listUsuariosByProjeto(projetoId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("usuarios")
-    .select("id, nome, email, provider, provider_id, ativo, usuarios_projetos!inner(papel, projeto_id, projetos(nome, slug))")
+    .select("id, nome, email, provider, provider_id, role, email_verificado, ativo, usuarios_projetos!inner(papel, projeto_id, projetos(nome, slug))")
     .eq("usuarios_projetos.projeto_id", projetoId)
     .order("nome", { ascending: true });
 
@@ -155,14 +184,41 @@ export async function listUsuariosByProjeto(projetoId: string) {
   return data.map((row) => mapUsuarioToAppUser(row as Omit<UsuarioRow, "senha">));
 }
 
+export async function updateUsuarioProviderAndVerification(input: {
+  usuarioId: string;
+  provider: string;
+  providerId: string;
+  emailVerificado: boolean;
+}) {
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("usuarios")
+    .update({
+      provider: input.provider,
+      provider_id: input.providerId,
+      email_verificado: input.emailVerificado,
+      updated_at: new Date().toISOString(),
+    } as never)
+    .eq("id", input.usuarioId);
+
+  if (error) {
+    console.error("[usuarios] failed to update usuario provider", error);
+    return false;
+  }
+
+  return true;
+}
+
 type SaveUsuarioInput = {
   id?: string;
   nome: string;
   email: string;
   senha?: string;
   ativo?: boolean;
+  emailVerificado?: boolean;
   papel?: AppUser["role"];
   projetoId?: string | null;
+  projetoIds?: string[];
   provider?: string | null;
   providerId?: string | null;
 };
@@ -172,6 +228,8 @@ function sanitizeUsuarioPayload(input: SaveUsuarioInput) {
     nome: input.nome.trim(),
     email: input.email.trim().toLowerCase(),
     ativo: input.ativo ?? true,
+    email_verificado: input.emailVerificado ?? true,
+    role: input.papel === "admin" ? "admin" : "viewer",
     provider: input.provider ?? "email",
     provider_id: input.providerId ?? null,
     updated_at: new Date().toISOString(),
@@ -231,9 +289,67 @@ async function syncUsuarioProjetoPapel(input: {
   }
 }
 
+function normalizeProjetoIds(input: Pick<SaveUsuarioInput, "projetoId" | "projetoIds">) {
+  const rawIds = [...(input.projetoIds ?? []), input.projetoId ?? null];
+  return Array.from(
+    new Set(
+      rawIds.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+        .map((value) => value.trim()),
+    ),
+  );
+}
+
+async function syncUsuarioProjetoPapeis(input: {
+  usuarioId: string;
+  projetoIds: string[];
+  papel?: AppUser["role"];
+}) {
+  const supabase = getSupabaseAdminClient();
+  const papel = input.papel === "admin" ? "admin" : "viewer";
+  const { data: existing, error: readError } = await supabase
+    .from("usuarios_projetos")
+    .select("projeto_id")
+    .eq("usuario_id", input.usuarioId);
+
+  if (readError) {
+    console.error("[usuarios] failed to read usuario_projetos", readError);
+    return;
+  }
+
+  const existingRows = (existing ?? []) as Array<{ projeto_id: string | null }>;
+  const existingProjetoIds = new Set(
+    existingRows
+      .map((item) => item.projeto_id)
+      .filter((value): value is string => typeof value === "string" && value.trim().length > 0),
+  );
+  const targetProjetoIds = new Set(input.projetoIds);
+
+  const projetoIdsToDelete = Array.from(existingProjetoIds).filter((projetoId) => !targetProjetoIds.has(projetoId));
+  if (projetoIdsToDelete.length > 0) {
+    const { error } = await supabase
+      .from("usuarios_projetos")
+      .delete()
+      .eq("usuario_id", input.usuarioId)
+      .in("projeto_id", projetoIdsToDelete);
+
+    if (error) {
+      console.error("[usuarios] failed to delete removed usuario_projetos", error);
+    }
+  }
+
+  for (const projetoId of input.projetoIds) {
+    await syncUsuarioProjetoPapel({
+      usuarioId: input.usuarioId,
+      projetoId,
+      papel: input.papel,
+    });
+  }
+}
+
 export async function createUsuario(input: SaveUsuarioInput) {
   const supabase = getSupabaseAdminClient();
   const payload = sanitizeUsuarioPayload(input);
+  const projetoIds = normalizeProjetoIds(input);
   const insertPayload = {
     ...payload,
     senha: hashSync(input.senha?.trim() || "123456", 10),
@@ -243,7 +359,7 @@ export async function createUsuario(input: SaveUsuarioInput) {
   const { data, error } = await supabase
     .from("usuarios")
     .insert(insertPayload as never)
-    .select("id, nome, email, provider, provider_id, ativo, usuarios_projetos(papel, projeto_id)")
+    .select(usuarioSelectFieldsCompact)
     .single();
 
   if (error || !data) {
@@ -252,9 +368,9 @@ export async function createUsuario(input: SaveUsuarioInput) {
   }
 
   const usuario = data as Omit<UsuarioRow, "senha">;
-  await syncUsuarioProjetoPapel({
+  await syncUsuarioProjetoPapeis({
     usuarioId: usuario.id,
-    projetoId: input.projetoId,
+    projetoIds,
     papel: input.papel,
   });
 
@@ -268,6 +384,7 @@ export async function updateUsuario(input: SaveUsuarioInput) {
 
   const supabase = getSupabaseAdminClient();
   const payload: Record<string, unknown> = sanitizeUsuarioPayload(input);
+  const projetoIds = normalizeProjetoIds(input);
 
   if (input.senha?.trim()) {
     payload.senha = hashSync(input.senha.trim(), 10);
@@ -277,7 +394,7 @@ export async function updateUsuario(input: SaveUsuarioInput) {
     .from("usuarios")
     .update(payload as never)
     .eq("id", input.id)
-    .select("id, nome, email, provider, provider_id, ativo, usuarios_projetos(papel, projeto_id)")
+    .select(usuarioSelectFieldsCompact)
     .single();
 
   if (error || !data) {
@@ -286,9 +403,9 @@ export async function updateUsuario(input: SaveUsuarioInput) {
   }
 
   const usuario = data as Omit<UsuarioRow, "senha">;
-  await syncUsuarioProjetoPapel({
+  await syncUsuarioProjetoPapeis({
     usuarioId: usuario.id,
-    projetoId: input.projetoId,
+    projetoIds,
     papel: input.papel,
   });
 
@@ -304,7 +421,7 @@ export async function setUsuarioAtivo(usuarioId: string, ativo: boolean) {
       updated_at: new Date().toISOString(),
     } as never)
     .eq("id", usuarioId)
-    .select("id, nome, email, provider, provider_id, ativo, usuarios_projetos(papel, projeto_id)")
+    .select(usuarioSelectFieldsCompact)
     .single();
 
   if (error || !data) {

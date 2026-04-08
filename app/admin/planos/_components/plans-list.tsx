@@ -9,11 +9,10 @@ export type PlanListItem = {
   precoMensal: number;
   limiteTokensTotalMensal: number | null;
   limiteCustoMensal: number | null;
-  maxAgentes: number;
-  maxApis: number;
-  maxWhatsapp: number;
+  isFree: boolean;
   ativo: boolean;
   permitirExcedente: boolean;
+  custoTokenExcedente: number;
 };
 
 type PlansListProps = {
@@ -62,6 +61,11 @@ export function PlansList({ planos, loading, onCreate, onEdit, onToggleActive, o
                       <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${plano.permitirExcedente ? "bg-sky-500/15 text-sky-300" : "bg-slate-800/80 text-slate-400"}`}>
                         {plano.permitirExcedente ? "com excedente" : "sem excedente"}
                       </span>
+                      {plano.isFree ? (
+                        <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
+                          free
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -81,12 +85,6 @@ export function PlansList({ planos, loading, onCreate, onEdit, onToggleActive, o
                           {plano.limiteCustoMensal === null ? "Sem limite" : formatCurrency(plano.limiteCustoMensal)}
                         </p>
                       </div>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                      <span>Agentes: {formatNumber(plano.maxAgentes)}</span>
-                      <span>APIs: {formatNumber(plano.maxApis)}</span>
-                      <span>WhatsApp: {formatNumber(plano.maxWhatsapp)}</span>
                     </div>
                   </div>
 

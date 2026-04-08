@@ -13,7 +13,8 @@ import { enrichLeadContext, generateSalesReply, shouldRefreshSummary, summarizeC
 import { DEFAULT_HOME_WIDGET_SLUG, getChatWidgetByProjetoAgente, getChatWidgetBySlug } from "@/lib/chat-widgets";
 import { getChatAttachmentsMetadata, uploadChatAttachmentPayloads } from "@/lib/chat-attachments";
 import { appendMessage, createChat, findActiveChatByChannel, findActiveWhatsAppChatByPhone, getChatById, getChatContext, listChatMessages, type ChatChannelKind, updateChatContext, updateChatStats } from "@/lib/chats";
-import { registrarUso, verifyProjetoBillingAccess } from "@/lib/billing";
+import { verificarLimite } from "@/lib/billing-access";
+import { registrarUso } from "@/lib/billing-usage-cycles";
 import { estimateOpenAICostUsd } from "@/lib/openai-pricing";
 import { getProjetoById, getProjetoByIdentifier } from "@/lib/projetos";
 import { appendRuntimeErrorLog } from "@/lib/runtime-error-log";
@@ -1162,7 +1163,7 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
   }
 
   const history = await listChatMessages(chat.id);
-  const billingAccess = chat.projetoId ? await verifyProjetoBillingAccess(chat.projetoId) : null;
+  const billingAccess = chat.projetoId ? await verificarLimite(chat.projetoId) : null;
   if (billingAccess && !billingAccess.allowed) {
     await appendChatFailureLog({
       projetoId: chat.projetoId,

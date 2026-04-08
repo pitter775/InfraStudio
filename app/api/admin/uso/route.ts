@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { canAccessGlobalAdmin } from "@/lib/access";
-import { listBillingUsageByProject } from "@/lib/billing";
+import { listBillingUsageByProject } from "@/lib/billing-access";
 import { getSessionUser } from "@/lib/session";
 
 export async function GET() {

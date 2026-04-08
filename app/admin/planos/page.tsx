@@ -11,15 +11,21 @@ import { formatCurrency, formatNumber } from "./_components/billing-helpers";
 
 type Plano = PlanListItem;
 type UsoRow = ProjectUsageListItem;
+type ProjetoPlanPayload = {
+  planoId: string | null;
+  nomePlano: string;
+  limiteTokensTotalMensal: number | null;
+  limiteCustoMensal: number | null;
+  permitirExcedente: boolean;
+  bloqueado: boolean;
+};
 
 type PlanoFormState = {
   nome: string;
   precoMensal: string;
   limiteTokensTotalMensal: string;
   limiteCustoMensal: string;
-  maxAgentes: string;
-  maxApis: string;
-  maxWhatsapp: string;
+  isFree: boolean;
   ativo: boolean;
 };
 
@@ -28,11 +34,46 @@ const emptyPlanoForm: PlanoFormState = {
   precoMensal: "0",
   limiteTokensTotalMensal: "",
   limiteCustoMensal: "",
-  maxAgentes: "0",
-  maxApis: "0",
-  maxWhatsapp: "0",
+  isFree: false,
   ativo: true,
 };
+
+function calculatePercentualUso(totalTokens: number, limiteTokensTotalMensal: number | null) {
+  if (limiteTokensTotalMensal === null || limiteTokensTotalMensal <= 0) {
+    return null;
+  }
+
+  return Number(((totalTokens / limiteTokensTotalMensal) * 100).toFixed(2));
+}
+
+function applyReturnedPlanToUsage(current: UsoRow, plan: ProjetoPlanPayload, modoCobranca: UsoRow["modoCobranca"]): UsoRow {
+  return {
+    ...current,
+    modoCobranca,
+    plano: {
+      ...current.plano,
+      planoId: modoCobranca === "ilimitado" ? null : plan.planoId,
+      nomePlano: modoCobranca === "ilimitado" ? "Ilimitado" : plan.nomePlano,
+      limiteTokensTotalMensal: modoCobranca === "ilimitado" ? null : plan.limiteTokensTotalMensal,
+      limiteCustoMensal: modoCobranca === "ilimitado" ? null : plan.limiteCustoMensal,
+      permitirExcedente: modoCobranca === "ilimitado" ? true : plan.permitirExcedente,
+      bloqueado: modoCobranca === "ilimitado" ? false : plan.bloqueado,
+    },
+    percentualUso:
+      modoCobranca === "ilimitado" ? null : calculatePercentualUso(current.consumoAtual.totalTokens, plan.limiteTokensTotalMensal),
+    status: modoCobranca === "ilimitado" ? "ativo" : plan.bloqueado ? "bloqueado" : "ativo",
+    cicloAtual: current.cicloAtual
+      ? {
+          ...current.cicloAtual,
+          alerta80: false,
+          alerta100: false,
+          bloqueado: false,
+          permitirExcedente: modoCobranca === "ilimitado" ? true : plan.permitirExcedente,
+          excedenteTokens: 0,
+        }
+      : null,
+  };
+}
 
 export default function AdminPlanosPage() {
   const [planos, setPlanos] = useState<Plano[]>([]);
@@ -96,9 +137,7 @@ export default function AdminPlanosPage() {
       precoMensal: String(plano.precoMensal),
       limiteTokensTotalMensal: plano.limiteTokensTotalMensal === null ? "" : String(plano.limiteTokensTotalMensal),
       limiteCustoMensal: plano.limiteCustoMensal === null ? "" : String(plano.limiteCustoMensal),
-      maxAgentes: String(plano.maxAgentes),
-      maxApis: String(plano.maxApis),
-      maxWhatsapp: String(plano.maxWhatsapp),
+      isFree: plano.isFree,
       ativo: plano.ativo,
     });
     setPlanModalOpen(true);
@@ -113,9 +152,7 @@ export default function AdminPlanosPage() {
       precoMensal: planoForm.precoMensal,
       limiteTokensTotalMensal: planoForm.limiteTokensTotalMensal,
       limiteCustoMensal: planoForm.limiteCustoMensal,
-      maxAgentes: planoForm.maxAgentes,
-      maxApis: planoForm.maxApis,
-      maxWhatsapp: planoForm.maxWhatsapp,
+      isFree: planoForm.isFree,
       ativo: planoForm.ativo,
     };
 
@@ -182,26 +219,56 @@ export default function AdminPlanosPage() {
   const handleProjectPlanChange = async (projetoId: string, planoId: string) => {
     setUpdatingProjetoId(projetoId);
     setFeedback(null);
+    const previousUso = uso.find((item) => item.projetoId === projetoId) ?? null;
+
+    const applyUsoUpdate = (next: UsoRow) => {
+      setUso((current) => current.map((item) => (item.projetoId === projetoId ? next : item)));
+    };
 
     if (planoId === unlimitedPlanId) {
+      if (previousUso) {
+        applyUsoUpdate({
+          ...previousUso,
+          modoCobranca: "ilimitado",
+          plano: {
+            ...previousUso.plano,
+            planoId: null,
+            nomePlano: "Ilimitado",
+            limiteTokensTotalMensal: null,
+            limiteCustoMensal: null,
+            permitirExcedente: true,
+            bloqueado: false,
+          },
+          percentualUso: null,
+          status: "ativo",
+          cicloAtual: previousUso.cicloAtual
+            ? {
+                ...previousUso.cicloAtual,
+                alerta80: false,
+                alerta100: false,
+                bloqueado: false,
+                permitirExcedente: true,
+                excedenteTokens: 0,
+              }
+            : null,
+        });
+      }
+
       const response = await fetch(`/api/admin/projetos/${projetoId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          applyPlano: true,
           modoCobranca: "ilimitado",
-          nomePlano: "Ilimitado",
-          limiteTokensTotalMensal: null,
-          limiteCustoMensal: null,
-          permitirExcedente: true,
-          custoTokenExcedente: 0,
-          autoBloquear: false,
-          bloqueado: false,
-          bloqueadoMotivo: null,
+          planoId: null,
         }),
       });
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as { error?: string; plan?: ProjetoPlanPayload } | null;
 
       if (!response.ok) {
+        if (previousUso) {
+          applyUsoUpdate(previousUso);
+        }
         setFeedback({
           tone: "error",
           message: payload?.error ?? "Nao foi possivel atualizar o projeto para ilimitado.",
@@ -210,7 +277,10 @@ export default function AdminPlanosPage() {
         return;
       }
 
-      await load();
+      if (previousUso && payload?.plan) {
+        applyUsoUpdate(applyReturnedPlanToUsage(previousUso, payload.plan, "ilimitado"));
+      }
+
       setUpdatingProjetoId(null);
       setFeedback({ tone: "success", message: "Projeto definido como ilimitado." });
       return;
@@ -223,24 +293,49 @@ export default function AdminPlanosPage() {
       return;
     }
 
+    if (previousUso) {
+      applyUsoUpdate({
+        ...previousUso,
+        modoCobranca: "plano",
+        plano: {
+          ...previousUso.plano,
+          planoId: plano.id,
+          nomePlano: plano.nome,
+          limiteTokensTotalMensal: plano.limiteTokensTotalMensal,
+          limiteCustoMensal: plano.limiteCustoMensal,
+          permitirExcedente: plano.permitirExcedente,
+          bloqueado: false,
+        },
+        percentualUso: calculatePercentualUso(previousUso.consumoAtual.totalTokens, plano.limiteTokensTotalMensal),
+        status: "ativo",
+        cicloAtual: previousUso.cicloAtual
+          ? {
+              ...previousUso.cicloAtual,
+              alerta80: false,
+              alerta100: false,
+              bloqueado: false,
+              permitirExcedente: plano.permitirExcedente,
+              excedenteTokens: 0,
+            }
+          : null,
+      });
+    }
+
     const response = await fetch(`/api/admin/projetos/${projetoId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        applyPlano: true,
         modoCobranca: "plano",
-        nomePlano: plano.nome,
-        limiteTokensTotalMensal: plano.limiteTokensTotalMensal,
-        limiteCustoMensal: plano.limiteCustoMensal,
-        permitirExcedente: plano.permitirExcedente,
-        custoTokenExcedente: 0,
-        autoBloquear: true,
-        bloqueado: false,
-        bloqueadoMotivo: null,
+        planoId: plano.id,
       }),
     });
-    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    const payload = (await response.json().catch(() => null)) as { error?: string; plan?: ProjetoPlanPayload } | null;
 
     if (!response.ok) {
+      if (previousUso) {
+        applyUsoUpdate(previousUso);
+      }
       setFeedback({
         tone: "error",
         message: payload?.error ?? "Nao foi possivel atualizar o plano do projeto.",
@@ -249,7 +344,10 @@ export default function AdminPlanosPage() {
       return;
     }
 
-    await load();
+    if (previousUso && payload?.plan) {
+      applyUsoUpdate(applyReturnedPlanToUsage(previousUso, payload.plan, "plano"));
+    }
+
     setUpdatingProjetoId(null);
     setFeedback({ tone: "success", message: "Plano do projeto atualizado." });
   };
@@ -345,6 +443,9 @@ export default function AdminPlanosPage() {
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
                 Modal largo para evoluir o CRUD de planos sem criar outra tela.
               </p>
+              <p className="mt-2 max-w-2xl text-xs leading-5 text-amber-300/80">
+                O plano free so pode existir uma vez por usuario dono.
+              </p>
             </div>
 
             <div className="grid gap-5 px-5 py-5 sm:px-8 sm:py-8 lg:grid-cols-2">
@@ -368,24 +469,14 @@ export default function AdminPlanosPage() {
                 <input value={planoForm.limiteCustoMensal} onChange={(event) => setPlanoForm((current) => ({ ...current, limiteCustoMensal: event.target.value }))} placeholder="vazio = sem limite" className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none" />
               </label>
 
-              <label className="grid gap-2 text-sm text-slate-300">
-                <span>Maximo de agentes</span>
-                <input value={planoForm.maxAgentes} onChange={(event) => setPlanoForm((current) => ({ ...current, maxAgentes: event.target.value }))} className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none" />
-              </label>
-
-              <label className="grid gap-2 text-sm text-slate-300">
-                <span>Maximo de APIs</span>
-                <input value={planoForm.maxApis} onChange={(event) => setPlanoForm((current) => ({ ...current, maxApis: event.target.value }))} className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none" />
-              </label>
-
-              <label className="grid gap-2 text-sm text-slate-300">
-                <span>Maximo de WhatsApp</span>
-                <input value={planoForm.maxWhatsapp} onChange={(event) => setPlanoForm((current) => ({ ...current, maxWhatsapp: event.target.value }))} className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none" />
-              </label>
-
               <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-sm text-slate-300">
                 <input type="checkbox" checked={planoForm.ativo} onChange={(event) => setPlanoForm((current) => ({ ...current, ativo: event.target.checked }))} />
                 Plano ativo
+              </label>
+
+              <label className="flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-100">
+                <input type="checkbox" checked={planoForm.isFree} onChange={(event) => setPlanoForm((current) => ({ ...current, isFree: event.target.checked }))} />
+                Plano free
               </label>
             </div>
 

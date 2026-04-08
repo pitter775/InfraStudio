@@ -2,7 +2,7 @@ import "server-only";
 
 import type { AppUser } from "@/lib/app-user";
 import { canAccessGlobalAdmin } from "@/lib/access";
-import { listBillingUsageByProject } from "@/lib/billing";
+import { listBillingUsageByProject } from "@/lib/billing-access";
 import { isAgentTestChatContext } from "@/lib/chats";
 import { getIaUsageSummaryForProjects } from "@/lib/ia-usage";
 import type { IaUsageSummary } from "@/lib/ia-usage-types";

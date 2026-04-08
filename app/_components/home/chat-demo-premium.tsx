@@ -69,6 +69,13 @@ const WHATSAPP_MESSAGES: WhatsAppMessage[] = [
 const FLIP_DURATION_MS = 1050;
 const FACE_SETTLE_MS = 260;
 
+type ScheduledTimer = {
+  callback: () => void;
+  dueAt: number;
+  id: number | null;
+  remaining: number;
+};
+
 export function PremiumHomeChatDemo() {
   const [cycle, setCycle] = useState(0);
   const [face, setFace] = useState<"front" | "back">("front");
@@ -81,18 +88,73 @@ export function PremiumHomeChatDemo() {
   const [showWhatsActions, setShowWhatsActions] = useState(false);
   const [whatsPhase, setWhatsPhase] = useState<"messages" | "handoff">("messages");
   const [pressedAction, setPressedAction] = useState<"continue" | "edit" | null>(null);
+  const [isVisible, setIsVisible] = useState(true);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const whatsappScrollRef = useRef<HTMLDivElement | null>(null);
-  const timersRef = useRef<number[]>([]);
+  const timersRef = useRef<ScheduledTimer[]>([]);
+  const pausedRef = useRef(false);
+
+  const armTimer = (entry: ScheduledTimer, delay: number) => {
+    entry.remaining = delay;
+    entry.dueAt = Date.now() + delay;
+    entry.id = window.setTimeout(() => {
+      timersRef.current = timersRef.current.filter((timer) => timer !== entry);
+      entry.id = null;
+      entry.callback();
+    }, delay);
+  };
 
   const clearTimers = () => {
-    timersRef.current.forEach((timer) => window.clearTimeout(timer));
+    timersRef.current.forEach((timer) => {
+      if (timer.id !== null) {
+        window.clearTimeout(timer.id);
+      }
+    });
     timersRef.current = [];
   };
 
   const schedule = (callback: () => void, delay: number) => {
-    const timer = window.setTimeout(callback, delay);
-    timersRef.current.push(timer);
+    const entry: ScheduledTimer = {
+      callback,
+      dueAt: Date.now() + delay,
+      id: null,
+      remaining: delay,
+    };
+
+    timersRef.current.push(entry);
+
+    if (!pausedRef.current) {
+      armTimer(entry, delay);
+    }
+  };
+
+  const pauseTimers = () => {
+    if (pausedRef.current) return;
+
+    pausedRef.current = true;
+    const now = Date.now();
+
+    timersRef.current.forEach((timer) => {
+      if (timer.id !== null) {
+        window.clearTimeout(timer.id);
+        timer.id = null;
+      }
+
+      timer.remaining = Math.max(0, timer.dueAt - now);
+    });
+  };
+
+  const resumeTimers = () => {
+    if (!pausedRef.current) return;
+
+    pausedRef.current = false;
+
+    timersRef.current.forEach((timer) => {
+      if (timer.id === null) {
+        armTimer(timer, timer.remaining);
+      }
+    });
   };
 
   const startNextCycle = () => {
@@ -183,6 +245,33 @@ export function PremiumHomeChatDemo() {
   };
 
   useEffect(() => {
+    const node = rootRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      },
+      { threshold: 0.35 },
+    );
+
+    observer.observe(node);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isVisible) {
+      resumeTimers();
+      return;
+    }
+
+    pauseTimers();
+  }, [isVisible]);
+
+  useEffect(() => {
     clearTimers();
     setFace("front");
     setMessages([]);
@@ -253,7 +342,7 @@ export function PremiumHomeChatDemo() {
 
   return (
     <>
-      <div className="relative mx-auto w-full max-w-[420px] [perspective:2400px] lg:mx-0">
+      <div ref={rootRef} className="relative mx-auto w-full max-w-[420px] [perspective:2400px] lg:mx-0">
         <div className="pointer-events-none absolute inset-0 -z-10 rounded-[36px] bg-[radial-gradient(circle_at_top,rgba(37,99,235,0.16),transparent_42%),radial-gradient(circle_at_bottom,rgba(16,185,129,0.12),transparent_32%)] blur-2xl" />
 
         <motion.div

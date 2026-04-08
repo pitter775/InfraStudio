@@ -1,6 +1,7 @@
 import "server-only";
 
-import { buildCurrentMonthWindow, listBillingUsageByProject } from "@/lib/billing";
+import { listBillingUsageByProject } from "@/lib/billing-access";
+import { buildCurrentMonthWindow } from "@/lib/billing-usage-cycles";
 import type {
   AgentUsageAggregate,
   DailyUsagePoint,

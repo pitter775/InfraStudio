@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronRight, Coins } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Coins, LoaderCircle } from "lucide-react";
 import { formatCurrency, formatNumber, getUsageProgressValue } from "./billing-helpers";
 import type { PlanListItem } from "./plans-list";
 
@@ -9,6 +10,7 @@ export type ProjectUsageListItem = {
   projetoNome: string;
   modoCobranca: "plano" | "manual" | "ilimitado";
   plano: {
+    planoId?: string | null;
     nomePlano: string;
     limiteTokensTotalMensal: number | null;
     limiteCustoMensal?: number | null;
@@ -116,6 +118,7 @@ export function ProjectUsageList({
         {!loading ? (
           <div className="divide-y divide-white/8">
             {rows.map((item) => {
+              const isUpdating = updatingProjetoId === item.projetoId;
               const status = resolveProjectStatus(item);
               const progressValue = getUsageProgressValue(item.percentualUso);
               const tokenLimitLabel =
@@ -123,12 +126,12 @@ export function ProjectUsageList({
               const currentPlanId =
                 item.modoCobranca === "ilimitado"
                   ? unlimitedPlanId
-                  : planos.find((plano) => plano.nome === item.plano.nomePlano)?.id ?? unlimitedPlanId;
+                  : item.plano.planoId ?? planos.find((plano) => plano.nome === item.plano.nomePlano)?.id ?? unlimitedPlanId;
 
               return (
                 <article
                   key={item.projetoId}
-                  className="grid gap-4 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,1.2fr)_220px_170px] lg:items-center"
+                  className={`grid gap-4 px-4 py-4 transition-opacity sm:px-5 lg:grid-cols-[minmax(0,1.2fr)_220px_170px] lg:items-center ${isUpdating ? "bg-white/[0.03]" : ""}`}
                 >
                   <div className="flex gap-3">
                     <div className={`mt-1 h-auto min-h-12 w-1 rounded-full ${status.tone} sm:w-1.5`} />
@@ -138,6 +141,12 @@ export function ProjectUsageList({
                         <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${status.badge}`}>
                           {status.label}
                         </span>
+                        {isUpdating ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-sky-400/20 bg-sky-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-sky-100">
+                            <LoaderCircle size={12} className="animate-spin" />
+                            Salvando
+                          </span>
+                        ) : null}
                       </div>
 
                       <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
@@ -170,7 +179,7 @@ export function ProjectUsageList({
                       <select
                         value={currentPlanId}
                         onChange={(event) => onChangePlano(item.projetoId, event.target.value)}
-                        disabled={updatingProjetoId === item.projetoId}
+                        disabled={isUpdating}
                         className="w-full rounded-2xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <option value={unlimitedPlanId}>Ilimitado</option>
@@ -194,6 +203,13 @@ export function ProjectUsageList({
                       <ChevronRight size={14} className="text-slate-500" />
                       <span>Limite tokens: {tokenLimitLabel}</span>
                     </div>
+                    <Link
+                      href={`/admin/projetos/${item.projetoId}`}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-500/10 px-3 py-2 text-sm font-medium text-sky-100 transition hover:bg-sky-500/15"
+                    >
+                      <ChevronRight size={14} />
+                      Abrir projeto
+                    </Link>
                   </div>
                 </article>
               );

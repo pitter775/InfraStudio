@@ -47,6 +47,66 @@ export async function signInWithProjectAuth(email: string, password: string): Pr
   }
 }
 
+export async function registerWithProjectAuth(input: {
+  nome: string;
+  email: string;
+  senha: string;
+  confirmarSenha: string;
+}) {
+  try {
+    const { response, payload } = await requestJson<{ error?: string; message?: string }>("/api/auth/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    });
+
+    return {
+      ok: response.ok,
+      error: response.ok ? null : payload.error ?? "Nao foi possivel concluir seu cadastro agora.",
+      message: payload.message ?? null,
+    };
+  } catch (error) {
+    console.error("[auth] register request failed", error);
+    return {
+      ok: false,
+      error: "Nao foi possivel concluir seu cadastro agora.",
+      message: null,
+    };
+  }
+}
+
+export async function signInWithSocialProvider(provider: "google" | "github" | "facebook") {
+  window.location.href = `/api/auth/oauth/start?provider=${provider}`;
+  return { ok: true as const, error: null };
+}
+
+export async function resendVerificationEmail(email: string) {
+  try {
+    const { response, payload } = await requestJson<{ error?: string; message?: string }>("/api/auth/resend-verification", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email }),
+    });
+
+    return {
+      ok: response.ok,
+      error: response.ok ? null : payload.error ?? "Nao foi possivel reenviar o email agora.",
+      message: payload.message ?? null,
+    };
+  } catch (error) {
+    console.error("[auth] resend verification request failed", error);
+    return {
+      ok: false,
+      error: "Nao foi possivel reenviar o email agora.",
+      message: null,
+    };
+  }
+}
+
 export async function getCurrentProjectUser() {
   try {
     const { payload } = await requestJson<{ user: AppUser | null }>("/api/auth/me", {
@@ -72,16 +132,24 @@ export async function listProjectUsers() {
   try {
     const { response, payload } = await requestJson<{ error?: string; users: AppUser[] }>("/api/admin/usuarios", {
       method: "GET",
+      cache: "no-store",
     });
 
     if (!response.ok) {
-      console.error("[auth] failed to list users", payload.error);
-      return [];
+      const message = payload.error ?? "Nao foi possivel carregar os usuarios.";
+      console.error("[auth] failed to list users", message);
+      throw new Error(message);
     }
 
-    return payload.users;
+    return {
+      users: payload.users,
+      error: null,
+    };
   } catch (error) {
     console.error("[auth] failed to list users", error);
-    return [];
+    return {
+      users: [],
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar os usuarios.",
+    };
   }
 }
