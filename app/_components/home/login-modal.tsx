@@ -2,6 +2,7 @@
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { ArrowRight, Facebook, Github, Instagram, Lock, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { resendVerificationEmail, signInWithSocialProvider } from "@/lib/auth";
 
 type AuthMode = "login" | "cadastro";
@@ -63,7 +64,7 @@ const primaryButtonClassName =
   "inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-3 text-white shadow-lg shadow-blue-900/20 transition hover:from-blue-500 hover:to-cyan-400 disabled:cursor-not-allowed disabled:opacity-70";
 
 const socialButtonClassName =
-  "flex h-14 w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60";
+  "flex h-12 w-full min-w-0 items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 px-2 py-2 text-[13px] font-medium text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60 sm:h-14 sm:gap-2 sm:px-3 sm:text-xs";
 
 function SocialButtons({
   socialLoadingProvider,
@@ -78,7 +79,7 @@ function SocialButtons({
     <div className="space-y-3">
       <p className="text-sm font-medium text-slate-300">Continuar com</p>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
         <button
           type="button"
           onClick={() => void onSocialLogin("google")}
@@ -87,13 +88,13 @@ function SocialButtons({
           aria-label={socialLoadingProvider === "google" ? "Abrindo Google" : "Continuar com Google"}
           title={socialLoadingProvider === "google" ? "Abrindo Google..." : "Continuar com Google"}
         >
-          <svg width="18" height="18" viewBox="0 0 48 48">
+          <svg width="16" height="16" viewBox="0 0 48 48">
             <path fill="#EA4335" d="M24 9.5c3.54 0 6.73 1.22 9.24 3.6l6.91-6.91C35.64 2.2 30.23 0 24 0 14.82 0 6.86 5.48 2.69 13.44l8.06 6.26C12.54 13.12 17.83 9.5 24 9.5z"/>
             <path fill="#4285F4" d="M46.1 24.55c0-1.63-.15-3.2-.43-4.71H24v9h12.5c-.54 2.9-2.2 5.36-4.7 7.02l7.2 5.6C43.94 37.36 46.1 31.45 46.1 24.55z"/>
             <path fill="#FBBC05" d="M10.75 28.7a14.5 14.5 0 010-9.4l-8.06-6.26A23.93 23.93 0 000 24c0 3.8.91 7.38 2.69 10.44l8.06-6.26z"/>
             <path fill="#34A853" d="M24 48c6.23 0 11.46-2.06 15.28-5.6l-7.2-5.6c-2 1.35-4.55 2.14-8.08 2.14-6.17 0-11.46-3.62-13.25-8.7l-8.06 6.26C6.86 42.52 14.82 48 24 48z"/>
           </svg>
-          <span className="truncate">Google</span>
+          <span className="min-w-0 truncate">Google</span>
         </button>
 
         <button
@@ -104,13 +105,13 @@ function SocialButtons({
           aria-label={socialLoadingProvider === "github" ? "Abrindo GitHub" : "Continuar com GitHub"}
           title={socialLoadingProvider === "github" ? "Abrindo GitHub..." : "Continuar com GitHub"}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
     <path
       fill="currentColor"
       d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2.17c-3.2.7-3.88-1.36-3.88-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.69.08-.69 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.73-1.52-2.55-.29-5.23-1.28-5.23-5.68 0-1.25.45-2.28 1.18-3.08-.12-.29-.51-1.47.11-3.06 0 0 .97-.31 3.19 1.18a11.1 11.1 0 0 1 5.8 0c2.22-1.49 3.19-1.18 3.19-1.18.62 1.59.23 2.77.11 3.06.74.8 1.18 1.83 1.18 3.08 0 4.41-2.69 5.39-5.25 5.67.41.35.78 1.04.78 2.09v3.1c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
     />
   </svg>
-          <span className="truncate">GitHub</span>
+          <span className="min-w-0 truncate">GitHub</span>
         </button>
 
         <button
@@ -121,13 +122,13 @@ function SocialButtons({
           aria-label={socialLoadingProvider === "facebook" ? "Abrindo Facebook" : "Continuar com Facebook"}
           title={socialLoadingProvider === "facebook" ? "Abrindo Facebook..." : "Continuar com Facebook"}
         >
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
     <path
       fill="#1877F2"
       d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07c0 6.03 4.39 11.03 10.13 11.93v-8.44H7.08v-3.5h3.05V9.41c0-3.03 1.79-4.7 4.53-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.95.93-1.95 1.88v2.26h3.32l-.53 3.5h-2.79V24C19.61 23.1 24 18.1 24 12.07Z"
     />
   </svg>
-          <span className="truncate">Facebook</span>
+          <span className="min-w-0 truncate">Facebook</span>
         </button>
 
         <button
@@ -138,7 +139,7 @@ function SocialButtons({
           aria-label="Continuar com Instagram"
           title="Continuar com Instagram"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
     <defs>
       <linearGradient id="instagram-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
         <stop offset="0%" stopColor="#F58529" />
@@ -153,7 +154,7 @@ function SocialButtons({
       d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2Zm0 1.8A3.95 3.95 0 0 0 3.8 7.75v8.5a3.95 3.95 0 0 0 3.95 3.95h8.5a3.95 3.95 0 0 0 3.95-3.95v-8.5a3.95 3.95 0 0 0-3.95-3.95h-8.5Zm8.95 1.35a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 1.8A3.2 3.2 0 1 0 12 15.2 3.2 3.2 0 0 0 12 8.8Z"
     />
   </svg>
-          <span className="truncate">Instagram</span>
+          <span className="min-w-0 truncate">Instagram</span>
         </button>
       </div>
 
@@ -557,8 +558,8 @@ export function AuthModal({ open, onClose, onLogin, onRegister, initialMode = "l
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-md overflow-hidden rounded-[28px] border border-white/15 bg-[#0f172a]/95 shadow-2xl shadow-black/40">
+    <div className="fixed inset-0 z-[80] flex items-start justify-center bg-slate-950/80 px-3 py-4 backdrop-blur-sm sm:items-center sm:px-4">
+      <div className="relative max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto overflow-x-hidden rounded-[28px] border border-white/15 bg-[#0f172a]/95 shadow-2xl shadow-black/40">
         <button
           type="button"
           onClick={onClose}
@@ -568,7 +569,7 @@ export function AuthModal({ open, onClose, onLogin, onRegister, initialMode = "l
           <X size={16} />
         </button>
 
-        <div className="border-b border-white/10 bg-white/5 px-6 py-5">
+        <div className="border-b border-white/10 bg-white/5 px-5 py-5 sm:px-6">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.25em] text-blue-300">
             <Lock size={14} />
             {modo === "login" ? "Acesso rapido" : "Criar conta"}
@@ -578,65 +579,58 @@ export function AuthModal({ open, onClose, onLogin, onRegister, initialMode = "l
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-400">
             {modo === "login"
-              ? "Entre para gerenciar seus projetos, agentes e operacoes em um so lugar."
-              : "Crie seu acesso e confirme o email para liberar o ambiente inicial."}
+              ? "Entre para gerenciar seus projetos"
+              : "Crie seu acesso e confirme o email"}
           </p>
         </div>
 
-        <div className="px-6 py-6">
-          <div className="overflow-hidden">
-            <div
-              className="flex w-[200%] transition-transform duration-300 ease-out"
-              style={{ transform: modo === "login" ? "translateX(0%)" : "translateX(-50%)" }}
+        <div className="px-5 py-5 sm:px-6 sm:py-6">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={modo}
+              initial={{ opacity: 0, y: 14, filter: "blur(4px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -10, filter: "blur(3px)" }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             >
-              <div className="w-full shrink-0 pr-6">
-                {modo === "login" ? (
-                  <LoginForm
-                    email={loginEmail}
-                    senha={loginSenha}
-                    error={loginError}
-                    notice={loginNotice}
-                    loading={loginLoading}
-                    socialLoadingProvider={socialLoadingProvider}
-                    resendingVerification={resendingVerification}
-                    emailRef={loginEmailRef}
-                    onEmailChange={setLoginEmail}
-                    onSenhaChange={setLoginSenha}
-                    onSubmit={handleLoginSubmit}
-                    onGoToCadastro={goToCadastro}
-                    onResendVerification={handleResendVerification}
-                    onSocialLogin={(provider) => handleSocialLogin(provider, "login")}
-                  />
-                ) : (
-                  <div aria-hidden="true" />
-                )}
-              </div>
-
-              <div className="w-full shrink-0 pl-6">
-                {modo === "cadastro" ? (
-                  <CadastroForm
-                    nome={cadastroNome}
-                    email={cadastroEmail}
-                    senha={cadastroSenha}
-                    confirmarSenha={cadastroConfirmarSenha}
-                    error={cadastroError}
-                    loading={cadastroLoading}
-                    nameRef={cadastroNomeRef}
-                    socialLoadingProvider={socialLoadingProvider}
-                    onNomeChange={setCadastroNome}
-                    onEmailChange={setCadastroEmail}
-                    onSenhaChange={setCadastroSenha}
-                    onConfirmarSenhaChange={setCadastroConfirmarSenha}
-                    onSubmit={handleCadastroSubmit}
-                    onBackToLogin={goToLogin}
-                    onSocialLogin={(provider) => handleSocialLogin(provider, "cadastro")}
-                  />
-                ) : (
-                  <div aria-hidden="true" />
-                )}
-              </div>
-            </div>
-          </div>
+              {modo === "login" ? (
+                <LoginForm
+                  email={loginEmail}
+                  senha={loginSenha}
+                  error={loginError}
+                  notice={loginNotice}
+                  loading={loginLoading}
+                  socialLoadingProvider={socialLoadingProvider}
+                  resendingVerification={resendingVerification}
+                  emailRef={loginEmailRef}
+                  onEmailChange={setLoginEmail}
+                  onSenhaChange={setLoginSenha}
+                  onSubmit={handleLoginSubmit}
+                  onGoToCadastro={goToCadastro}
+                  onResendVerification={handleResendVerification}
+                  onSocialLogin={(provider) => handleSocialLogin(provider, "login")}
+                />
+              ) : (
+                <CadastroForm
+                  nome={cadastroNome}
+                  email={cadastroEmail}
+                  senha={cadastroSenha}
+                  confirmarSenha={cadastroConfirmarSenha}
+                  error={cadastroError}
+                  loading={cadastroLoading}
+                  nameRef={cadastroNomeRef}
+                  socialLoadingProvider={socialLoadingProvider}
+                  onNomeChange={setCadastroNome}
+                  onEmailChange={setCadastroEmail}
+                  onSenhaChange={setCadastroSenha}
+                  onConfirmarSenhaChange={setCadastroConfirmarSenha}
+                  onSubmit={handleCadastroSubmit}
+                  onBackToLogin={goToLogin}
+                  onSocialLogin={(provider) => handleSocialLogin(provider, "cadastro")}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
     </div>

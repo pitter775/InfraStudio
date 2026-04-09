@@ -207,7 +207,6 @@ export function NichesSection() {
   const [activePlanIndex, setActivePlanIndex] = useState(2);
   const mobilePlansRef = useRef<HTMLDivElement | null>(null);
   const scrollFrameRef = useRef<number>(0);
-  const scrollTimeoutRef = useRef<number | null>(null);
   const planCount = PLAN_ITEMS.length;
 
   const getNearestPlanIndex = (container: HTMLDivElement) => {
@@ -231,21 +230,24 @@ export function NichesSection() {
     return nextIndex;
   };
 
-  const snapToPlan = (index: number, behavior: ScrollBehavior = "smooth") => {
+  const scrollToPlan = (index: number, behavior: ScrollBehavior = "smooth") => {
     const container = mobilePlansRef.current;
     const card = container?.querySelector<HTMLElement>(`[data-plan-index="${index}"]`);
     if (!container || !card) return;
 
-    card.scrollIntoView({ behavior, inline: "center", block: "nearest" });
+    const targetLeft = card.offsetLeft - (container.clientWidth - card.clientWidth) / 2;
+    const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+    const nextScrollLeft = Math.min(Math.max(targetLeft, 0), maxScrollLeft);
+
+    container.scrollTo({ left: nextScrollLeft, behavior });
     setActivePlanIndex((current) => (current === index ? current : index));
   };
 
   useEffect(() => {
     const container = mobilePlansRef.current;
-    const card = container?.querySelector<HTMLElement>(`[data-plan-index="${activePlanIndex}"]`);
-    if (!container || !card) return;
+    if (!container) return;
 
-    card.scrollIntoView({ inline: "center", block: "nearest" });
+    scrollToPlan(activePlanIndex, "auto");
   }, [activePlanIndex]);
 
   useEffect(() => {
@@ -253,16 +255,12 @@ export function NichesSection() {
       if (scrollFrameRef.current) {
         cancelAnimationFrame(scrollFrameRef.current);
       }
-
-      if (scrollTimeoutRef.current) {
-        window.clearTimeout(scrollTimeoutRef.current);
-      }
     };
   }, []);
 
   const goToPlan = (index: number) => {
     const normalizedIndex = (index + planCount) % planCount;
-    snapToPlan(normalizedIndex);
+    scrollToPlan(normalizedIndex);
   };
 
   return (
@@ -280,7 +278,7 @@ export function NichesSection() {
               <div className="mt-14 px-1 md:hidden">
                 <div
                   ref={mobilePlansRef}
-                  className="flex snap-x snap-mandatory gap-0 overflow-x-auto scroll-smooth px-4 pb-2 [&::-webkit-scrollbar]:hidden"
+                  className="flex snap-x snap-mandatory gap-0 overflow-x-auto px-4 pb-2 [&::-webkit-scrollbar]:hidden"
                   style={{ scrollbarWidth: "none", scrollPaddingInline: "1rem" }}
                   onScroll={(event) => {
                     const container = event.currentTarget;
@@ -292,17 +290,6 @@ export function NichesSection() {
 
                       setActivePlanIndex((current) => (current === nextIndex ? current : nextIndex));
                     });
-
-                    if (scrollTimeoutRef.current) {
-                      window.clearTimeout(scrollTimeoutRef.current);
-                    }
-
-                    scrollTimeoutRef.current = window.setTimeout(() => {
-                      const nextIndex = getNearestPlanIndex(container);
-                      if (nextIndex === null) return;
-
-                      snapToPlan(nextIndex);
-                    }, 120);
                   }}
                 >
                   {PLAN_ITEMS.map((plan, index) => (
