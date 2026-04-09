@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin, canManageProject } from "@/lib/access";
 import { createApi, listApis } from "@/lib/apis";
-import { canDemoUserEditProject } from "@/lib/demo-project-guard";
+import { canDemoUserEditProject, isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
 import { getSessionUser } from "@/lib/session";
 
 type RouteContext = {
@@ -19,7 +19,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const { id } = await context.params;
 
-  if (!canManageProject(user, id) && !await canDemoUserEditProject(user?.email, id)) {
+  if (!canManageProject(user, id) && !await canDemoUserEditProject(user?.email, id, user)) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
   }
 
@@ -36,7 +36,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   const { id } = await context.params;
 
-  if (!canManageProject(user, id) && !await canDemoUserEditProject(user?.email, id)) {
+  if (!canManageProject(user, id) && !await canDemoUserEditProject(user?.email, id, user)) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
   }
 
@@ -64,6 +64,10 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (body.metodo && body.metodo.trim().toUpperCase() !== "GET") {
     return NextResponse.json({ error: "Somente APIs GET sao permitidas neste momento." }, { status: 400 });
+  }
+
+  if (await isDemoProjectMutationBlocked(user?.email, id, "POST", user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
   }
 
   const api = await createApi({

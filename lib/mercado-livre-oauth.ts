@@ -3,6 +3,8 @@ import "server-only";
 import { createHash, randomBytes, randomUUID } from "crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { appendSystemLog } from "@/lib/chat-logs";
+import { sanitizeConnectorConfigForDemo } from "@/lib/demo";
+import { getProjetoById } from "@/lib/projetos";
 import {
   getConectorById,
   getMercadoLivreConnectorConfig,
@@ -301,6 +303,7 @@ async function persistMercadoLivreTokens(connector: ConnectorRecord, tokenPayloa
   const currentConfig = getMercadoLivreConnectorConfig(connector) ?? {};
   const accessToken = tokenPayload.access_token?.trim();
   const refreshToken = tokenPayload.refresh_token?.trim() || currentConfig.refresh_token;
+  const projeto = connector.projetoId ? await getProjetoById(connector.projetoId) : null;
 
   if (!accessToken) {
     throw new Error("Mercado Livre nao retornou access_token.");
@@ -310,6 +313,18 @@ async function persistMercadoLivreTokens(connector: ConnectorRecord, tokenPayloa
   const sellerId = String(user.id ?? tokenPayload.user_id ?? currentConfig.seller_id ?? "").trim();
   const nickname = user.nickname?.trim() || currentConfig.nickname;
 
+  const nextConfig = {
+    ...connector.configuracoes,
+    app_id: currentConfig.app_id,
+    client_secret: currentConfig.client_secret,
+    seller_id: sellerId || currentConfig.seller_id,
+    nickname,
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    token_expires_at: buildTokenExpiry(tokenPayload.expires_in),
+    user_id: sellerId || currentConfig.user_id,
+  };
+
   const updated = await updateConector({
     id: connector.id,
     projetoId: connector.projetoId ?? "",
@@ -318,17 +333,7 @@ async function persistMercadoLivreTokens(connector: ConnectorRecord, tokenPayloa
     tipo: connector.tipo,
     endpointBase: connector.endpointBase,
     ativo: connector.ativo,
-    configuracoes: {
-      ...connector.configuracoes,
-      app_id: currentConfig.app_id,
-      client_secret: currentConfig.client_secret,
-      seller_id: sellerId || currentConfig.seller_id,
-      nickname,
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      token_expires_at: buildTokenExpiry(tokenPayload.expires_in),
-      user_id: sellerId || currentConfig.user_id,
-    },
+    configuracoes: projeto?.isDemo ? sanitizeConnectorConfigForDemo(nextConfig) : nextConfig,
   });
 
   if (!updated) {

@@ -25,6 +25,11 @@ type Projeto = {
   modeloId?: string | null;
   modeloNome?: string | null;
   isDemo?: boolean;
+  demoExpiresAt?: string | null;
+  demoStatus?: "ativo" | "expirado" | "convertido" | "descartado" | null;
+  demoExpired?: boolean;
+  demoRemainingMs?: number;
+  demoWarning?: boolean;
 };
 
 type ModeloDisponivel = {
@@ -251,6 +256,13 @@ function buildDemoProjectSnapshot(data: ProjetoDetalhe) {
       })),
     })),
   };
+}
+
+function formatDemoRemaining(ms: number) {
+  const totalSeconds = Math.max(Math.floor(ms / 1000), 0);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 type BillingPricingModel = {
@@ -5074,7 +5086,12 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const currentUserIsDemo = isDemoUser(currentUser?.email);
-  const demoEditBlocked = currentUserIsDemo && data?.projeto.isDemo === true;
+  const [demoNow, setDemoNow] = useState(() => Date.now());
+  const demoRemainingMs = data?.projeto.demoExpiresAt
+    ? Math.max(new Date(data.projeto.demoExpiresAt).getTime() - demoNow, 0)
+    : 0;
+  const demoExpired = currentUserIsDemo && data?.projeto.isDemo === true && (data.projeto.demoExpired === true || demoRemainingMs <= 0);
+  const demoEditBlocked = demoExpired;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -5099,6 +5116,18 @@ export default function AdminProjetoDetalhePage() {
 
     writeDemoProjectSnapshot(buildDemoProjectSnapshot(data));
   }, [data]);
+
+  useEffect(() => {
+    if (!currentUserIsDemo || data?.projeto.isDemo !== true || !data.projeto.demoExpiresAt) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setDemoNow(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [currentUserIsDemo, data?.projeto.isDemo, data?.projeto.demoExpiresAt]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -7876,6 +7905,38 @@ export default function AdminProjetoDetalhePage() {
       {demoConverted ? (
         <section className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
           Seu projeto foi criado com base na demonstracao.
+        </section>
+      ) : null}
+      {data.projeto.isDemo ? (
+        <section
+          className={`rounded-xl px-4 py-3 text-sm ${
+            demoExpired
+              ? "border border-rose-500/20 bg-rose-500/10 text-rose-100"
+              : demoRemainingMs <= 5 * 60_000
+                ? "border border-amber-400/20 bg-amber-500/10 text-amber-100"
+                : "border border-cyan-400/20 bg-cyan-400/10 text-cyan-100"
+          }`}
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold">
+                {demoExpired ? "Sua demonstracao expirou." : `Tempo restante da demonstracao: ${formatDemoRemaining(demoRemainingMs)}`}
+              </p>
+              <p className="mt-1 text-xs opacity-90">
+                {demoExpired
+                  ? "Crie uma conta ou faca login para converter sua estrutura em um projeto real."
+                  : demoRemainingMs <= 5 * 60_000
+                    ? "Faltam menos de 5 minutos. Converta sua conta para continuar sem perder a estrutura segura."
+                    : "Voce esta usando um projeto demo isolado, com dados sensiveis e sessoes temporarias."}
+              </p>
+            </div>
+            <Link
+              href="/?auth=cadastro"
+              className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white transition hover:bg-white/15"
+            >
+              Criar conta para continuar
+            </Link>
+          </div>
         </section>
       ) : null}
       <section className="px-1 py-1">

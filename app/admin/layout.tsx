@@ -775,7 +775,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
             <div className={cn("flex flex-col", isAtendimentoRoute ? "h-screen overflow-hidden" : "min-h-screen")}>
               <div className="mx-auto w-full max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
                 <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-100 shadow-[0_18px_40px_rgba(245,158,11,0.12)]">
-                  Modo demonstracao - seus dados nao serao salvos.
+                  Modo demonstracao - voce pode testar tudo em um projeto isolado, com expiracao automatica.
                 </div>
               </div>
               <div

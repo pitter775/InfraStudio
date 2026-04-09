@@ -1,54 +1,9 @@
 import { NextResponse } from "next/server";
-import { getDemoProjeto } from "@/lib/projetos";
-import { createSession } from "@/lib/session";
-import { createUsuario, findUsuarioWithPasswordByEmail } from "@/lib/usuarios";
-import { getUsuarioById } from "@/lib/usuarios";
+import { createOrReuseDemoProjectForUser } from "@/lib/demo-project-service";
 import { isDemoUser } from "@/lib/demo-user";
+import { createSession } from "@/lib/session";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-
-async function syncDemoProjectMembership(usuarioId: string, projetoId: string) {
-  const supabase = getSupabaseAdminClient();
-  const { error: deleteError } = await supabase
-    .from("usuarios_projetos")
-    .delete()
-    .eq("usuario_id", usuarioId)
-    .neq("projeto_id", projetoId);
-
-  if (deleteError) {
-    console.error("[auth] failed to prune demo project memberships", deleteError);
-    return false;
-  }
-
-  const { data: existing, error: readError } = await supabase
-    .from("usuarios_projetos")
-    .select("usuario_id")
-    .eq("usuario_id", usuarioId)
-    .eq("projeto_id", projetoId)
-    .maybeSingle();
-
-  if (readError) {
-    console.error("[auth] failed to read demo project membership", readError);
-    return false;
-  }
-
-  if (existing) {
-    return true;
-  }
-
-  const { error } = await supabase.from("usuarios_projetos").insert({
-    usuario_id: usuarioId,
-    projeto_id: projetoId,
-    papel: "viewer",
-    created_at: new Date().toISOString(),
-  } as never);
-
-  if (error) {
-    console.error("[auth] failed to ensure demo project membership", error);
-    return false;
-  }
-
-  return true;
-}
+import { createUsuario, findUsuarioWithPasswordByEmail, getUsuarioById } from "@/lib/usuarios";
 
 export async function POST(request: Request) {
   try {
@@ -64,52 +19,60 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email de demonstracao invalido." }, { status: 400 });
     }
 
-    const demoProjeto = await getDemoProjeto();
-    if (!demoProjeto) {
+    let demoUser = await findUsuarioWithPasswordByEmail(normalizedEmail);
+    if (!demoUser) {
+      const created = await createUsuario({
+        nome: "Usuario Demonstracao",
+        email: normalizedEmail,
+        senha: password,
+        ativo: true,
+        papel: "viewer",
+        provider: "email",
+        emailVerificado: true,
+        projetoIds: [],
+      });
+
+      if (!created) {
+        return NextResponse.json({ error: "Nao foi possivel criar o usuario demo." }, { status: 500 });
+      }
+
+      demoUser = await findUsuarioWithPasswordByEmail(normalizedEmail);
+    }
+
+    if (!demoUser) {
+      return NextResponse.json({ error: "Nao foi possivel preparar o usuario demo." }, { status: 500 });
+    }
+
+    const projeto = await createOrReuseDemoProjectForUser(demoUser.id);
+    if (!projeto) {
       return NextResponse.json({ error: "Projeto demo nao configurado." }, { status: 500 });
     }
 
-    const existing = await findUsuarioWithPasswordByEmail(normalizedEmail);
-    if (existing) {
-      const membershipEnsured = await syncDemoProjectMembership(existing.id, demoProjeto.id);
-      if (!membershipEnsured) {
-        return NextResponse.json({ error: "Nao foi possivel vincular o usuario demo ao projeto." }, { status: 500 });
-      }
+    await getSupabaseAdminClient()
+      .from("usuarios")
+      .update({
+        ultimo_login_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", demoUser.id);
 
-      const refreshedUser = await getUsuarioById(existing.id);
-      if (refreshedUser) {
-        await createSession(refreshedUser);
-      }
-
-      return NextResponse.json({ ok: true, existed: true, projectId: demoProjeto.id }, { status: 200 });
-    }
-
-    const created = await createUsuario({
-      nome: "Usuario Demonstracao",
-      email: normalizedEmail,
-      senha: password,
-      ativo: true,
-      papel: "viewer",
-      provider: "email",
-      emailVerificado: true,
-      projetoIds: [demoProjeto.id],
-    });
-
-    if (!created) {
-      return NextResponse.json({ error: "Nao foi possivel criar o usuario demo." }, { status: 500 });
-    }
-
-    const membershipEnsured = await syncDemoProjectMembership(created.id, demoProjeto.id);
-    if (!membershipEnsured) {
-      return NextResponse.json({ error: "Nao foi possivel vincular o usuario demo ao projeto." }, { status: 500 });
-    }
-
-    const refreshedUser = await getUsuarioById(created.id);
+    const refreshedUser = await getUsuarioById(demoUser.id);
     if (refreshedUser) {
       await createSession(refreshedUser);
     }
 
-    return NextResponse.json({ ok: true, existed: false, projectId: demoProjeto.id, user: created }, { status: 201 });
+    return NextResponse.json(
+      {
+        ok: true,
+        projectId: projeto.id,
+        demo: {
+          expiresAt: projeto.demoExpiresAt,
+          status: projeto.demoStatus,
+          remainingMs: projeto.demoRemainingMs,
+        },
+      },
+      { status: 200 },
+    );
   } catch (error) {
     console.error("[auth] demo-create failed", error);
     return NextResponse.json({ error: "Nao foi possivel criar o usuario demo." }, { status: 500 });

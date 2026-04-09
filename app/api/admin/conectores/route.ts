@@ -12,6 +12,8 @@ import {
   type MercadoLivreConnectorConfig,
 } from "@/lib/conectores";
 import { canDemoUserEditProject, isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
+import { sanitizeConnectorConfigForDemo } from "@/lib/demo";
+import { getProjetoById } from "@/lib/projetos";
 import { getSessionUser } from "@/lib/session";
 
 type ConnectorBody = {
@@ -101,7 +103,7 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as ConnectorBody;
 
-  if (!body.projetoId || (!canManageProject(user, body.projetoId) && !await canDemoUserEditProject(user?.email, body.projetoId))) {
+  if (!body.projetoId || (!canManageProject(user, body.projetoId) && !await canDemoUserEditProject(user?.email, body.projetoId, user))) {
     return NextResponse.json({ error: "Projeto invalido para criar conector." }, { status: 403 });
   }
 
@@ -123,14 +125,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: projectRuleError }, { status: 409 });
   }
 
+  if (await isDemoProjectMutationBlocked(user?.email, body.projetoId, "POST", user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
+  }
+
   const configuracoes = normalizeMercadoLivreConfig(body.configuracoes);
+  const projeto = await getProjetoById(body.projetoId);
   const conector = await createConector({
     projetoId: body.projetoId,
     agenteId: body.agenteId ?? null,
     nome: body.nome,
     tipo: MERCADO_LIVRE_CONNECTOR_TYPE,
     endpointBase: body.endpointBase ?? null,
-    configuracoes,
+    configuracoes: projeto?.isDemo ? sanitizeConnectorConfigForDemo(configuracoes) : configuracoes,
     ativo: body.ativo ?? true,
   });
 
@@ -164,7 +171,7 @@ export async function PUT(request: Request) {
   }
 
   const projetoId = body.projetoId ?? existingConnector.projetoId;
-  if (!projetoId || (!canManageProject(user, projetoId) && !await canDemoUserEditProject(user?.email, projetoId))) {
+  if (!projetoId || (!canManageProject(user, projetoId) && !await canDemoUserEditProject(user?.email, projetoId, user))) {
     return NextResponse.json({ error: "Projeto invalido para atualizar conector." }, { status: 403 });
   }
 
@@ -182,10 +189,15 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: projectRuleError }, { status: 409 });
   }
 
+  if (await isDemoProjectMutationBlocked(user?.email, projetoId, "PUT", user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
+  }
+
   const configuracoes = {
     ...normalizeMercadoLivreConfig(existingConnector.configuracoes),
     ...normalizeMercadoLivreConfig(body.configuracoes),
   };
+  const projeto = await getProjetoById(projetoId);
   const conector = await updateConector({
     id: body.id,
     projetoId,
@@ -193,7 +205,7 @@ export async function PUT(request: Request) {
     nome: body.nome,
     tipo: MERCADO_LIVRE_CONNECTOR_TYPE,
     endpointBase: body.endpointBase ?? null,
-    configuracoes,
+    configuracoes: projeto?.isDemo ? sanitizeConnectorConfigForDemo(configuracoes) : configuracoes,
     ativo: body.ativo ?? true,
   });
 
@@ -229,8 +241,8 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Projeto invalido para excluir conector." }, { status: 403 });
   }
 
-  if (await isDemoProjectMutationBlocked(user?.email, body.projetoId)) {
-    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
+  if (await isDemoProjectMutationBlocked(user?.email, body.projetoId, "DELETE", user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
   }
 
   const deleted = await deleteConector(body.id);

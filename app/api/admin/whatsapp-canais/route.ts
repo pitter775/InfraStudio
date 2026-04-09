@@ -31,7 +31,7 @@ async function validateProjectAccess(projetoId: string | null | undefined) {
 
   const resolvedProjectId = resolveRequestedProjectId(user, projetoId);
   const canManageResolvedProject = resolvedProjectId
-    ? canManageProject(user, resolvedProjectId) || await canDemoUserEditProject(user?.email, resolvedProjectId)
+    ? canManageProject(user, resolvedProjectId) || await canDemoUserEditProject(user?.email, resolvedProjectId, user)
     : false;
   if (!resolvedProjectId || !canManageResolvedProject || !canAccessProject(user, resolvedProjectId)) {
     return { user, error: NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 }) };
@@ -74,7 +74,7 @@ export async function GET(request: Request) {
     return access.error;
   }
 
-  if (await isDemoProjectReadRestricted(access.user?.email, access.projetoId)) {
+  if (await isDemoProjectReadRestricted(access.user?.email, access.projetoId, access.user)) {
     return NextResponse.json({ channels: [] }, { status: 200 });
   }
 
@@ -103,8 +103,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: projectRuleError }, { status: 409 });
   }
 
-  if (await isDemoProjectMutationBlocked(access.user?.email, access.projetoId)) {
-    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
+  if (await isDemoProjectMutationBlocked(access.user?.email, access.projetoId, "POST", access.user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
   }
 
   try {
@@ -157,8 +157,8 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: projectRuleError }, { status: 409 });
   }
 
-  if (await isDemoProjectMutationBlocked(access.user?.email, access.projetoId)) {
-    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
+  if (await isDemoProjectMutationBlocked(access.user?.email, access.projetoId, "PUT", access.user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
   }
 
   try {
@@ -201,8 +201,8 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Projeto invalido para excluir canal WhatsApp." }, { status: 403 });
   }
 
-  if (await isDemoProjectMutationBlocked(access.user?.email, access.projetoId)) {
-    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
+  if (await isDemoProjectMutationBlocked(access.user?.email, access.projetoId, "DELETE", access.user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
   }
 
   try {

@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       {
         error: error instanceof Error ? error.message : "Nao foi possivel responder agora.",
       },
-      { status: 500, headers: corsHeaders },
+      { status: error instanceof Error && error.message === "DEMO_EXPIRED" ? 410 : 500, headers: corsHeaders },
     );
   }
 }

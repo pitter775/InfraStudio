@@ -1,5 +1,8 @@
 import "server-only";
 
+import { randomUUID } from "crypto";
+import { buildDemoExpirationDate, getDemoChannelMetadata, isDemoChannelExpired, withDemoChannelMetadata } from "@/lib/demo";
+import { getProjetoById } from "@/lib/projetos";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { purgeWhatsAppServiceSessions } from "@/lib/whatsapp-service";
 
@@ -25,6 +28,10 @@ export type WhatsAppChannelRecord = {
   projetoId: string | null;
   agenteId: string | null;
   numero: string;
+  sessionId: string | null;
+  modo: "demo" | "real";
+  expiraEm: string | null;
+  demoExpired: boolean;
   status: WhatsAppChannelStatus;
   sessionData: WhatsAppSessionData | null;
   createdAt: string;
@@ -54,11 +61,17 @@ function normalizeNumero(value: string | null | undefined) {
 }
 
 function mapWhatsAppChannel(row: WhatsAppChannelRow): WhatsAppChannelRecord {
+  const demo = getDemoChannelMetadata(row.session_data);
+
   return {
     id: row.id,
     projetoId: row.projeto_id,
     agenteId: row.agente_id,
     numero: normalizeNumero(row.numero),
+    sessionId: demo.sessionId,
+    modo: demo.modo,
+    expiraEm: demo.expiraEm,
+    demoExpired: isDemoChannelExpired(row.session_data),
     sessionData: row.session_data ?? null,
     status: row.status === "inativo" ? "inativo" : "ativo",
     createdAt: row.created_at ?? new Date().toISOString(),
@@ -152,13 +165,25 @@ export async function createWhatsAppChannel(input: {
 }) {
   const supabase = getSupabaseAdminClient();
   const now = new Date().toISOString();
+  const projeto = await getProjetoById(input.projetoId);
+  const isDemo = projeto?.isDemo === true;
+  const sessionId = `wa_${randomUUID()}`;
+  const nextSessionData = withDemoChannelMetadata(
+    input.sessionData ?? { connectionStatus: "offline" },
+    {
+      sessionId,
+      modo: isDemo ? "demo" : "real",
+      expiraEm: isDemo ? (projeto?.demoExpiresAt ?? buildDemoExpirationDate()) : null,
+      reconnectDisabled: isDemo,
+    },
+  );
   const { data, error } = await supabase
     .from("canais_whatsapp")
     .insert({
       projeto_id: input.projetoId,
       agente_id: input.agenteId ?? null,
       numero: normalizeNumero(input.numero),
-      session_data: input.sessionData ?? { connectionStatus: "offline" },
+      session_data: nextSessionData,
       status: input.status ?? "ativo",
       created_at: now,
       updated_at: now,

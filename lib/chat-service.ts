@@ -885,6 +885,23 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
     throw new Error("Projeto ou widget do chat nao encontrado. Revise o embed configurado para este site.");
   }
 
+  if (resolved.projeto.isDemo && resolved.projeto.demoExpired) {
+    await appendChatFailureLog({
+      projetoId: resolved.projeto.id,
+      agenteId: resolved.agente?.id ?? null,
+      chatId: effectiveBody.chatId ?? null,
+      origem: "chat_service.demo_guardrail",
+      descricao: "Projeto demo expirado bloqueado.",
+      payload: {
+        demoExpiresAt: resolved.projeto.demoExpiresAt,
+        demoStatus: resolved.projeto.demoStatus,
+        channelKind,
+      },
+    });
+
+    throw new Error("DEMO_EXPIRED");
+  }
+
   if (resolved.lockedToAgent && !resolved.agente) {
     await appendRuntimeErrorLog({
       source: "chat_service.channel_resolution",

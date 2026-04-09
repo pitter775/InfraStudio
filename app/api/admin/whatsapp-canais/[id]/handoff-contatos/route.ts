@@ -80,8 +80,8 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Canal WhatsApp nao encontrado ou sem acesso." }, { status: 404 });
   }
 
-  if (await isDemoProjectMutationBlocked(user?.email, channel.projetoId)) {
-    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
+  if (await isDemoProjectMutationBlocked(user?.email, channel.projetoId, "POST", user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
   }
 
   const body = (await request.json().catch(() => null)) as {

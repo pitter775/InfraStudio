@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { canAccessAdmin, canManageProject } from "@/lib/access";
 import { buildMercadoLivreAuthorizationUrl } from "@/lib/mercado-livre-oauth";
 import { getConectorById } from "@/lib/conectores";
+import { canDemoUserEditProject, isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
 import { getSessionUser } from "@/lib/session";
 
 type RouteContext = {
@@ -25,8 +26,12 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Conector nao encontrado." }, { status: 404 });
   }
 
-  if (!connector.projetoId || !canManageProject(user, connector.projetoId)) {
+  if (!connector.projetoId || (!canManageProject(user, connector.projetoId) && !await canDemoUserEditProject(user?.email, connector.projetoId, user))) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
+  }
+
+  if (await isDemoProjectMutationBlocked(user?.email, connector.projetoId, "GET", user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
   }
 
   try {

@@ -37,6 +37,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Canal WhatsApp nao encontrado." }, { status: 404 });
     }
 
+    if (channel.modo === "demo" && channel.demoExpired) {
+      await updateWhatsAppChannelSession(channel.id, {
+        connectionStatus: "offline",
+        qrCodeUrl: null,
+        qrCodeDataUrl: null,
+        qrCodeText: null,
+        disconnectedAt: new Date().toISOString(),
+        notes: "Sessao demo expirada e encerrada automaticamente.",
+      }, "inativo");
+
+      return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 410 });
+    }
+
     const numero = String(body.numero || "").replace(/\D/g, "");
     if (!numero) {
       return NextResponse.json({ error: "Numero do remetente obrigatorio." }, { status: 400 });

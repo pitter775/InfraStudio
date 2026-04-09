@@ -24,7 +24,7 @@ export async function PUT(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "API nao encontrada." }, { status: 404 });
   }
 
-  if (!canManageProject(user, currentApi.projetoId) && !await canDemoUserEditProject(user?.email, currentApi.projetoId)) {
+  if (!canManageProject(user, currentApi.projetoId) && !await canDemoUserEditProject(user?.email, currentApi.projetoId, user)) {
     return NextResponse.json({ error: "Acesso negado para esta API." }, { status: 403 });
   }
 
@@ -52,6 +52,10 @@ export async function PUT(request: Request, context: RouteContext) {
 
   if (body.metodo && body.metodo.trim().toUpperCase() !== "GET") {
     return NextResponse.json({ error: "Somente APIs GET sao permitidas neste momento." }, { status: 400 });
+  }
+
+  if (await isDemoProjectMutationBlocked(user?.email, currentApi.projetoId, "PUT", user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
   }
 
   const api = await updateApi({
@@ -106,8 +110,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Acesso negado para esta API." }, { status: 403 });
   }
 
-  if (await isDemoProjectMutationBlocked(user?.email, currentApi.projetoId)) {
-    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
+  if (await isDemoProjectMutationBlocked(user?.email, currentApi.projetoId, "DELETE", user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
   }
 
   const deleted = await deleteApi(id);

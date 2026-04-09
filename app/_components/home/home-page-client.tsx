@@ -9,9 +9,6 @@ import { isAdminUser } from "@/lib/access";
 import {
   clearDemoProjectSnapshot,
   clearPendingDemoConversion,
-  readDemoProjectSnapshot,
-  readPendingDemoConversion,
-  writePendingDemoConversion,
 } from "@/lib/demo-conversion";
 import { isDemoUser } from "@/lib/demo-user";
 import { DEFAULT_CHAT_AGENT, DEFAULT_CHAT_PROJECT } from "@/app/_components/home/data";
@@ -132,9 +129,7 @@ export function HomePageClient({
       return false;
     }
 
-    const snapshot = readDemoProjectSnapshot();
-    const pendingDemoConversion = readPendingDemoConversion();
-    const demoEmail = typeof window !== "undefined" ? window.localStorage.getItem(DEMO_USER_STORAGE_KEY)?.trim() || "" : "";
+    const demoProjectId = typeof window !== "undefined" ? window.localStorage.getItem(DEMO_PROJECT_STORAGE_KEY)?.trim() || "" : "";
 
     if (typeof window !== "undefined") {
       const convertedProjectId = window.sessionStorage.getItem(DEMO_CONVERSION_RESULT_KEY)?.trim() || "";
@@ -148,7 +143,7 @@ export function HomePageClient({
       }
     }
 
-    if (!snapshot || !snapshot.projeto || !pendingDemoConversion?.demoUserId || !demoEmail) {
+    if (!demoProjectId) {
       return false;
     }
 
@@ -164,9 +159,7 @@ export function HomePageClient({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        demoUserId: pendingDemoConversion.demoUserId,
-        demoEmail,
-        snapshot,
+        demoProjectId,
       }),
     });
 
@@ -276,17 +269,6 @@ export function HomePageClient({
   }, [authResolved, currentUser]);
 
   const handleLogin = async (email: string, password: string) => {
-    if (currentUser && isDemoUser(currentUser.email)) {
-      const snapshot = readDemoProjectSnapshot();
-      if (snapshot) {
-        writePendingDemoConversion({
-          demoUserId: currentUser.id,
-          demoEmail: currentUser.email,
-          snapshot,
-        });
-      }
-    }
-
     const result = await signInWithProjectAuth(email, password);
 
     if (result.user) {
@@ -317,17 +299,6 @@ export function HomePageClient({
     senha: string;
     confirmarSenha: string;
   }) => {
-    if (currentUser && isDemoUser(currentUser.email)) {
-      const snapshot = readDemoProjectSnapshot();
-      if (snapshot) {
-        writePendingDemoConversion({
-          demoUserId: currentUser.id,
-          demoEmail: currentUser.email,
-          snapshot,
-        });
-      }
-    }
-
     return await registerWithProjectAuth(input);
   };
 

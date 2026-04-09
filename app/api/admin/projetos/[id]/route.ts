@@ -48,7 +48,7 @@ export async function GET(_request: Request, context: RouteContext) {
     getProjetoModeloSelecionado(id),
   ]);
   const projeto = projetos.find((item) => item.id === id) ?? null;
-  const demoReadRestricted = projeto ? await isDemoProjectReadRestricted(user?.email, id) : false;
+  const demoReadRestricted = projeto ? await isDemoProjectReadRestricted(user?.email, id, user) : false;
   const sanitizedWhatsAppChannels = demoReadRestricted ? [] : whatsappChannels;
   const sanitizedWidgets = demoReadRestricted
     ? widgets.map((widget) => ({
@@ -110,8 +110,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Acesso negado para gerenciar este projeto." }, { status: 403 });
   }
 
-  if (isDemoUser(user?.email) || await isDemoProjectMutationBlocked(user?.email, id)) {
-    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para salvar alteracoes do projeto." }, { status: 403 });
+  if (await isDemoProjectMutationBlocked(user?.email, id, "PATCH", user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
   }
 
   const body = (await request.json().catch(() => null)) as
@@ -298,8 +298,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
   }
 
-  if (isDemoUser(user?.email) || await isDemoProjectMutationBlocked(user?.email, id)) {
-    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para salvar alteracoes do projeto." }, { status: 403 });
+  if (await isDemoProjectMutationBlocked(user?.email, id, "DELETE", user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
   }
 
   const deleted = await deleteProjeto(id);

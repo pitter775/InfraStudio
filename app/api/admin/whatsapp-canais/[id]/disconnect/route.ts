@@ -20,12 +20,12 @@ export async function POST(_request: Request, context: RouteContext) {
   const { id } = await context.params;
   const channel = await getWhatsAppChannelById(id);
 
-  if (!channel || !channel.projetoId || (!canManageProject(user, channel.projetoId) && !await canDemoUserEditProject(user?.email, channel.projetoId))) {
+  if (!channel || !channel.projetoId || (!canManageProject(user, channel.projetoId) && !await canDemoUserEditProject(user?.email, channel.projetoId, user))) {
     return NextResponse.json({ error: "Canal nao encontrado." }, { status: 404 });
   }
 
-  if (await isDemoProjectMutationBlocked(user?.email, channel.projetoId)) {
-    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
+  if (await isDemoProjectMutationBlocked(user?.email, channel.projetoId, "POST", user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
   }
 
   const updated = await updateWhatsAppChannelSession(

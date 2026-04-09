@@ -4,6 +4,7 @@ import { AGENTE_ASSETS_BUCKET } from "@/lib/agente-assets";
 import { isAgentTestChatContext } from "@/lib/chats";
 import { appendSystemLog } from "@/lib/chat-logs";
 import { MERCADO_LIVRE_CONNECTOR_TYPE } from "@/lib/conectores";
+import { getDemoProjectMetadata, getDemoRemainingMs, isDemoProjectExpired, shouldWarnDemoExpiration, withDemoProjectMetadata, type DemoProjectMode, type DemoProjectStatus } from "@/lib/demo";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { purgeWhatsAppServiceSessions } from "@/lib/whatsapp-service";
 
@@ -18,6 +19,15 @@ export type ProjetoRecord = {
   modeloId?: string | null;
   siteChatAtivo: boolean;
   isDemo: boolean;
+  modo: DemoProjectMode;
+  demoExpiresAt: string | null;
+  demoStatus: DemoProjectStatus | null;
+  demoOwnerUserId: string | null;
+  demoTemplateSourceId: string | null;
+  demoTemplateSource: boolean;
+  demoExpired: boolean;
+  demoRemainingMs: number;
+  demoWarning: boolean;
   ownerUserId: string | null;
   criadorNome: string | null;
   criadorEmail: string | null;
@@ -66,6 +76,7 @@ type ProjetoMembershipRow = {
 
 function mapProjeto(row: ProjetoRow): ProjetoRecord {
   const configuracoes = row.configuracoes ?? {};
+  const demo = getDemoProjectMetadata(configuracoes, row.is_demo === true);
 
   return {
     id: row.id,
@@ -77,7 +88,16 @@ function mapProjeto(row: ProjetoRow): ProjetoRecord {
     modoCobranca: row.modo_cobranca ?? "plano",
     modeloId: row.modelo_id ?? null,
     siteChatAtivo: configuracoes.site_chat_ativo === true,
-    isDemo: row.is_demo === true,
+    isDemo: demo.isDemo,
+    modo: demo.modo,
+    demoExpiresAt: demo.demoExpiresAt,
+    demoStatus: demo.demoStatus,
+    demoOwnerUserId: demo.demoOwnerUserId,
+    demoTemplateSourceId: demo.demoTemplateSourceId,
+    demoTemplateSource: demo.isDemoTemplateSource,
+    demoExpired: isDemoProjectExpired(demo),
+    demoRemainingMs: getDemoRemainingMs(demo),
+    demoWarning: shouldWarnDemoExpiration(demo),
     ownerUserId: row.owner_user_id ?? null,
     criadorNome: null,
     criadorEmail: null,
@@ -264,9 +284,31 @@ export async function createProjeto(input: {
   modoCobranca?: "plano" | "manual" | "ilimitado";
   siteChatAtivo?: boolean;
   ownerUserId?: string | null;
+  modeloId?: string | null;
+  isDemo?: boolean;
+  modo?: DemoProjectMode;
+  demoExpiresAt?: string | null;
+  demoStatus?: DemoProjectStatus | null;
+  demoOwnerUserId?: string | null;
+  demoTemplateSourceId?: string | null;
+  demoTemplateSource?: boolean;
 }) {
   const supabase = getSupabaseAdminClient();
   const now = new Date().toISOString();
+  const configuracoes = withDemoProjectMetadata(
+    {
+      site_chat_ativo: input.siteChatAtivo ?? false,
+    },
+    {
+      isDemo: input.isDemo ?? false,
+      modo: input.modo ?? "real",
+      demoExpiresAt: input.demoExpiresAt ?? null,
+      demoStatus: input.demoStatus ?? null,
+      demoOwnerUserId: input.demoOwnerUserId ?? null,
+      demoTemplateSourceId: input.demoTemplateSourceId ?? null,
+      isDemoTemplateSource: input.demoTemplateSource ?? false,
+    },
+  );
   const { data, error } = await supabase
     .from("projetos")
     .insert({
@@ -276,10 +318,10 @@ export async function createProjeto(input: {
       descricao: input.descricao?.trim() || null,
       status: input.status?.trim() || "ativo",
       modo_cobranca: input.modoCobranca ?? "plano",
+      ...(input.modeloId !== undefined ? { modelo_id: input.modeloId } : {}),
+      is_demo: input.isDemo ?? false,
       owner_user_id: input.ownerUserId ?? null,
-      configuracoes: {
-        site_chat_ativo: input.siteChatAtivo ?? false,
-      },
+      configuracoes,
       created_at: now,
       updated_at: now,
     } as never)
@@ -303,6 +345,13 @@ export async function createProjetoForUsuario(input: {
   status?: string | null;
   modoCobranca?: "plano" | "manual" | "ilimitado";
   siteChatAtivo?: boolean;
+  modeloId?: string | null;
+  isDemo?: boolean;
+  modo?: DemoProjectMode;
+  demoExpiresAt?: string | null;
+  demoStatus?: DemoProjectStatus | null;
+  demoTemplateSourceId?: string | null;
+  demoTemplateSource?: boolean;
 }) {
   const supabase = getSupabaseAdminClient();
   const projeto = await createProjeto({
@@ -313,7 +362,15 @@ export async function createProjetoForUsuario(input: {
     status: input.status,
     modoCobranca: input.modoCobranca,
     siteChatAtivo: input.siteChatAtivo,
+    modeloId: input.modeloId,
     ownerUserId: input.usuarioId,
+    isDemo: input.isDemo,
+    modo: input.modo,
+    demoExpiresAt: input.demoExpiresAt,
+    demoStatus: input.demoStatus,
+    demoOwnerUserId: input.usuarioId,
+    demoTemplateSourceId: input.demoTemplateSourceId,
+    demoTemplateSource: input.demoTemplateSource,
   });
 
   if (!projeto) {
@@ -349,6 +406,13 @@ export async function updateProjeto(input: {
   siteChatAtivo?: boolean;
   modeloId?: string | null;
   ownerUserId?: string | null;
+  isDemo?: boolean;
+  modo?: DemoProjectMode;
+  demoExpiresAt?: string | null;
+  demoStatus?: DemoProjectStatus | null;
+  demoOwnerUserId?: string | null;
+  demoTemplateSourceId?: string | null;
+  demoTemplateSource?: boolean;
 }) {
   const supabase = getSupabaseAdminClient();
   const { data: current } = await supabase
@@ -357,10 +421,21 @@ export async function updateProjeto(input: {
     .eq("id", input.id)
     .maybeSingle<{ configuracoes: Record<string, unknown> | null }>();
 
-  const nextConfiguracoes = {
-    ...(current?.configuracoes ?? {}),
-    ...(input.siteChatAtivo === undefined ? {} : { site_chat_ativo: input.siteChatAtivo }),
-  };
+  const nextConfiguracoes = withDemoProjectMetadata(
+    {
+      ...(current?.configuracoes ?? {}),
+      ...(input.siteChatAtivo === undefined ? {} : { site_chat_ativo: input.siteChatAtivo }),
+    },
+    {
+      ...(input.isDemo !== undefined ? { isDemo: input.isDemo } : {}),
+      ...(input.modo !== undefined ? { modo: input.modo } : {}),
+      ...(input.demoExpiresAt !== undefined ? { demoExpiresAt: input.demoExpiresAt } : {}),
+      ...(input.demoStatus !== undefined ? { demoStatus: input.demoStatus } : {}),
+      ...(input.demoOwnerUserId !== undefined ? { demoOwnerUserId: input.demoOwnerUserId } : {}),
+      ...(input.demoTemplateSourceId !== undefined ? { demoTemplateSourceId: input.demoTemplateSourceId } : {}),
+      ...(input.demoTemplateSource !== undefined ? { isDemoTemplateSource: input.demoTemplateSource } : {}),
+    },
+  );
 
   const { data, error } = await supabase
     .from("projetos")
@@ -372,6 +447,7 @@ export async function updateProjeto(input: {
       status: input.status?.trim() || "ativo",
       modo_cobranca: input.modoCobranca ?? undefined,
       ...(input.modeloId !== undefined ? { modelo_id: input.modeloId } : {}),
+      ...(input.isDemo !== undefined ? { is_demo: input.isDemo } : {}),
       ...(input.ownerUserId !== undefined ? { owner_user_id: input.ownerUserId } : {}),
       configuracoes: nextConfiguracoes,
       updated_at: new Date().toISOString(),

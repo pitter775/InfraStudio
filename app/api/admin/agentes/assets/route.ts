@@ -35,10 +35,14 @@ export async function POST(request: Request) {
   const projetoId = canAccessGlobalAdmin(user) ? projetoIdFromBody ?? agente?.projetoId ?? null : resolveCurrentProjectId(user);
 
   const canEditProjeto = projetoId
-    ? canManageProject(user, projetoId) || await canDemoUserEditProject(user?.email, projetoId)
+    ? canManageProject(user, projetoId) || await canDemoUserEditProject(user?.email, projetoId, user)
     : false;
   if (!agente || !projetoId || agente.projetoId !== projetoId || !canEditProjeto) {
     return NextResponse.json({ error: "Agente ou projeto invalido para upload." }, { status: 403 });
+  }
+
+  if (await isDemoProjectMutationBlocked(user?.email, projetoId, "POST", user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
   }
 
   const asset = await createAgenteAsset({
@@ -73,8 +77,12 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Arquivo nao encontrado." }, { status: 404 });
   }
 
-  if (!canManageProject(user, asset.projetoId)) {
+  if (!canManageProject(user, asset.projetoId) && !await canDemoUserEditProject(user?.email, asset.projetoId, user)) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
+  }
+
+  if (await isDemoProjectMutationBlocked(user?.email, asset.projetoId, "DELETE", user)) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
   }
 
   const deleted = await deleteAgenteAsset(body.id);
