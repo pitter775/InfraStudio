@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { getDemoProjeto } from "@/lib/projetos";
+import { ensureDemoProjetoForUsuario } from "@/lib/projetos";
 import { createSession } from "@/lib/session";
 import { createUsuario, findUsuarioWithPasswordByEmail } from "@/lib/usuarios";
-import { getUsuarioById } from "@/lib/usuarios";
+import { getUsuarioById, setUsuarioAtivo } from "@/lib/usuarios";
 import { isDemoUser } from "@/lib/demo-user";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -21,7 +21,7 @@ async function syncDemoProjectMembership(usuarioId: string, projetoId: string) {
 
   const { data: existing, error: readError } = await supabase
     .from("usuarios_projetos")
-    .select("usuario_id")
+    .select("usuario_id, papel")
     .eq("usuario_id", usuarioId)
     .eq("projeto_id", projetoId)
     .maybeSingle();
@@ -32,13 +32,26 @@ async function syncDemoProjectMembership(usuarioId: string, projetoId: string) {
   }
 
   if (existing) {
+    if ((existing as { papel?: string | null }).papel !== "admin") {
+      const { error: updateError } = await supabase
+        .from("usuarios_projetos")
+        .update({ papel: "admin" } as never)
+        .eq("usuario_id", usuarioId)
+        .eq("projeto_id", projetoId);
+
+      if (updateError) {
+        console.error("[auth] failed to promote demo project membership", updateError);
+        return false;
+      }
+    }
+
     return true;
   }
 
   const { error } = await supabase.from("usuarios_projetos").insert({
     usuario_id: usuarioId,
     projeto_id: projetoId,
-    papel: "viewer",
+    papel: "admin",
     created_at: new Date().toISOString(),
   } as never);
 
@@ -56,6 +69,12 @@ export async function POST(request: Request) {
     const normalizedEmail = email?.trim().toLowerCase() ?? "";
     const password = senha?.trim() ?? "";
 
+    console.info("[auth] demo-create input received", {
+      hasEmail: Boolean(normalizedEmail),
+      hasPassword: Boolean(password),
+      normalizedEmail: normalizedEmail || null,
+    });
+
     if (!normalizedEmail || !password) {
       return NextResponse.json({ error: "Email e senha sao obrigatorios." }, { status: 400 });
     }
@@ -64,13 +83,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email de demonstracao invalido." }, { status: 400 });
     }
 
-    const demoProjeto = await getDemoProjeto();
-    if (!demoProjeto) {
-      return NextResponse.json({ error: "Projeto demo nao configurado." }, { status: 500 });
-    }
-
     const existing = await findUsuarioWithPasswordByEmail(normalizedEmail);
+    console.info("[auth] demo-create user lookup", {
+      normalizedEmail,
+      userFound: Boolean(existing),
+      userId: existing?.id ?? null,
+      membershipCount: Array.isArray(existing?.usuarios_projetos) ? existing.usuarios_projetos.length : 0,
+    });
     if (existing) {
+      await setUsuarioAtivo(existing.id, true);
+      const demoProjeto = await ensureDemoProjetoForUsuario(existing.id);
+      console.info("[auth] demo-create project prepared for existing user", {
+        userId: existing.id,
+        projectId: demoProjeto?.id ?? null,
+        ownerUserId: demoProjeto?.ownerUserId ?? null,
+      });
+      if (!demoProjeto) {
+        return NextResponse.json({ error: "Nao foi possivel preparar o projeto demo." }, { status: 500 });
+      }
+
       const membershipEnsured = await syncDemoProjectMembership(existing.id, demoProjeto.id);
       if (!membershipEnsured) {
         return NextResponse.json({ error: "Nao foi possivel vincular o usuario demo ao projeto." }, { status: 500 });
@@ -92,11 +123,27 @@ export async function POST(request: Request) {
       papel: "viewer",
       provider: "email",
       emailVerificado: true,
-      projetoIds: [demoProjeto.id],
+      skipDefaultProjeto: true,
     });
 
     if (!created) {
       return NextResponse.json({ error: "Nao foi possivel criar o usuario demo." }, { status: 500 });
+    }
+
+    console.info("[auth] demo-create user created", {
+      userId: created.id,
+      userEmail: created.email,
+      membershipCount: created.memberships?.length ?? 0,
+    });
+
+    const demoProjeto = await ensureDemoProjetoForUsuario(created.id);
+    console.info("[auth] demo-create project prepared for new user", {
+      userId: created.id,
+      projectId: demoProjeto?.id ?? null,
+      ownerUserId: demoProjeto?.ownerUserId ?? null,
+    });
+    if (!demoProjeto) {
+      return NextResponse.json({ error: "Nao foi possivel preparar o projeto demo." }, { status: 500 });
     }
 
     const membershipEnsured = await syncDemoProjectMembership(created.id, demoProjeto.id);
@@ -111,7 +158,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, existed: false, projectId: demoProjeto.id, user: created }, { status: 201 });
   } catch (error) {
-    console.error("[auth] demo-create failed", error);
+    console.error("[auth] demo-create failed", {
+      error,
+      message: error instanceof Error ? error.message : "unknown_error",
+    });
+    if (error instanceof Error && /Supabase server environment variables are not configured/i.test(error.message)) {
+      return NextResponse.json({ error: "Configuracao do banco nao foi carregada no servidor." }, { status: 503 });
+    }
     return NextResponse.json({ error: "Nao foi possivel criar o usuario demo." }, { status: 500 });
   }
 }

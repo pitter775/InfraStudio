@@ -2,6 +2,7 @@ import "server-only";
 
 import { isDemoUser } from "@/lib/demo-user";
 import { getProjetoById } from "@/lib/projetos";
+import { getUsuarioByEmail } from "@/lib/usuarios";
 
 export async function isDemoProjectReadRestricted(userEmail: string | null | undefined, projetoId: string | null | undefined) {
   const normalizedProjectId = projetoId?.trim() || null;
@@ -9,8 +10,21 @@ export async function isDemoProjectReadRestricted(userEmail: string | null | und
     return false;
   }
 
-  const projeto = await getProjetoById(normalizedProjectId);
-  return projeto?.isDemo === true;
+  const normalizedEmail = String(userEmail || "").trim().toLowerCase();
+  const [projeto, usuario] = await Promise.all([
+    getProjetoById(normalizedProjectId),
+    getUsuarioByEmail(normalizedEmail),
+  ]);
+
+  if (!projeto?.isDemo || !usuario) {
+    return false;
+  }
+
+  if (projeto.ownerUserId === usuario.id) {
+    return true;
+  }
+
+  return Boolean(usuario.memberships?.some((membership) => membership.projetoId === normalizedProjectId));
 }
 
 export async function canDemoUserEditProject(userEmail: string | null | undefined, projetoId: string | null | undefined) {

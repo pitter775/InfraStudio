@@ -22,7 +22,16 @@ function passwordMatches(inputPassword: string, storedPassword: string | null) {
   }
 
   if (storedPassword.startsWith("$2a$") || storedPassword.startsWith("$2b$") || storedPassword.startsWith("$2y$")) {
-    return compareSync(inputPassword, storedPassword);
+    try {
+      return compareSync(inputPassword, storedPassword);
+    } catch (error) {
+      console.error("[auth] password hash validation failed", {
+        error,
+        hashPrefix: storedPassword.slice(0, 4),
+        hashLength: storedPassword.length,
+      });
+      return false;
+    }
   }
 
   if (storedPassword === inputPassword) {
@@ -39,6 +48,12 @@ export async function POST(request: Request) {
     const rawEmail = email?.trim() ?? "";
     const normalizedEmail = rawEmail.toLowerCase();
 
+    console.info("[auth] login input received", {
+      hasEmail: Boolean(rawEmail),
+      hasPassword: Boolean(password),
+      normalizedEmail: normalizedEmail ? maskEmail(normalizedEmail) : null,
+    });
+
     if (!rawEmail || !password) {
       console.warn("[auth] login rejected: missing credentials", {
         hasEmail: Boolean(rawEmail),
@@ -53,6 +68,14 @@ export async function POST(request: Request) {
     });
 
     const usuario = await findUsuarioWithPasswordByEmail(normalizedEmail);
+    console.info("[auth] login user lookup", {
+      normalizedEmail: maskEmail(normalizedEmail),
+      userFound: Boolean(usuario),
+      userId: usuario?.id ?? null,
+      userStatus: usuario?.ativo ?? null,
+      emailVerified: usuario?.email_verificado ?? null,
+      membershipCount: Array.isArray(usuario?.usuarios_projetos) ? usuario.usuarios_projetos.length : 0,
+    });
     const passwordOk = usuario ? passwordMatches(password, usuario.senha) : false;
 
     if (!usuario || !passwordOk) {
@@ -96,7 +119,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ user: appUser }, { status: 200 });
   } catch (error) {
-    console.error("[auth] login failed", error);
+    console.error("[auth] login failed", {
+      error,
+      message: error instanceof Error ? error.message : "unknown_error",
+    });
+    if (error instanceof Error && /Supabase server environment variables are not configured/i.test(error.message)) {
+      return NextResponse.json({ error: "Configuracao do banco nao foi carregada no servidor." }, { status: 503 });
+    }
     return NextResponse.json({ error: "Nao foi possivel autenticar agora." }, { status: 500 });
   }
 }

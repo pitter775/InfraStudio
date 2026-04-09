@@ -169,6 +169,24 @@ export async function getUsuarioById(usuarioId: string) {
   return mapUsuarioToAppUser(data as Omit<UsuarioRow, "senha">);
 }
 
+export async function getUsuarioByEmail(email: string) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("usuarios")
+    .select(usuarioSelectFieldsNoPassword)
+    .eq("email", email.trim().toLowerCase())
+    .maybeSingle();
+
+  if (error || !data) {
+    if (error) {
+      console.error("[usuarios] failed to get usuario by email", error);
+    }
+    return null;
+  }
+
+  return mapUsuarioToAppUser(data as Omit<UsuarioRow, "senha">);
+}
+
 export async function listUsuariosByProjeto(projetoId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
@@ -222,6 +240,7 @@ type SaveUsuarioInput = {
   projetoIds?: string[];
   provider?: string | null;
   providerId?: string | null;
+  skipDefaultProjeto?: boolean;
 };
 
 function sanitizeUsuarioPayload(input: SaveUsuarioInput) {
@@ -404,12 +423,14 @@ export async function createUsuario(input: SaveUsuarioInput) {
   }
 
   const usuario = data as Omit<UsuarioRow, "senha">;
-  const projetoIds = await ensureUsuarioHasProjeto({
-    usuarioId: usuario.id,
-    nome: input.nome,
-    projetoIds: requestedProjetoIds,
-    papel: input.papel,
-  });
+  const projetoIds = input.skipDefaultProjeto
+    ? requestedProjetoIds
+    : await ensureUsuarioHasProjeto({
+        usuarioId: usuario.id,
+        nome: input.nome,
+        projetoIds: requestedProjetoIds,
+        papel: input.papel,
+      });
 
   await syncUsuarioProjetoPapeis({
     usuarioId: usuario.id,
