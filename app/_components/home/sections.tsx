@@ -1,20 +1,19 @@
 ﻿"use client";
 
+import Link from "next/link";
 import { motion } from "motion/react";
-import { ArrowRight, CheckCircle2, Smartphone } from "lucide-react";
+import { ArrowRight, CheckCircle2, LoaderCircle, Smartphone, Sparkles } from "lucide-react";
 import {
   BENEFIT_ITEMS,
   DEMO_FEATURES,
   FOOTER_COMPANY_LINKS,
   FOOTER_SOLUTION_LINKS,
-  PROCESS_STEPS,
   SERVICE_ITEMS,
   TECH_STACK,
   USE_CASE_ITEMS,
   WHATSAPP_NUMBER,
 } from "@/app/_components/home/data";
 import { PremiumHomeChatDemo } from "@/app/_components/home/chat-demo-premium";
-import { cn } from "@/lib/utils";
 
 const FOOTER_LINK_TARGETS: Record<string, string> = {
   "Automações": "/#servicos",
@@ -120,7 +119,15 @@ function UseCaseCard({
   );
 }
 
-export function HeroSection({ onOpenChat }: { onOpenChat: () => void }) {
+export function HeroSection({
+  onOpenChat,
+  onDemoLogin,
+  demoLoginLoading,
+}: {
+  onOpenChat: () => void;
+  onDemoLogin: () => void;
+  demoLoginLoading?: boolean;
+}) {
   return (
     <section className="relative overflow-hidden pb-20 pt-32 md:pb-32 md:pt-48">
       <div className="pointer-events-none absolute left-1/2 top-0 h-full w-full max-w-7xl -translate-x-1/2">
@@ -157,31 +164,28 @@ export function HeroSection({ onOpenChat }: { onOpenChat: () => void }) {
           transition={{ delay: 0.2 }}
           className="mx-auto mb-12 max-w-3xl text-lg leading-relaxed text-slate-400 md:text-xl"
         >
-          Responda clientes automaticamente no WhatsApp, site ou sistema.
+          Agentes no WhatsApp, Instagram, site e conversar com seus sistemas via API.
         </motion.p>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="flex flex-col items-center justify-center gap-4 sm:flex-row"
+          className="flex flex-col items-center justify-center gap-2"
         >
-          <a
-            href="#"
-            onClick={(event) => {
-              event.preventDefault();
-              onOpenChat();
-            }}
-            className="inline-flex rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-8 py-4 font-medium text-slate-100/88 shadow-md shadow-blue-600/20 transition-all hover:-translate-y-1 hover:from-blue-500 hover:to-blue-400"
-          >
-            Criar meu atendente
-          </a>
-          <a
-            href="#demonstracao"
-            className="inline-flex rounded-xl border border-white/10 bg-white/5 px-8 py-4 font-medium text-slate-100/88 transition-all hover:bg-white/10"
-          >
-            Ver funcionando
-          </a>
+          <div className="flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={onDemoLogin}
+              disabled={demoLoginLoading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-300/40 bg-cyan-400/12 px-8 py-4 font-medium text-cyan-50 shadow-[0_0_0_1px_rgba(34,211,238,0.18),0_0_28px_rgba(34,211,238,0.22),0_0_60px_rgba(59,130,246,0.18)] transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200/50 hover:bg-cyan-400/18 hover:shadow-[0_0_0_1px_rgba(103,232,249,0.24),0_0_36px_rgba(34,211,238,0.28),0_0_80px_rgba(59,130,246,0.22)] disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              <Sparkles size={18} className="animate-pulse text-cyan-200" />
+              {demoLoginLoading ? <LoaderCircle size={18} className="animate-spin" /> : null}
+              {demoLoginLoading ? "Abrindo demonstracao..." : "Testar agora sem cadastro"}
+            </button>
+            <p className="text-xs font-medium text-slate-400">Sem cadastro • Teste em segundos</p>
+          </div>
         </motion.div>
 
         <motion.div
@@ -290,42 +294,6 @@ export function BenefitsSection() {
   );
 }
 
-export function ProcessSection() {
-  return (
-    <section id="como-funciona" className="bg-slate-900/20 py-32">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-20 text-center">
-          <h2 className="text-3xl font-semibold tracking-[-0.03em] text-slate-100/88 md:text-[2.35rem]">Como funciona</h2>
-        </div>
-
-        <div className="relative">
-          <div className="absolute left-0 top-1/2 hidden h-px w-full -translate-y-1/2 bg-gradient-to-r from-transparent via-blue-500/30 to-transparent lg:block" />
-
-          <div className="relative z-10 grid grid-cols-1 gap-8 md:grid-cols-3 lg:grid-cols-3">
-            {PROCESS_STEPS.map((step) => (
-              <div
-                key={step.n}
-                className="rounded-2xl border border-white/10 bg-brand-dark p-8 text-center transition-colors hover:border-blue-500/30"
-              >
-                <div
-                  className={cn(
-                    "mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full font-medium text-slate-100/88 shadow-lg",
-                    step.highlight ? "bg-emerald-500 shadow-emerald-500/20" : "bg-blue-600 shadow-blue-600/20",
-                  )}
-                >
-                  {step.n}
-                </div>
-                <h4 className="mb-3 font-medium text-slate-100/88">{step.title}</h4>
-                <p className="text-xs leading-relaxed text-slate-500">{step.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export function UseCasesSection() {
   return (
     <section id="onde-usar" className="py-24">
@@ -383,10 +351,10 @@ export function FooterSection() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-start justify-between gap-12 md:flex-row">
           <div className="max-w-sm">
-            <div className="mb-6 flex items-center gap-2">
+            <Link href="/" className="mb-6 flex items-center gap-2">
               <img src="/logo.png" alt="Logo" className="h-8 w-8 object-contain" />
               <span className="text-xl font-bold tracking-tight text-white">InfraStudio</span>
-            </div>
+            </Link>
             <p className="text-sm leading-relaxed text-slate-500">
               Tecnologia sob medida para acelerar negócios brasileiros com inteligência e automação.
             </p>
@@ -435,6 +403,3 @@ export function FooterSection() {
     </footer>
   );
 }
-
-
-

@@ -17,6 +17,7 @@ export type ProjetoRecord = {
   modoCobranca: "plano" | "manual" | "ilimitado";
   modeloId?: string | null;
   siteChatAtivo: boolean;
+  isDemo: boolean;
   ownerUserId: string | null;
   criadorNome: string | null;
   criadorEmail: string | null;
@@ -43,6 +44,7 @@ type ProjetoRow = {
   status: string | null;
   modo_cobranca: "plano" | "manual" | "ilimitado" | null;
   modelo_id?: string | null;
+  is_demo?: boolean | null;
   owner_user_id?: string | null;
   configuracoes: Record<string, unknown> | null;
 };
@@ -75,6 +77,7 @@ function mapProjeto(row: ProjetoRow): ProjetoRecord {
     modoCobranca: row.modo_cobranca ?? "plano",
     modeloId: row.modelo_id ?? null,
     siteChatAtivo: configuracoes.site_chat_ativo === true,
+    isDemo: row.is_demo === true,
     ownerUserId: row.owner_user_id ?? null,
     criadorNome: null,
     criadorEmail: null,
@@ -85,7 +88,7 @@ export async function listProjetos() {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("projetos")
-    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, modelo_id, owner_user_id, configuracoes")
+    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, modelo_id, is_demo, owner_user_id, configuracoes")
     .order("nome", { ascending: true });
 
   if (error || !data) {
@@ -156,7 +159,7 @@ export async function listProjetosByUsuario(usuarioId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("usuarios_projetos")
-    .select("projetos(id, nome, slug, tipo, descricao, status, modo_cobranca, modelo_id, owner_user_id, configuracoes)")
+    .select("projetos(id, nome, slug, tipo, descricao, status, modo_cobranca, modelo_id, is_demo, owner_user_id, configuracoes)")
     .eq("usuario_id", usuarioId);
 
   if (error || !data) {
@@ -186,7 +189,7 @@ export async function getProjetoBySlug(slug: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("projetos")
-    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, modelo_id, owner_user_id, configuracoes")
+    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, modelo_id, is_demo, owner_user_id, configuracoes")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -204,7 +207,7 @@ export async function getProjetoById(id: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("projetos")
-    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, modelo_id, owner_user_id, configuracoes")
+    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, modelo_id, is_demo, owner_user_id, configuracoes")
     .eq("id", id)
     .maybeSingle();
 
@@ -230,6 +233,26 @@ export async function getProjetoByIdentifier(identifier: string) {
   }
 
   return await getProjetoById(value);
+}
+
+export async function getDemoProjeto() {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("projetos")
+    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, modelo_id, is_demo, owner_user_id, configuracoes")
+    .eq("is_demo", true)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) {
+    if (error) {
+      console.error("[projetos] failed to load demo projeto", error);
+    }
+    return null;
+  }
+
+  return mapProjeto(data as ProjetoRow);
 }
 
 export async function createProjeto(input: {
@@ -260,7 +283,7 @@ export async function createProjeto(input: {
       created_at: now,
       updated_at: now,
     } as never)
-    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, modelo_id, owner_user_id, configuracoes")
+    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, modelo_id, is_demo, owner_user_id, configuracoes")
     .single();
 
   if (error || !data) {
@@ -354,7 +377,7 @@ export async function updateProjeto(input: {
       updated_at: new Date().toISOString(),
     } as never)
     .eq("id", input.id)
-    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, modelo_id, owner_user_id, configuracoes")
+    .select("id, nome, slug, tipo, descricao, status, modo_cobranca, modelo_id, is_demo, owner_user_id, configuracoes")
     .single();
 
   if (error || !data) {

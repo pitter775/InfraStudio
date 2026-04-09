@@ -40,8 +40,12 @@ Perfis atuais:
 
 Auth atual:
 - auth propria com JWT
-- login sempre pelo backend (`/api/auth/login`)
-- sem modo demo/mock no client
+- login/sessao sempre pelo backend (`/api/auth/login`, `/api/auth/me`, `/api/auth/logout`)
+- cadastro manual com backend em `/api/auth/register`
+- login social via OAuth hoje suporta `google`, `github` e `facebook`
+- `instagram` ja existe no modal, mas ainda nao tem backend OAuth funcional
+- existe modo demonstracao real no client e no backend
+- o modo demo bloqueia mutacoes persistentes e empurra conversao para login/cadastro
 
 ## 3. Stack
 
@@ -59,6 +63,17 @@ Auth atual:
 - deploy principal na Vercel
 - local: `http://localhost:3000`
 
+### Demo / onboarding
+- existe fluxo de demonstracao com usuario demo real
+- entrada principal demo hoje passa por `C:\Projetos\infrastudio\app\nova_home\nova-home-client.tsx`
+- criacao/conversao demo usa:
+  - `C:\Projetos\infrastudio\app\api\auth\demo-create\route.ts`
+  - `C:\Projetos\infrastudio\app\api\auth\demo-convert\route.ts`
+- helper de demo e bloqueio:
+  - `C:\Projetos\infrastudio\lib\demo-user.ts`
+  - `C:\Projetos\infrastudio\lib\demo-conversion.ts`
+  - `C:\Projetos\infrastudio\lib\demo-project-guard.ts`
+
 ### Worker WhatsApp
 - repo separado: `C:\Projetos\whatsapp-service`
 - stack: `whatsapp-web.js` + Puppeteer
@@ -69,6 +84,22 @@ Auth atual:
 - sessao deve persistir por volume via `WHATSAPP_STORAGE_DIR`
 
 ## 5. Fluxos que importam
+
+### Auth / onboarding
+1. homepage abre `AuthModal` com login e cadastro manual
+2. login manual chama `/api/auth/login`
+3. cadastro manual chama `/api/auth/register`
+4. login social usa `/api/auth/oauth/start` + `/api/auth/oauth/callback`
+5. provedores ativos hoje no backend: Google, GitHub e Facebook
+6. Instagram ainda esta so na interface e precisa backend antes de funcionar de verdade
+
+### Demonstracao
+1. `nova_home` cria ou reaproveita um email demo em localStorage
+2. client tenta login do usuario demo
+3. se nao existir, cria via `/api/auth/demo-create`
+4. usuario entra em projeto demo real
+5. mutacoes sensiveis ficam bloqueadas no frontend e backend
+6. ao tentar salvar/editar, o sistema pede login/cadastro para converter o demo
 
 ### Chat
 1. widget/worker chama backend
@@ -90,6 +121,18 @@ Auth atual:
 4. `Liberar para IA` devolve o chat ao assistente
 
 ## 6. Arquivos centrais
+
+### Auth / demo
+- `C:\Projetos\infrastudio\app\_components\home\login-modal.tsx`
+- `C:\Projetos\infrastudio\app\_components\home\home-page-client.tsx`
+- `C:\Projetos\infrastudio\app\nova_home\nova-home-client.tsx`
+- `C:\Projetos\infrastudio\lib\auth.ts`
+- `C:\Projetos\infrastudio\lib\auth-service.ts`
+- `C:\Projetos\infrastudio\lib\social-oauth.ts`
+- `C:\Projetos\infrastudio\app\api\auth\oauth\start\route.ts`
+- `C:\Projetos\infrastudio\app\api\auth\oauth\callback\route.ts`
+- `C:\Projetos\infrastudio\app\api\auth\demo-create\route.ts`
+- `C:\Projetos\infrastudio\app\api\auth\demo-convert\route.ts`
 
 ### Chat
 - `C:\Projetos\infrastudio\lib\chat-service.ts`
@@ -139,6 +182,11 @@ Auth atual:
 - UI verde no painel nao prova runtime real do WhatsApp
 - widget do site e inbox humana nao sao a mesma entrega
 - a fonte de verdade de conversa/handoff esta em `admin/atendimento`
+- quando mexer em auth, conferir manual + social + demo
+- nao assumir que o texto da UI define a verdade; checar se o backend do provider existe
+- se mexer em demo, validar bloqueio de mutacao no frontend e no backend
+- instagram no auth ainda e placeholder visual; nao tratar como provider pronto
+- facebook continua provider valido no backend mesmo se a UI mudar
 
 ### Ao investigar WhatsApp
 - validar painel
@@ -157,6 +205,14 @@ npm run test:chat-intelligence:scenarios
 npm run test:chat-intelligence:domains
 ```
 
+Validacao manual recomendada quando mexer em auth/demo:
+- login manual
+- cadastro manual
+- login social com Google/GitHub/Facebook
+- fluxo demo em `nova_home`
+- bloqueio de edicao no modo demo
+- conversao de demo para conta real
+
 ```powershell
 cd C:\Projetos\whatsapp-service
 npm run dev
@@ -172,3 +228,6 @@ Env local importante:
 - qualquer mudanca de banco vai para `database/seeder`
 - nao mexer automaticamente no `geral-schema.sql`
 - se o problema envolver WhatsApp, checar app + worker + logs
+- modo demonstracao existe e e parte real do produto
+- login social atual do backend: Google, GitHub e Facebook
+- Instagram no modal ainda nao significa suporte backend

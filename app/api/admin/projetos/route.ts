@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canAccessGlobalAdmin, canAccessWorkspace, canManageProject } from "@/lib/access";
 import { createProjetoForUsuario, listProjetosByUsuarioWithStats, listProjetosWithStats, updateProjeto } from "@/lib/projetos";
+import { isDemoUser } from "@/lib/demo-user";
 import { createSession } from "@/lib/session";
 import { getUsuarioById } from "@/lib/usuarios";
 import { getSessionUser } from "@/lib/session";
@@ -21,6 +22,10 @@ export async function POST(request: Request) {
 
   if (!user || !canAccessWorkspace(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+  }
+
+  if (isDemoUser(user.email)) {
+    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para salvar projetos." }, { status: 403 });
   }
 
   const body = (await request.json()) as {
@@ -63,6 +68,10 @@ export async function PUT(request: Request) {
 
   if (!user || !canAccessWorkspace(user)) {
     return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+  }
+
+  if (isDemoUser(user.email)) {
+    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para salvar alteracoes do projeto." }, { status: 403 });
   }
 
   const body = (await request.json()) as {

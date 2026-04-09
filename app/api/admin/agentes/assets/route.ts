@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { canAccessAdmin, canAccessGlobalAdmin, canManageProject, resolveCurrentProjectId } from "@/lib/access";
 import { createAgenteAsset, deleteAgenteAsset, getAgenteAssetById } from "@/lib/agente-assets";
 import { getAgenteById } from "@/lib/agentes";
+import { canDemoUserEditProject, isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
 import { getSessionUser } from "@/lib/session";
 
 export async function POST(request: Request) {
@@ -33,7 +34,10 @@ export async function POST(request: Request) {
   const agente = await getAgenteById(agenteId);
   const projetoId = canAccessGlobalAdmin(user) ? projetoIdFromBody ?? agente?.projetoId ?? null : resolveCurrentProjectId(user);
 
-  if (!agente || !projetoId || agente.projetoId !== projetoId || !canManageProject(user, projetoId)) {
+  const canEditProjeto = projetoId
+    ? canManageProject(user, projetoId) || await canDemoUserEditProject(user?.email, projetoId)
+    : false;
+  if (!agente || !projetoId || agente.projetoId !== projetoId || !canEditProjeto) {
     return NextResponse.json({ error: "Agente ou projeto invalido para upload." }, { status: 403 });
   }
 

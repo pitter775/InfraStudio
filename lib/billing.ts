@@ -2,8 +2,10 @@ import "server-only";
 
 import { getBillingPlanCatalogById } from "@/lib/billing-plan-catalog";
 import { appendSystemLog } from "@/lib/chat-logs";
+import { isDemoUser } from "@/lib/demo-user";
 import { getDefaultOpenAIModel, resolvePricingModel } from "@/lib/openai-pricing";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getUsuarioById } from "@/lib/usuarios";
 
 export type BillingMode = "plano" | "manual" | "ilimitado";
 
@@ -439,6 +441,15 @@ function buildDecision(code: BillingDecisionCode, snapshot: BillingSnapshot, mes
     message,
     snapshot,
   };
+}
+
+async function isDemoUsuarioId(usuarioId: string | null | undefined) {
+  if (!usuarioId) {
+    return false;
+  }
+
+  const usuario = await getUsuarioById(usuarioId);
+  return isDemoUser(usuario?.email);
 }
 
 function clampPercent(value: number | null) {
@@ -1316,6 +1327,16 @@ export async function registrarUso(
     referenciaId?: string | null;
   },
 ) {
+  if (await isDemoUsuarioId(details?.usuarioId ?? null)) {
+    const current = await getPlanoProjeto(projetoId);
+    return {
+      allowed: true,
+      code: "allowed" as const,
+      message: null,
+      current,
+    };
+  }
+
   const supabase = getSupabaseAdminClient();
   const cycle = await ensureProjetoUsageCycle(projetoId);
   const totalTokens = Math.max(0, Math.round(tokens));
@@ -1513,6 +1534,19 @@ export async function evaluateBillingAccess(input: {
   usuarioId: string;
   referenceDate?: Date;
 }) {
+  if (await isDemoUsuarioId(input.usuarioId)) {
+    const snapshot = await getBillingSnapshot(input);
+    return buildDecision(
+      "allowed",
+      {
+        ...snapshot,
+        consumoProjeto: normalizeTotals(),
+        consumoUsuario: normalizeTotals(),
+      },
+      null,
+    );
+  }
+
   const snapshot = await getBillingSnapshot(input);
   const modoCobranca = await getProjetoBillingMode(input.projetoId);
 

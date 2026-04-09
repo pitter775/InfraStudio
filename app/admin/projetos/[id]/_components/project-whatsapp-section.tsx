@@ -381,7 +381,7 @@ export function ProjectWhatsAppSection({
               </div>
             );
           })() : (
-            <div className="xl:col-span-2">
+            <div>
               <div className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),rgba(6,78,59,0.08)_35%,rgba(2,6,23,0.88)_75%)] px-6 py-7">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Primeiro passo</p>
                 <h4 className="mt-3 max-w-3xl text-3xl font-bold text-white">Crie o numero que vai atender no WhatsApp</h4>
@@ -582,7 +582,48 @@ export function ProjectWhatsAppSection({
                 </div>
               </div>
             </div>
-          ) : null}
+          ) : (
+            <aside className="hidden rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4 lg:block xl:col-start-2 xl:sticky xl:top-6">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Tutorial rapido</p>
+                <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${
+                  whatsappServiceHealthTone === "online"
+                    ? "bg-emerald-500/15 text-emerald-300"
+                    : whatsappServiceHealthTone === "offline"
+                      ? "bg-rose-500/15 text-rose-300"
+                      : "bg-amber-500/15 text-amber-200"
+                }`}>
+                  {whatsappServiceHealthTone === "online" ? "worker online" : whatsappServiceHealthTone === "offline" ? "worker offline" : "verificando"}
+                </span>
+              </div>
+
+              <div className="mt-4 space-y-4 text-sm text-slate-300">
+                <div className="rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Passo 1</p>
+                  <p className="mt-2 font-semibold text-white">Cadastre o numero</p>
+                  <p className="mt-2 leading-6 text-slate-400">
+                    Crie o canal com o numero que vai atender e, se quiser, ja vincule ao agente principal do projeto.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Passo 2</p>
+                  <p className="mt-2 font-semibold text-white">Gere o QR Code</p>
+                  <p className="mt-2 leading-6 text-slate-400">
+                    Depois de salvar, o painel passa a mostrar o QR para escanear no WhatsApp do aparelho correto.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Passo 3</p>
+                  <p className="mt-2 font-semibold text-white">Valide a conexao</p>
+                  <p className="mt-2 leading-6 text-slate-400">
+                    Com o canal online, a area lateral libera os contatos de handoff e os testes de alerta para atendimento humano.
+                  </p>
+                </div>
+              </div>
+            </aside>
+          )}
         </div>
       </section>
     </div>

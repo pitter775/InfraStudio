@@ -11,6 +11,7 @@ import {
   updateConector,
   type MercadoLivreConnectorConfig,
 } from "@/lib/conectores";
+import { canDemoUserEditProject, isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
 import { getSessionUser } from "@/lib/session";
 
 type ConnectorBody = {
@@ -100,7 +101,7 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as ConnectorBody;
 
-  if (!body.projetoId || !canManageProject(user, body.projetoId)) {
+  if (!body.projetoId || (!canManageProject(user, body.projetoId) && !await canDemoUserEditProject(user?.email, body.projetoId))) {
     return NextResponse.json({ error: "Projeto invalido para criar conector." }, { status: 403 });
   }
 
@@ -149,7 +150,7 @@ export async function PUT(request: Request) {
 
   const body = (await request.json()) as ConnectorBody;
 
-  if (!body.id || !body.projetoId || !canManageProject(user, body.projetoId)) {
+  if (!body.id) {
     return NextResponse.json({ error: "Projeto invalido para atualizar conector." }, { status: 403 });
   }
 
@@ -162,16 +163,21 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Conector nao encontrado." }, { status: 404 });
   }
 
-  if (!existingConnector.projetoId || existingConnector.projetoId !== body.projetoId) {
+  const projetoId = body.projetoId ?? existingConnector.projetoId;
+  if (!projetoId || (!canManageProject(user, projetoId) && !await canDemoUserEditProject(user?.email, projetoId))) {
     return NextResponse.json({ error: "Projeto invalido para atualizar conector." }, { status: 403 });
   }
 
-  const agentError = await validateAgentProject(body.projetoId, body.agenteId);
+  if (!existingConnector.projetoId || existingConnector.projetoId !== projetoId) {
+    return NextResponse.json({ error: "Projeto invalido para atualizar conector." }, { status: 403 });
+  }
+
+  const agentError = await validateAgentProject(projetoId, body.agenteId);
   if (agentError) {
     return NextResponse.json({ error: agentError }, { status: 400 });
   }
 
-  const projectRuleError = await validateMercadoLivreProjectRule(body.projetoId, body.id);
+  const projectRuleError = await validateMercadoLivreProjectRule(projetoId, body.id);
   if (projectRuleError) {
     return NextResponse.json({ error: projectRuleError }, { status: 409 });
   }
@@ -182,7 +188,7 @@ export async function PUT(request: Request) {
   };
   const conector = await updateConector({
     id: body.id,
-    projetoId: body.projetoId,
+    projetoId,
     agenteId: body.agenteId ?? null,
     nome: body.nome,
     tipo: MERCADO_LIVRE_CONNECTOR_TYPE,
@@ -221,6 +227,10 @@ export async function DELETE(request: Request) {
 
   if (!conector.projetoId || !body.projetoId || conector.projetoId !== body.projetoId || !canManageProject(user, body.projetoId)) {
     return NextResponse.json({ error: "Projeto invalido para excluir conector." }, { status: 403 });
+  }
+
+  if (await isDemoProjectMutationBlocked(user?.email, body.projetoId)) {
+    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
   }
 
   const deleted = await deleteConector(body.id);

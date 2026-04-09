@@ -6,8 +6,12 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Activity, ArrowLeft, Bold, Bot, Boxes, Cable, CheckCircle2, ChevronDown, Coins, Copy, Cpu, Expand, ExternalLink, FileImage, Heading, List, ListOrdered, LoaderCircle, MessageCircle, MessageSquare, MessageSquareText, Minimize2, PanelsTopLeft, Paperclip, Pencil, Plus, Power, ShieldAlert, Sparkles, Target, TestTube2, Trash2, Waypoints, X, Zap } from "lucide-react";
 import { getAgentRuntimeBlockEntries, normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
+import { getCurrentProjectUser } from "@/lib/auth";
+import { saveCurrentDemoState, writeDemoProjectSnapshot } from "@/lib/demo-conversion";
 import { formatBrazilWhatsAppPhone, getNormalizedBrazilPhoneLocalDigits, normalizeBrazilWhatsAppPhone } from "@/lib/whatsapp-phone";
+import { isDemoUser } from "@/lib/demo-user";
 import { ProjectChatsSection } from "./_components/project-chats-section";
+import { ProjectApisSection } from "./_components/project-apis-section";
 import { ProjectMercadoSection } from "./_components/project-mercado-section";
 import { ProjectWhatsAppSection } from "./_components/project-whatsapp-section";
 
@@ -20,6 +24,7 @@ type Projeto = {
   status: string;
   modeloId?: string | null;
   modeloNome?: string | null;
+  isDemo?: boolean;
 };
 
 type ModeloDisponivel = {
@@ -208,6 +213,45 @@ type ProjetoDetalhe = {
     totalChats: number;
   };
 };
+
+function buildDemoProjectSnapshot(data: ProjetoDetalhe) {
+  return {
+    projeto: {
+      nome: data.projeto.nome,
+      slug: data.projeto.slug,
+      tipo: data.projeto.tipo,
+      descricao: data.projeto.descricao,
+      status: data.projeto.status,
+      modeloId: data.projeto.modeloId ?? null,
+    },
+    agentes: data.agentes.map((agente) => ({
+      id: agente.id,
+      nome: agente.nome,
+      descricao: agente.descricao,
+      promptBase: agente.promptBase,
+      ativo: agente.ativo,
+      apiIds: agente.apiIds,
+    })),
+    apis: data.apis.map((api) => ({
+      id: api.id,
+      nome: api.nome,
+      url: api.url,
+      metodo: api.metodo,
+      descricao: api.descricao,
+      ativo: api.ativo,
+      campos: api.campos.map((campo) => ({
+        nome: campo.nome,
+        tipo: campo.tipo,
+        descricao: campo.descricao,
+      })),
+      parametros: api.parametros.map((parametro) => ({
+        nome: parametro.nome,
+        tipo: parametro.tipo,
+        obrigatorio: parametro.obrigatorio,
+      })),
+    })),
+  };
+}
 
 type BillingPricingModel = {
   id: string;
@@ -4822,7 +4866,9 @@ export default function AdminProjetoDetalhePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentPath = `/admin/projetos/${params.id}`;
+  const demoConverted = searchParams.get("demo_converted") === "1";
   const [data, setData] = useState<ProjetoDetalhe | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ email: string } | null>(null);
   const [billingPlanForm, setBillingPlanForm] = useState<BillingPlanFormState>(createBillingPlanForm(null));
   const [agenteForm, setAgenteForm] = useState<AgenteFormState>(emptyAgenteForm);
   const [apiForm, setApiForm] = useState<ApiFormState>(emptyApiForm);
@@ -4875,6 +4921,7 @@ export default function AdminProjetoDetalhePage() {
   const [updatingWhatsAppHandoffContactId, setUpdatingWhatsAppHandoffContactId] = useState<string | null>(null);
   const [feedbackBilling, setFeedbackBilling] = useState<string | null>(null);
   const [feedbackProjeto, setFeedbackProjeto] = useState<string | null>(null);
+  const [demoBlockedModalOpen, setDemoBlockedModalOpen] = useState(false);
   const [savingProjetoModel, setSavingProjetoModel] = useState(false);
   const [agenteModalOpen, setAgenteModalOpen] = useState(false);
   const [apiModalOpen, setApiModalOpen] = useState(false);
@@ -5026,12 +5073,32 @@ export default function AdminProjetoDetalhePage() {
     router.replace(buildProjectUrl(mutate), { scroll: false });
   };
 
+  const currentUserIsDemo = isDemoUser(currentUser?.email);
+  const demoEditBlocked = currentUserIsDemo && data?.projeto.isDemo === true;
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       setOrigin(window.location.origin);
     }
     void loadProjeto();
   }, [params.id]);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const user = await getCurrentProjectUser();
+      setCurrentUser(user ? { email: user.email } : null);
+    };
+
+    void loadUser();
+  }, []);
+
+  useEffect(() => {
+    if (!data) {
+      return;
+    }
+
+    writeDemoProjectSnapshot(buildDemoProjectSnapshot(data));
+  }, [data]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -5320,8 +5387,23 @@ export default function AdminProjetoDetalhePage() {
     setWhatsAppHandoffContactForm(emptyWhatsAppHandoffContactForm);
   };
 
+  const openDemoBlockedModal = () => {
+    setDemoBlockedModalOpen(true);
+  };
+
+  const handleDemoAuthRedirect = (mode: "login" | "cadastro") => {
+    saveCurrentDemoState();
+    setDemoBlockedModalOpen(false);
+    router.push(`/?auth=${mode}`);
+  };
+
   const saveProjetoModel = async (modeloId: string | null) => {
     if (!data) {
+      return;
+    }
+
+    if (demoEditBlocked) {
+      openDemoBlockedModal();
       return;
     }
 
@@ -5351,6 +5433,9 @@ export default function AdminProjetoDetalhePage() {
       };
 
       if (!response.ok || !payload.projeto) {
+        if (response.status === 403) {
+          openDemoBlockedModal();
+        }
         setFeedbackProjeto(payload.error ?? "Nao foi possivel salvar o modelo do projeto.");
         return;
       }
@@ -5407,6 +5492,11 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const openNewAgenteModal = () => {
+    if (demoEditBlocked) {
+      openDemoBlockedModal();
+      return;
+    }
+
     resetAgenteForm();
     setAgenteModalOpen(true);
   };
@@ -7137,6 +7227,11 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const handleDeleteApi = async (api: Api) => {
+    if (demoEditBlocked) {
+      openDemoBlockedModal();
+      return;
+    }
+
     const confirmed = window.confirm(`Tem certeza que deseja excluir a API "${api.nome}"?`);
     if (!confirmed) {
       return;
@@ -7165,6 +7260,11 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const handleDeleteAgente = async (agente: Agente) => {
+    if (demoEditBlocked) {
+      openDemoBlockedModal();
+      return;
+    }
+
     setAgentePendingDelete(agente);
     setDeleteAgenteConfirmation("");
     setDeleteAgenteModalOpen(true);
@@ -7210,6 +7310,11 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const handleDeleteConnector = async (connector: Connector) => {
+    if (demoEditBlocked) {
+      openDemoBlockedModal();
+      return;
+    }
+
     if (!connector.id) {
       return;
     }
@@ -7262,6 +7367,11 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const handleDeleteWidget = async (widget: ChatWidget) => {
+    if (demoEditBlocked) {
+      openDemoBlockedModal();
+      return;
+    }
+
     const confirmed = window.confirm(`Remover completamente o widget "${widget.nome}"?`);
     if (!confirmed || !widget.id) {
       return;
@@ -7302,6 +7412,11 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const handleDeleteWhatsAppChannel = async (channel: WhatsAppChannel) => {
+    if (demoEditBlocked) {
+      openDemoBlockedModal();
+      return;
+    }
+
     setWhatsAppChannelPendingDelete(channel);
     setDeleteWhatsAppChannelConfirmation("");
     setDeleteWhatsAppChannelModalOpen(true);
@@ -7412,6 +7527,11 @@ export default function AdminProjetoDetalhePage() {
       return;
     }
 
+    if (demoEditBlocked) {
+      openDemoBlockedModal();
+      return;
+    }
+
     setSavingBillingPlan(true);
     setFeedbackBilling(null);
 
@@ -7430,6 +7550,9 @@ export default function AdminProjetoDetalhePage() {
       };
 
       if (!response.ok || !payload.plan) {
+        if (response.status === 403) {
+          openDemoBlockedModal();
+        }
         setFeedbackBilling(payload.error ?? "Nao foi possivel salvar o plano do projeto.");
         return;
       }
@@ -7543,10 +7666,32 @@ export default function AdminProjetoDetalhePage() {
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
+    const hasAgents = Boolean(data?.agentes.length);
+    const allowedWithoutAgents: ProjectTab[] = ["agentes"];
+
     if (tabParam === "agentes" || tabParam === "apis" || tabParam === "whatsapp" || tabParam === "mercado" || tabParam === "chats") {
+      if (!hasAgents && !allowedWithoutAgents.includes(tabParam)) {
+        setActiveTab("agentes");
+        return;
+      }
+
       setActiveTab(tabParam);
     }
-  }, [searchParams]);
+  }, [data?.agentes.length, searchParams]);
+
+  useEffect(() => {
+    if (data?.agentes.length) {
+      return;
+    }
+
+    if (activeTab !== "agentes") {
+      setActiveTab("agentes");
+      replaceProjectUrl((nextParams) => {
+        nextParams.set("tab", "agentes");
+        nextParams.delete("fonte");
+      });
+    }
+  }, [activeTab, data?.agentes.length, replaceProjectUrl]);
 
   useEffect(() => {
     if (activeTab !== "agentes") {
@@ -7672,12 +7817,14 @@ export default function AdminProjetoDetalhePage() {
       whatsAppQrModalChannel?.sessionData?.qrCodeUrl ??
       null
     : null;
+  const hasAgents = data.agentes.length > 0;
   const projectTabs = [
     {
       key: "agentes" as const,
       label: "Agentes",
       icon: Bot,
       count: data.stats.totalAgentes,
+      locked: false,
       activeClass: "border-cyan-400/30 bg-cyan-400/14 text-cyan-50 shadow-[0_10px_25px_rgba(34,211,238,0.12)]",
       inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-400/18 hover:bg-cyan-400/[0.08] hover:text-cyan-50",
     },
@@ -7686,6 +7833,7 @@ export default function AdminProjetoDetalhePage() {
       label: "APIs",
       icon: Activity,
       count: data.stats.totalApis,
+      locked: !hasAgents,
       activeClass: "border-sky-400/30 bg-sky-400/14 text-sky-50 shadow-[0_10px_25px_rgba(56,189,248,0.12)]",
       inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-sky-400/18 hover:bg-sky-400/[0.08] hover:text-sky-50",
     },
@@ -7694,6 +7842,7 @@ export default function AdminProjetoDetalhePage() {
       label: "WhatsApp",
       icon: Waypoints,
       count: data.stats.totalWhatsAppChannels,
+      locked: !hasAgents,
       activeClass: "border-emerald-400/30 bg-emerald-400/14 text-emerald-50 shadow-[0_10px_25px_rgba(52,211,153,0.12)]",
       inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-emerald-400/18 hover:bg-emerald-400/[0.08] hover:text-emerald-50",
     },
@@ -7702,6 +7851,7 @@ export default function AdminProjetoDetalhePage() {
       label: "Mercado Livre",
       icon: Cable,
       count: data.stats.totalConectores,
+      locked: !hasAgents,
       activeClass: "border-amber-400/30 bg-amber-400/14 text-amber-50 shadow-[0_10px_25px_rgba(251,191,36,0.12)]",
       inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-amber-400/18 hover:bg-amber-400/[0.08] hover:text-amber-50",
     },
@@ -7710,6 +7860,7 @@ export default function AdminProjetoDetalhePage() {
       label: "Chat widget",
       icon: MessageSquareText,
       count: data.stats.totalWidgets,
+      locked: !hasAgents,
       activeClass: "border-violet-400/30 bg-violet-400/14 text-violet-50 shadow-[0_10px_25px_rgba(167,139,250,0.12)]",
       inactiveClass: "border-white/10 bg-white/[0.04] text-slate-200 hover:border-violet-400/18 hover:bg-violet-400/[0.08] hover:text-violet-50",
     },
@@ -7722,6 +7873,11 @@ export default function AdminProjetoDetalhePage() {
 
   return (
     <main className="space-y-6">
+      {demoConverted ? (
+        <section className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+          Seu projeto foi criado com base na demonstracao.
+        </section>
+      ) : null}
       <section className="px-1 py-1">
           <div className="space-y-3">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -7802,29 +7958,41 @@ export default function AdminProjetoDetalhePage() {
               {projectTabs.map((tab) => {
                 const Icon = tab.icon;
                 const active = activeTab === tab.key;
+                const locked = tab.locked;
 
                 return (
                   <button
                     key={tab.key}
                     type="button"
+                    disabled={locked}
                     onClick={() => {
+                      if (locked) {
+                        return;
+                      }
+
                       setActiveTab(tab.key);
                       replaceProjectUrl((nextParams) => {
                         nextParams.set("tab", tab.key);
                         nextParams.delete("fonte");
                       });
                     }}
+                    title={locked ? "Crie o primeiro agente para liberar esta aba." : undefined}
                     className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-3.5 py-2 text-sm font-semibold ${premiumInteractiveClass} ${
-                      active
+                      locked
+                        ? "cursor-not-allowed border-white/8 bg-white/[0.03] text-slate-500 opacity-55"
+                        : active
                         ? tab.activeClass
                         : tab.inactiveClass
                     }`}
                   >
                     <Icon size={15} />
                     {tab.label}
+                    {locked ? <ShieldAlert size={13} className="text-slate-500" /> : null}
                     <span
                       className={`inline-flex min-w-[1.65rem] items-center justify-center rounded-full border px-1.5 py-0.5 text-[10px] font-bold leading-none ${
-                        active
+                        locked
+                          ? "border-white/8 bg-white/[0.04] text-slate-500"
+                          : active
                           ? "border-white/20 bg-white/12 text-white"
                           : "border-white/10 bg-white/[0.06] text-slate-300"
                       }`}
@@ -8147,7 +8315,7 @@ export default function AdminProjetoDetalhePage() {
                       <button
                         type="button"
                         onClick={() => void handleDeleteAgente(agente)}
-                        disabled={deletingAgenteId === agente.id}
+                        disabled={demoEditBlocked || deletingAgenteId === agente.id}
                         className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-50 transition-all hover:border-rose-300/30 hover:bg-rose-400/14 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <Trash2 size={14} />
@@ -8220,82 +8388,69 @@ export default function AdminProjetoDetalhePage() {
               })}
               </div>
             ) : (
-              <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhum agente cadastrado para este projeto ainda.</div>
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+                <div className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),rgba(8,47,73,0.08)_35%,rgba(2,6,23,0.88)_75%)] px-6 py-7">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Primeiro passo</p>
+                  <h4 className="mt-3 max-w-3xl text-3xl font-bold text-white">Crie o primeiro agente do projeto</h4>
+                  <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+                    O agente e quem centraliza prompt, comportamento, APIs, widget, WhatsApp e conectores. Assim que o primeiro for criado, esta area passa a mostrar os cards com diagnostico e operacao.
+                  </p>
+                  <div className="mt-5">
+                    <button
+                      type="button"
+                      onClick={openNewAgenteModal}
+                      className={`inline-flex items-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14 ${premiumInteractiveClass}`}
+                    >
+                      <Plus size={16} />
+                      Novo agente
+                    </button>
+                  </div>
+                </div>
+
+                <aside className="hidden rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4 xl:block xl:sticky xl:top-6">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Tutorial rapido</p>
+
+                  <div className="mt-4 space-y-4 text-sm text-slate-300">
+                    <div className="rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Passo 1</p>
+                      <p className="mt-2 font-semibold text-white">Defina a funcao do agente</p>
+                      <p className="mt-2 leading-6 text-slate-400">
+                        Comece pelo nome, objetivo e prompt base. O agente precisa nascer com uma funcao clara, nao so com texto generico.
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Passo 2</p>
+                      <p className="mt-2 font-semibold text-white">Conecte os canais certos</p>
+                      <p className="mt-2 leading-6 text-slate-400">
+                        Depois de criar, vincule APIs, widgets, WhatsApp ou Mercado Livre conforme o papel operacional desse agente.
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Passo 3</p>
+                      <p className="mt-2 font-semibold text-white">Teste antes de publicar</p>
+                      <p className="mt-2 leading-6 text-slate-400">
+                        Use o teste interno para validar contexto, integrações e resposta. Quando existir o primeiro agente, este tutorial sai e o lado direito vira diagnostico real.
+                      </p>
+                    </div>
+                  </div>
+                </aside>
+              </div>
             )}
           </div>
         </section>
 
         <section className={`${renderedTab === "apis" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
-          <div className="flex flex-col gap-4 px-2 py-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h3 className="inline-flex items-center gap-2 text-xl font-semibold text-slate-100/88"><Activity size={18} className="text-sky-200" />APIs do projeto</h3>
-              <p className="mt-1 text-sm text-slate-400">Gerencie as APIs externas, teste o retorno e controle os campos ativos.</p>
-            </div>
-            <button type="button" onClick={openNewApiModal} className={`${headerActionButtonClass} ${premiumInteractiveClass}`}>
-              <Plus size={16} />
-              Nova API
-            </button>
-          </div>
-          <div className="space-y-3 pt-2">
-            {data.apis.length ? (
-              data.apis.map((api) => (
-                    <div key={api.id} className={`rounded-xl border border-white/10 bg-slate-950/30 p-4 ${premiumTransitionClass}`}>
-                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-3">
-                        <h4 className="text-base font-medium text-slate-100/88">{api.nome}</h4>
-                        <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200">{api.metodo}</span>
-                        <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${api.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
-                          {api.ativo ? "ativa" : "inativa"}
-                        </span>
-                      </div>
-                      <p className="mt-2 truncate text-sm text-slate-400">{api.url}</p>
-                      <p className="mt-2 line-clamp-1 text-sm leading-relaxed text-slate-400">{api.descricao || "Sem descricao."}</p>
-                      <div className="mt-3 grid gap-2 text-xs text-slate-400 sm:grid-cols-3">
-                        <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2">
-                          <span className="block text-[10px] uppercase tracking-[0.16em] text-slate-500">Campos</span>
-                          <span className="mt-1 block font-semibold text-white">{api.campos.length}</span>
-                        </div>
-                        <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2">
-                          <span className="block text-[10px] uppercase tracking-[0.16em] text-slate-500">Parametros</span>
-                          <span className="mt-1 block font-semibold text-white">{api.parametros.length}</span>
-                        </div>
-                        <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2 sm:col-span-2">
-                          <span className="block text-[10px] uppercase tracking-[0.16em] text-slate-500">Resumo</span>
-                          <span className="mt-1 block text-cyan-200/80">
-                            {api.campos.length ? summarizeApiFields(api.campos) : "Nenhum campo detectado"}
-                          </span>
-                        </div>
-                      </div>
-                      {api.parametros.length ? (
-                        <p className="mt-2 text-xs text-amber-200/80">
-                          Parametros: {api.parametros.map((parametro) => `${parametro.nome}${parametro.obrigatorio ? "*" : ""}`).join(", ")}
-                        </p>
-                      ) : null}
-                      {api.parametros.some((parametro) => parametro.obrigatorio) ? (
-                        <p className="mt-1 text-xs text-cyan-100/80">
-                          Essa API so funciona no chat quando o contexto enviar:{" "}
-                          {api.parametros.filter((parametro) => parametro.obrigatorio).map((parametro) => parametro.nome).join(", ")}
-                        </p>
-                      ) : null}
-                    </div>
-                      <div className="flex flex-col gap-2 sm:flex-row md:flex-col">
-                      <button type="button" onClick={() => handleEditApi(api)} className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${editButtonClass}`}>
-                        <Pencil size={14} />
-                        Editar
-                      </button>
-                      <button type="button" onClick={() => void handleDeleteApi(api)} className={dangerActionButtonClass}>
-                        <Trash2 size={14} />
-                        Excluir
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/20 p-8 text-center text-slate-400">Nenhuma API cadastrada para este projeto ainda.</div>
-            )}
-          </div>
+          <ProjectApisSection
+            apis={data.apis}
+            createButtonClass={`${headerActionButtonClass} ${premiumInteractiveClass}`}
+            editButtonClass={editButtonClass}
+            dangerButtonClass={dangerActionButtonClass}
+            onOpenNewApi={openNewApiModal}
+            onEditApi={handleEditApi}
+            onDeleteApi={(api) => void handleDeleteApi(api)}
+          />
         </section>
 
       </div>
@@ -8614,6 +8769,39 @@ export default function AdminProjetoDetalhePage() {
         onChange={(next) => setBillingPlanForm((current) => ({ ...current, ...next }))}
         onSave={() => void handleSaveBillingPlan()}
       />
+      {demoBlockedModalOpen ? (
+        <div className="fixed inset-0 z-[96] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
+          <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
+            <div className="border-b border-white/10 px-6 py-5">
+              <h2 className="text-2xl font-bold text-white">Modo demonstracao</h2>
+              <p className="mt-2 text-sm text-slate-300">Voce esta em modo demonstracao. Crie uma conta para editar e salvar.</p>
+            </div>
+            <div className="flex flex-wrap gap-3 px-6 py-6">
+              <button
+                type="button"
+                onClick={() => handleDemoAuthRedirect("cadastro")}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14"
+              >
+                Criar conta
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoAuthRedirect("login")}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/10"
+              >
+                Fazer login
+              </button>
+              <button
+                type="button"
+                onClick={() => setDemoBlockedModalOpen(false)}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/10"
+              >
+                Continuar testando
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

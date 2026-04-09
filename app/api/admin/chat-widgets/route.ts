@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { canAccessAdmin, canAccessGlobalAdmin } from "@/lib/access";
+import { canAccessAdmin, canAccessGlobalAdmin, canManageProject } from "@/lib/access";
 import { getAgenteById, listAgentes } from "@/lib/agentes";
 import { listApis } from "@/lib/apis";
 import { createChatWidget, deleteChatWidget, getChatWidgetById, getChatWidgetByProjectAgentBinding, listChatWidgets, updateChatWidget } from "@/lib/chat-widgets";
+import { canDemoUserEditProject, isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
 import { listProjetos } from "@/lib/projetos";
 import { getSessionUser } from "@/lib/session";
 
@@ -82,6 +83,9 @@ export async function POST(request: Request) {
   if (!body.projetoId) {
     return NextResponse.json({ error: "Selecione um projeto para o widget." }, { status: 400 });
   }
+  if (!canManageProject(user, body.projetoId) && !await canDemoUserEditProject(user?.email, body.projetoId)) {
+    return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
+  }
 
   const agentError = await validateAgentProject(body.projetoId, body.agenteId);
   if (agentError) {
@@ -126,16 +130,30 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Id, nome e slug do widget sao obrigatorios." }, { status: 400 });
   }
 
-  if (!body.projetoId) {
+  const existingWidget = await getChatWidgetById(body.id);
+  if (!existingWidget) {
+    return NextResponse.json({ error: "Widget nao encontrado." }, { status: 404 });
+  }
+
+  const projetoId = body.projetoId ?? existingWidget.projetoId;
+  if (!projetoId) {
     return NextResponse.json({ error: "Selecione um projeto para o widget." }, { status: 400 });
   }
 
-  const agentError = await validateAgentProject(body.projetoId, body.agenteId);
+  if (!canManageProject(user, projetoId) && !await canDemoUserEditProject(user?.email, projetoId)) {
+    return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
+  }
+
+  if (existingWidget.projetoId !== projetoId) {
+    return NextResponse.json({ error: "Projeto invalido para atualizar widget." }, { status: 403 });
+  }
+
+  const agentError = await validateAgentProject(projetoId, body.agenteId);
   if (agentError) {
     return NextResponse.json({ error: agentError }, { status: 400 });
   }
 
-  const bindingError = await validateWidgetBinding(body.projetoId, body.agenteId!, body.id);
+  const bindingError = await validateWidgetBinding(projetoId, body.agenteId!, body.id);
   if (bindingError) {
     return NextResponse.json({ error: bindingError }, { status: 409 });
   }
@@ -144,7 +162,7 @@ export async function PUT(request: Request) {
     id: body.id,
     nome: body.nome,
     slug: body.slug,
-    projetoId: body.projetoId,
+    projetoId,
     agenteId: body.agenteId ?? null,
     dominio: body.dominio ?? null,
     whatsappCelular: body.whatsappCelular ?? null,
@@ -184,6 +202,10 @@ export async function DELETE(request: Request) {
 
   if (!body.projetoId || widget.projetoId !== body.projetoId) {
     return NextResponse.json({ error: "Projeto invalido para excluir widget." }, { status: 403 });
+  }
+
+  if (await isDemoProjectMutationBlocked(user?.email, body.projetoId)) {
+    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
   }
 
   const deleted = await deleteChatWidget(body.id);

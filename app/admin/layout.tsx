@@ -1,10 +1,9 @@
 ﻿"use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { type ReactNode, Suspense, useEffect, useState } from "react";
+import { type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import {
   ActivitySquare,
   BriefcaseBusiness,
@@ -18,6 +17,7 @@ import {
   Menu,
   MessageCircle,
   MessageCircleMore,
+  MessageSquareText,
   Globe,
   Settings,
   Store,
@@ -27,7 +27,11 @@ import {
 } from "lucide-react";
 import { getCurrentProjectUser, signOutProjectAuth } from "@/lib/auth";
 import type { AppUser } from "@/lib/app-user";
+import { Navbar } from "@/app/_components/home/interactive";
+import { FooterSection } from "@/app/_components/home/sections";
 import { canAccessGlobalAdmin, canAccessWorkspace } from "@/lib/access";
+import { clearDemoNavigationState, saveCurrentDemoState } from "@/lib/demo-conversion";
+import { isDemoUser } from "@/lib/demo-user";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COOKIE_NAME = "infrastudio_admin_sidebar";
@@ -37,6 +41,7 @@ const adminLinks = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/projetos", label: "Projetos", icon: BriefcaseBusiness },
   { href: "/admin/atendimento", label: "Atendimento", icon: MessageCircleMore, tone: "atendimento" },
+  { href: "/admin/feedback", label: "Feedback", icon: MessageSquareText },
   { projectTab: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { projectTab: "mercado", label: "Mercado Livre", icon: Store },
   { href: "/admin/adriana", label: "Adriana", icon: FileStack, tone: "adriana" },
@@ -156,7 +161,8 @@ type SidebarProps = {
   onCloseMobile: () => void;
   onNavigate: (href: string) => void;
   onProjectTabNavigate: (tab: "whatsapp" | "mercado") => void;
-  onLogout: () => Promise<void> | void;
+  onProtectedHomeNavigation: () => void;
+  onProtectedLogout: () => Promise<void> | void;
 };
 
 function Sidebar({
@@ -170,16 +176,22 @@ function Sidebar({
   onCloseMobile,
   onNavigate,
   onProjectTabNavigate,
-  onLogout,
+  onProtectedHomeNavigation,
+  onProtectedLogout,
 }: SidebarProps) {
   const [buildId, setBuildId] = useState("...");
   const [activeProjectName, setActiveProjectName] = useState<string | null>(null);
+  const [feedbackResumo, setFeedbackResumo] = useState({
+    pendentesAdmin: 0,
+    respostasNaoLidasUsuario: 0,
+  });
   const visibleLinks = (currentUser && !canAccessGlobalAdmin(currentUser)
     ? adminLinks.filter((item) => {
         return ("projectTab" in item)
           || item.href === "/admin/dashboard"
           || item.href === "/admin/projetos"
           || item.href === "/admin/atendimento"
+          || item.href === "/admin/feedback"
           || item.href === "/admin/me"
           || item.href === "/admin/adriana";
       })
@@ -264,6 +276,73 @@ function Sidebar({
     };
   }, [pathname]);
 
+  useEffect(() => {
+    let active = true;
+
+    const loadFeedbackResumo = async () => {
+      if (!currentUser) {
+        if (active) {
+          setFeedbackResumo({
+            pendentesAdmin: 0,
+            respostasNaoLidasUsuario: 0,
+          });
+        }
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/feedbacks/resumo", { cache: "no-store" });
+        const payload = (await response.json().catch(() => null)) as {
+          resumo?: {
+            pendentesAdmin?: number;
+            respostasNaoLidasUsuario?: number;
+          };
+        } | null;
+
+        if (!active) {
+          return;
+        }
+
+        setFeedbackResumo({
+          pendentesAdmin: payload?.resumo?.pendentesAdmin ?? 0,
+          respostasNaoLidasUsuario: payload?.resumo?.respostasNaoLidasUsuario ?? 0,
+        });
+      } catch {
+        if (active) {
+          setFeedbackResumo({
+            pendentesAdmin: 0,
+            respostasNaoLidasUsuario: 0,
+          });
+        }
+      }
+    };
+
+    void loadFeedbackResumo();
+
+    const handleRefreshResumo = () => {
+      void loadFeedbackResumo();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void loadFeedbackResumo();
+      }
+    };
+
+    window.addEventListener("focus", handleRefreshResumo);
+    window.addEventListener("infrastudio:session-updated", handleRefreshResumo);
+    window.addEventListener("infrastudio:feedback-updated", handleRefreshResumo);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      active = false;
+      window.removeEventListener("focus", handleRefreshResumo);
+      window.removeEventListener("infrastudio:session-updated", handleRefreshResumo);
+      window.removeEventListener("infrastudio:feedback-updated", handleRefreshResumo);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [currentUser, pathname]);
+
   return (
     <>
       <div
@@ -283,8 +362,9 @@ function Sidebar({
         )}
       >
         <div className={cn("px-2", collapsed ? "flex justify-center" : "flex items-center justify-between")}>
-            <Link
-              href="/"
+            <button
+              type="button"
+              onClick={onProtectedHomeNavigation}
               className={cn(
                 "flex items-center gap-3 overflow-hidden px-2 py-2",
                 collapsed ? "pointer-events-none absolute opacity-0" : "",
@@ -303,7 +383,7 @@ function Sidebar({
                   ) : null}
                 </div>
               ) : null}
-            </Link>
+            </button>
 
           <div className={cn("flex items-center gap-2", collapsed ? "justify-center" : "")}>
             <button
@@ -333,6 +413,10 @@ function Sidebar({
             const active = isAdminLinkActive(pathname, currentProjectTab, item);
             const targetKey = "projectTab" in item ? `project-tab:${item.projectTab}` : item.href;
             const isLoading = loadingHref === targetKey;
+            const badgeValue =
+              "href" in item && item.href === "/admin/feedback"
+                ? (canAccessGlobalAdmin(currentUser) ? feedbackResumo.pendentesAdmin : feedbackResumo.respostasNaoLidasUsuario)
+                : 0;
 
             return (
               <button
@@ -349,14 +433,22 @@ function Sidebar({
                   onCloseMobile();
                 }}
                 className={cn(
-                  "infra-click-pulse group flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition-all duration-200",
+                  "infra-click-pulse group relative flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition-all duration-200",
                   getSidebarLinkTone(item, active),
                   collapsed ? "justify-center" : "",
                 )}
                 title={collapsed ? item.label : undefined}
               >
                 {isLoading ? <LoaderCircle size={18} className="shrink-0 animate-spin" /> : <Icon size={18} className="shrink-0" />}
-                {!collapsed ? <span>{item.label}</span> : null}
+                {!collapsed ? <span className="flex-1 truncate">{item.label}</span> : null}
+                {badgeValue > 0 ? (
+                  <span className={cn(
+                    "inline-flex min-w-[24px] items-center justify-center rounded-full border border-cyan-300/20 bg-cyan-400/10 px-2 py-0.5 text-[11px] font-bold text-cyan-100",
+                    collapsed ? "absolute right-2 top-2 min-w-[20px] px-1.5 text-[10px]" : "",
+                  )}>
+                    {badgeValue > 99 ? "99+" : badgeValue}
+                  </span>
+                ) : null}
               </button>
             );
           })}
@@ -390,19 +482,20 @@ function Sidebar({
                   </div>
                 ) : null}
                 <div className="grid grid-cols-2 gap-3 px-1">
-                  <Link
-                    href="/"
+                  <button
+                    type="button"
+                    onClick={onProtectedHomeNavigation}
                     className="infra-click-pulse inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 transition-colors hover:text-white"
                     title="Site"
                   >
                     <Globe size={16} />
                     <span>Site</span>
-                  </Link>
+                  </button>
 
                   <button
                     type="button"
                     onClick={() => {
-                      void onLogout();
+                      void onProtectedLogout();
                     }}
                     className="infra-click-pulse inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 transition-colors hover:text-white"
                     title="Sair"
@@ -428,18 +521,19 @@ function Sidebar({
                     {getUserInitials(currentUser.name)}
                   </div>
                 ) : null}
-                <Link
-                  href="/"
+                <button
+                  type="button"
+                  onClick={onProtectedHomeNavigation}
                   className="infra-click-pulse inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-300 transition-colors hover:text-white"
                   title="Site"
                 >
                   <Globe size={16} />
-                </Link>
+                </button>
 
                 <button
                   type="button"
                   onClick={() => {
-                    void onLogout();
+                    void onProtectedLogout();
                   }}
                   className="infra-click-pulse inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-300 transition-colors hover:text-white"
                   title="Sair"
@@ -470,8 +564,11 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   const [projectPickerLoading, setProjectPickerLoading] = useState(false);
   const [projectPickerProjects, setProjectPickerProjects] = useState<Array<{ id: string; nome: string; descricao: string; status: string }>>([]);
   const [projectPickerFeedback, setProjectPickerFeedback] = useState<string | null>(null);
+  const [demoNavigationModalOpen, setDemoNavigationModalOpen] = useState(false);
+  const pendingProtectedActionRef = useRef<(() => void) | null>(null);
   const currentProjectTab = searchParams.get("tab");
   const isAtendimentoRoute = pathname.startsWith("/admin/atendimento");
+  const demoMode = isDemoUser(currentUser?.email);
 
   useEffect(() => {
     let active = true;
@@ -543,14 +640,42 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
     router.replace("/");
   };
 
+  const handleProtectedNavigation = (action: () => void) => {
+    if (demoMode) {
+      saveCurrentDemoState();
+      pendingProtectedActionRef.current = action;
+      setDemoNavigationModalOpen(true);
+      return;
+    }
+
+    action();
+  };
+
+  const handleAuthRedirect = (mode: "login" | "cadastro") => {
+    saveCurrentDemoState();
+    pendingProtectedActionRef.current = null;
+    setDemoNavigationModalOpen(false);
+    router.push(`/?auth=${mode}`);
+  };
+
+  const handleLeaveDemoWithoutSaving = () => {
+    clearDemoNavigationState();
+    setDemoNavigationModalOpen(false);
+    const pendingAction = pendingProtectedActionRef.current;
+    pendingProtectedActionRef.current = null;
+    pendingAction?.();
+  };
+
   const handleNavigate = (href: string) => {
     if (loadingHref === href) {
       return;
     }
 
-    setLoadingHref(href);
-    router.prefetch(href);
-    router.push(href);
+    handleProtectedNavigation(() => {
+      setLoadingHref(href);
+      router.prefetch(href);
+      router.push(href);
+    });
   };
 
   const loadProjectPickerProjects = async () => {
@@ -592,8 +717,10 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
     }
 
     if (activeProjectId) {
-      setLoadingHref(loadingKey);
-      router.push(`/admin/projetos/${activeProjectId}?tab=${tab}`);
+      handleProtectedNavigation(() => {
+        setLoadingHref(loadingKey);
+        router.push(`/admin/projetos/${activeProjectId}?tab=${tab}`);
+      });
       return;
     }
 
@@ -632,68 +759,118 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
 
   return (
     <div className={cn("infra-premium-bg text-slate-200", isAtendimentoRoute ? "h-screen overflow-hidden" : "min-h-screen")}>
-      <Sidebar
-        currentUser={currentUser}
-        collapsed={collapsed}
-        mobileOpen={mobileOpen}
-        pathname={pathname}
-        currentProjectTab={currentProjectTab}
-        loadingHref={loadingHref}
-        onCollapseToggle={() => setCollapsed((value) => !value)}
-        onCloseMobile={() => setMobileOpen(false)}
-        onNavigate={handleNavigate}
-        onProjectTabNavigate={(tab) => void handleProjectTabNavigate(tab)}
-        onLogout={handleLogout}
-      />
+      {demoMode ? (
+        <>
+          <Navbar
+            currentUser={currentUser}
+            onOpenLogin={() => router.push("/?auth=login")}
+            onLogout={() => handleProtectedNavigation(() => { void handleLogout(); })}
+            onOpenChat={() => {
+              window.location.href = "/#contato";
+            }}
+            basePath="/"
+          />
 
-        <div className={cn("transition-all duration-300", collapsed ? "lg:pl-[92px]" : "lg:pl-[280px]", isAtendimentoRoute ? "h-screen overflow-hidden" : "")}>
-         <div className="sticky top-0 z-30 border-b border-white/8 bg-[#050814]/78 px-4 py-4 backdrop-blur-xl lg:hidden">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setMobileOpen(true)}
-              className="infra-premium-panel inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white"
-            >
-              <Menu size={16} />
-              Menu
-            </button>
-            <div className="flex items-center gap-3">
-              <p className="text-sm font-semibold text-slate-300">
-                {canAccessGlobalAdmin(currentUser) ? "Painel admin" : "Ambiente do projeto"}
-              </p>
-              <Link
-                href="/"
-                className="infra-premium-panel inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-white"
+          <div className={cn("transition-all duration-300", isAtendimentoRoute ? "h-screen overflow-hidden pt-32" : "min-h-screen pt-32")}>
+            <div className={cn("flex flex-col", isAtendimentoRoute ? "h-screen overflow-hidden" : "min-h-screen")}>
+              <div className="mx-auto w-full max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
+                <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-100 shadow-[0_18px_40px_rgba(245,158,11,0.12)]">
+                  Modo demonstracao - seus dados nao serao salvos.
+                </div>
+              </div>
+              <div
+                className={cn(
+                  "relative flex-1 overflow-hidden",
+                  isAtendimentoRoute ? "h-[calc(100dvh-7rem)] py-3 lg:h-[calc(100dvh-7rem)] lg:py-4" : "pb-10 pt-6",
+                )}
               >
-                <Globe size={15} />
-                Site
-              </Link>
+                <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={pathname}
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.26, ease: "easeOut" }}
+                      className={cn(isAtendimentoRoute ? "h-full min-h-0" : "")}
+                    >
+                      {children}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </div>
+              {!isAtendimentoRoute ? <FooterSection /> : null}
             </div>
           </div>
-        </div>
+        </>
+      ) : (
+        <>
+          <Sidebar
+            currentUser={currentUser}
+            collapsed={collapsed}
+            mobileOpen={mobileOpen}
+            pathname={pathname}
+            currentProjectTab={currentProjectTab}
+            loadingHref={loadingHref}
+            onCollapseToggle={() => setCollapsed((value) => !value)}
+            onCloseMobile={() => setMobileOpen(false)}
+            onNavigate={handleNavigate}
+            onProjectTabNavigate={(tab) => void handleProjectTabNavigate(tab)}
+            onProtectedHomeNavigation={() => handleProtectedNavigation(() => router.push("/"))}
+            onProtectedLogout={() => handleProtectedNavigation(() => { void handleLogout(); })}
+          />
 
-         <div className={cn("flex flex-col", isAtendimentoRoute ? "h-screen overflow-hidden" : "min-h-screen")}>
-          <div
-            className={cn(
-              "relative flex-1 overflow-hidden px-4 sm:px-6 lg:px-8",
-              isAtendimentoRoute ? "h-[calc(100dvh-4.5rem)] py-3 lg:h-[100dvh] lg:py-4" : "py-6",
-            )}
-          >
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={pathname}
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.26, ease: "easeOut" }}
-                className={cn(isAtendimentoRoute ? "h-full min-h-0" : "")}
+          <div className={cn("transition-all duration-300", collapsed ? "lg:pl-[92px]" : "lg:pl-[280px]", isAtendimentoRoute ? "h-screen overflow-hidden" : "")}>
+            <div className="sticky top-0 z-30 border-b border-white/8 bg-[#050814]/78 px-4 py-4 backdrop-blur-xl lg:hidden">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setMobileOpen(true)}
+                  className="infra-premium-panel inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white"
+                >
+                  <Menu size={16} />
+                  Menu
+                </button>
+                <div className="flex items-center gap-3">
+                  <p className="text-sm font-semibold text-slate-300">
+                    {canAccessGlobalAdmin(currentUser) ? "Painel admin" : "Ambiente do projeto"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleProtectedNavigation(() => router.push("/"))}
+                    className="infra-premium-panel inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-white"
+                  >
+                    <Globe size={15} />
+                    Site
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className={cn("flex flex-col", isAtendimentoRoute ? "h-screen overflow-hidden" : "min-h-screen")}>
+              <div
+                className={cn(
+                  "relative flex-1 overflow-hidden px-4 sm:px-6 lg:px-8",
+                  isAtendimentoRoute ? "h-[calc(100dvh-4.5rem)] py-3 lg:h-[100dvh] lg:py-4" : "py-6",
+                )}
               >
-                {children}
-              </motion.div>
-            </AnimatePresence>
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={pathname}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.26, ease: "easeOut" }}
+                    className={cn(isAtendimentoRoute ? "h-full min-h-0" : "")}
+                  >
+                    {children}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </div>
           </div>
-         </div>
-      </div>
+        </>
+      )}
 
       {projectPickerOpen ? (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
@@ -761,6 +938,52 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                   ))}
                 </div>
               ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {demoNavigationModalOpen ? (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
+          <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
+            <div className="border-b border-white/10 px-6 py-5">
+              <h2 className="text-2xl font-bold text-white">Modo demonstracao</h2>
+              <p className="mt-2 text-sm text-slate-300">
+                Voce esta em modo demonstracao. Se sair agora, tudo que voce fez sera perdido.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 px-6 py-6">
+              <button
+                type="button"
+                onClick={() => handleAuthRedirect("cadastro")}
+                className="infra-click-pulse inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14"
+              >
+                Criar conta
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAuthRedirect("login")}
+                className="infra-click-pulse inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/10"
+              >
+                Fazer login
+              </button>
+              <button
+                type="button"
+                onClick={handleLeaveDemoWithoutSaving}
+                className="infra-click-pulse inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-50 shadow-[0_10px_30px_rgba(244,63,94,0.14)] transition-all hover:border-rose-300/30 hover:bg-rose-400/14"
+              >
+                Sair sem salvar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  pendingProtectedActionRef.current = null;
+                  setDemoNavigationModalOpen(false);
+                }}
+                className="infra-click-pulse inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/10"
+              >
+                Continuar testando
+              </button>
             </div>
           </div>
         </div>

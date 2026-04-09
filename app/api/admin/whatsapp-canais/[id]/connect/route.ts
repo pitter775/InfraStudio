@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin, canManageProject } from "@/lib/access";
+import { canDemoUserEditProject } from "@/lib/demo-project-guard";
 import { getSessionUser } from "@/lib/session";
 import { getWhatsAppChannelById, updateWhatsAppChannelSession } from "@/lib/whatsapp-channels";
 
@@ -19,7 +20,7 @@ export async function POST(_request: Request, context: RouteContext) {
   const { id } = await context.params;
   const channel = await getWhatsAppChannelById(id);
 
-  if (!channel || !channel.projetoId || !canManageProject(user, channel.projetoId)) {
+  if (!channel || !channel.projetoId || (!canManageProject(user, channel.projetoId) && !await canDemoUserEditProject(user?.email, channel.projetoId))) {
     return NextResponse.json({ error: "Canal nao encontrado." }, { status: 404 });
   }
 

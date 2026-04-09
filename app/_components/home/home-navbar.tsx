@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { BookOpenText, BriefcaseBusiness, Lock, LogOut, Menu, MessageCircle, Sparkles, UserRound, X } from "lucide-react";
 import type { AppUser } from "@/lib/app-user";
 import { isAdminUser } from "@/lib/access";
+import { isDemoUser } from "@/lib/demo-user";
 import { cn } from "@/lib/utils";
 
 type NavbarProps = {
@@ -13,13 +14,28 @@ type NavbarProps = {
   onOpenLogin: () => void;
   onLogout: () => Promise<void> | void;
   onOpenChat: () => void;
+  basePath?: string;
 };
 
-export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: NavbarProps) {
+export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat, basePath = "" }: NavbarProps) {
+  const DEMO_PROJECT_STORAGE_KEY = "demoProjectId";
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const adminHomeHref = currentUser ? (isAdminUser(currentUser) ? "/admin/dashboard" : "/admin/projetos") : "/admin/dashboard";
+  const [demoProjectId, setDemoProjectId] = useState<string | null>(null);
+  const adminHomeHref = currentUser
+    ? isAdminUser(currentUser)
+      ? "/admin/dashboard"
+      : isDemoUser(currentUser.email) && demoProjectId
+        ? `/admin/projetos/${demoProjectId}`
+      : currentUser.currentProjectId
+        ? `/admin/projetos/${currentUser.currentProjectId}`
+        : isDemoUser(currentUser.email) && currentUser.memberships?.[0]?.projetoId
+          ? `/admin/projetos/${currentUser.memberships[0].projetoId}`
+          : "/admin/projetos"
+    : "/admin/dashboard";
   const adminHomeLabel = currentUser ? (isAdminUser(currentUser) ? "Ir para admin" : "Abrir ambiente") : "Ir para admin";
+  const homeHref = basePath || "/";
+  const resolveSectionHref = (hash: string) => `${basePath}${hash}`;
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -27,6 +43,16 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
 
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !currentUser || !isDemoUser(currentUser.email)) {
+      setDemoProjectId(null);
+      return;
+    }
+
+    const savedProjectId = window.localStorage.getItem(DEMO_PROJECT_STORAGE_KEY)?.trim() || "";
+    setDemoProjectId(savedProjectId || null);
+  }, [currentUser]);
 
   useEffect(() => {
     if (!mobileMenuOpen) {
@@ -86,7 +112,7 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
 
               <div className="space-y-2">
                 <a
-                  href="#planos"
+                  href={resolveSectionHref("#planos")}
                   onClick={closeMobileMenu}
                   className="infra-click-pulse flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/[0.08]"
                 >
@@ -94,7 +120,7 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
                   Planos
                 </a>
                 <a
-                  href="#servicos"
+                  href={resolveSectionHref("#servicos")}
                   onClick={closeMobileMenu}
                   className="infra-click-pulse flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/[0.08]"
                 >
@@ -102,7 +128,7 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
                   Servicos
                 </a>
                 <a
-                  href="#como-funciona"
+                  href={resolveSectionHref("#como-funciona")}
                   onClick={closeMobileMenu}
                   className="infra-click-pulse flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/[0.08]"
                 >
@@ -186,7 +212,7 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
         )}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
+          <Link href={homeHref} className="flex items-center gap-3">
             <div className="relative h-14 w-14 overflow-hidden p-1">
               <img src="/logo.png" alt="InfraStudio Logo" className="h-full w-full object-contain" />
             </div>
@@ -194,18 +220,18 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat }: Navba
               <span className="block text-2xl font-bold tracking-tight text-white">InfraStudio</span>
               <span className="hidden text-xs uppercase tracking-[0.11em] text-slate-500 sm:block">Smart Systems Lab</span>
             </div>
-          </div>
+          </Link>
 
           <div className="hidden items-center space-x-3 md:flex">
-            <a href="#planos" className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
+            <a href={resolveSectionHref("#planos")} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
               <Sparkles size={15} className="text-slate-500" />
               Planos
             </a>
-            <a href="#servicos" className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
+            <a href={resolveSectionHref("#servicos")} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
               <Sparkles size={15} className="text-slate-500" />
               Servicos
             </a>
-            <a href="#como-funciona" className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
+            <a href={resolveSectionHref("#como-funciona")} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
               <BriefcaseBusiness size={15} className="text-slate-500" />
               Como funciona
             </a>

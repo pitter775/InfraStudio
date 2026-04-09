@@ -8,6 +8,8 @@ import { appendSystemLog } from "@/lib/chat-logs";
 import { listChatWidgets } from "@/lib/chat-widgets";
 import { listChats } from "@/lib/chats";
 import { listConectores } from "@/lib/conectores";
+import { isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
+import { isDemoUser } from "@/lib/demo-user";
 import { getProjetoModeloSelecionado, listModelosDisponiveisParaProjeto } from "@/lib/modelos";
 import { getOpenAIModelPricingOptions } from "@/lib/openai-pricing";
 import { deleteProjeto, listProjetos, updateProjeto } from "@/lib/projetos";
@@ -98,6 +100,10 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { id } = await context.params;
   if (!canManageProject(user, id)) {
     return NextResponse.json({ error: "Acesso negado para gerenciar este projeto." }, { status: 403 });
+  }
+
+  if (isDemoUser(user?.email) || await isDemoProjectMutationBlocked(user?.email, id)) {
+    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para salvar alteracoes do projeto." }, { status: 403 });
   }
 
   const body = (await request.json().catch(() => null)) as
@@ -282,6 +288,10 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const { id } = await context.params;
   if (!canManageProject(user, id)) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
+  }
+
+  if (isDemoUser(user?.email) || await isDemoProjectMutationBlocked(user?.email, id)) {
+    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para salvar alteracoes do projeto." }, { status: 403 });
   }
 
   const deleted = await deleteProjeto(id);

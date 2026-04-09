@@ -3,6 +3,7 @@ import "server-only";
 import { hashSync } from "bcryptjs";
 import type { AppUser } from "@/lib/app-user";
 import { applyAccessProfile } from "@/lib/access";
+import { createProjeto } from "@/lib/projetos";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type UsuarioProjetoRow = {
@@ -346,10 +347,45 @@ async function syncUsuarioProjetoPapeis(input: {
   }
 }
 
+async function ensureUsuarioHasProjeto(input: {
+  usuarioId: string;
+  nome: string;
+  projetoIds: string[];
+  papel?: AppUser["role"];
+}) {
+  if (input.projetoIds.length > 0) {
+    return input.projetoIds;
+  }
+
+  const projetoNome = input.nome.trim() ? `Projeto ${input.nome.trim()}` : "Projeto sem nome";
+  const projeto = await createProjeto({
+    nome: projetoNome,
+    status: "ativo",
+    modoCobranca: "plano",
+    ownerUserId: input.usuarioId,
+  });
+
+  if (!projeto) {
+    console.error("[usuarios] failed to create default projeto for usuario", {
+      usuarioId: input.usuarioId,
+      nome: input.nome,
+    });
+    return input.projetoIds;
+  }
+
+  await syncUsuarioProjetoPapel({
+    usuarioId: input.usuarioId,
+    projetoId: projeto.id,
+    papel: input.papel,
+  });
+
+  return [projeto.id];
+}
+
 export async function createUsuario(input: SaveUsuarioInput) {
   const supabase = getSupabaseAdminClient();
   const payload = sanitizeUsuarioPayload(input);
-  const projetoIds = normalizeProjetoIds(input);
+  const requestedProjetoIds = normalizeProjetoIds(input);
   const insertPayload = {
     ...payload,
     senha: hashSync(input.senha?.trim() || "123456", 10),
@@ -368,6 +404,13 @@ export async function createUsuario(input: SaveUsuarioInput) {
   }
 
   const usuario = data as Omit<UsuarioRow, "senha">;
+  const projetoIds = await ensureUsuarioHasProjeto({
+    usuarioId: usuario.id,
+    nome: input.nome,
+    projetoIds: requestedProjetoIds,
+    papel: input.papel,
+  });
+
   await syncUsuarioProjetoPapeis({
     usuarioId: usuario.id,
     projetoIds,
@@ -384,7 +427,7 @@ export async function updateUsuario(input: SaveUsuarioInput) {
 
   const supabase = getSupabaseAdminClient();
   const payload: Record<string, unknown> = sanitizeUsuarioPayload(input);
-  const projetoIds = normalizeProjetoIds(input);
+  const requestedProjetoIds = normalizeProjetoIds(input);
 
   if (input.senha?.trim()) {
     payload.senha = hashSync(input.senha.trim(), 10);
@@ -403,6 +446,13 @@ export async function updateUsuario(input: SaveUsuarioInput) {
   }
 
   const usuario = data as Omit<UsuarioRow, "senha">;
+  const projetoIds = await ensureUsuarioHasProjeto({
+    usuarioId: usuario.id,
+    nome: input.nome,
+    projetoIds: requestedProjetoIds,
+    papel: input.papel,
+  });
+
   await syncUsuarioProjetoPapeis({
     usuarioId: usuario.id,
     projetoIds,

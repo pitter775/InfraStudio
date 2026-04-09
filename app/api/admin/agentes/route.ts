@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin, canManageProject, resolveCurrentProjectId } from "@/lib/access";
 import { createAgente, deleteAgente, getAgenteById, listAgentes, updateAgente } from "@/lib/agentes";
+import { canDemoUserEditProject, isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
 import { getSessionUser } from "@/lib/session";
 
 function parseConfiguracoes(value: unknown) {
@@ -65,12 +66,19 @@ export async function POST(request: Request) {
     };
 
     if (!body.nome?.trim()) {
-      return NextResponse.json({ error: "Nome do agente é obrigatório." }, { status: 400 });
+      return NextResponse.json({ error: "Nome do agente e obrigatorio." }, { status: 400 });
     }
 
     const projetoId = resolveRequestedProjectId(user, body.projetoId);
-    if (!projetoId || !canManageProject(user, projetoId)) {
-      return NextResponse.json({ error: "Projeto inválido para criar agente." }, { status: 403 });
+    const canEditProjeto = projetoId
+      ? canManageProject(user, projetoId) || await canDemoUserEditProject(user?.email, projetoId)
+      : false;
+    if (!projetoId || !canEditProjeto) {
+      return NextResponse.json({ error: "Projeto invalido para criar agente." }, { status: 403 });
+    }
+
+    if (await isDemoProjectMutationBlocked(user?.email, projetoId)) {
+      return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
     }
 
     const created = await createAgente({
@@ -85,13 +93,13 @@ export async function POST(request: Request) {
     });
 
     if (!created) {
-      return NextResponse.json({ error: "Não foi possível criar o agente." }, { status: 500 });
+      return NextResponse.json({ error: "Nao foi possivel criar o agente." }, { status: 500 });
     }
 
     return NextResponse.json({ agente: created }, { status: 201 });
   } catch (error) {
     console.error("[api/admin/agentes] failed to create agent", error);
-    return NextResponse.json({ error: "Configurações inválidas. Use JSON válido." }, { status: 400 });
+    return NextResponse.json({ error: "Configuracoes invalidas. Use JSON valido." }, { status: 400 });
   }
 }
 
@@ -116,12 +124,25 @@ export async function PUT(request: Request) {
     };
 
     if (!body.id || !body.nome?.trim()) {
-      return NextResponse.json({ error: "Id e nome do agente são obrigatórios." }, { status: 400 });
+      return NextResponse.json({ error: "Id e nome do agente sao obrigatorios." }, { status: 400 });
     }
 
-    const projetoId = resolveRequestedProjectId(user, body.projetoId);
-    if (!projetoId || !canManageProject(user, projetoId)) {
-      return NextResponse.json({ error: "Projeto inválido para atualizar agente." }, { status: 403 });
+    const currentAgent = await getAgenteById(body.id);
+    if (!currentAgent) {
+      return NextResponse.json({ error: "Agente nao encontrado." }, { status: 404 });
+    }
+
+    const projetoId = resolveRequestedProjectId(user, body.projetoId ?? currentAgent.projetoId ?? undefined);
+    const canEditProjeto = projetoId
+      ? canManageProject(user, projetoId) || await canDemoUserEditProject(user?.email, projetoId)
+      : false;
+    if (!projetoId || !canEditProjeto || currentAgent.projetoId !== projetoId) {
+      return NextResponse.json({ error: "Projeto invalido para atualizar agente." }, { status: 403 });
+    }
+
+    const demoMutationBlocked = await isDemoProjectMutationBlocked(user?.email, projetoId);
+    if (demoMutationBlocked && currentAgent.projetoId !== projetoId) {
+      return NextResponse.json({ error: "Projeto invalido para atualizar agente." }, { status: 403 });
     }
 
     const updated = await updateAgente({
@@ -137,13 +158,13 @@ export async function PUT(request: Request) {
     });
 
     if (!updated) {
-      return NextResponse.json({ error: "Não foi possível atualizar o agente." }, { status: 500 });
+      return NextResponse.json({ error: "Nao foi possivel atualizar o agente." }, { status: 500 });
     }
 
     return NextResponse.json({ agente: updated }, { status: 200 });
   } catch (error) {
     console.error("[api/admin/agentes] failed to update agent", error);
-    return NextResponse.json({ error: "Configurações inválidas. Use JSON válido." }, { status: 400 });
+    return NextResponse.json({ error: "Configuracoes invalidas. Use JSON valido." }, { status: 400 });
   }
 }
 
@@ -171,6 +192,10 @@ export async function DELETE(request: Request) {
   const projetoId = resolveRequestedProjectId(user, body.projetoId ?? agente.projetoId ?? undefined);
   if (!projetoId || !canManageProject(user, projetoId) || agente.projetoId !== projetoId) {
     return NextResponse.json({ error: "Projeto invalido para excluir agente." }, { status: 403 });
+  }
+
+  if (await isDemoProjectMutationBlocked(user?.email, projetoId)) {
+    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
   }
 
   const deleted = await deleteAgente(body.id);

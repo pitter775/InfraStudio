@@ -101,8 +101,8 @@ export function ProjectMercadoSection({
           ) : null}
         </div>
 
-        <div className={`mt-4 grid gap-6 ${hasConnectors ? "xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start" : ""}`}>
-          <div className={`space-y-3 ${hasConnectors ? "order-2 xl:order-1 xl:max-w-[920px]" : ""}`}>
+        <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+          <div className="order-2 space-y-3 xl:order-1 xl:max-w-[920px]">
             {connectors.length ? (
               connectors.map((connector) => (
                 <article
@@ -179,7 +179,7 @@ export function ProjectMercadoSection({
             )}
           </div>
 
-          <aside className={`${hasConnectors ? "order-1 xl:order-2" : ""}`}>
+          <aside className="order-1 xl:order-2">
             <div className="rounded-2xl border border-amber-400/14 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(15,23,42,0.22))] p-5 shadow-[0_18px_36px_rgba(2,8,23,0.18)]">
               <button
                 type="button"

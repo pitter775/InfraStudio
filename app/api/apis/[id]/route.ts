@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin, canManageProject } from "@/lib/access";
 import { deleteApi, getApiById, updateApi } from "@/lib/apis";
+import { canDemoUserEditProject, isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
 import { getSessionUser } from "@/lib/session";
 
 type RouteContext = {
@@ -23,7 +24,7 @@ export async function PUT(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "API nao encontrada." }, { status: 404 });
   }
 
-  if (!canManageProject(user, currentApi.projetoId)) {
+  if (!canManageProject(user, currentApi.projetoId) && !await canDemoUserEditProject(user?.email, currentApi.projetoId)) {
     return NextResponse.json({ error: "Acesso negado para esta API." }, { status: 403 });
   }
 
@@ -103,6 +104,10 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
   if (!canManageProject(user, currentApi.projetoId)) {
     return NextResponse.json({ error: "Acesso negado para esta API." }, { status: 403 });
+  }
+
+  if (await isDemoProjectMutationBlocked(user?.email, currentApi.projetoId)) {
+    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
   }
 
   const deleted = await deleteApi(id);

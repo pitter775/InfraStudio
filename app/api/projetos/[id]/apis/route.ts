@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin, canManageProject } from "@/lib/access";
 import { createApi, listApis } from "@/lib/apis";
+import { canDemoUserEditProject } from "@/lib/demo-project-guard";
 import { getSessionUser } from "@/lib/session";
 
 type RouteContext = {
@@ -18,7 +19,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const { id } = await context.params;
 
-  if (!canManageProject(user, id)) {
+  if (!canManageProject(user, id) && !await canDemoUserEditProject(user?.email, id)) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
   }
 
@@ -35,7 +36,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   const { id } = await context.params;
 
-  if (!canManageProject(user, id)) {
+  if (!canManageProject(user, id) && !await canDemoUserEditProject(user?.email, id)) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
   }
 

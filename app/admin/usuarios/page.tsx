@@ -90,8 +90,6 @@ export default function AdminUsuariosPage() {
   }, []);
 
   const isAllowed = canAccessGlobalAdmin(currentUser);
-  const isProjectRequired = form.papel !== "admin";
-
   const refreshUsers = async () => {
     setUsersLoading(true);
     const { users: nextUsers, error } = await listProjectUsers();
@@ -103,12 +101,6 @@ export default function AdminUsuariosPage() {
   const handleSubmit = async () => {
     setSaving(true);
     setFeedback(null);
-
-    if (isProjectRequired && form.projetoIds.length === 0) {
-      setFeedback("Selecione um projeto para vincular o usuario.");
-      setSaving(false);
-      return;
-    }
 
     const method = form.id ? "PUT" : "POST";
     const response = await fetch("/api/admin/usuarios", {
@@ -284,7 +276,7 @@ export default function AdminUsuariosPage() {
 
                   <label className="space-y-2">
                     <span className="text-sm font-semibold text-slate-300">
-                      Projetos {isProjectRequired ? <span className="text-rose-300">*</span> : <span className="text-slate-500">(opcional)</span>}
+                      Projetos <span className="text-slate-500">(opcional)</span>
                     </span>
                     <div className="max-h-56 space-y-2 overflow-y-auto rounded-xl border border-white/10 bg-slate-950/40 p-3">
                       {projects.map((project) => {
@@ -311,9 +303,7 @@ export default function AdminUsuariosPage() {
                       })}
                     </div>
                     <p className="text-xs text-slate-500">
-                      {isProjectRequired
-                        ? "Usuarios comuns precisam nascer vinculados a pelo menos um projeto."
-                        : "Admin global pode ser criado sem projeto e vinculado depois."}
+                      Se nenhum projeto for selecionado, o sistema cria um projeto automaticamente com o nome do usuario.
                     </p>
                   </label>
 

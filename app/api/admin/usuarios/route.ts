@@ -44,10 +44,6 @@ export async function POST(request: Request) {
     ),
   );
 
-  if (papel !== "admin" && projetoIds.length === 0) {
-    return NextResponse.json({ error: "Selecione um projeto para vincular o usuario." }, { status: 400 });
-  }
-
   const created = await createUsuario({
     nome: body.nome,
     email: body.email,
@@ -95,10 +91,6 @@ export async function PUT(request: Request) {
       ),
     ),
   );
-
-  if (papel !== "admin" && projetoIds.length === 0) {
-    return NextResponse.json({ error: "Selecione um projeto para vincular o usuario." }, { status: 400 });
-  }
 
   const updated = await updateUsuario({
     id: body.id,

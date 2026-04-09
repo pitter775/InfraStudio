@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { canAccessAdmin, canAccessGlobalAdmin, canManageProject, resolveCurrentProjectId } from "@/lib/access";
+import { canAccessAdmin, canAccessGlobalAdmin, canAccessProject, canManageProject, resolveCurrentProjectId } from "@/lib/access";
 import { getAgenteById } from "@/lib/agentes";
+import { canDemoUserEditProject, isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
 import { getSessionUser } from "@/lib/session";
 import { createWhatsAppChannel, deleteWhatsAppChannel, getWhatsAppChannelById, getWhatsAppChannelByProject, listWhatsAppChannels, updateWhatsAppChannel, WhatsAppChannelError } from "@/lib/whatsapp-channels";
 
@@ -29,7 +30,10 @@ async function validateProjectAccess(projetoId: string | null | undefined) {
   }
 
   const resolvedProjectId = resolveRequestedProjectId(user, projetoId);
-  if (!resolvedProjectId || !canManageProject(user, resolvedProjectId)) {
+  const canManageResolvedProject = resolvedProjectId
+    ? canManageProject(user, resolvedProjectId) || await canDemoUserEditProject(user?.email, resolvedProjectId)
+    : false;
+  if (!resolvedProjectId || !canManageResolvedProject || !canAccessProject(user, resolvedProjectId)) {
     return { user, error: NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 }) };
   }
 
@@ -117,9 +121,18 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Id do canal obrigatorio." }, { status: 400 });
   }
 
-  const access = await validateProjectAccess(body.projetoId);
+  const currentChannel = await getWhatsAppChannelById(body.id);
+  if (!currentChannel) {
+    return NextResponse.json({ error: "Canal WhatsApp nao encontrado." }, { status: 404 });
+  }
+
+  const access = await validateProjectAccess(body.projetoId ?? currentChannel.projetoId);
   if (access.error) {
     return access.error;
+  }
+
+  if (currentChannel.projetoId !== access.projetoId) {
+    return NextResponse.json({ error: "Projeto invalido para atualizar canal WhatsApp." }, { status: 403 });
   }
 
   if (!body.numero?.trim()) {
@@ -174,6 +187,10 @@ export async function DELETE(request: Request) {
 
   if (channel.projetoId !== access.projetoId) {
     return NextResponse.json({ error: "Projeto invalido para excluir canal WhatsApp." }, { status: 403 });
+  }
+
+  if (await isDemoProjectMutationBlocked(access.user?.email, access.projetoId)) {
+    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
   }
 
   try {
