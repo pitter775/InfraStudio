@@ -5,8 +5,9 @@ type HomePageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
+
 export const metadata = buildPageMetadata({
-  title: "Automacao com IA para WhatsApp, site e operacao",
+  title: "Automacao com  IA para WhatsApp, site e operacão",
   description:
     "Crie atendentes com IA para WhatsApp, site e fluxos internos com uma base tecnica pronta para integrar canais, APIs e atendimento humano.",
   path: "/",
