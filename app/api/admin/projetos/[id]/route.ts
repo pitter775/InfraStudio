@@ -8,7 +8,7 @@ import { appendSystemLog } from "@/lib/chat-logs";
 import { listChatWidgets } from "@/lib/chat-widgets";
 import { listChats } from "@/lib/chats";
 import { listConectores } from "@/lib/conectores";
-import { isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
+import { isDemoProjectMutationBlocked, isDemoProjectReadRestricted } from "@/lib/demo-project-guard";
 import { isDemoUser } from "@/lib/demo-user";
 import { getProjetoModeloSelecionado, listModelosDisponiveisParaProjeto } from "@/lib/modelos";
 import { getOpenAIModelPricingOptions } from "@/lib/openai-pricing";
@@ -48,6 +48,14 @@ export async function GET(_request: Request, context: RouteContext) {
     getProjetoModeloSelecionado(id),
   ]);
   const projeto = projetos.find((item) => item.id === id) ?? null;
+  const demoReadRestricted = projeto ? await isDemoProjectReadRestricted(user?.email, id) : false;
+  const sanitizedWhatsAppChannels = demoReadRestricted ? [] : whatsappChannels;
+  const sanitizedWidgets = demoReadRestricted
+    ? widgets.map((widget) => ({
+        ...widget,
+        whatsappCelular: "",
+      }))
+    : widgets;
 
   if (!projeto) {
     return NextResponse.json({ error: "Projeto não encontrado." }, { status: 404 });
@@ -64,8 +72,8 @@ export async function GET(_request: Request, context: RouteContext) {
       agentes,
       apis,
       conectores,
-      widgets,
-      whatsappChannels,
+      widgets: sanitizedWidgets,
+      whatsappChannels: sanitizedWhatsAppChannels,
       chats,
       billing: billing
         ? {
@@ -81,8 +89,8 @@ export async function GET(_request: Request, context: RouteContext) {
         agenteAtivoId: agentes.find((agente) => agente.ativo)?.id ?? null,
         totalApis: apis.length,
         totalConectores: conectores.length,
-        totalWidgets: widgets.length,
-        totalWhatsAppChannels: whatsappChannels.length,
+        totalWidgets: sanitizedWidgets.length,
+        totalWhatsAppChannels: sanitizedWhatsAppChannels.length,
         totalChats: chats.length,
       },
     },

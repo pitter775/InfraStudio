@@ -153,7 +153,7 @@ export const USE_CASE_ITEMS: UseCaseItem[] = [
   },
   {
     icon: ShoppingBag,
-    title: "Loja (Mercado Livre)",
+    title: "Mercado Livre",
     description:
       "Automatize respostas e ganhe velocidade no atendimento da sua operação, mantendo padrão comercial, agilidade e escala nos contatos da loja.",
     delay: 0.4,

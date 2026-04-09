@@ -7896,11 +7896,14 @@ export default function AdminProjetoDetalhePage() {
                     <button
                       type="button"
                       onClick={() => {
+                        if (demoEditBlocked) {
+                          return;
+                        }
                         setDeleteProjectConfirmation("");
                         setDeleteProjectModalOpen(true);
                       }}
-                      disabled={deletingProject}
-                      className="infra-click-pulse inline-flex items-center justify-center gap-2 rounded-full border border-rose-400/14 bg-rose-400/[0.07] px-3 py-1 text-[11px] font-semibold text-rose-100 transition-all hover:border-rose-300/24 hover:bg-rose-400/[0.11] disabled:opacity-60"
+                      disabled={deletingProject || demoEditBlocked}
+                      className="infra-click-pulse inline-flex items-center justify-center gap-2 rounded-full border border-rose-400/14 bg-rose-400/[0.07] px-3 py-1 text-[11px] font-semibold text-rose-100 transition-all hover:border-rose-300/24 hover:bg-rose-400/[0.11] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Trash2 size={12} />
                       {deletingProject ? "Removendo..." : "Remover"}
@@ -7921,7 +7924,7 @@ export default function AdminProjetoDetalhePage() {
                 >
                   <ArrowLeft size={18} />
                 </Link>
-                {data.billing ? (
+                {data.billing && !demoEditBlocked ? (
                   <button
                     type="button"
                     onClick={() => setBillingModalOpen(true)}
@@ -8467,6 +8470,7 @@ export default function AdminProjetoDetalhePage() {
       </section>
       <section className={`${renderedTab === "whatsapp" ? "block" : "hidden"} ${premiumTransitionClass} ${tabContentTransitionClass}`}>
         <ProjectWhatsAppSection
+          demoMode={demoEditBlocked}
           whatsappServiceEnabled={Boolean(process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL)}
           whatsappServiceHealthMessage={whatsAppServiceHealth.message}
           whatsappServiceHealthTone={

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin, canAccessGlobalAdmin, canAccessProject, canManageProject, resolveCurrentProjectId } from "@/lib/access";
 import { getAgenteById } from "@/lib/agentes";
-import { canDemoUserEditProject, isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
+import { canDemoUserEditProject, isDemoProjectMutationBlocked, isDemoProjectReadRestricted } from "@/lib/demo-project-guard";
 import { getSessionUser } from "@/lib/session";
 import { createWhatsAppChannel, deleteWhatsAppChannel, getWhatsAppChannelById, getWhatsAppChannelByProject, listWhatsAppChannels, updateWhatsAppChannel, WhatsAppChannelError } from "@/lib/whatsapp-channels";
 
@@ -74,6 +74,10 @@ export async function GET(request: Request) {
     return access.error;
   }
 
+  if (await isDemoProjectReadRestricted(access.user?.email, access.projetoId)) {
+    return NextResponse.json({ channels: [] }, { status: 200 });
+  }
+
   const channels = await listWhatsAppChannels(access.projetoId);
   return NextResponse.json({ channels }, { status: 200 });
 }
@@ -97,6 +101,10 @@ export async function POST(request: Request) {
   const projectRuleError = await validateWhatsAppProjectRule(access.projetoId!);
   if (projectRuleError) {
     return NextResponse.json({ error: projectRuleError }, { status: 409 });
+  }
+
+  if (await isDemoProjectMutationBlocked(access.user?.email, access.projetoId)) {
+    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
   }
 
   try {
@@ -147,6 +155,10 @@ export async function PUT(request: Request) {
   const projectRuleError = await validateWhatsAppProjectRule(access.projetoId!, body.id);
   if (projectRuleError) {
     return NextResponse.json({ error: projectRuleError }, { status: 409 });
+  }
+
+  if (await isDemoProjectMutationBlocked(access.user?.email, access.projetoId)) {
+    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
   }
 
   try {

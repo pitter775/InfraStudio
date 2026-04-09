@@ -57,6 +57,7 @@ type WhatsAppHandoffContactFormState = {
 };
 
 type ProjectWhatsAppSectionProps = {
+  demoMode: boolean;
   whatsappServiceEnabled: boolean;
   whatsappServiceHealthMessage: string | null;
   whatsappServiceHealthTone: "online" | "offline" | "checking";
@@ -199,6 +200,7 @@ function BusyIcon() {
 }
 
 export function ProjectWhatsAppSection({
+  demoMode,
   whatsappServiceEnabled,
   whatsappServiceHealthMessage,
   whatsappServiceHealthTone,
@@ -384,20 +386,26 @@ export function ProjectWhatsAppSection({
             <div>
               <div className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),rgba(6,78,59,0.08)_35%,rgba(2,6,23,0.88)_75%)] px-6 py-7">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Primeiro passo</p>
-                <h4 className="mt-3 max-w-3xl text-3xl font-bold text-white">Crie o numero que vai atender no WhatsApp</h4>
+                <h4 className="mt-3 max-w-3xl text-3xl font-bold text-white">
+                  {demoMode ? "WhatsApp oculto no modo demonstracao" : "Crie o numero que vai atender no WhatsApp"}
+                </h4>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-                  Assim que o canal for criado, esta area passa a mostrar o QR bem grande para escanear ou o estado de conexao.
+                  {demoMode
+                    ? "Para evitar vazamento entre sessoes anonimas, o demo nao exibe nem reaproveita numeros ja cadastrados no projeto."
+                    : "Assim que o canal for criado, esta area passa a mostrar o QR bem grande para escanear ou o estado de conexao."}
                 </p>
-                <div className="mt-5">
-                  <button
-                    type="button"
-                    onClick={onOpenNewChannel}
-                    className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/20 px-4 py-3 text-sm font-semibold text-emerald-50 transition-all hover:border-emerald-300/40 hover:bg-emerald-500/25"
-                  >
-                    <Plus size={16} />
-                    Conectar ao WhatsApp
-                  </button>
-                </div>
+                {!demoMode ? (
+                  <div className="mt-5">
+                    <button
+                      type="button"
+                      onClick={onOpenNewChannel}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/20 px-4 py-3 text-sm font-semibold text-emerald-50 transition-all hover:border-emerald-300/40 hover:bg-emerald-500/25"
+                    >
+                      <Plus size={16} />
+                      Conectar ao WhatsApp
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
           )}
