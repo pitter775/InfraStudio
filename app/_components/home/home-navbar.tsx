@@ -15,9 +15,10 @@ type NavbarProps = {
   onLogout: () => Promise<void> | void;
   onOpenChat: () => void;
   basePath?: string;
+  onNavigateHref?: (href: string) => void;
 };
 
-export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat, basePath = "" }: NavbarProps) {
+export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat, basePath = "", onNavigateHref }: NavbarProps) {
   const DEMO_PROJECT_STORAGE_KEY = "demoProjectId";
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -68,6 +69,14 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat, basePat
   }, [mobileMenuOpen]);
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
+  const handleNavigateHref = (href: string) => {
+    if (onNavigateHref) {
+      onNavigateHref(href);
+      return;
+    }
+
+    window.location.href = href;
+  };
 
   return (
     <>
@@ -111,38 +120,50 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat, basePat
               </div>
 
               <div className="space-y-2">
-                <a
-                  href={resolveSectionHref("#planos")}
-                  onClick={closeMobileMenu}
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMobileMenu();
+                    handleNavigateHref(resolveSectionHref("#planos"));
+                  }}
                   className="infra-click-pulse flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/[0.08]"
                 >
                   <Sparkles size={16} className="text-cyan-200" />
                   Planos
-                </a>
-                <a
-                  href={resolveSectionHref("#servicos")}
-                  onClick={closeMobileMenu}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMobileMenu();
+                    handleNavigateHref(resolveSectionHref("#servicos"));
+                  }}
                   className="infra-click-pulse flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/[0.08]"
                 >
                   <Sparkles size={16} className="text-cyan-200" />
                   Servicos
-                </a>
-                <a
-                  href={resolveSectionHref("#como-funciona")}
-                  onClick={closeMobileMenu}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMobileMenu();
+                    handleNavigateHref(resolveSectionHref("#como-funciona"));
+                  }}
                   className="infra-click-pulse flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/[0.08]"
                 >
                   <BriefcaseBusiness size={16} className="text-cyan-200" />
                   Como funciona
-                </a>
-                <Link
-                  href="/docs/chat-widget-host-control"
-                  onClick={closeMobileMenu}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMobileMenu();
+                    handleNavigateHref("/docs/chat-widget-host-control");
+                  }}
                   className="infra-click-pulse flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/[0.08]"
                 >
                   <BookOpenText size={16} className="text-cyan-200" />
                   Documentacao
-                </Link>
+                </button>
                 <a
                   href="#"
                   onClick={(event) => {
@@ -160,14 +181,17 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat, basePat
               <div className="mt-5 border-t border-white/8 pt-5">
                 {currentUser ? (
                   <div className="space-y-3">
-                    <Link
-                      href={adminHomeHref}
-                      onClick={closeMobileMenu}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeMobileMenu();
+                        handleNavigateHref(adminHomeHref);
+                      }}
                       className="infra-click-pulse flex items-center gap-3 rounded-2xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-100"
                     >
                       <Lock size={16} />
                       {adminHomeLabel}
-                    </Link>
+                    </button>
                     <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/10 px-4 py-3">
                       <p className="text-sm font-semibold text-white">{currentUser.name}</p>
                       <p className="text-xs uppercase tracking-[0.18em] text-emerald-200/80">{currentUser.role}</p>
@@ -212,33 +236,45 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat, basePat
         )}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <Link href={homeHref} className="flex items-center gap-3">
-            <div className="relative h-14 w-14 overflow-hidden p-1">
-              <img src="/logo.png" alt="InfraStudio Logo" className="h-full w-full object-contain" />
-            </div>
-            <div>
-              <span className="block text-2xl font-bold tracking-tight text-white">InfraStudio</span>
-              <span className="hidden text-xs uppercase tracking-[0.11em] text-slate-500 sm:block">Smart Systems Lab</span>
-            </div>
-          </Link>
+          {onNavigateHref ? (
+            <button type="button" onClick={() => handleNavigateHref(homeHref)} className="flex items-center gap-3">
+              <div className="relative h-14 w-14 overflow-hidden p-1">
+                <img src="/logo.png" alt="InfraStudio Logo" className="h-full w-full object-contain" />
+              </div>
+              <div>
+                <span className="block text-2xl font-bold tracking-tight text-white">InfraStudio</span>
+                <span className="hidden text-xs uppercase tracking-[0.11em] text-slate-500 sm:block">Smart Systems Lab</span>
+              </div>
+            </button>
+          ) : (
+            <Link href={homeHref} className="flex items-center gap-3">
+              <div className="relative h-14 w-14 overflow-hidden p-1">
+                <img src="/logo.png" alt="InfraStudio Logo" className="h-full w-full object-contain" />
+              </div>
+              <div>
+                <span className="block text-2xl font-bold tracking-tight text-white">InfraStudio</span>
+                <span className="hidden text-xs uppercase tracking-[0.11em] text-slate-500 sm:block">Smart Systems Lab</span>
+              </div>
+            </Link>
+          )}
 
           <div className="hidden items-center space-x-3 md:flex">
-            <a href={resolveSectionHref("#planos")} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
+            <button type="button" onClick={() => handleNavigateHref(resolveSectionHref("#planos"))} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
               <Sparkles size={15} className="text-slate-500" />
               Planos
-            </a>
-            <a href={resolveSectionHref("#servicos")} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
+            </button>
+            <button type="button" onClick={() => handleNavigateHref(resolveSectionHref("#servicos"))} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
               <Sparkles size={15} className="text-slate-500" />
               Servicos
-            </a>
-            <a href={resolveSectionHref("#como-funciona")} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
+            </button>
+            <button type="button" onClick={() => handleNavigateHref(resolveSectionHref("#como-funciona"))} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
               <BriefcaseBusiness size={15} className="text-slate-500" />
               Como funciona
-            </a>
-            <Link href="/docs/chat-widget-host-control" className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
+            </button>
+            <button type="button" onClick={() => handleNavigateHref("/docs/chat-widget-host-control")} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.04] hover:text-blue-300">
               <BookOpenText size={15} className="text-slate-500" />
               Documentacao
-            </Link>
+            </button>
             <a
               href="#"
               onClick={(event) => {
@@ -269,13 +305,13 @@ export function Navbar({ currentUser, onOpenLogin, onLogout, onOpenChat, basePat
                 </button>
 
                 <div className="invisible absolute right-0 top-full z-20 mt-2 w-44 rounded-2xl border border-white/10 bg-slate-950/95 p-2 opacity-0 shadow-2xl backdrop-blur-xl transition-all duration-200 group-hover:visible group-hover:opacity-100">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.location.href = adminHomeHref;
-                    }}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/8 hover:text-white"
-                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleNavigateHref(adminHomeHref);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/8 hover:text-white"
+                    >
                     <Lock size={14} />
                     {isAdminUser(currentUser) ? "Admin" : "Ambiente"}
                   </button>

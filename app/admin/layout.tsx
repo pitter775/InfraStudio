@@ -769,6 +769,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
               window.location.href = "/#contato";
             }}
             basePath="/"
+            onNavigateHref={(href) => handleProtectedNavigation(() => { window.location.href = href; })}
           />
 
           <div className={cn("transition-all duration-300", isAtendimentoRoute ? "h-screen overflow-hidden pt-32" : "min-h-screen pt-32")}>
