@@ -121,6 +121,47 @@ export function buildLeadNameAcknowledgementReply(
     : `Prazer, **${safeName}**.\n\nPode me dizer o que voce quer validar?`;
 }
 
+export function findRecentUserIntentBeforeLeadNameReply(
+  history: ConversationMessage[],
+  latestUserMessage: string,
+  deps: {
+    normalizeText: (value: string) => string;
+    extractName: (message: string) => string | null;
+    isGreetingOrAckMessage: (message: string) => boolean;
+  },
+) {
+  if (!isLikelyLeadNameReply(latestUserMessage, history, deps)) {
+    return null;
+  }
+
+  const previousUserMessages = history
+    .filter((item) => item.role === "user")
+    .map((item) => item.content.trim())
+    .filter(Boolean)
+    .slice(0, -1)
+    .reverse();
+
+  for (const candidate of previousUserMessages) {
+    if (deps.isGreetingOrAckMessage(candidate)) {
+      continue;
+    }
+
+    const normalized = deps.normalizeText(candidate);
+    const compact = normalized.replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+    if (!compact) {
+      continue;
+    }
+
+    if (deps.extractName(candidate)) {
+      continue;
+    }
+
+    return candidate;
+  }
+
+  return null;
+}
+
 export function extractPhone(message: string) {
   return extractPhoneFromModule(message);
 }

@@ -10,7 +10,12 @@ type ConversationMessage = {
 export function buildOpenAiInput(messages: ConversationMessage[]) {
   return messages.map((message) => ({
     role: message.role === "assistant" ? "assistant" : message.role === "system" ? "system" : "user",
-    content: [{ type: "input_text", text: message.content }],
+    content: [
+      {
+        type: message.role === "assistant" ? "output_text" : "input_text",
+        text: message.content,
+      },
+    ],
   }));
 }
 

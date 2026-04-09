@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin, canManageProject, resolveCurrentProjectId } from "@/lib/access";
+import { buildEffectiveAgentConfig } from "@/lib/agent-config";
 import { createAgente, deleteAgente, getAgenteById, listAgentes, updateAgente } from "@/lib/agentes";
 import { canDemoUserEditProject, getDemoProjectMutationBlockReason } from "@/lib/demo-project-guard";
 import { getSessionUser } from "@/lib/session";
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
       nome: body.nome,
       descricao: body.descricao,
       promptBase: body.promptBase,
-      configuracoes: parseConfiguracoes(body.configuracoes),
+      configuracoes: buildEffectiveAgentConfig(body.promptBase, parseConfiguracoes(body.configuracoes)),
       ativo: body.ativo,
       apiIds: Array.isArray(body.apiIds) ? body.apiIds : [],
     });
@@ -157,7 +158,7 @@ export async function PUT(request: Request) {
       nome: body.nome,
       descricao: body.descricao,
       promptBase: body.promptBase,
-      configuracoes: parseConfiguracoes(body.configuracoes),
+      configuracoes: buildEffectiveAgentConfig(body.promptBase, parseConfiguracoes(body.configuracoes)),
       ativo: body.ativo,
       apiIds: Array.isArray(body.apiIds) ? body.apiIds : [],
     });

@@ -4797,12 +4797,21 @@ function EmbeddedAgentTestChat({
 
     const projetoRef = projeto.id;
     const agenteRef = agente.id;
+    const testScopeKey = [
+      "admin-agent-test",
+      projeto.id,
+      agente.id,
+      effectiveChannelKind,
+      whatsappChannelId ?? "no-channel",
+    ].join(":");
     const testSessionId =
       effectiveChannelKind === "whatsapp"
         ? `55${Date.now().toString().slice(-11)}`
         : `admin-agent-test:${projeto.id}:${agente.id}:${Date.now()}`;
     const scriptId = "infrastudio-admin-agent-test-chat-sdk";
     const mountWidget = () => {
+      console.log("AGENTE TESTE:", agente.id);
+      console.log("PROMPT TESTE:", agente.promptBase);
       infraChatWindow.InfraChat?.destroy();
       infraChatWindow.InfraChat?.mount({
         projeto: projetoRef,
@@ -4825,11 +4834,13 @@ function EmbeddedAgentTestChat({
           },
           channel: {
             kind: effectiveChannelKind,
+            sessionKey: testScopeKey,
           },
           admin: {
             mode: "agent_test",
             projetoId: projeto.id,
             agenteId: agente.id,
+            sessionKey: testScopeKey,
           },
           ...(effectiveChannelKind === "whatsapp"
             ? {
@@ -4855,10 +4866,11 @@ function EmbeddedAgentTestChat({
       script.id = scriptId;
       script.src = `${origin}/chat.js`;
       script.async = true;
-      script.setAttribute("data-projeto", projetoRef);
-      script.setAttribute("data-agente", agenteRef);
       document.body.appendChild(script);
     }
+
+    script.setAttribute("data-projeto", projetoRef);
+    script.setAttribute("data-agente", agenteRef);
 
     script.addEventListener("load", mountWidget);
     if (infraChatWindow.InfraChat) {

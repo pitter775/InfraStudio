@@ -11,7 +11,7 @@ export type ChatChannelContext = {
 };
 
 export type ChatChannelPolicy = {
-  kind: "home" | "external_widget" | "whatsapp" | "unknown";
+  kind: "home" | "external_widget" | "admin_agent_test" | "whatsapp" | "unknown";
   preferStructuredReplies: boolean;
   allowCatalogPricing: boolean;
   allowLeadGate: boolean;
@@ -35,6 +35,15 @@ export function getChatChannelPolicy(context?: ChatChannelContext): ChatChannelP
       preferStructuredReplies: context?.ui?.structured_response !== false,
       allowCatalogPricing: false,
       allowLeadGate: true,
+    };
+  }
+
+  if (kind === "admin_agent_test") {
+    return {
+      kind: "admin_agent_test",
+      preferStructuredReplies: context?.ui?.structured_response !== false,
+      allowCatalogPricing: false,
+      allowLeadGate: false,
     };
   }
 

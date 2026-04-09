@@ -72,6 +72,7 @@ import {
   buildLeadNameAcknowledgementReply as buildLeadNameAcknowledgementReplyFromModule,
   enrichLeadContext as enrichLeadContextFromModule,
   extractName as extractNameFromModule,
+  findRecentUserIntentBeforeLeadNameReply as findRecentUserIntentBeforeLeadNameReplyFromModule,
   isLikelyLeadNameReply as isLikelyLeadNameReplyFromModule,
 } from "@/lib/chat-lead-stage";
 export { shouldRefreshSummary, summarizeConversation } from "@/lib/chat-summary-stage";
@@ -293,6 +294,24 @@ function buildZeroUsageReply(
   };
 }
 
+function buildTemporaryChatFailureReply(input: {
+  routeStage: SalesReplyMetadata["routeStage"];
+  domainStage: SalesReplyMetadata["domainStage"];
+  agentId: string | null;
+  agentName: string | null;
+  model: string;
+}) {
+  return buildZeroUsageReply("Estamos com uma instabilidade temporaria no atendimento. Tente novamente em instantes.", [], {
+    provider: "guardrail",
+    model: input.model,
+    agenteId: input.agentId,
+    agenteNome: input.agentName,
+    routeStage: input.routeStage,
+    heuristicStage: null,
+    domainStage: input.domainStage,
+  });
+}
+
 function buildBillingControlMetadata(current: BillingProjectPlan | null): SalesReplyMetadata["billingControl"] {
   if (!current) {
     return null;
@@ -468,6 +487,7 @@ async function resolveOpenAiStageReply(input: {
   apiFallbackReply?: string | null;
   agentId: string | null;
   agentName: string | null;
+  allowScopedRecoveryFallback: boolean;
 }) {
   try {
     const { hasSummary, recentMessageWindow, requestPayload } = buildOpenAiStageRequestPayload({
@@ -514,15 +534,25 @@ async function resolveOpenAiStageReply(input: {
           hasApiFallbackReply: Boolean(input.apiFallbackReply),
         },
       });
-      return buildZeroUsageReply(input.apiFallbackReply || input.scopedRecoveryReply, [], {
-        provider: "agent_scoped_recovery",
-        model: input.apiFallbackReply ? "fail_closed_after_openai_error_api_fallback" : "fail_closed_after_openai_error",
-        agenteId: input.agentId,
-        agenteNome: input.agentName,
-        routeStage: "openai",
-        heuristicStage: null,
-        domainStage: input.domainSupportState.domainStage,
-      });
+        if (!input.allowScopedRecoveryFallback) {
+          return buildTemporaryChatFailureReply({
+            routeStage: "openai",
+            domainStage: input.domainSupportState.domainStage,
+            agentId: input.agentId,
+            agentName: input.agentName,
+            model: "fail_closed_after_openai_error",
+          });
+        }
+
+        return buildZeroUsageReply(input.apiFallbackReply || input.scopedRecoveryReply, [], {
+          provider: "agent_scoped_recovery",
+          model: input.apiFallbackReply ? "fail_closed_after_openai_error_api_fallback" : "fail_closed_after_openai_error",
+          agenteId: input.agentId,
+          agenteNome: input.agentName,
+          routeStage: "openai",
+          heuristicStage: null,
+          domainStage: input.domainSupportState.domainStage,
+        });
     }
 
     const resolvedReply = extractTaggedAssetsFromModule(outputText, input.runtimeAssets);
@@ -568,15 +598,25 @@ async function resolveOpenAiStageReply(input: {
           hasApiFallbackReply: Boolean(input.apiFallbackReply),
         },
       });
-    return buildZeroUsageReply(input.apiFallbackReply || input.scopedRecoveryReply, [], {
-      provider: "agent_scoped_recovery",
-      model: input.apiFallbackReply ? "fail_closed_after_exception_api_fallback" : "fail_closed_after_exception",
-      agenteId: input.agentId,
-      agenteNome: input.agentName,
-      routeStage: "openai",
-      heuristicStage: null,
-      domainStage: input.domainSupportState.domainStage,
-    });
+      if (!input.allowScopedRecoveryFallback) {
+        return buildTemporaryChatFailureReply({
+          routeStage: "openai",
+          domainStage: input.domainSupportState.domainStage,
+          agentId: input.agentId,
+          agentName: input.agentName,
+          model: "fail_closed_after_exception",
+        });
+      }
+
+      return buildZeroUsageReply(input.apiFallbackReply || input.scopedRecoveryReply, [], {
+        provider: "agent_scoped_recovery",
+        model: input.apiFallbackReply ? "fail_closed_after_exception_api_fallback" : "fail_closed_after_exception",
+        agenteId: input.agentId,
+        agenteNome: input.agentName,
+        routeStage: "openai",
+        heuristicStage: null,
+        domainStage: input.domainSupportState.domainStage,
+      });
   }
 }
 
@@ -590,6 +630,7 @@ async function resolveGuardrailStageReply(input: {
   apiFallbackReply?: string | null;
   agentId: string | null;
   agentName: string | null;
+  allowScopedRecoveryFallback: boolean;
 }) {
   if (input.stage === "inactive_or_invalid_agent") {
     await appendRuntimeErrorLog({
@@ -620,14 +661,34 @@ async function resolveGuardrailStageReply(input: {
           hasApiFallbackReply: Boolean(input.apiFallbackReply),
         },
       });
-    return buildZeroUsageReply(input.apiFallbackReply || input.scopedRecoveryReply || "", [], {
-      provider: "agent_scoped_recovery",
-      model: input.apiFallbackReply ? "fail_closed_no_openai_key_api_fallback" : "fail_closed_no_openai_key",
-      agenteId: input.agentId,
-      agenteNome: input.agentName,
+      if (!input.allowScopedRecoveryFallback) {
+        return buildTemporaryChatFailureReply({
+          routeStage: "guardrail_no_openai",
+          domainStage: input.conversationDomainStage ?? null,
+          agentId: input.agentId,
+          agentName: input.agentName,
+          model: "fail_closed_no_openai_key",
+        });
+      }
+
+      return buildZeroUsageReply(input.apiFallbackReply || input.scopedRecoveryReply || "", [], {
+        provider: "agent_scoped_recovery",
+        model: input.apiFallbackReply ? "fail_closed_no_openai_key_api_fallback" : "fail_closed_no_openai_key",
+        agenteId: input.agentId,
+        agenteNome: input.agentName,
+        routeStage: "guardrail_no_openai",
+        heuristicStage: null,
+        domainStage: input.conversationDomainStage ?? null,
+      });
+    }
+  
+  if (!input.allowScopedRecoveryFallback) {
+    return buildTemporaryChatFailureReply({
       routeStage: "guardrail_no_openai",
-      heuristicStage: null,
       domainStage: input.conversationDomainStage ?? null,
+      agentId: input.agentId,
+      agentName: input.agentName,
+      model: "unexpected_route_fallback",
     });
   }
 
@@ -646,6 +707,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const latestUserMessage = [...history].reverse().find((item) => item.role === "user")?.content ?? "";
   const channelPolicy = getChatChannelPolicy(context);
   const enableInfraStudioHeuristics = isInfraStudioFirstPartyContextFromModule(context);
+  const isGreetingOrAckMessage = (message: string) => isGreetingOrAckMessageFromModule(message, { normalizeText });
   const projectId = context?.admin?.projetoId ?? context?.projeto?.id ?? null;
   const agentId = context?.admin?.agenteId ?? context?.agente?.id ?? null;
   const lockedToAgent = context?.agente?.locked === true;
@@ -682,6 +744,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
       traceBase,
       agentId: null,
       agentName: null,
+      allowScopedRecoveryFallback: enableInfraStudioHeuristics,
     }), billingProjectPlan);
   }
   const activeAgent: AgenteRecord = agent;
@@ -694,6 +757,11 @@ export async function generateSalesReply(history: ConversationMessage[], context
     extractName: (message) => extractNameFromModule(message, normalizeText),
   });
   const extractedLeadName = leadNameReplyDetected ? extractNameFromModule(latestUserMessage, normalizeText) : null;
+  const recentUserIntentBeforeLeadNameReply = findRecentUserIntentBeforeLeadNameReplyFromModule(history, latestUserMessage, {
+    normalizeText,
+    extractName: (message) => extractNameFromModule(message, normalizeText),
+    isGreetingOrAckMessage,
+  });
   const {
     openai,
     recentCatalogProducts,
@@ -791,16 +859,18 @@ export async function generateSalesReply(history: ConversationMessage[], context
           normalizeText,
           prefersStructuredReply: prefersStructuredReplyFromModule,
         }),
-      maybeAskForLeadIdentification: (runtimeContext, history, latestMessage) =>
-        maybeAskForLeadIdentificationFromModule(runtimeContext, history, latestMessage, {
-          normalizeText,
-          isOutOfScopeForCatalog: (messages) => isOutOfScopeForCatalogFromModule(messages, { normalizeText }),
-          isWhatsAppChannel,
-        }),
-      buildLeadNameAcknowledgementReply: (name, connector, runtimeContext) =>
-        buildLeadNameAcknowledgementReplyFromModule(name, connector, runtimeContext, isWhatsAppChannel),
-    },
-  });
+        maybeAskForLeadIdentification: (runtimeContext, history, latestMessage) =>
+          maybeAskForLeadIdentificationFromModule(runtimeContext, history, latestMessage, {
+            normalizeText,
+            isOutOfScopeForCatalog: (messages) => isOutOfScopeForCatalogFromModule(messages, { normalizeText }),
+            isWhatsAppChannel,
+            isGreetingOrAckMessage,
+          }),
+        buildLeadNameAcknowledgementReply: (name, connector, runtimeContext) =>
+          buildLeadNameAcknowledgementReplyFromModule(name, connector, runtimeContext, isWhatsAppChannel),
+      },
+    });
+  const effectiveLeadNameAcknowledgementReply = recentUserIntentBeforeLeadNameReply ? null : leadNameAcknowledgementReply;
   const semanticApiIntentStage = hasFocusedApiContext
     ? await classifySemanticApiIntentStage({
         openai,
@@ -926,7 +996,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
     orchestratorRouteStage,
     domainSupportState,
   } = resolveConversationPipelineStageState({
-    leadNameAcknowledgementReply,
+    leadNameAcknowledgementReply: effectiveLeadNameAcknowledgementReply,
     hasCatalogReferenceHeuristicReply: Boolean(catalogReferenceHeuristicReply),
     hasMercadoLivreHeuristicReply: Boolean(mercadoLivreHeuristicReply),
     catalogPricingReply,
@@ -960,7 +1030,7 @@ export async function generateSalesReply(history: ConversationMessage[], context
   const heuristicStageReply = await resolveHeuristicStageReply({
     heuristicIntentStage,
     conversationDomainStage,
-    leadNameAcknowledgementReply,
+    leadNameAcknowledgementReply: effectiveLeadNameAcknowledgementReply,
     extractedLeadName,
     catalogReferenceHeuristicReply,
     mercadoLivreHeuristicReply,
@@ -981,12 +1051,13 @@ export async function generateSalesReply(history: ConversationMessage[], context
       stage: "guardrail_no_openai",
       conversationDomainStage,
       traceBase,
-        resourceTrace,
-        scopedRecoveryReply,
-        apiFallbackReply,
-        agentId: activeAgent.id ?? null,
-        agentName: activeAgent.nome ?? null,
-      }), billingProjectPlan);
+      resourceTrace,
+      scopedRecoveryReply,
+      apiFallbackReply,
+      agentId: activeAgent.id ?? null,
+      agentName: activeAgent.nome ?? null,
+      allowScopedRecoveryFallback: enableInfraStudioHeuristics,
+    }), billingProjectPlan);
   }
 
   if (orchestratorRouteStage === "openai") {
@@ -1007,24 +1078,26 @@ export async function generateSalesReply(history: ConversationMessage[], context
       mercadoLivreDetailPromptContext,
       runtimeAssets,
       traceBase,
-        resourceTrace,
-        scopedRecoveryReply,
-        apiFallbackReply,
-        agentId: activeAgent.id ?? null,
-        agentName: activeAgent.nome ?? null,
-      }), billingProjectPlan);
+      resourceTrace,
+      scopedRecoveryReply,
+      apiFallbackReply,
+      agentId: activeAgent.id ?? null,
+      agentName: activeAgent.nome ?? null,
+      allowScopedRecoveryFallback: enableInfraStudioHeuristics,
+    }), billingProjectPlan);
   }
 
   return withBillingControl(await resolveGuardrailStageReply({
     stage: "unexpected_route_fallback",
     conversationDomainStage,
     traceBase,
-      resourceTrace,
-      scopedRecoveryReply,
-      apiFallbackReply,
-      agentId: activeAgent.id ?? null,
-      agentName: activeAgent.nome ?? null,
-    }), billingProjectPlan);
+    resourceTrace,
+    scopedRecoveryReply,
+    apiFallbackReply,
+    agentId: activeAgent.id ?? null,
+    agentName: activeAgent.nome ?? null,
+    allowScopedRecoveryFallback: enableInfraStudioHeuristics,
+  }), billingProjectPlan);
 }
 
 function extractPhone(message: string) {

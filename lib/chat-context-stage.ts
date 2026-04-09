@@ -3,6 +3,7 @@ import "server-only";
 import type { ApiRuntimeContext } from "@/lib/apis";
 import type { CatalogProductReference, ConversationContext } from "@/lib/chat-context";
 import type { AgenteRecord } from "@/lib/agentes";
+import { buildEffectiveAgentConfig } from "@/lib/agent-config";
 import type { ChatMessageRole } from "@/lib/chats";
 
 type ConversationMessage = {
@@ -111,9 +112,10 @@ export function resolveConversationContextStageState(input: {
   const leadNameAcknowledgementReply = input.extractedLeadName
     ? input.deps.buildLeadNameAcknowledgementReply(input.extractedLeadName, input.hasMercadoLivreConnector, input.context)
     : null;
+  const effectiveConfig = buildEffectiveAgentConfig(input.agent.promptBase, input.agent.configuracoes);
   const lojaCta =
-    typeof input.agent.configuracoes?.cta_whatsapp === "string" && input.agent.configuracoes.cta_whatsapp.trim()
-      ? input.agent.configuracoes.cta_whatsapp.trim()
+    typeof effectiveConfig?.cta_whatsapp === "string" && effectiveConfig.cta_whatsapp.trim()
+      ? effectiveConfig.cta_whatsapp.trim()
       : null;
 
   return {

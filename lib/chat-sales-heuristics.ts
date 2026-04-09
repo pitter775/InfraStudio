@@ -521,6 +521,7 @@ export function maybeAskForLeadIdentification(
     normalizeText: (value: string) => string;
     isOutOfScopeForCatalog: (history: ConversationMessage[]) => boolean;
     isWhatsAppChannel: (context?: ConversationContext) => boolean;
+    isGreetingOrAckMessage: (message: string) => boolean;
   },
 ) {
   const count = context.memoria?.mensagem_count ?? 0;
@@ -538,6 +539,10 @@ export function maybeAskForLeadIdentification(
   }
 
   if (count <= 2) {
+    if (!deps.isGreetingOrAckMessage(latestUserMessage)) {
+      return null;
+    }
+
     return deps.isWhatsAppChannel(context)
       ? "Perfeito. Antes de seguir, qual e o seu nome?"
       : "Antes de eu te orientar melhor, como posso te chamar?";

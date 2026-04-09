@@ -4,7 +4,7 @@ import { formatHeuristicReply } from "@/lib/chat-prompt-builders";
 import { extractName as extractNameFromModule, extractPhone as extractPhoneFromModule } from "@/lib/chat-contact-utils";
 import { buildProductSearchCandidates, isGreetingOrAckMessage, shouldSearchProducts } from "@/lib/chat-sales-heuristics";
 import { buildSearchTokens, isWhatsAppChannel, normalizeText, singularizeToken } from "@/lib/chat-text-utils";
-import { normalizeAgentRuntimeConfig } from "@/lib/agent-runtime";
+import { getEffectiveAgentRuntime } from "@/lib/agent-config";
 import type { AgenteRecord } from "@/lib/agentes";
 import type { ApiRuntimeContext } from "@/lib/apis";
 
@@ -112,7 +112,7 @@ export function heuristicReply(message: string, context?: ConversationContext) {
 
 export function buildNeutralGlobalFallbackReply(agent: AgenteRecord | null, context?: ConversationContext) {
   const objective =
-    normalizeAgentRuntimeConfig(agent?.configuracoes?.runtime)?.overview.objetivo?.trim() ||
+    getEffectiveAgentRuntime(agent?.promptBase, agent?.configuracoes)?.overview.objetivo?.trim() ||
     context?.qualificacao?.objetivo?.trim() ||
     agent?.descricao?.trim() ||
     context?.projeto?.nome?.trim() ||
@@ -207,7 +207,7 @@ export function buildAgentScopedRecoveryReply(input: {
         })
       : null;
 
-  const runtime = normalizeAgentRuntimeConfig(input.agent?.configuracoes?.runtime);
+  const runtime = getEffectiveAgentRuntime(input.agent?.promptBase, input.agent?.configuracoes);
   const objective =
     runtime?.overview.objetivo?.trim() ||
     input.context?.qualificacao?.objetivo?.trim() ||
@@ -239,5 +239,4 @@ export function extractPhone(message: string) {
 export function extractName(message: string) {
   return extractNameFromModule(message, normalizeText);
 }
-
 
