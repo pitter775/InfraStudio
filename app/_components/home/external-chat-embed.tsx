@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 
 export function ExternalChatEmbed({
   projeto,
@@ -11,6 +11,8 @@ export function ExternalChatEmbed({
   agente: string;
   open?: boolean;
 }) {
+  const mountTargetId = useId().replace(/:/g, "");
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -31,6 +33,9 @@ export function ExternalChatEmbed({
         apiBase: window.location.origin,
         strictHostControl: true,
         open,
+        embedded: true,
+        hideLauncher: true,
+        target: `#${mountTargetId}`,
         context: {
           route: {
             path: window.location.pathname,
@@ -62,7 +67,7 @@ export function ExternalChatEmbed({
       infraChatWindow.InfraChat?.destroy();
       script.remove();
     };
-  }, [agente, open, projeto]);
+  }, [agente, mountTargetId, open, projeto]);
 
-  return null;
+  return <div id={mountTargetId} className="h-full min-h-0 w-full" />;
 }

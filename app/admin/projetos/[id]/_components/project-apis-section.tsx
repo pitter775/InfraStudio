@@ -140,7 +140,7 @@ export function ProjectApisSection({
         </div>
 
         <aside className="order-1 xl:order-2">
-          <div className="rounded-2xl border border-sky-400/14 bg-[linear-gradient(180deg,rgba(56,189,248,0.08),rgba(15,23,42,0.22))] p-5 shadow-[0_18px_36px_rgba(2,8,23,0.18)]">
+          <div className="rounded-xl border border-sky-400/14 bg-[linear-gradient(180deg,rgba(56,189,248,0.08),rgba(15,23,42,0.22))] p-4 shadow-[0_18px_36px_rgba(2,8,23,0.18)] sm:rounded-2xl sm:p-5">
             <button
               type="button"
               onClick={() => setTutorialExpanded((current) => !current)}
@@ -148,19 +148,19 @@ export function ProjectApisSection({
             >
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-sky-100/85">Tutorial rapido</p>
-                <h4 className="mt-2 text-lg font-bold text-white">Como cadastrar uma API</h4>
-                <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                <h4 className="mt-2 text-base font-bold text-white sm:text-lg">Como cadastrar uma API</h4>
+                <p className="mt-2 text-xs leading-relaxed text-slate-300 sm:text-sm">
                   Aqui o fluxo ideal e simples: cadastre uma URL GET real, rode o teste para descobrir os campos e marque apenas o que o agente deve usar.
                 </p>
               </div>
-              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
+              <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300 sm:px-2.5">
                 {tutorialExpanded || !hasApis ? "Ocultar" : "Expandir"}
               </span>
             </button>
 
             {tutorialExpanded || !hasApis ? (
               <>
-                <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4 text-sm text-slate-300">
+                <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/35 px-3.5 py-3.5 text-xs text-slate-300 sm:px-4 sm:py-4 sm:text-sm">
                   <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Resumo rapido</p>
                   <p className="mt-3">
                     <span className="font-semibold text-white">Etapa 1. Cadastre a URL:</span> informe um endpoint GET publico ou acessivel pelo backend, com a URL mais proxima do caso real.
@@ -173,16 +173,16 @@ export function ProjectApisSection({
                   </p>
                 </div>
 
-                <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4 text-sm text-slate-300">
+                <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/35 px-3.5 py-3.5 text-xs text-slate-300 sm:px-4 sm:py-4 sm:text-sm">
                   <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Boas praticas</p>
-                  <div className="mt-3 space-y-2 text-sm leading-6">
+                  <div className="mt-3 space-y-2 text-xs leading-6 sm:text-sm">
                     <p>Use placeholders na URL como <code className="rounded bg-slate-950/50 px-1.5 py-0.5 text-xs text-sky-100">{"{id}"}</code> ou <code className="rounded bg-slate-950/50 px-1.5 py-0.5 text-xs text-sky-100">{"{cpf}"}</code> quando a rota depender de contexto.</p>
                     <p>Preencha os valores de teste antes de testar, para o sistema montar uma chamada valida e detectar os campos certos.</p>
                     <p>Evite expor respostas gigantes. Quanto menor e mais focado o payload, melhor fica o uso pelo agente.</p>
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4 text-sm text-slate-300">
+                <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/35 px-3.5 py-3.5 text-xs text-slate-300 sm:px-4 sm:py-4 sm:text-sm">
                   <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Exemplo rapido</p>
                   <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 font-mono text-[11px] text-sky-100">
                     https://api.exemplo.com/imoveis/{"{id}"}
@@ -196,7 +196,7 @@ export function ProjectApisSection({
                   href="https://httpbin.org/get"
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/35 px-3.5 py-3 text-sm font-semibold text-white transition-colors hover:border-sky-300/25 hover:bg-slate-950/50"
+                  className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/35 px-3.5 py-3 text-xs font-semibold text-white transition-colors hover:border-sky-300/25 hover:bg-slate-950/50 sm:text-sm"
                 >
                   Exemplo publico simples para testes
                   <ExternalLink size={15} />

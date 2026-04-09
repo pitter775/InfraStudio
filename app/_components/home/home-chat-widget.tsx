@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { MessageCircle, Send, X } from "lucide-react";
+import { ChatLayout } from "@/app/_components/chat/chat-layout";
+import { useChatViewportHeight } from "@/app/_components/chat/use-chat-viewport-height";
 import { HOME_CHAT_WIDGET_SLUG, WHATSAPP_NUMBER } from "@/app/_components/home/data";
 import { cn } from "@/lib/utils";
 
@@ -145,6 +147,7 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
   const [loading, setLoading] = useState(false);
   const [chatId, setChatId] = useState<string | null>(null);
   const quickReplies: string[] = [];
+  useChatViewportHeight(open);
   const fallbackWhatsappCta: ChatWidgetCta = {
     url: `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Ola! Vim pelo chat da home da InfraStudio e quero falar com o time comercial.")}`,
     label: "Ir para o WhatsApp",
@@ -224,7 +227,6 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
       marginLeft: document.body.style.marginLeft,
       marginRight: document.body.style.marginRight,
       width: document.body.style.width,
-      minHeight: document.body.style.minHeight,
       transition: document.body.style.transition,
       overflowX: document.body.style.overflowX,
     };
@@ -238,7 +240,6 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
       document.body.style.marginLeft = previous.marginLeft;
       document.body.style.marginRight = "420px";
       document.body.style.width = "calc(100% - 420px)";
-      document.body.style.minHeight = "100vh";
       document.body.style.overflowX = "hidden";
     } else {
       document.body.style.overflowX = "hidden";
@@ -248,7 +249,6 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
       document.body.style.marginLeft = previous.marginLeft;
       document.body.style.marginRight = previous.marginRight;
       document.body.style.width = previous.width;
-      document.body.style.minHeight = previous.minHeight;
       document.body.style.transition = previous.transition;
       document.body.style.overflowX = previous.overflowX;
     };
@@ -368,56 +368,107 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
         initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         className={cn(
-          "flex flex-col overflow-hidden border border-white/10 bg-[rgba(9,16,34,0.84)] shadow-2xl backdrop-blur-xl",
+          "overflow-hidden border border-white/10 bg-[rgba(9,16,34,0.84)] shadow-2xl backdrop-blur-xl",
           docked
-            ? "h-screen w-full rounded-none md:w-[420px] md:rounded-l-[28px] md:border-r-0"
-            : "max-h-[min(780px,calc(100vh-7rem))] rounded-[28px]",
+            ? "w-full rounded-none md:h-[100dvh] md:w-[420px] md:rounded-l-[28px] md:border-r-0"
+            : "w-full max-h-[min(780px,calc(var(--vh,100dvh)-7rem))] rounded-[28px]",
         )}
       >
-        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.04] px-5 py-4">
-          <div className="flex-1">
-            <div>
-              <p className="font-bold text-white">Atendimento</p>
+        <ChatLayout
+          viewportMode={docked ? "full" : undefined}
+          className="bg-transparent"
+          header={
+            <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.04] px-5 py-4">
+              <div className="flex-1">
+                <div>
+                  <p className="font-bold text-white">Atendimento</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetConversation}
+                  className="mt-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[10px] font-semibold text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+                >
+                  Limpar
+                </button>
+              </div>
+              <div className="ml-4 flex self-start">
+                <button
+                  type="button"
+                  onClick={() => onDockedChange(!docked)}
+                  className="mr-2 rounded-full border border-white/10 bg-white/5 p-2 text-blue-400 transition-colors hover:bg-white/10 hover:text-blue-300"
+                  aria-label={docked ? "Reduzir chat" : "Maximizar chat"}
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+                    <rect x="4" y="5" width="16" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+                    <path d="M9 5v14" stroke="currentColor" strokeWidth="1.8" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDockedChange(false);
+                    onClose();
+                  }}
+                  className="rounded-full border border-white/10 bg-white/5 p-2 text-blue-400 transition-colors hover:bg-white/10 hover:text-blue-300"
+                  aria-label="Fechar chat"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={resetConversation}
-              className="mt-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[10px] font-semibold text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
-            >
-              Limpar
-            </button>
-          </div>
-          <div className="ml-4 flex self-start">
-            <button
-              type="button"
-              onClick={() => onDockedChange(!docked)}
-              className="mr-2 rounded-full border border-white/10 bg-white/5 p-2 text-blue-400 transition-colors hover:bg-white/10 hover:text-blue-300"
-              aria-label={docked ? "Reduzir chat" : "Maximizar chat"}
-            >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
-                <rect x="4" y="5" width="16" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
-                <path d="M9 5v14" stroke="currentColor" strokeWidth="1.8" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onDockedChange(false);
-                onClose();
-              }}
-              className="rounded-full border border-white/10 bg-white/5 p-2 text-blue-400 transition-colors hover:bg-white/10 hover:text-blue-300"
-              aria-label="Fechar chat"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-
-        <div
-          ref={messagesRef}
-          className="chat-scroll min-h-0 flex-1 overflow-y-auto bg-slate-950/20 p-5 [scrollbar-width:thin] [scrollbar-color:rgba(59,130,246,0.45)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-blue-400/50"
+          }
+          messagesClassName="chat-scroll bg-slate-950/20 p-5 [scrollbar-width:thin] [scrollbar-color:rgba(59,130,246,0.45)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-blue-400/50"
+          inputClassName="border-t border-white/10 bg-[rgba(9,16,34,0.92)]"
+          input={
+            <>
+              {quickReplies.length ? (
+                <div className="border-b border-white/10 bg-slate-950/15 px-4 py-3">
+                  <div className="flex flex-wrap gap-2">
+                    {quickReplies.map((reply) => (
+                      <button
+                        key={reply}
+                        type="button"
+                        onClick={() => void sendMessage(reply)}
+                        className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-white/10"
+                      >
+                        {reply}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <div className="p-4">
+                <div className="flex items-end gap-2">
+                  <textarea
+                    ref={textareaRef}
+                    rows={1}
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        void sendMessage(draft);
+                      }
+                    }}
+                    className="chat-scroll flex-1 resize-none rounded-[18px] border border-white/8 bg-white/[0.05] px-4 py-[11px] text-sm leading-[22px] text-white outline-none placeholder:text-slate-500 backdrop-blur-md [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                    placeholder={loading ? "Atendente esta digitando..." : "Digite sua mensagem..."}
+                    readOnly={loading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void sendMessage(draft)}
+                    disabled={loading}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-white shadow-lg shadow-blue-950/40 transition-all hover:scale-105 hover:bg-[#1d4ed8]"
+                    aria-label="Enviar mensagem"
+                  >
+                    <Send size={15} />
+                  </button>
+                </div>
+              </div>
+            </>
+          }
         >
-          <div className="space-y-3">
+          <div ref={messagesRef} className="space-y-3">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -486,53 +537,7 @@ export function ChatWidget({ open, docked, onDockedChange, onClose }: ChatWidget
               </div>
             ) : null}
           </div>
-        </div>
-
-        {quickReplies.length ? (
-          <div className="border-t border-white/10 bg-slate-950/15 px-4 py-3">
-            <div className="flex flex-wrap gap-2">
-              {quickReplies.map((reply) => (
-                <button
-                  key={reply}
-                  type="button"
-                  onClick={() => void sendMessage(reply)}
-                  className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-white/10"
-                >
-                  {reply}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        <div className="border-t border-white/10 p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  void sendMessage(draft);
-                }
-              }}
-              className="chat-scroll flex-1 resize-none rounded-[18px] border border-white/8 bg-white/[0.05] px-4 py-[11px] text-sm leading-[22px] text-white outline-none placeholder:text-slate-500 backdrop-blur-md [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-              placeholder={loading ? "Atendente esta digitando..." : "Digite sua mensagem..."}
-              readOnly={loading}
-            />
-            <button
-              type="button"
-              onClick={() => void sendMessage(draft)}
-              disabled={loading}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#2563eb] text-white shadow-lg shadow-blue-950/40 transition-all hover:scale-105 hover:bg-[#1d4ed8]"
-              aria-label="Enviar mensagem"
-            >
-              <Send size={15} />
-            </button>
-          </div>
-        </div>
+        </ChatLayout>
       </motion.div>
     </div>
   );

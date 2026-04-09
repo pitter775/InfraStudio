@@ -8410,11 +8410,11 @@ export default function AdminProjetoDetalhePage() {
                   </div>
                 </div>
 
-                <aside className="hidden rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4 xl:block xl:sticky xl:top-6">
+                <aside className="rounded-xl border border-white/10 bg-slate-950/45 px-3.5 py-3.5 sm:px-4 sm:py-4 xl:sticky xl:top-6">
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Tutorial rapido</p>
 
-                  <div className="mt-4 space-y-4 text-sm text-slate-300">
-                    <div className="rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4">
+                  <div className="mt-4 space-y-3 text-xs text-slate-300 sm:space-y-4 sm:text-sm">
+                    <div className="rounded-xl border border-white/10 bg-slate-950/35 px-3.5 py-3.5 sm:px-4 sm:py-4">
                       <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Passo 1</p>
                       <p className="mt-2 font-semibold text-white">Defina a funcao do agente</p>
                       <p className="mt-2 leading-6 text-slate-400">
@@ -8422,7 +8422,7 @@ export default function AdminProjetoDetalhePage() {
                       </p>
                     </div>
 
-                    <div className="rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4">
+                    <div className="rounded-xl border border-white/10 bg-slate-950/35 px-3.5 py-3.5 sm:px-4 sm:py-4">
                       <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Passo 2</p>
                       <p className="mt-2 font-semibold text-white">Conecte os canais certos</p>
                       <p className="mt-2 leading-6 text-slate-400">
@@ -8430,7 +8430,7 @@ export default function AdminProjetoDetalhePage() {
                       </p>
                     </div>
 
-                    <div className="rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4">
+                    <div className="rounded-xl border border-white/10 bg-slate-950/35 px-3.5 py-3.5 sm:px-4 sm:py-4">
                       <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Passo 3</p>
                       <p className="mt-2 font-semibold text-white">Teste antes de publicar</p>
                       <p className="mt-2 leading-6 text-slate-400">

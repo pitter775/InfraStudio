@@ -235,6 +235,7 @@ export function ProjectWhatsAppSection({
 }: ProjectWhatsAppSectionProps) {
   const activeHandoffContacts = handoffContacts.filter((contact) => contact.ativo && contact.receberAlertas);
   const [mobileWhatsAppTab, setMobileWhatsAppTab] = useState<"channel" | "handoff">("channel");
+  const [tutorialExpanded, setTutorialExpanded] = useState(false);
   const whatsAppServiceHealthClass =
     whatsappServiceHealthTone === "online"
       ? "text-emerald-300"
@@ -591,10 +592,20 @@ export function ProjectWhatsAppSection({
               </div>
             </div>
           ) : (
-            <aside className="hidden rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4 lg:block xl:col-start-2 xl:sticky xl:top-6">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Tutorial rapido</p>
-                <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${
+            <aside className="rounded-xl border border-white/10 bg-slate-950/45 px-4 py-4 xl:col-start-2 xl:sticky xl:top-6">
+              <button
+                type="button"
+                onClick={() => setTutorialExpanded((current) => !current)}
+                className="flex w-full items-start justify-between gap-3 text-left"
+              >
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Tutorial rapido</p>
+                  <p className="mt-2 text-sm font-semibold text-white">Como subir o primeiro canal</p>
+                  <p className="mt-2 text-xs leading-6 text-slate-400 sm:text-sm">
+                    No celular ele aparece compacto. No desktop continua como guia lateral completa.
+                  </p>
+                </div>
+                <span className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${
                   whatsappServiceHealthTone === "online"
                     ? "bg-emerald-500/15 text-emerald-300"
                     : whatsappServiceHealthTone === "offline"
@@ -603,9 +614,10 @@ export function ProjectWhatsAppSection({
                 }`}>
                   {whatsappServiceHealthTone === "online" ? "worker online" : whatsappServiceHealthTone === "offline" ? "worker offline" : "verificando"}
                 </span>
-              </div>
+              </button>
 
-              <div className="mt-4 space-y-4 text-sm text-slate-300">
+              {tutorialExpanded || !primaryChannel ? (
+              <div className="mt-4 space-y-4 text-xs text-slate-300 sm:text-sm">
                 <div className="rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4">
                   <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Passo 1</p>
                   <p className="mt-2 font-semibold text-white">Cadastre o numero</p>
@@ -630,6 +642,7 @@ export function ProjectWhatsAppSection({
                   </p>
                 </div>
               </div>
+              ) : null}
             </aside>
           )}
         </div>
