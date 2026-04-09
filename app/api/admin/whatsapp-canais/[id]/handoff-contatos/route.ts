@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin, canManageProject } from "@/lib/access";
 import { appendSystemLog } from "@/lib/chat-logs";
-import { isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
+import { getDemoProjectMutationBlockReason } from "@/lib/demo-project-guard";
 import { getSessionUser } from "@/lib/session";
 import { getWhatsAppChannelById } from "@/lib/whatsapp-channels";
 import { sendWhatsAppHandoffTestAlert } from "@/lib/whatsapp-handoff-alerts";
@@ -80,8 +80,12 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Canal WhatsApp nao encontrado ou sem acesso." }, { status: 404 });
   }
 
-  if (await isDemoProjectMutationBlocked(user?.email, channel.projetoId)) {
-    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
+  const blockReason = await getDemoProjectMutationBlockReason(user?.email, channel.projetoId);
+  if (blockReason) {
+    return NextResponse.json(
+      { error: blockReason === "DEMO_EXPIRED" ? "DEMO_EXPIRED" : "Modo demonstracao: crie uma conta para editar e salvar." },
+      { status: 403 },
+    );
   }
 
   const body = (await request.json().catch(() => null)) as {

@@ -45,7 +45,7 @@ Auth atual:
 - login social via OAuth hoje suporta `google`, `github` e `facebook`
 - `instagram` ja existe no modal, mas ainda nao tem backend OAuth funcional
 - existe modo demonstracao real no client e no backend
-- o modo demo bloqueia mutacoes persistentes e empurra conversao para login/cadastro
+- usuario demo sempre deve ser `viewer`, nunca `admin`
 
 ## 3. Stack
 
@@ -73,6 +73,10 @@ Auth atual:
   - `C:\Projetos\infrastudio\lib\demo-user.ts`
   - `C:\Projetos\infrastudio\lib\demo-conversion.ts`
   - `C:\Projetos\infrastudio\lib\demo-project-guard.ts`
+- template oficial da demo vem exclusivamente de `DEMO_TEMPLATE_PROJECT_ID`
+- projeto demo usa `is_demo`, `demo_expires_at` e `demo_status`
+- TTL atual da demo: 30 minutos
+- cleanup de demos expirados: `POST /api/cron/demo-cleanup` com `CRON_SECRET`
 
 ### Worker WhatsApp
 - repo separado: `C:\Projetos\whatsapp-service`
@@ -95,11 +99,13 @@ Auth atual:
 
 ### Demonstracao
 1. `nova_home` cria ou reaproveita um email demo em localStorage
-2. client tenta login do usuario demo
-3. se nao existir, cria via `/api/auth/demo-create`
+2. client usa `/api/auth/demo-create` para criar ou reaproveitar a sessao demo
+3. se necessario, o backend cria usuario demo + projeto demo a partir do template oficial
 4. usuario entra em projeto demo real
-5. mutacoes sensiveis ficam bloqueadas no frontend e backend
-6. ao tentar salvar/editar, o sistema pede login/cadastro para converter o demo
+5. demo ativa permite editar apenas o agente base existente
+6. demo ativa nao pode criar/excluir agente nem alterar APIs, widgets, conectores, WhatsApp ou projeto
+7. demo expirada bloqueia mutacoes no frontend e backend com `DEMO_EXPIRED`
+8. ao expirar ou tentar converter, o sistema empurra cadastro/login
 
 ### Chat
 1. widget/worker chama backend
@@ -185,6 +191,9 @@ Auth atual:
 - quando mexer em auth, conferir manual + social + demo
 - nao assumir que o texto da UI define a verdade; checar se o backend do provider existe
 - se mexer em demo, validar bloqueio de mutacao no frontend e no backend
+- em demo, nao usar fallback de template; a fonte oficial e `DEMO_TEMPLATE_PROJECT_ID`
+- em demo, nao liberar admin para usuario demo nem em `usuarios.role` nem em `usuarios_projetos.papel`
+- em demo, bloqueio de mutacao deve acontecer por expiracao (`DEMO_EXPIRED`) ou pela restricao funcional atual do fluxo demo, nao por `user.is_demo` isolado
 - instagram no auth ainda e placeholder visual; nao tratar como provider pronto
 - facebook continua provider valido no backend mesmo se a UI mudar
 
@@ -210,7 +219,10 @@ Validacao manual recomendada quando mexer em auth/demo:
 - cadastro manual
 - login social com Google/GitHub/Facebook
 - fluxo demo em `nova_home`
-- bloqueio de edicao no modo demo
+- demo cria a partir do template oficial
+- demo ativa consegue editar o agente existente
+- demo ativa nao consegue criar/excluir agente nem mexer em recursos bloqueados
+- demo expirada retorna `DEMO_EXPIRED`
 - conversao de demo para conta real
 
 ```powershell
@@ -229,5 +241,6 @@ Env local importante:
 - nao mexer automaticamente no `geral-schema.sql`
 - se o problema envolver WhatsApp, checar app + worker + logs
 - modo demonstracao existe e e parte real do produto
+- demo nao usa projeto aleatorio nem fallback automatico de template
 - login social atual do backend: Google, GitHub e Facebook
 - Instagram no modal ainda nao significa suporte backend

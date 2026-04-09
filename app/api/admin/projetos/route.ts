@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { canAccessGlobalAdmin, canAccessWorkspace, canManageProject } from "@/lib/access";
+import { getDemoProjectMutationBlockReason } from "@/lib/demo-project-guard";
 import { createProjetoForUsuario, listProjetosByUsuarioWithStats, listProjetosWithStats, updateProjeto } from "@/lib/projetos";
 import { isDemoUser } from "@/lib/demo-user";
 import { createSession } from "@/lib/session";
@@ -91,6 +92,14 @@ export async function PUT(request: Request) {
 
   if (!canManageProject(user, body.id)) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
+  }
+
+  const demoBlockReason = await getDemoProjectMutationBlockReason(user?.email, body.id);
+  if (demoBlockReason) {
+    return NextResponse.json(
+      { error: demoBlockReason === "DEMO_EXPIRED" ? "DEMO_EXPIRED" : "Modo demonstracao: crie uma conta para salvar alteracoes do projeto." },
+      { status: 403 },
+    );
   }
 
   const projeto = await updateProjeto({

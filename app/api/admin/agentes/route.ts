@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin, canManageProject, resolveCurrentProjectId } from "@/lib/access";
 import { createAgente, deleteAgente, getAgenteById, listAgentes, updateAgente } from "@/lib/agentes";
-import { canDemoUserEditProject, isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
+import { canDemoUserEditProject, getDemoProjectMutationBlockReason } from "@/lib/demo-project-guard";
 import { getSessionUser } from "@/lib/session";
 
 function parseConfiguracoes(value: unknown) {
@@ -70,15 +70,17 @@ export async function POST(request: Request) {
     }
 
     const projetoId = resolveRequestedProjectId(user, body.projetoId);
-    const canEditProjeto = projetoId
-      ? canManageProject(user, projetoId) || await canDemoUserEditProject(user?.email, projetoId)
-      : false;
-    if (!projetoId || !canEditProjeto) {
+    if (!projetoId || !canManageProject(user, projetoId)) {
       return NextResponse.json({ error: "Projeto invalido para criar agente." }, { status: 403 });
     }
 
-    if (await isDemoProjectMutationBlocked(user?.email, projetoId)) {
-      return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
+    if (await canDemoUserEditProject(user?.email, projetoId)) {
+      return NextResponse.json({ error: "Modo demonstracao: o agente base ja vem criado." }, { status: 403 });
+    }
+
+    const demoBlockReason = await getDemoProjectMutationBlockReason(user?.email, projetoId);
+    if (demoBlockReason) {
+      return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
     }
 
     const created = await createAgente({
@@ -140,9 +142,12 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Projeto invalido para atualizar agente." }, { status: 403 });
     }
 
-    const demoMutationBlocked = await isDemoProjectMutationBlocked(user?.email, projetoId);
-    if (demoMutationBlocked && currentAgent.projetoId !== projetoId) {
-      return NextResponse.json({ error: "Projeto invalido para atualizar agente." }, { status: 403 });
+    const demoBlockReason = await getDemoProjectMutationBlockReason(user?.email, projetoId);
+    if (demoBlockReason) {
+      return NextResponse.json(
+        { error: demoBlockReason === "DEMO_EXPIRED" ? "DEMO_EXPIRED" : "Modo demonstracao: crie uma conta para editar e salvar." },
+        { status: 403 },
+      );
     }
 
     const updated = await updateAgente({
@@ -194,8 +199,13 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Projeto invalido para excluir agente." }, { status: 403 });
   }
 
-  if (await isDemoProjectMutationBlocked(user?.email, projetoId)) {
-    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
+  if (await canDemoUserEditProject(user?.email, projetoId)) {
+    return NextResponse.json({ error: "Modo demonstracao: exclusao de agente bloqueada." }, { status: 403 });
+  }
+
+  const demoBlockReason = await getDemoProjectMutationBlockReason(user?.email, projetoId);
+  if (demoBlockReason) {
+    return NextResponse.json({ error: "DEMO_EXPIRED" }, { status: 403 });
   }
 
   const deleted = await deleteAgente(body.id);

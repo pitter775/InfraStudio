@@ -1,6 +1,10 @@
 import "server-only";
 
+import { createAgente, listAgentes } from "@/lib/agentes";
+import { createApi, listApis } from "@/lib/apis";
+import { createChatWidget, listChatWidgets } from "@/lib/chat-widgets";
 import { AGENTE_ASSETS_BUCKET } from "@/lib/agente-assets";
+import { deleteChatAttachmentsByStoragePaths } from "@/lib/chat-attachments";
 import { isAgentTestChatContext } from "@/lib/chats";
 import { appendSystemLog } from "@/lib/chat-logs";
 import { MERCADO_LIVRE_CONNECTOR_TYPE } from "@/lib/conectores";
@@ -18,6 +22,8 @@ export type ProjetoRecord = {
   modeloId?: string | null;
   siteChatAtivo: boolean;
   isDemo: boolean;
+  demoExpiresAt: string | null;
+  demoStatus: "ativo" | "expirado";
   ownerUserId: string | null;
   criadorNome: string | null;
   criadorEmail: string | null;
@@ -45,11 +51,14 @@ type ProjetoRow = {
   modo_cobranca: "plano" | "manual" | "ilimitado" | null;
   modelo_id?: string | null;
   is_demo?: boolean | null;
+  demo_expires_at?: string | null;
+  demo_status?: string | null;
   owner_user_id?: string | null;
   configuracoes: Record<string, unknown> | null;
 };
 
-const projetoSelectFields = "id, nome, slug, tipo, descricao, status, modo_cobranca, modelo_id, is_demo, owner_user_id, configuracoes";
+const projetoSelectFields =
+  "id, nome, slug, tipo, descricao, status, modo_cobranca, modelo_id, is_demo, demo_expires_at, demo_status, owner_user_id, configuracoes";
 
 type ProjetoMembershipRow = {
   projeto_id: string | null;
@@ -66,6 +75,24 @@ type ProjetoMembershipRow = {
     | null;
 };
 
+function extractAttachmentStoragePaths(metadata: Record<string, unknown> | null | undefined) {
+  const attachments =
+    metadata && Array.isArray(metadata.attachments)
+      ? metadata.attachments
+      : [];
+
+  return attachments
+    .map((attachment) => {
+      if (!attachment || typeof attachment !== "object" || Array.isArray(attachment)) {
+        return "";
+      }
+
+      const storagePath = "storagePath" in attachment ? String((attachment as { storagePath?: string | null }).storagePath || "").trim() : "";
+      return storagePath;
+    })
+    .filter(Boolean);
+}
+
 function mapProjeto(row: ProjetoRow): ProjetoRecord {
   const configuracoes = row.configuracoes ?? {};
 
@@ -80,6 +107,8 @@ function mapProjeto(row: ProjetoRow): ProjetoRecord {
     modeloId: row.modelo_id ?? null,
     siteChatAtivo: configuracoes.site_chat_ativo === true,
     isDemo: row.is_demo === true,
+    demoExpiresAt: row.demo_expires_at ?? null,
+    demoStatus: row.demo_status === "expirado" ? "expirado" : "ativo",
     ownerUserId: row.owner_user_id ?? null,
     criadorNome: null,
     criadorEmail: null,
@@ -237,25 +266,24 @@ export async function getProjetoByIdentifier(identifier: string) {
   return await getProjetoById(value);
 }
 
-export async function getDemoProjeto() {
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("projetos")
-    .select(projetoSelectFields)
-    .eq("is_demo", true)
-    .is("owner_user_id", null)
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+async function getDemoTemplateProjeto() {
+  const templateProjectId = process.env.DEMO_TEMPLATE_PROJECT_ID?.trim() || "";
+  console.log("DEMO TEMPLATE USADO:", templateProjectId);
 
-  if (error || !data) {
-    if (error) {
-      console.error("[projetos] failed to load demo projeto", error);
-    }
-    return null;
+  if (!templateProjectId) {
+    throw new Error("DEMO_TEMPLATE_PROJECT_ID nao configurado.");
   }
 
-  return mapProjeto(data as ProjetoRow);
+  const templateProjeto = await getProjetoById(templateProjectId);
+  if (!templateProjeto) {
+    throw new Error(`Projeto template demo nao encontrado: ${templateProjectId}`);
+  }
+
+  if (templateProjeto.ownerUserId === null) {
+    return templateProjeto;
+  }
+
+  return templateProjeto;
 }
 
 export async function getDemoProjetoByOwner(usuarioId: string) {
@@ -277,6 +305,79 @@ export async function getDemoProjetoByOwner(usuarioId: string) {
   }
 
   return mapProjeto(data as ProjetoRow);
+}
+
+async function projetoNeedsDemoHydration(projetoId: string) {
+  const [agentes, apis, widgets] = await Promise.all([
+    listAgentes(projetoId),
+    listApis(projetoId),
+    listChatWidgets(projetoId),
+  ]);
+
+  return agentes.length === 0 && apis.length === 0 && widgets.length === 0;
+}
+
+async function cloneDemoTemplateStructure(sourceProjetoId: string, targetProjetoId: string) {
+  const [sourceApis, sourceAgentes, sourceWidgets] = await Promise.all([
+    listApis(sourceProjetoId),
+    listAgentes(sourceProjetoId),
+    listChatWidgets(sourceProjetoId),
+  ]);
+
+  const apiIdMap = new Map<string, string>();
+  for (const api of sourceApis) {
+    const createdApi = await createApi({
+      projetoId: targetProjetoId,
+      nome: api.nome,
+      url: api.url,
+      metodo: api.metodo,
+      descricao: api.descricao,
+      ativo: api.ativo,
+      campos: api.campos.map((campo) => ({
+        nome: campo.nome,
+        tipo: campo.tipo,
+        descricao: campo.descricao,
+      })),
+      parametros: api.parametros,
+    });
+
+    if (createdApi) {
+      apiIdMap.set(api.id, createdApi.id);
+    }
+  }
+
+  const agenteIdMap = new Map<string, string>();
+  for (const agente of sourceAgentes) {
+    const createdAgente = await createAgente({
+      projetoId: targetProjetoId,
+      slug: null,
+      nome: agente.nome,
+      descricao: agente.descricao,
+      promptBase: agente.promptBase,
+      configuracoes: agente.configuracoes,
+      ativo: agente.ativo,
+      apiIds: agente.apiIds.map((apiId) => apiIdMap.get(apiId)).filter((apiId): apiId is string => Boolean(apiId)),
+    });
+
+    if (createdAgente) {
+      agenteIdMap.set(agente.id, createdAgente.id);
+    }
+  }
+
+  for (const widget of sourceWidgets) {
+    await createChatWidget({
+      nome: widget.nome,
+      slug: `${widget.slug}-${targetProjetoId.slice(0, 8)}`,
+      projetoId: targetProjetoId,
+      agenteId: widget.agenteId ? (agenteIdMap.get(widget.agenteId) ?? null) : null,
+      dominio: widget.dominio,
+      whatsappCelular: "",
+      tema: widget.tema,
+      corPrimaria: widget.corPrimaria,
+      fundoTransparente: widget.fundoTransparente,
+      ativo: widget.ativo,
+    });
+  }
 }
 
 export async function createProjeto(input: {
@@ -305,6 +406,8 @@ export async function createProjeto(input: {
       owner_user_id: input.ownerUserId ?? null,
       modelo_id: input.modeloId ?? null,
       is_demo: input.isDemo === true,
+      demo_expires_at: input.isDemo === true ? new Date(Date.now() + 30 * 60 * 1000).toISOString() : null,
+      demo_status: input.isDemo === true ? "ativo" : null,
       configuracoes: {
         site_chat_ativo: input.siteChatAtivo ?? false,
       },
@@ -372,24 +475,33 @@ export async function createProjetoForUsuario(input: {
 }
 
 export async function ensureDemoProjetoForUsuario(usuarioId: string) {
+  const templateProjeto = await getDemoTemplateProjeto();
   const existingProjeto = await getDemoProjetoByOwner(usuarioId);
   if (existingProjeto) {
+    if (templateProjeto.id !== existingProjeto.id && (await projetoNeedsDemoHydration(existingProjeto.id))) {
+      await cloneDemoTemplateStructure(templateProjeto.id, existingProjeto.id);
+    }
     return existingProjeto;
   }
 
-  const templateProjeto = await getDemoProjeto();
-  return await createProjetoForUsuario({
+  const projeto = await createProjetoForUsuario({
     usuarioId,
-    nome: templateProjeto?.nome || "Projeto demonstracao",
-    tipo: templateProjeto?.tipo ?? "demo",
-    descricao: templateProjeto?.descricao ?? "Projeto temporario de demonstracao.",
-    status: templateProjeto?.status ?? "ativo",
-    modoCobranca: templateProjeto?.modoCobranca ?? "plano",
-    siteChatAtivo: templateProjeto?.siteChatAtivo ?? false,
-    modeloId: templateProjeto?.modeloId ?? null,
+    nome: templateProjeto.nome,
+    tipo: templateProjeto.tipo ?? "demo",
+    descricao: templateProjeto.descricao || "Projeto temporario de demonstracao.",
+    status: templateProjeto.status,
+    modoCobranca: templateProjeto.modoCobranca,
+    siteChatAtivo: templateProjeto.siteChatAtivo,
+    modeloId: templateProjeto.modeloId ?? null,
     isDemo: true,
-    membershipRole: "admin",
+    membershipRole: "viewer",
   });
+
+  if (projeto && templateProjeto.id !== projeto.id) {
+    await cloneDemoTemplateStructure(templateProjeto.id, projeto.id);
+  }
+
+  return projeto;
 }
 
 export async function updateProjeto(input: {
@@ -509,6 +621,33 @@ export async function deleteProjeto(id: string): Promise<DeleteProjetoResult> {
 
   const chatIds = ((chatsData ?? []) as Array<{ id: string | null }>).map((item) => item.id).filter(Boolean) as string[];
   if (chatIds.length) {
+    const { data: messagesData, error: messagesReadError } = await supabase
+      .from("mensagens")
+      .select("id, metadata")
+      .in("chat_id", chatIds);
+
+    if (messagesReadError) {
+      return await fail("read project chat attachments", messagesReadError);
+    }
+
+    const chatAttachmentStoragePaths = ((messagesData ?? []) as Array<{ metadata?: Record<string, unknown> | null }>)
+      .flatMap((message) => extractAttachmentStoragePaths(message.metadata))
+      .filter(Boolean);
+
+    if (chatAttachmentStoragePaths.length) {
+      await deleteChatAttachmentsByStoragePaths(chatAttachmentStoragePaths);
+    }
+
+    const { error: handoffEventsError } = await supabase.from("chat_handoff_eventos").delete().in("chat_id", chatIds);
+    if (handoffEventsError) {
+      return await fail("delete project chat handoff events", handoffEventsError);
+    }
+
+    const { error: handoffError } = await supabase.from("chat_handoffs").delete().in("chat_id", chatIds);
+    if (handoffError) {
+      return await fail("delete project chat handoffs", handoffError);
+    }
+
     const { error: messageError } = await supabase.from("mensagens").delete().in("chat_id", chatIds);
     if (messageError) {
       return await fail("delete project chat messages", messageError);
@@ -557,6 +696,7 @@ export async function deleteProjeto(id: string): Promise<DeleteProjetoResult> {
     { label: "project memberships", execute: () => supabase.from("usuarios_projetos").delete().eq("projeto_id", id) },
     { label: "project widgets", execute: () => supabase.from("chat_widgets").delete().eq("projeto_id", id) },
     { label: "project whatsapp channels", execute: () => supabase.from("canais_whatsapp").delete().eq("projeto_id", id) },
+    { label: "project whatsapp handoff contacts", execute: () => supabase.from("whatsapp_handoff_contatos").delete().eq("projeto_id", id) },
     { label: "project connectors", execute: () => supabase.from("conectores").delete().eq("projeto_id", id) },
     { label: "project asset rows", execute: () => supabase.from("agente_arquivos").delete().eq("projeto_id", id) },
     { label: "project chats", execute: () => supabase.from("chats").delete().eq("projeto_id", id) },
@@ -577,4 +717,66 @@ export async function deleteProjeto(id: string): Promise<DeleteProjetoResult> {
   }
 
   return { ok: true };
+}
+
+export async function listExpiredDemoProjetosForCleanup(safetyWindowMs = 60 * 60 * 1000) {
+  const supabase = getSupabaseAdminClient();
+  const threshold = new Date(Date.now() - Math.max(0, safetyWindowMs)).toISOString();
+  const { data, error } = await supabase
+    .from("projetos")
+    .select(projetoSelectFields)
+    .eq("is_demo", true)
+    .eq("demo_status", "expirado")
+    .lt("demo_expires_at", threshold)
+    .order("demo_expires_at", { ascending: true });
+
+  if (error || !data) {
+    console.error("[projetos] failed to list expired demo projetos for cleanup", error);
+    return [];
+  }
+
+  return (data as ProjetoRow[]).map((row) => mapProjeto(row));
+}
+
+export async function cleanupExpiredDemoProjetos(safetyWindowMs = 60 * 60 * 1000) {
+  const projetos = await listExpiredDemoProjetosForCleanup(safetyWindowMs);
+  const projetosProcessados: string[] = [];
+  const falhas: Array<{ projetoId: string; step?: string; error?: string }> = [];
+  let totalRemovido = 0;
+
+  for (const projeto of projetos) {
+    if (!projeto.isDemo) {
+      continue;
+    }
+
+    projetosProcessados.push(projeto.id);
+    const deleted = await deleteProjeto(projeto.id);
+    if (deleted.ok) {
+      totalRemovido += 1;
+      continue;
+    }
+
+    falhas.push({
+      projetoId: projeto.id,
+      step: deleted.step,
+      error: deleted.error,
+    });
+  }
+
+  await appendSystemLog({
+    tipo: "demo_cleanup",
+    origem: "lib.projetos.cleanupExpiredDemoProjetos",
+    descricao: "Limpeza automatica de projetos demo expirados executada.",
+    payload: {
+      total_removido: totalRemovido,
+      projetos_processados: projetosProcessados,
+      falhas,
+    },
+  });
+
+  return {
+    totalRemovido,
+    projetosProcessados,
+    falhas,
+  };
 }

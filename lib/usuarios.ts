@@ -3,6 +3,7 @@ import "server-only";
 import { hashSync } from "bcryptjs";
 import type { AppUser } from "@/lib/app-user";
 import { applyAccessProfile } from "@/lib/access";
+import { isDemoUser } from "@/lib/demo-user";
 import { createProjeto } from "@/lib/projetos";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -47,14 +48,15 @@ function normalizeStatus(ativo: boolean | null | undefined): AppUser["status"] {
 }
 
 export function mapUsuarioToAppUser(row: Omit<UsuarioRow, "senha">): AppUser {
+  const demoUser = isDemoUser(row.email);
   const memberships =
     row.usuarios_projetos?.map((item) => ({
       projetoId: item.projeto_id,
       projetoNome: Array.isArray(item.projetos) ? item.projetos[0]?.nome ?? null : item.projetos?.nome ?? null,
       projetoSlug: Array.isArray(item.projetos) ? item.projetos[0]?.slug ?? null : item.projetos?.slug ?? null,
-      papel: normalizeRole(item.papel),
+      papel: demoUser ? "viewer" : normalizeRole(item.papel),
     })) ?? [];
-  const globalRole = normalizeRole(row.role);
+  const globalRole = demoUser ? "viewer" : normalizeRole(row.role);
 
   return applyAccessProfile({
     id: row.id,
@@ -62,7 +64,7 @@ export function mapUsuarioToAppUser(row: Omit<UsuarioRow, "senha">): AppUser {
     email: row.email?.trim() || "",
     provider: row.provider ?? undefined,
     providerId: row.provider_id ?? undefined,
-    role: globalRole === "admin" || memberships.some((item) => item.papel === "admin") ? "admin" : "viewer",
+    role: demoUser ? "viewer" : globalRole === "admin" || memberships.some((item) => item.papel === "admin") ? "admin" : "viewer",
     status: normalizeStatus(row.ativo),
     currentProjectId: memberships[0]?.projetoId ?? null,
     memberships,
@@ -244,12 +246,13 @@ type SaveUsuarioInput = {
 };
 
 function sanitizeUsuarioPayload(input: SaveUsuarioInput) {
+  const demoUser = isDemoUser(input.email);
   return {
     nome: input.nome.trim(),
     email: input.email.trim().toLowerCase(),
     ativo: input.ativo ?? true,
     email_verificado: input.emailVerificado ?? true,
-    role: input.papel === "admin" ? "admin" : "viewer",
+    role: demoUser ? "viewer" : input.papel === "admin" ? "admin" : "viewer",
     provider: input.provider ?? "email",
     provider_id: input.providerId ?? null,
     updated_at: new Date().toISOString(),
@@ -260,13 +263,14 @@ async function syncUsuarioProjetoPapel(input: {
   usuarioId: string;
   projetoId?: string | null;
   papel?: AppUser["role"];
+  forceViewer?: boolean;
 }) {
   if (!input.projetoId) {
     return;
   }
 
   const supabase = getSupabaseAdminClient();
-  const papel = input.papel === "admin" ? "admin" : "viewer";
+  const papel = input.forceViewer ? "viewer" : input.papel === "admin" ? "admin" : "viewer";
   const { data: existing, error: readError } = await supabase
     .from("usuarios_projetos")
     .select("usuario_id")
@@ -404,6 +408,7 @@ async function ensureUsuarioHasProjeto(input: {
 export async function createUsuario(input: SaveUsuarioInput) {
   const supabase = getSupabaseAdminClient();
   const payload = sanitizeUsuarioPayload(input);
+  const demoUser = isDemoUser(input.email);
   const requestedProjetoIds = normalizeProjetoIds(input);
   const insertPayload = {
     ...payload,
@@ -429,13 +434,13 @@ export async function createUsuario(input: SaveUsuarioInput) {
         usuarioId: usuario.id,
         nome: input.nome,
         projetoIds: requestedProjetoIds,
-        papel: input.papel,
+        papel: demoUser ? "viewer" : input.papel,
       });
 
   await syncUsuarioProjetoPapeis({
     usuarioId: usuario.id,
     projetoIds,
-    papel: input.papel,
+    papel: demoUser ? "viewer" : input.papel,
   });
 
   return (await getUsuarioById(usuario.id)) ?? mapUsuarioToAppUser(usuario);
@@ -448,6 +453,7 @@ export async function updateUsuario(input: SaveUsuarioInput) {
 
   const supabase = getSupabaseAdminClient();
   const payload: Record<string, unknown> = sanitizeUsuarioPayload(input);
+  const demoUser = isDemoUser(input.email);
   const requestedProjetoIds = normalizeProjetoIds(input);
 
   if (input.senha?.trim()) {
@@ -471,13 +477,13 @@ export async function updateUsuario(input: SaveUsuarioInput) {
     usuarioId: usuario.id,
     nome: input.nome,
     projetoIds: requestedProjetoIds,
-    papel: input.papel,
+    papel: demoUser ? "viewer" : input.papel,
   });
 
   await syncUsuarioProjetoPapeis({
     usuarioId: usuario.id,
     projetoIds,
-    papel: input.papel,
+    papel: demoUser ? "viewer" : input.papel,
   });
 
   return (await getUsuarioById(usuario.id)) ?? mapUsuarioToAppUser(usuario);
@@ -501,6 +507,72 @@ export async function setUsuarioAtivo(usuarioId: string, ativo: boolean) {
   }
 
   return mapUsuarioToAppUser(data as Omit<UsuarioRow, "senha">);
+}
+
+export async function enforceDemoUserRestrictions(input?: {
+  usuarioId?: string | null;
+  email?: string | null;
+  projetoId?: string | null;
+}) {
+  const supabase = getSupabaseAdminClient();
+  const normalizedEmail = input?.email?.trim().toLowerCase() || "";
+  const shouldFilterByEmail = Boolean(normalizedEmail && isDemoUser(normalizedEmail));
+
+  const userIds = new Set<string>();
+  if (input?.usuarioId?.trim()) {
+    userIds.add(input.usuarioId.trim());
+  }
+
+  if (shouldFilterByEmail) {
+    const { data: byEmail } = await supabase
+      .from("usuarios")
+      .select("id")
+      .eq("email", normalizedEmail)
+      .limit(10);
+
+    for (const row of (byEmail ?? []) as Array<{ id: string | null }>) {
+      if (row.id) {
+        userIds.add(row.id);
+      }
+    }
+  }
+
+  if (!userIds.size && !shouldFilterByEmail) {
+    const { data: demoUsers } = await supabase
+      .from("usuarios")
+      .select("id")
+      .like("email", "demonstracao_%");
+
+    for (const row of (demoUsers ?? []) as Array<{ id: string | null }>) {
+      if (row.id) {
+        userIds.add(row.id);
+      }
+    }
+  }
+
+  const normalizedUserIds = Array.from(userIds);
+  if (!normalizedUserIds.length) {
+    return;
+  }
+
+  await supabase
+    .from("usuarios")
+    .update({
+      role: "viewer",
+      updated_at: new Date().toISOString(),
+    } as never)
+    .in("id", normalizedUserIds);
+
+  let membershipQuery = supabase
+    .from("usuarios_projetos")
+    .update({ papel: "viewer" } as never)
+    .in("usuario_id", normalizedUserIds);
+
+  if (input?.projetoId?.trim()) {
+    membershipQuery = membershipQuery.eq("projeto_id", input.projetoId.trim());
+  }
+
+  await membershipQuery;
 }
 
 export async function deleteUsuario(usuarioId: string) {

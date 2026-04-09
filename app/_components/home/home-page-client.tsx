@@ -87,6 +87,26 @@ export function HomePageClient({
               ? "Nao foi possivel concluir o login social."
             : null;
 
+  const ensureDemoSession = async (email: string) => {
+    const response = await fetch("/api/auth/demo-create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        senha: "123",
+      }),
+    }).catch(() => null);
+
+    if (!response?.ok) {
+      return null;
+    }
+
+    const payload = (await response.json().catch(() => ({}))) as { projectId?: string };
+    return payload.projectId?.trim() || null;
+  };
+
   const isConversionLocked = () => {
     if (typeof window === "undefined") {
       return false;
@@ -244,28 +264,13 @@ export function HomePageClient({
     let cancelled = false;
 
     const syncDemoSession = async () => {
-      const response = await fetch("/api/auth/demo-create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: currentUser.email,
-          senha: "123",
-        }),
-      }).catch(() => null);
-
-      if (!response?.ok || cancelled) {
+      const projectId = await ensureDemoSession(currentUser.email);
+      if (!projectId || cancelled) {
         return;
       }
-
-      const payload = (await response.json().catch(() => ({}))) as { projectId?: string };
       window.sessionStorage.setItem(DEMO_SESSION_SYNC_KEY, String(Date.now()));
       window.localStorage.setItem(DEMO_USER_STORAGE_KEY, currentUser.email);
-
-      if (payload.projectId) {
-        window.localStorage.setItem(DEMO_PROJECT_STORAGE_KEY, payload.projectId);
-      }
+      window.localStorage.setItem(DEMO_PROJECT_STORAGE_KEY, projectId);
     };
 
     void syncDemoSession();
@@ -339,22 +344,12 @@ export function HomePageClient({
     setDemoLoginLoading(true);
 
     if (currentUser && isDemoUser(currentUser.email)) {
-      const response = await fetch("/api/auth/demo-create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: currentUser.email,
-          senha: "123",
-        }),
-      }).catch(() => null);
-      const payload = response?.ok ? (((await response.json().catch(() => ({}))) as { projectId?: string })) : {};
-      if (typeof window !== "undefined" && payload.projectId) {
-        window.localStorage.setItem(DEMO_PROJECT_STORAGE_KEY, payload.projectId);
+      const projectId = await ensureDemoSession(currentUser.email);
+      if (typeof window !== "undefined" && projectId) {
+        window.localStorage.setItem(DEMO_PROJECT_STORAGE_KEY, projectId);
       }
       setDemoLoginLoading(false);
-      router.push(payload.projectId ? `/admin/projetos/${payload.projectId}` : "/admin/projetos");
+      router.push(projectId ? `/admin/projetos/${projectId}` : "/admin/projetos");
       return;
     }
 
@@ -375,32 +370,8 @@ export function HomePageClient({
       email = `demonstracao_${Date.now()}@demo.com`;
     }
 
-    let result = await signInWithProjectAuth(email, senha);
-
-    if (!result.user) {
-      const response = await fetch("/api/auth/demo-create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          senha,
-        }),
-      });
-
-      if (!response.ok) {
-        if (typeof window !== "undefined") {
-          window.localStorage.removeItem(DEMO_USER_STORAGE_KEY);
-        }
-        setDemoLoginLoading(false);
-        return;
-      }
-
-      result = await signInWithProjectAuth(email, senha);
-    }
-
-    if (!result.user) {
+    const projectId = await ensureDemoSession(email);
+    if (!projectId) {
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(DEMO_USER_STORAGE_KEY);
       }
@@ -408,28 +379,12 @@ export function HomePageClient({
       return;
     }
 
-    const demoCreateResponse = await fetch("/api/auth/demo-create", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email,
-        senha,
-      }),
-    }).catch(() => null);
-
-    const createdProjectId = demoCreateResponse?.ok
-      ? (((await demoCreateResponse.json().catch(() => ({}))) as { projectId?: string }).projectId ?? null)
-      : null;
-
-    if (typeof window !== "undefined" && createdProjectId) {
-      window.localStorage.setItem(DEMO_PROJECT_STORAGE_KEY, createdProjectId);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(DEMO_PROJECT_STORAGE_KEY, projectId);
     }
 
-    setCurrentUser(result.user);
     setDemoLoginLoading(false);
-    router.push(createdProjectId ? `/admin/projetos/${createdProjectId}` : "/admin/projetos");
+    router.push(`/admin/projetos/${projectId}`);
   };
 
   const openPreferredChat = () => {

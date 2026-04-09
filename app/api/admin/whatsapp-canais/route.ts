@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { canAccessAdmin, canAccessGlobalAdmin, canAccessProject, canManageProject, resolveCurrentProjectId } from "@/lib/access";
 import { getAgenteById } from "@/lib/agentes";
-import { canDemoUserEditProject, isDemoProjectMutationBlocked, isDemoProjectReadRestricted } from "@/lib/demo-project-guard";
+import { getDemoProjectMutationBlockReason, isDemoProjectReadRestricted } from "@/lib/demo-project-guard";
 import { getSessionUser } from "@/lib/session";
 import { createWhatsAppChannel, deleteWhatsAppChannel, getWhatsAppChannelById, getWhatsAppChannelByProject, listWhatsAppChannels, updateWhatsAppChannel, WhatsAppChannelError } from "@/lib/whatsapp-channels";
 
@@ -31,7 +31,7 @@ async function validateProjectAccess(projetoId: string | null | undefined) {
 
   const resolvedProjectId = resolveRequestedProjectId(user, projetoId);
   const canManageResolvedProject = resolvedProjectId
-    ? canManageProject(user, resolvedProjectId) || await canDemoUserEditProject(user?.email, resolvedProjectId)
+    ? canManageProject(user, resolvedProjectId)
     : false;
   if (!resolvedProjectId || !canManageResolvedProject || !canAccessProject(user, resolvedProjectId)) {
     return { user, error: NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 }) };
@@ -103,8 +103,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: projectRuleError }, { status: 409 });
   }
 
-  if (await isDemoProjectMutationBlocked(access.user?.email, access.projetoId)) {
-    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
+  const createBlockReason = await getDemoProjectMutationBlockReason(access.user?.email, access.projetoId);
+  if (createBlockReason) {
+    return NextResponse.json(
+      { error: createBlockReason === "DEMO_EXPIRED" ? "DEMO_EXPIRED" : "Modo demonstracao: crie uma conta para editar e salvar." },
+      { status: 403 },
+    );
   }
 
   try {
@@ -157,8 +161,12 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: projectRuleError }, { status: 409 });
   }
 
-  if (await isDemoProjectMutationBlocked(access.user?.email, access.projetoId)) {
-    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
+  const updateBlockReason = await getDemoProjectMutationBlockReason(access.user?.email, access.projetoId);
+  if (updateBlockReason) {
+    return NextResponse.json(
+      { error: updateBlockReason === "DEMO_EXPIRED" ? "DEMO_EXPIRED" : "Modo demonstracao: crie uma conta para editar e salvar." },
+      { status: 403 },
+    );
   }
 
   try {
@@ -201,8 +209,12 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Projeto invalido para excluir canal WhatsApp." }, { status: 403 });
   }
 
-  if (await isDemoProjectMutationBlocked(access.user?.email, access.projetoId)) {
-    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
+  const deleteBlockReason = await getDemoProjectMutationBlockReason(access.user?.email, access.projetoId);
+  if (deleteBlockReason) {
+    return NextResponse.json(
+      { error: deleteBlockReason === "DEMO_EXPIRED" ? "DEMO_EXPIRED" : "Modo demonstracao: crie uma conta para editar e salvar." },
+      { status: 403 },
+    );
   }
 
   try {

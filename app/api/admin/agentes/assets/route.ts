@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { canAccessAdmin, canAccessGlobalAdmin, canManageProject, resolveCurrentProjectId } from "@/lib/access";
 import { createAgenteAsset, deleteAgenteAsset, getAgenteAssetById } from "@/lib/agente-assets";
 import { getAgenteById } from "@/lib/agentes";
-import { canDemoUserEditProject, isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
+import { canDemoUserEditProject, getDemoProjectMutationBlockReason } from "@/lib/demo-project-guard";
 import { getSessionUser } from "@/lib/session";
 
 export async function POST(request: Request) {
@@ -34,11 +34,20 @@ export async function POST(request: Request) {
   const agente = await getAgenteById(agenteId);
   const projetoId = canAccessGlobalAdmin(user) ? projetoIdFromBody ?? agente?.projetoId ?? null : resolveCurrentProjectId(user);
 
-  const canEditProjeto = projetoId
-    ? canManageProject(user, projetoId) || await canDemoUserEditProject(user?.email, projetoId)
-    : false;
-  if (!agente || !projetoId || agente.projetoId !== projetoId || !canEditProjeto) {
+  if (!agente || !projetoId || agente.projetoId !== projetoId || !canManageProject(user, projetoId)) {
     return NextResponse.json({ error: "Agente ou projeto invalido para upload." }, { status: 403 });
+  }
+
+  if (await canDemoUserEditProject(user?.email, projetoId)) {
+    return NextResponse.json({ error: "Modo demonstracao: upload de arquivos do agente bloqueado." }, { status: 403 });
+  }
+
+  const createBlockReason = await getDemoProjectMutationBlockReason(user?.email, projetoId);
+  if (createBlockReason) {
+    return NextResponse.json(
+      { error: createBlockReason === "DEMO_EXPIRED" ? "DEMO_EXPIRED" : "Modo demonstracao: crie uma conta para editar e salvar." },
+      { status: 403 },
+    );
   }
 
   const asset = await createAgenteAsset({
@@ -75,6 +84,18 @@ export async function DELETE(request: Request) {
 
   if (!canManageProject(user, asset.projetoId)) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
+  }
+
+  if (await canDemoUserEditProject(user?.email, asset.projetoId)) {
+    return NextResponse.json({ error: "Modo demonstracao: exclusao de arquivos do agente bloqueada." }, { status: 403 });
+  }
+
+  const deleteBlockReason = await getDemoProjectMutationBlockReason(user?.email, asset.projetoId);
+  if (deleteBlockReason) {
+    return NextResponse.json(
+      { error: deleteBlockReason === "DEMO_EXPIRED" ? "DEMO_EXPIRED" : "Modo demonstracao: crie uma conta para editar e salvar." },
+      { status: 403 },
+    );
   }
 
   const deleted = await deleteAgenteAsset(body.id);

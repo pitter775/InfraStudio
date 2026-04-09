@@ -25,6 +25,8 @@ type Projeto = {
   modeloId?: string | null;
   modeloNome?: string | null;
   isDemo?: boolean;
+  demoExpiresAt?: string | null;
+  demoStatus?: "ativo" | "expirado";
 };
 
 type ModeloDisponivel = {
@@ -639,6 +641,17 @@ function formatShortTimeLabel(value: string | null | undefined) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatDemoRemainingTime(ms: number) {
+  if (ms <= 0) {
+    return "00:00";
+  }
+
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 function isSameCalendarDay(left: Date, right: Date) {
@@ -4922,6 +4935,7 @@ export default function AdminProjetoDetalhePage() {
   const [feedbackBilling, setFeedbackBilling] = useState<string | null>(null);
   const [feedbackProjeto, setFeedbackProjeto] = useState<string | null>(null);
   const [demoBlockedModalOpen, setDemoBlockedModalOpen] = useState(false);
+  const [demoNow, setDemoNow] = useState(() => Date.now());
   const [savingProjetoModel, setSavingProjetoModel] = useState(false);
   const [agenteModalOpen, setAgenteModalOpen] = useState(false);
   const [apiModalOpen, setApiModalOpen] = useState(false);
@@ -5074,7 +5088,15 @@ export default function AdminProjetoDetalhePage() {
   };
 
   const currentUserIsDemo = isDemoUser(currentUser?.email);
-  const demoEditBlocked = currentUserIsDemo && data?.projeto.isDemo === true;
+  const demoExpiresAtMs = data?.projeto.demoExpiresAt ? new Date(data.projeto.demoExpiresAt).getTime() : Number.NaN;
+  const demoIsTimedProject = data?.projeto.isDemo === true && Number.isFinite(demoExpiresAtMs);
+  const demoExpired =
+    data?.projeto.isDemo === true &&
+    (data.projeto.demoStatus === "expirado" || (Number.isFinite(demoExpiresAtMs) && demoExpiresAtMs <= demoNow));
+  const demoTimeRemainingMs = demoIsTimedProject ? Math.max(0, demoExpiresAtMs - demoNow) : 0;
+  const demoTimeRemainingLabel = demoIsTimedProject ? formatDemoRemainingTime(demoTimeRemainingMs) : null;
+  const demoWarningActive = demoIsTimedProject && !demoExpired && demoTimeRemainingMs <= 5 * 60 * 1000;
+  const demoEditBlocked = demoExpired;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -5082,6 +5104,28 @@ export default function AdminProjetoDetalhePage() {
     }
     void loadProjeto();
   }, [params.id]);
+
+  useEffect(() => {
+    if (!demoIsTimedProject || demoExpired) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setDemoNow(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [demoExpired, demoIsTimedProject]);
+
+  useEffect(() => {
+    if (!demoExpired) {
+      return;
+    }
+
+    setDemoBlockedModalOpen(true);
+  }, [demoExpired]);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -7878,6 +7922,50 @@ export default function AdminProjetoDetalhePage() {
           Seu projeto foi criado com base na demonstracao.
         </section>
       ) : null}
+      {data?.projeto.isDemo ? (
+        <section
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            demoExpired
+              ? "border-rose-500/20 bg-rose-500/10 text-rose-100"
+              : demoWarningActive
+                ? "border-amber-400/20 bg-amber-500/10 text-amber-100"
+                : "border-cyan-400/20 bg-cyan-400/10 text-cyan-100"
+          }`}
+        >
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="font-semibold">
+                {demoExpired
+                  ? "Seu tempo de demonstracao acabou. Crie sua conta para continuar."
+                  : "Modo demonstracao ativo."}
+              </p>
+              <p className="mt-1 text-xs opacity-90">
+                {demoExpired
+                  ? "O backend bloqueou alteracoes neste projeto demo."
+                  : demoWarningActive
+                    ? "Faltam menos de 5 minutos para a demonstracao expirar."
+                    : "Tudo liberado durante a janela de demonstracao."}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {demoTimeRemainingLabel ? (
+                <span className="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-white">
+                  {demoExpired ? "expirado" : `restante ${demoTimeRemainingLabel}`}
+                </span>
+              ) : null}
+              {demoExpired ? (
+                <button
+                  type="button"
+                  onClick={() => handleDemoAuthRedirect("cadastro")}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14"
+                >
+                  CRIAR CONTA
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
       <section className="px-1 py-1">
           <div className="space-y-3">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -8777,8 +8865,12 @@ export default function AdminProjetoDetalhePage() {
         <div className="fixed inset-0 z-[96] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
           <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-white/10 bg-brand-dark shadow-2xl">
             <div className="border-b border-white/10 px-6 py-5">
-              <h2 className="text-2xl font-bold text-white">Modo demonstracao</h2>
-              <p className="mt-2 text-sm text-slate-300">Voce esta em modo demonstracao. Crie uma conta para editar e salvar.</p>
+              <h2 className="text-2xl font-bold text-white">{demoExpired ? "Demonstracao expirada" : "Modo demonstracao"}</h2>
+              <p className="mt-2 text-sm text-slate-300">
+                {demoExpired
+                  ? "Seu tempo de demonstracao acabou. Crie sua conta para continuar."
+                  : "Voce esta em modo demonstracao. Crie uma conta para editar e salvar."}
+              </p>
             </div>
             <div className="flex flex-wrap gap-3 px-6 py-6">
               <button
@@ -8786,7 +8878,7 @@ export default function AdminProjetoDetalhePage() {
                 onClick={() => handleDemoAuthRedirect("cadastro")}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.12)] transition-all hover:border-sky-300/30 hover:bg-sky-400/14"
               >
-                Criar conta
+                CRIAR CONTA
               </button>
               <button
                 type="button"
@@ -8795,13 +8887,15 @@ export default function AdminProjetoDetalhePage() {
               >
                 Fazer login
               </button>
-              <button
-                type="button"
-                onClick={() => setDemoBlockedModalOpen(false)}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/10"
-              >
-                Continuar testando
-              </button>
+              {!demoExpired ? (
+                <button
+                  type="button"
+                  onClick={() => setDemoBlockedModalOpen(false)}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.18)] transition-all hover:border-white/20 hover:bg-white/10"
+                >
+                  Continuar testando
+                </button>
+              ) : null}
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 ﻿import { getAgenteById, getAgenteByIdentifier, type AgenteRecord } from "@/lib/agentes";
 import { appendChatRequestLog, appendSystemLog } from "@/lib/chat-logs";
+import { getAgenteAtivo } from "@/lib/agentes";
 import { buildChatUsageTelemetry } from "@/lib/chat-usage-metrics";
 import {
   appendOptionalHumanOffer,
@@ -615,7 +616,9 @@ async function validateChatAgainstResolvedChannel(input: {
   }
 
   const lockedAgentIdFromContext = getLockedAgentIdFromChatContext(chat);
-  const expectedAgentId = lockedAgentIdFromContext ?? chat.agenteId ?? resolved.agente?.id ?? null;
+  const expectedAgentId = resolved.lockedToAgent
+    ? resolved.agente?.id ?? null
+    : lockedAgentIdFromContext ?? chat.agenteId ?? resolved.agente?.id ?? null;
 
   if (expectedAgentId && chat.agenteId !== expectedAgentId) {
     await appendRuntimeErrorLog({
@@ -685,7 +688,11 @@ async function resolveChatChannel(body: ChatRequestBody): Promise<ResolvedChatCh
 
   if (projetoIdentifier) {
     const projeto = await getProjetoByIdentifier(projetoIdentifier);
-    let agente = agenteIdentifier ? await getAgenteByIdentifier(agenteIdentifier, projeto?.id ?? null) : null;
+    let agente = agenteIdentifier
+      ? await getAgenteByIdentifier(agenteIdentifier, projeto?.id ?? null)
+      : projeto?.id
+        ? await getAgenteAtivo(projeto.id)
+        : null;
 
     if (agente && (!agente.ativo || agente.projetoId !== projeto?.id)) {
       agente = null;
@@ -726,7 +733,12 @@ async function resolveChatChannel(body: ChatRequestBody): Promise<ResolvedChatCh
 
   const projeto = await getProjetoById(widget.projetoId);
   const widgetAgent = widget?.agenteId && projeto ? await getAgenteById(widget.agenteId) : null;
-  const agente = widgetAgent && widgetAgent.ativo && widgetAgent.projetoId === projeto?.id ? widgetAgent : null;
+  const agente =
+    widgetAgent && widgetAgent.ativo && widgetAgent.projetoId === projeto?.id
+      ? widgetAgent
+      : projeto?.id
+        ? await getAgenteAtivo(projeto.id)
+        : null;
 
   return {
     projeto,
@@ -1059,6 +1071,9 @@ export async function processIncomingChatMessage(body: ChatRequestBody) {
 
     authoritativeAgent = currentAgent;
   }
+
+  console.log("AGENTE USADO:", authoritativeAgent?.id ?? null);
+  console.log("PROMPT:", authoritativeAgent?.promptBase ?? "");
 
   const uploadedInboundAttachments =
     inboundAttachments.length && chat.id

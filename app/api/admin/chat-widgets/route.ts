@@ -3,7 +3,7 @@ import { canAccessAdmin, canAccessGlobalAdmin, canManageProject } from "@/lib/ac
 import { getAgenteById, listAgentes } from "@/lib/agentes";
 import { listApis } from "@/lib/apis";
 import { createChatWidget, deleteChatWidget, getChatWidgetById, getChatWidgetByProjectAgentBinding, listChatWidgets, updateChatWidget } from "@/lib/chat-widgets";
-import { canDemoUserEditProject, isDemoProjectMutationBlocked } from "@/lib/demo-project-guard";
+import { getDemoProjectMutationBlockReason } from "@/lib/demo-project-guard";
 import { listProjetos } from "@/lib/projetos";
 import { getSessionUser } from "@/lib/session";
 
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
   if (!body.projetoId) {
     return NextResponse.json({ error: "Selecione um projeto para o widget." }, { status: 400 });
   }
-  if (!canManageProject(user, body.projetoId) && !await canDemoUserEditProject(user?.email, body.projetoId)) {
+  if (!canManageProject(user, body.projetoId)) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
   }
 
@@ -95,6 +95,14 @@ export async function POST(request: Request) {
   const bindingError = await validateWidgetBinding(body.projetoId, body.agenteId!);
   if (bindingError) {
     return NextResponse.json({ error: bindingError }, { status: 409 });
+  }
+
+  const createBlockReason = await getDemoProjectMutationBlockReason(user?.email, body.projetoId);
+  if (createBlockReason) {
+    return NextResponse.json(
+      { error: createBlockReason === "DEMO_EXPIRED" ? "DEMO_EXPIRED" : "Modo demonstracao: crie uma conta para editar e salvar." },
+      { status: 403 },
+    );
   }
 
   const widget = await createChatWidget({
@@ -140,7 +148,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Selecione um projeto para o widget." }, { status: 400 });
   }
 
-  if (!canManageProject(user, projetoId) && !await canDemoUserEditProject(user?.email, projetoId)) {
+  if (!canManageProject(user, projetoId)) {
     return NextResponse.json({ error: "Acesso negado para este projeto." }, { status: 403 });
   }
 
@@ -156,6 +164,14 @@ export async function PUT(request: Request) {
   const bindingError = await validateWidgetBinding(projetoId, body.agenteId!, body.id);
   if (bindingError) {
     return NextResponse.json({ error: bindingError }, { status: 409 });
+  }
+
+  const updateBlockReason = await getDemoProjectMutationBlockReason(user?.email, projetoId);
+  if (updateBlockReason) {
+    return NextResponse.json(
+      { error: updateBlockReason === "DEMO_EXPIRED" ? "DEMO_EXPIRED" : "Modo demonstracao: crie uma conta para editar e salvar." },
+      { status: 403 },
+    );
   }
 
   const widget = await updateChatWidget({
@@ -204,8 +220,12 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Projeto invalido para excluir widget." }, { status: 403 });
   }
 
-  if (await isDemoProjectMutationBlocked(user?.email, body.projetoId)) {
-    return NextResponse.json({ error: "Modo demonstracao: crie uma conta para editar e salvar." }, { status: 403 });
+  const deleteBlockReason = await getDemoProjectMutationBlockReason(user?.email, body.projetoId);
+  if (deleteBlockReason) {
+    return NextResponse.json(
+      { error: deleteBlockReason === "DEMO_EXPIRED" ? "DEMO_EXPIRED" : "Modo demonstracao: crie uma conta para editar e salvar." },
+      { status: 403 },
+    );
   }
 
   const deleted = await deleteChatWidget(body.id);

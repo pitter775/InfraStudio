@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { appendSystemLog } from "@/lib/chat-logs";
 import { ensureDemoProjetoForUsuario } from "@/lib/projetos";
 import { createSession } from "@/lib/session";
-import { createUsuario, findUsuarioWithPasswordByEmail } from "@/lib/usuarios";
+import { createUsuario, enforceDemoUserRestrictions, findUsuarioWithPasswordByEmail } from "@/lib/usuarios";
 import { getUsuarioById, setUsuarioAtivo } from "@/lib/usuarios";
 import { isDemoUser } from "@/lib/demo-user";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -32,10 +33,10 @@ async function syncDemoProjectMembership(usuarioId: string, projetoId: string) {
   }
 
   if (existing) {
-    if ((existing as { papel?: string | null }).papel !== "admin") {
+    if ((existing as { papel?: string | null }).papel !== "viewer") {
       const { error: updateError } = await supabase
         .from("usuarios_projetos")
-        .update({ papel: "admin" } as never)
+        .update({ papel: "viewer" } as never)
         .eq("usuario_id", usuarioId)
         .eq("projeto_id", projetoId);
 
@@ -51,7 +52,7 @@ async function syncDemoProjectMembership(usuarioId: string, projetoId: string) {
   const { error } = await supabase.from("usuarios_projetos").insert({
     usuario_id: usuarioId,
     projeto_id: projetoId,
-    papel: "admin",
+    papel: "viewer",
     created_at: new Date().toISOString(),
   } as never);
 
@@ -83,6 +84,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email de demonstracao invalido." }, { status: 400 });
     }
 
+    await enforceDemoUserRestrictions();
+
     const existing = await findUsuarioWithPasswordByEmail(normalizedEmail);
     console.info("[auth] demo-create user lookup", {
       normalizedEmail,
@@ -99,13 +102,39 @@ export async function POST(request: Request) {
         ownerUserId: demoProjeto?.ownerUserId ?? null,
       });
       if (!demoProjeto) {
+        await appendSystemLog({
+          tipo: "auth_demo_error",
+          origem: "api_auth_demo_create",
+          descricao: "Falha ao preparar o projeto demo para usuario existente.",
+          payload: {
+            email: normalizedEmail,
+            userId: existing.id,
+          },
+        });
         return NextResponse.json({ error: "Nao foi possivel preparar o projeto demo." }, { status: 500 });
       }
 
       const membershipEnsured = await syncDemoProjectMembership(existing.id, demoProjeto.id);
       if (!membershipEnsured) {
+        await appendSystemLog({
+          projetoId: demoProjeto.id,
+          tipo: "auth_demo_error",
+          origem: "api_auth_demo_create",
+          descricao: "Falha ao vincular usuario demo existente ao projeto demo.",
+          payload: {
+            email: normalizedEmail,
+            userId: existing.id,
+            projectId: demoProjeto.id,
+          },
+        });
         return NextResponse.json({ error: "Nao foi possivel vincular o usuario demo ao projeto." }, { status: 500 });
       }
+
+      await enforceDemoUserRestrictions({
+        usuarioId: existing.id,
+        email: normalizedEmail,
+        projetoId: demoProjeto.id,
+      });
 
       const refreshedUser = await getUsuarioById(existing.id);
       if (refreshedUser) {
@@ -143,13 +172,39 @@ export async function POST(request: Request) {
       ownerUserId: demoProjeto?.ownerUserId ?? null,
     });
     if (!demoProjeto) {
+      await appendSystemLog({
+        tipo: "auth_demo_error",
+        origem: "api_auth_demo_create",
+        descricao: "Falha ao preparar o projeto demo para novo usuario.",
+        payload: {
+          email: normalizedEmail,
+          userId: created.id,
+        },
+      });
       return NextResponse.json({ error: "Nao foi possivel preparar o projeto demo." }, { status: 500 });
     }
 
     const membershipEnsured = await syncDemoProjectMembership(created.id, demoProjeto.id);
     if (!membershipEnsured) {
+      await appendSystemLog({
+        projetoId: demoProjeto.id,
+        tipo: "auth_demo_error",
+        origem: "api_auth_demo_create",
+        descricao: "Falha ao vincular novo usuario demo ao projeto demo.",
+        payload: {
+          email: normalizedEmail,
+          userId: created.id,
+          projectId: demoProjeto.id,
+        },
+      });
       return NextResponse.json({ error: "Nao foi possivel vincular o usuario demo ao projeto." }, { status: 500 });
     }
+
+    await enforceDemoUserRestrictions({
+      usuarioId: created.id,
+      email: normalizedEmail,
+      projetoId: demoProjeto.id,
+    });
 
     const refreshedUser = await getUsuarioById(created.id);
     if (refreshedUser) {
@@ -161,6 +216,14 @@ export async function POST(request: Request) {
     console.error("[auth] demo-create failed", {
       error,
       message: error instanceof Error ? error.message : "unknown_error",
+    });
+    await appendSystemLog({
+      tipo: "auth_demo_error",
+      origem: "api_auth_demo_create",
+      descricao: "Falha no fluxo de criacao de demonstracao.",
+      payload: {
+        message: error instanceof Error ? error.message : "unknown_error",
+      },
     });
     if (error instanceof Error && /Supabase server environment variables are not configured/i.test(error.message)) {
       return NextResponse.json({ error: "Configuracao do banco nao foi carregada no servidor." }, { status: 503 });
